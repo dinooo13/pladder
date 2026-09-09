@@ -12,5 +12,8 @@ public protocol TextProcessor: Sendable {
     /// Human readable name for settings.
     var displayName: String { get }
 
+    /// One-line description shown under the toggle in settings.
+    var detail: String { get }
+
     func process(_ text: String) async throws -> String
 }

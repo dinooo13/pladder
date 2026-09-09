@@ -15,6 +15,11 @@ final class AppModel {
     let registry: EngineRegistry
     let coordinator: DictationCoordinator
 
+    /// Text processors in pipeline order. The single source of truth for both
+    /// the settings toggles (ids, display names, details) and the runtime
+    /// pipeline `makePipeline` builds below.
+    let processors: [any TextProcessor]
+
     /// Mirrored permission state, refreshed on a timer so the menu and the
     /// settings window stay correct after the user flips a switch in System
     /// Settings (neither API offers a change notification).
@@ -50,6 +55,7 @@ final class AppModel {
                 make: { FluidAudioEngine() }
             )
         )
+        #if DEBUG
         registry.register(
             EngineRegistry.Entry(
                 id: EchoEngine.engineID,
@@ -58,6 +64,7 @@ final class AppModel {
                 make: { EchoEngine() }
             )
         )
+        #endif
         self.registry = registry
 
         let store = SettingsStore(
@@ -70,6 +77,20 @@ final class AppModel {
         )
         self.store = store
 
+        // Processors, in pipeline order: the dictionary runs first so its
+        // output is what the optional language model sees, and whitespace is
+        // tidied last. This is the single place that order is defined; both
+        // the settings toggles and `makePipeline` below derive from it.
+        // `DictionaryReplacer`'s entries here are unused placeholders — its
+        // `id`/`displayName`/`detail` don't depend on them, and `makePipeline`
+        // rebuilds it from the live settings on every dictation.
+        let processorOrder: [any TextProcessor] = [
+            DictionaryReplacer(entries: []),
+            FoundationModelProcessor(),
+            WhitespaceNormalizer(),
+        ]
+        self.processors = processorOrder
+
         let events = self.events
         coordinator = DictationCoordinator(
             settings: store.load(),
@@ -78,13 +99,11 @@ final class AppModel {
             output: PasteboardOutput(),
             hotkeyMonitor: GlobalHotkeyMonitor(),
             makePipeline: { s in
-                // Order matters: the dictionary runs first so its output is what
-                // the optional language model sees, and whitespace is tidied last.
-                ProcessorPipeline([
-                    DictionaryReplacer(entries: s.dictionary),
-                    FoundationModelProcessor(),
-                    WhitespaceNormalizer(),
-                ])
+                ProcessorPipeline(processorOrder.map { processor in
+                    processor.id == DictionaryReplacer.processorID
+                        ? DictionaryReplacer(entries: s.dictionary)
+                        : processor
+                })
             },
             onEvent: { [events] event in events.send(event) }
         )
@@ -109,14 +128,7 @@ final class AppModel {
         }
         overlay.start()
         coordinator.start()
-
-        permissionTask?.cancel()
-        permissionTask = Task { [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(2))
-                self?.refreshPermissions()
-            }
-        }
+        startPermissionMirroring()
     }
 
     func stop() {
@@ -145,9 +157,33 @@ final class AppModel {
     var needsMicrophone: Bool { microphoneStatus != .authorized }
     var needsAnyPermission: Bool { needsAccessibility || needsMicrophone }
 
+    /// Polls permission status every 2s until both Accessibility and
+    /// Microphone are granted, then stops. Neither API offers a change
+    /// notification, so this is how the menu and settings window notice a
+    /// permission flipped in System Settings. Re-armed by
+    /// `grantAccessibility()` and `grantMicrophone()` so a later revoke is
+    /// picked up again.
+    private func startPermissionMirroring() {
+        refreshPermissions()
+        guard needsAnyPermission else {
+            permissionTask?.cancel()
+            return
+        }
+        permissionTask?.cancel()
+        permissionTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(2))
+                guard let self else { return }
+                self.refreshPermissions()
+                if !self.needsAnyPermission { return }
+            }
+        }
+    }
+
     func grantAccessibility() {
         Permissions.requestAccessibility()
         Permissions.openAccessibilitySettings()
+        startPermissionMirroring()
     }
 
     func grantMicrophone() {
@@ -158,14 +194,23 @@ final class AppModel {
                 Permissions.openMicrophoneSettings()
             }
             self?.refreshPermissions()
+            self?.startPermissionMirroring()
         }
     }
+
+    /// Set when `setLaunchAtLogin` fails, so settings can show the reason
+    /// under the toggle. `LaunchAtLogin.isEnabled` is the source of truth for
+    /// the toggle itself, since it can be changed behind the app's back in
+    /// System Settings.
+    private(set) var launchAtLoginError: String?
 
     func setLaunchAtLogin(_ enabled: Bool) {
         do {
             try LaunchAtLogin.setEnabled(enabled)
+            launchAtLoginError = nil
             settings.launchAtLogin = enabled
         } catch {
+            launchAtLoginError = error.localizedDescription
             settings.launchAtLogin = LaunchAtLogin.isEnabled
         }
     }

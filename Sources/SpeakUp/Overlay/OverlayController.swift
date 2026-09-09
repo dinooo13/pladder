@@ -49,16 +49,23 @@ final class OverlayController {
     }
 
     private func apply(_ state: DictationState) {
-        model.state = state
         switch state {
         case .recording, .transcribing, .inserting:
+            model.state = state
             cancelHide()
             present()
         case .error:
+            model.state = state
             cancelHide()
             present()
             scheduleHide(after: .seconds(2))
         case .idle, .unavailable:
+            // Deliberately *not* updating the model here: `.inserting` now lasts
+            // only a few milliseconds (the pasteboard restore no longer blocks
+            // it), so swapping to the empty idle pill on the way out would make
+            // the "Done" tick flash. Keep the last content on screen and let the
+            // pill fade out with it; the next `present()` sets fresh content
+            // before the panel is shown again.
             guard visible else { return }
             scheduleHide(after: .milliseconds(400))
         }

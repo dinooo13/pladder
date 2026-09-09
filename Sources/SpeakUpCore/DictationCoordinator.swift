@@ -13,9 +13,23 @@ public final class DictationCoordinator {
     public private(set) var lastTranscript: Transcript?
     public private(set) var lastError: String?
 
+    /// The transcribe → process → insert work for the most recent release.
+    /// Exposed so callers (and tests) can await completion of a cycle.
+    public private(set) var inFlight: Task<Void, Never>?
+
     public var settings: Settings {
         didSet { settingsChanged(from: oldValue) }
     }
+
+    /// Minimum recording length worth transcribing. Taps shorter than this are
+    /// treated as accidental.
+    public var minimumDuration: TimeInterval = 0.3
+    /// Recordings are cut off after this long. A release event can be lost for
+    /// real, for example while a secure password field has focus and global
+    /// monitors receive nothing, and this keeps the microphone from staying on.
+    public var maximumDuration: Duration = .seconds(120)
+    /// How long an error stays on screen before returning to idle.
+    public var errorDisplayDuration: Duration = .seconds(2)
 
     private var engine: any TranscriptionEngine
     private let capture: any AudioCapture
@@ -29,9 +43,7 @@ public final class DictationCoordinator {
     private var levelTask: Task<Void, Never>?
     private var statusTask: Task<Void, Never>?
     private var errorResetTask: Task<Void, Never>?
-    /// Minimum recording length worth transcribing. Taps shorter than this are
-    /// treated as accidental.
-    public var minimumDuration: TimeInterval = 0.3
+    private var maxDurationTask: Task<Void, Never>?
 
     public enum Event: Sendable {
         case recordingStarted
@@ -76,9 +88,12 @@ public final class DictationCoordinator {
         hotkeyMonitor.stop()
         statusTask?.cancel()
         levelTask?.cancel()
+        errorResetTask?.cancel()
+        maxDurationTask?.cancel()
+        if state.isRecording {
+            Task { await cancelRecording() }
+        }
     }
-
-    public var engineDisplayName: String { engine.displayName }
 
     /// Re-run engine load, for example after a failed download.
     public func reloadEngine() {
@@ -88,35 +103,42 @@ public final class DictationCoordinator {
     private func loadEngine() {
         statusTask?.cancel()
         let engine = self.engine
+        // The poll is the single writer of `engineStatus` while loading, so the
+        // failure text always comes from the engine itself.
         statusTask = Task { [weak self] in
             guard let self else { return }
-            await self.pollStatus(of: engine, until: { $0.isReady || self.isFailed($0) })
+            await self.pollStatus(of: engine)
         }
         Task { [weak self] in
             guard let self else { return }
             do {
                 try await engine.load()
             } catch {
-                self.setEngineStatus(.failed(message: error.localizedDescription))
+                let status = await engine.status
+                if case .failed = status {
+                    self.setEngineStatus(status)
+                } else {
+                    self.setEngineStatus(.failed(message: error.localizedDescription))
+                }
+                self.statusTask?.cancel()
                 return
             }
-            let status = await engine.status
-            self.setEngineStatus(status)
+            self.setEngineStatus(await engine.status)
+            self.statusTask?.cancel()
         }
-    }
-
-    private func isFailed(_ status: EngineStatus) -> Bool {
-        if case .failed = status { return true }
-        return false
     }
 
     /// Cheap polling of the engine's status while it loads, so the UI can show
     /// download progress without every engine needing to expose a stream.
-    private func pollStatus(of engine: any TranscriptionEngine, until done: @escaping (EngineStatus) -> Bool) async {
+    private func pollStatus(of engine: any TranscriptionEngine) async {
         while !Task.isCancelled {
             let status = await engine.status
+            guard !Task.isCancelled else { return }
             setEngineStatus(status)
-            if done(status) { return }
+            switch status {
+            case .ready, .failed: return
+            default: break
+            }
             try? await Task.sleep(for: .milliseconds(250))
         }
     }
@@ -135,13 +157,20 @@ public final class DictationCoordinator {
 
     private func settingsChanged(from old: Settings) {
         if old.hotkey != settings.hotkey {
+            // The old key's release will never arrive on the new stream.
+            if state.isRecording {
+                Task { await cancelRecording() }
+            }
             startHotkey()
         }
         if old.engineID != settings.engineID, let next = registry.make(settings.engineID) {
             let previous = engine
             Task { await previous.unload() }
             engine = next
-            state = .unavailable(reason: "Loading model")
+            engineStatus = .unloaded
+            // Leave a recording or transcription alone; the poll moves the
+            // state once the new engine reports.
+            if !state.isBusy { state = .unavailable(reason: "Loading model") }
             loadEngine()
         }
     }
@@ -157,7 +186,7 @@ public final class DictationCoordinator {
                 guard let self else { return }
                 switch event {
                 case .pressed: await self.hotkeyPressed()
-                case .released: await self.hotkeyReleased()
+                case .released: self.hotkeyReleased()
                 }
             }
         }
@@ -167,9 +196,16 @@ public final class DictationCoordinator {
     public func hotkeyPressed() async {
         guard case .idle = state else { return }
         guard engineStatus.isReady else { return }
+        // Flip state before the await so the overlay reacts on key-down and a
+        // second concurrent press cannot start capture twice.
+        state = .recording(level: 0)
         do {
             let levels = try await capture.start()
-            state = .recording(level: 0)
+            guard state.isRecording else {
+                // Cancelled or superseded while the mic was starting.
+                _ = await capture.stop()
+                return
+            }
             onEvent(.recordingStarted)
             levelTask?.cancel()
             levelTask = Task { [weak self] in
@@ -178,28 +214,43 @@ public final class DictationCoordinator {
                     self.state = .recording(level: level)
                 }
             }
+            maxDurationTask?.cancel()
+            maxDurationTask = Task { [weak self, maximumDuration] in
+                try? await Task.sleep(for: maximumDuration)
+                guard let self, !Task.isCancelled, self.state.isRecording else { return }
+                self.hotkeyReleased()
+            }
         } catch {
             fail("Microphone: \(error.localizedDescription)")
         }
     }
 
-    public func hotkeyReleased() async {
+    /// Returns immediately; the transcription runs in `inFlight`. Presses that
+    /// arrive while it runs are dropped by the `.idle` guard rather than queued.
+    public func hotkeyReleased() {
         guard state.isRecording else { return }
         levelTask?.cancel()
+        maxDurationTask?.cancel()
         state = .transcribing
         onEvent(.recordingStopped)
-        let audio = await capture.stop()
+        inFlight = Task { [weak self] in
+            guard let self else { return }
+            let audio = await self.capture.stop()
+            await self.finish(audio)
+        }
+    }
 
+    private func finish(_ audio: CapturedAudio) async {
         guard audio.duration >= minimumDuration else {
             state = .idle
             return
         }
-
         do {
             let transcript = try await engine.transcribe(audio.samples)
             lastTranscript = transcript
             let settings = self.settings
-            let processed = try await makePipeline(settings).run(transcript.text, disabled: settings.disabledProcessors)
+            let processed = try await makePipeline(settings)
+                .run(transcript.text, disabled: settings.disabledProcessors)
             guard !processed.isEmpty else {
                 state = .idle
                 return
@@ -221,8 +272,9 @@ public final class DictationCoordinator {
     public func cancelRecording() async {
         guard state.isRecording else { return }
         levelTask?.cancel()
-        _ = await capture.stop()
+        maxDurationTask?.cancel()
         state = .idle
+        _ = await capture.stop()
     }
 
     private func fail(_ message: String) {
@@ -230,9 +282,9 @@ public final class DictationCoordinator {
         state = .error(message: message)
         onEvent(.failed(message))
         errorResetTask?.cancel()
-        errorResetTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(2))
-            guard let self, case .error = self.state else { return }
+        errorResetTask = Task { [weak self, errorDisplayDuration] in
+            try? await Task.sleep(for: errorDisplayDuration)
+            guard let self, !Task.isCancelled, case .error = self.state else { return }
             self.state = self.engineStatus.isReady ? .idle : .unavailable(reason: "Model not loaded")
         }
     }

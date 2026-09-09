@@ -16,6 +16,7 @@ public struct DictionaryReplacer: TextProcessor {
 
     public let id = DictionaryReplacer.processorID
     public let displayName = "Dictionary"
+    public let detail = "Applies your replacement rules. Edit them in the Dictionary tab."
 
     private let rules: [Rule]
 

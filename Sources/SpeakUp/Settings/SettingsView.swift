@@ -58,7 +58,15 @@ private struct GeneralSettingsView: View {
             Section("Output") {
                 Toggle("Append a space after each dictation", isOn: $model.settings.appendTrailingSpace)
                 Toggle("Play start and stop sounds", isOn: $model.settings.playSounds)
-                Toggle("Launch at login", isOn: launchAtLogin)
+                VStack(alignment: .leading, spacing: 2) {
+                    Toggle("Launch at login", isOn: launchAtLogin)
+                    if let error = model.launchAtLoginError {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
             }
 
             Section("Permissions") {
@@ -82,7 +90,7 @@ private struct GeneralSettingsView: View {
 
     private var launchAtLogin: Binding<Bool> {
         Binding(
-            get: { model.settings.launchAtLogin },
+            get: { LaunchAtLogin.isEnabled },
             set: { model.setLaunchAtLogin($0) }
         )
     }
@@ -99,38 +107,14 @@ private struct GeneralSettingsView: View {
 private struct ProcessingSettingsView: View {
     @Bindable var model: AppModel
 
-    private struct ProcessorInfo: Identifiable {
-        let id: String
-        let title: String
-        let detail: String
-    }
-
-    /// Listed in pipeline order. IDs must match the processors the app builds.
-    private static let processors: [ProcessorInfo] = [
-        ProcessorInfo(
-            id: DictionaryReplacer.processorID,
-            title: "Dictionary",
-            detail: "Applies your replacement rules. Edit them in the Dictionary tab."
-        ),
-        ProcessorInfo(
-            id: WhitespaceNormalizer.processorID,
-            title: "Tidy whitespace",
-            detail: "Trims the transcript and collapses runs of spaces."
-        ),
-        ProcessorInfo(
-            id: "foundation-model",
-            title: "Apple Intelligence cleanup",
-            detail: "Fixes punctuation and capitalisation with the on-device model. Adds about a second. Requires Apple Intelligence."
-        ),
-    ]
-
     var body: some View {
         Form {
             Section {
-                ForEach(Self.processors) { processor in
+                ForEach(model.processors, id: \.id) { processor in
                     VStack(alignment: .leading, spacing: 2) {
-                        Toggle(processor.title, isOn: binding(for: processor.id))
-                        Text(processor.detail)
+                        Toggle(processor.displayName, isOn: binding(for: processor.id))
+                            .disabled(isDisabled(processor))
+                        Text(unavailabilityReason(for: processor) ?? processor.detail)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -153,6 +137,15 @@ private struct ProcessingSettingsView: View {
             get: { !model.settings.disabledProcessors.contains(id) },
             set: { model.settings.setProcessor(id, enabled: $0) }
         )
+    }
+
+    private func isDisabled(_ processor: any TextProcessor) -> Bool {
+        unavailabilityReason(for: processor) != nil
+    }
+
+    private func unavailabilityReason(for processor: any TextProcessor) -> String? {
+        guard processor.id == FoundationModelProcessor.processorID else { return nil }
+        return FoundationModelProcessor.availability
     }
 }
 

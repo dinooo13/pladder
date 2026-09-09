@@ -32,6 +32,23 @@ public struct Settings: Codable, Sendable, Equatable {
         self.playSounds = playSounds
     }
 
+    // Decoding tolerates missing keys so adding a field in a later version
+    // never makes an existing settings file unreadable.
+    private enum CodingKeys: String, CodingKey {
+        case engineID, hotkey, disabledProcessors, dictionary, appendTrailingSpace, launchAtLogin, playSounds
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        engineID = try c.decode(EngineID.self, forKey: .engineID)
+        hotkey = try c.decodeIfPresent(Hotkey.self, forKey: .hotkey) ?? .rightOption
+        disabledProcessors = try c.decodeIfPresent(Set<String>.self, forKey: .disabledProcessors) ?? []
+        dictionary = try c.decodeIfPresent([DictionaryEntry].self, forKey: .dictionary) ?? []
+        appendTrailingSpace = try c.decodeIfPresent(Bool.self, forKey: .appendTrailingSpace) ?? true
+        launchAtLogin = try c.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
+        playSounds = try c.decodeIfPresent(Bool.self, forKey: .playSounds) ?? true
+    }
+
     public func isProcessorEnabled(_ id: String) -> Bool {
         !disabledProcessors.contains(id)
     }
@@ -52,11 +69,18 @@ public final class SettingsStore: Sendable {
         self.defaults = defaults
     }
 
+    /// Returns the saved settings, or the defaults when there is no file. A
+    /// file that exists but cannot be decoded is moved aside rather than left
+    /// in place to be overwritten by the next save, so a user's dictionary is
+    /// never silently lost.
     public func load() -> Settings {
         guard let data = try? Data(contentsOf: url) else { return defaults }
         do {
             return try JSONDecoder().decode(Settings.self, from: data)
         } catch {
+            let broken = url.appendingPathExtension("broken")
+            try? FileManager.default.removeItem(at: broken)
+            try? FileManager.default.moveItem(at: url, to: broken)
             return defaults
         }
     }

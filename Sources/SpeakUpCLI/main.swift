@@ -1,5 +1,6 @@
 @preconcurrency import AVFoundation
 import Foundation
+import SpeakUpAudio
 import SpeakUpCore
 import SpeakUpEngines
 
@@ -8,27 +9,11 @@ import SpeakUpEngines
 
 func loadSamples(_ url: URL) throws -> [Float] {
     let file = try AVAudioFile(forReading: url)
-    guard let target = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1, interleaved: false),
-          let converter = AVAudioConverter(from: file.processingFormat, to: target),
-          let input = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length))
+    guard let input = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length))
     else { throw NSError(domain: "cli", code: 1, userInfo: [NSLocalizedDescriptionKey: "unsupported audio format"]) }
     try file.read(into: input)
-    let ratio = 16_000 / file.processingFormat.sampleRate
-    let capacity = AVAudioFrameCount(Double(input.frameLength) * ratio) + 1024
-    guard let output = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: capacity) else { throw NSError(domain: "cli", code: 2) }
-    // The converter pulls input synchronously on this thread; the flag only
-    // exists to hand the single buffer over once, then signal end of stream.
-    final class Once: @unchecked Sendable { var done = false }
-    let once = Once()
-    var error: NSError?
-    converter.convert(to: output, error: &error) { _, status in
-        if once.done { status.pointee = .endOfStream; return nil }
-        once.done = true
-        status.pointee = .haveData
-        return input
-    }
-    if let error { throw error }
-    return Array(UnsafeBufferPointer(start: output.floatChannelData![0], count: Int(output.frameLength)))
+    let target = try AudioResampler.monoFloat32Format()
+    return try AudioResampler.convert(input, to: target)
 }
 
 let args = CommandLine.arguments.dropFirst()

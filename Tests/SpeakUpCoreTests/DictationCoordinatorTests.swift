@@ -121,7 +121,9 @@ private func waitUntil(_ timeout: Duration = .seconds(2), _ condition: @MainActo
         #expect(c.state.isRecording)
         #expect(await capture.startCount == 1)
 
-        await c.hotkeyReleased()
+        c.hotkeyReleased()
+        #expect(c.state == .transcribing)
+        await c.inFlight?.value
         #expect(c.state == .idle)
         #expect(await capture.stopCount == 1)
         #expect(output.inserted == ["Hello, World! "])
@@ -135,7 +137,8 @@ private func waitUntil(_ timeout: Duration = .seconds(2), _ condition: @MainActo
         c.start()
         #expect(await waitUntil { c.state == .idle })
         await c.hotkeyPressed()
-        await c.hotkeyReleased()
+        c.hotkeyReleased()
+        await c.inFlight?.value
         #expect(output.inserted == ["hello world"])
     }
 
@@ -145,7 +148,8 @@ private func waitUntil(_ timeout: Duration = .seconds(2), _ condition: @MainActo
         c.start()
         #expect(await waitUntil { c.state == .idle })
         await c.hotkeyPressed()
-        await c.hotkeyReleased()
+        c.hotkeyReleased()
+        await c.inFlight?.value
         #expect(c.state == .idle)
         #expect(output.inserted.isEmpty)
     }
@@ -157,27 +161,31 @@ private func waitUntil(_ timeout: Duration = .seconds(2), _ condition: @MainActo
         await c.hotkeyPressed()
         await capture.emitLevel(0.7)
         #expect(await waitUntil { c.state == .recording(level: 0.7) })
-        await c.hotkeyReleased()
+        c.hotkeyReleased()
+        await c.inFlight?.value
     }
 
     @Test func outputFailureSurfacesErrorThenRecovers() async {
         let output = FakeOutput()
         output.shouldFail = true
         let (c, _, _) = makeCoordinator(output: output)
+        c.errorDisplayDuration = .milliseconds(50)
         c.start()
         #expect(await waitUntil { c.state == .idle })
         await c.hotkeyPressed()
-        await c.hotkeyReleased()
+        c.hotkeyReleased()
+        await c.inFlight?.value
         #expect(c.state == .error(message: "paste failed"))
         #expect(c.lastError == "paste failed")
-        #expect(await waitUntil(.seconds(3)) { c.state == .idle })
+        #expect(await waitUntil { c.state == .idle })
     }
 
     @Test func releaseWithoutPressIsNoop() async {
         let (c, output, capture) = makeCoordinator()
         c.start()
         #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyReleased()
+        c.hotkeyReleased()
+        await c.inFlight?.value
         #expect(c.state == .idle)
         #expect(await capture.stopCount == 0)
         #expect(output.inserted.isEmpty)
@@ -203,8 +211,76 @@ private func waitUntil(_ timeout: Duration = .seconds(2), _ condition: @MainActo
         c.start()
         #expect(await waitUntil { c.state == .idle })
         await c.hotkeyPressed()
-        await c.hotkeyReleased()
+        c.hotkeyReleased()
+        await c.inFlight?.value
         #expect(output.inserted == ["hello world"])
+    }
+
+    @Test func pressDuringTranscriptionIsDropped() async {
+        let (c, output, capture) = makeCoordinator()
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed()
+        c.hotkeyReleased()
+        // A second press while transcribing must not start the mic again.
+        await c.hotkeyPressed()
+        #expect(c.state == .transcribing)
+        await c.inFlight?.value
+        #expect(await capture.startCount == 1)
+        #expect(output.inserted.count == 1)
+    }
+
+    @Test func hotkeyChangeWhileRecordingStopsTheMicrophone() async {
+        let (c, output, capture) = makeCoordinator()
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed()
+        #expect(c.state.isRecording)
+        c.settings.hotkey = .rightCommand
+        #expect(await waitUntil { c.state == .idle })
+        #expect(await capture.stopCount == 1)
+        #expect(output.inserted.isEmpty)
+    }
+
+    @Test func engineChangeWhileRecordingKeepsTheCycleAlive() async {
+        var registry = EngineRegistry([
+            .init(id: EchoEngine.engineID, displayName: "Echo", detail: "") { EchoEngine(text: "one", delay: .milliseconds(5)) }
+        ])
+        registry.register(.init(id: EngineID("two"), displayName: "Two", detail: "") { EchoEngine(text: "two", delay: .milliseconds(5)) })
+        let output = FakeOutput()
+        let capture = FakeCapture()
+        var settings = Settings(engineID: EchoEngine.engineID)
+        settings.appendTrailingSpace = false
+        let c = DictationCoordinator(
+            settings: settings, registry: registry, capture: capture, output: output,
+            hotkeyMonitor: FakeHotkey(), makePipeline: { _ in ProcessorPipeline([]) })
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed()
+        c.settings.engineID = EngineID("two")
+        // Still recording: the switch must not clobber the state.
+        #expect(c.state.isRecording)
+        c.hotkeyReleased()
+        await c.inFlight?.value
+        #expect(await capture.stopCount == 1)
+        // The new engine may or may not be loaded by the time we transcribe; either
+        // way the cycle ends in a terminal state and the mic is off.
+        #expect(await waitUntil { c.state == .idle || !c.state.isBusy })
+        #expect(await waitUntil { c.engineStatus == .ready })
+        #expect(await waitUntil { c.state == .idle })
+    }
+
+    @Test func maximumDurationReleasesAutomatically() async {
+        let (c, output, capture) = makeCoordinator()
+        c.maximumDuration = .milliseconds(60)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed()
+        #expect(await waitUntil { c.state == .transcribing || c.state == .idle })
+        #expect(await waitUntil { c.inFlight != nil })
+        await c.inFlight?.value
+        #expect(await capture.stopCount == 1)
+        #expect(output.inserted.count == 1)
     }
 }
 
@@ -221,6 +297,27 @@ private func waitUntil(_ timeout: Duration = .seconds(2), _ condition: @MainActo
         changed.dictionary = [DictionaryEntry(from: "a", to: "b")]
         try store.save(changed)
         #expect(store.load() == changed)
+        try? FileManager.default.removeItem(at: dir)
+    }
+
+    @Test func missingKeysFallBackToDefaults() throws {
+        let json = #"{"engineID":"echo","dictionary":[{"id":"6E36117C-6200-4C7E-BFB8-6FA228542578","from":"a","to":"b","matchCase":false}]}"#
+        let decoded = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
+        #expect(decoded.engineID == EchoEngine.engineID)
+        #expect(decoded.dictionary.count == 1)
+        #expect(decoded.hotkey == .rightOption)
+        #expect(decoded.appendTrailingSpace == true)
+    }
+
+    @Test func unreadableFileIsMovedAsideNotOverwritten() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let url = dir.appendingPathComponent("settings.json")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try Data("not json".utf8).write(to: url)
+        let store = SettingsStore(url: url, defaults: Settings(engineID: EchoEngine.engineID))
+        _ = store.load()
+        #expect(!FileManager.default.fileExists(atPath: url.path))
+        #expect(FileManager.default.fileExists(atPath: url.appendingPathExtension("broken").path))
         try? FileManager.default.removeItem(at: dir)
     }
 }

@@ -43,7 +43,7 @@ let package = Package(
         ),
 
         // Developer tool: transcribe a file from the terminal to verify engines.
-        .executableTarget(name: "SpeakUpCLI", dependencies: ["SpeakUpCore", "SpeakUpEngines"]),
+        .executableTarget(name: "SpeakUpCLI", dependencies: ["SpeakUpCore", "SpeakUpEngines", "SpeakUpAudio"]),
 
         .testTarget(name: "SpeakUpCoreTests", dependencies: ["SpeakUpCore"]),
         .testTarget(name: "SpeakUpAudioTests", dependencies: ["SpeakUpAudio"]),

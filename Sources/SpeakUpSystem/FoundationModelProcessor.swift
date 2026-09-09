@@ -20,6 +20,7 @@ public struct FoundationModelProcessor: TextProcessor {
 
     public let id = FoundationModelProcessor.processorID
     public let displayName = "Apple Intelligence cleanup"
+    public let detail = "Fixes punctuation and capitalisation with the on-device model. Adds about a second. Requires Apple Intelligence."
 
     /// How long the model gets before we give up and paste the raw transcript.
     /// A second is typical; four seconds means something is wrong.

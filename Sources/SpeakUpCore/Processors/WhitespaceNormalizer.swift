@@ -6,6 +6,7 @@ public struct WhitespaceNormalizer: TextProcessor {
 
     public let id = WhitespaceNormalizer.processorID
     public let displayName = "Tidy whitespace"
+    public let detail = "Trims the transcript and collapses runs of spaces."
 
     public init() {}
 
