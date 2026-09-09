@@ -9,7 +9,9 @@ import SwiftUI
 /// becomes the key window, and `ignoresMouseEvents` so clicks fall through to
 /// whatever is underneath.
 final class OverlayPanel: NSPanel {
-    private static let size = NSSize(width: 220, height: 56)
+    /// Includes room around the capsule for its own drop shadow; the window
+    /// itself draws nothing, so nothing is clipped.
+    private static let size = NSSize(width: 260, height: 92)
 
     /// Bumped on every show/hide so a fade-out that is superseded by a new
     /// show does not order the window out afterwards.
@@ -30,7 +32,10 @@ final class OverlayPanel: NSPanel {
         isMovableByWindowBackground = false
         backgroundColor = .clear
         isOpaque = false
-        hasShadow = true
+        // The capsule draws its own shadow. A window shadow on a transparent
+        // panel is computed from the window's rectangle and shows up as a faint
+        // box around the pill.
+        hasShadow = false
         ignoresMouseEvents = true
         isReleasedWhenClosed = false
         animationBehavior = .none
@@ -85,7 +90,7 @@ final class OverlayPanel: NSPanel {
         guard let frame = screen?.frame else { return }
         let origin = NSPoint(
             x: frame.midX - Self.size.width / 2,
-            y: frame.minY + 80
+            y: frame.minY + 64
         )
         setFrame(NSRect(origin: origin, size: Self.size), display: false)
     }

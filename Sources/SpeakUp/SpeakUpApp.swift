@@ -60,7 +60,16 @@ private struct MenuContent: View {
 
         Divider()
 
-        Button("Settings…") { openSettings() }
+        Button("Settings…") {
+            // An accessory app is never active, so a plain openSettings() puts
+            // the window behind whatever the user was using.
+            NSApp.activate(ignoringOtherApps: true)
+            openSettings()
+            Task { @MainActor in
+                NSApp.activate(ignoringOtherApps: true)
+                NSApp.windows.first { $0.isVisible && $0.canBecomeKey }?.makeKeyAndOrderFront(nil)
+            }
+        }
             .keyboardShortcut(",", modifiers: .command)
 
         if model.needsAnyPermission {
