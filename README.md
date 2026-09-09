@@ -1,67 +1,151 @@
-# SpeakUp
+<p align="center">
+  <img src="Assets/icon_1024.png" width="160" alt="SpeakUp icon">
+</p>
 
-Minimal push-to-talk dictation for macOS. Hold Right Option, speak, release. The
-text lands in whatever app has focus. Everything runs on this Mac: NVIDIA
-Parakeet TDT v3 via [FluidAudio](https://github.com/FluidInference/FluidAudio) on
-the Neural Engine, a user dictionary for names and jargon, and an optional Apple
-Intelligence cleanup pass. No cloud, no accounts.
+<h1 align="center">SpeakUp</h1>
 
-Requires macOS 26 on Apple Silicon.
+<p align="center">
+  Push-to-talk dictation for macOS. Hold a key, speak, let go. The words land where your cursor is.<br>
+  Fast, private, and entirely on your Mac.
+</p>
 
-## Build and run
+<p align="center">
+  <a href="#install">Install</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#building-from-source">Build</a> ·
+  <a href="#customising">Customise</a> ·
+  <a href="#architecture">Architecture</a>
+</p>
+
+---
+
+## Why SpeakUp
+
+- **Hold to talk.** One key, no toggles, no windows to click. Hold Right Option (or Fn, or Right Command), speak, release. Works in every app that takes text.
+- **Fast.** NVIDIA's Parakeet TDT v3 runs on the Neural Engine through [FluidAudio](https://github.com/FluidInference/FluidAudio). A ten second sentence transcribes in well under half a second. The model stays loaded, so the first word is as quick as the last.
+- **Private.** Audio never leaves your Mac. There is no account, no cloud, no telemetry. The microphone is only open while the key is held, and macOS shows the orange indicator only then.
+- **Accurate with your words.** A dictionary fixes the names and jargon speech models get wrong. "clode code" becomes "Claude Code" every time.
+- **Native.** A menu bar app with a Liquid Glass status pill and a standard settings window. It looks and behaves like it shipped with the system.
+- **Multilingual.** Parakeet v3 handles 25 European languages and switches automatically. Dictate in English, German or Spanish in the same session.
+
+<p align="center">
+  <img src="docs/images/pill-recording.png" width="360" alt="Recording pill"> &nbsp;
+  <img src="docs/images/pill-transcribing.png" width="360" alt="Transcribing pill">
+</p>
+
+## Install
+
+**Requirements:** macOS 26 or later on Apple Silicon.
+
+There is no binary release yet. Build it yourself in about a minute:
 
 ```sh
-./scripts/bundle.sh --run      # release build, assembles and signs dist/SpeakUp.app, launches it
-swift test                     # unit tests (core state machine, dictionary, audio conversion)
-swift run speakup-cli file.wav # transcribe a file from the terminal to check the engine
+git clone https://github.com/dinooo13/speakup.git
+cd speakup
+./scripts/bundle.sh --install --run
 ```
 
-The first launch downloads about 700 MB of CoreML models into
-`~/Library/Application Support/FluidAudio/Models`. The menu bar icon shows
-progress and the hotkey stays disabled until the model is ready.
+That compiles a release build, wraps it into `SpeakUp.app`, signs it, copies it to `/Applications`, and launches it. SpeakUp lives in the menu bar; there is no Dock icon.
 
-### Permissions
+On first launch:
 
-SpeakUp needs two permissions, both requested on first launch:
+1. **Grant Microphone** when macOS asks. That is what records your voice.
+2. **Grant Accessibility** in System Settings when prompted. That is what lets SpeakUp see the push-to-talk key in other apps and paste the result.
+3. Wait for the model. The first run downloads about 700 MB of CoreML models from Hugging Face into `~/Library/Application Support/FluidAudio/Models`. The menu bar shows progress. This happens once.
 
-- **Microphone**, to record while the key is held.
-- **Accessibility**, for the global hotkey and for pasting into other apps.
+Then click into any text field, hold **Right Option**, say something, and let go.
 
-macOS ties both grants to the app's code signature. The bundle script signs with
-your Apple Development or Developer ID certificate when one is in the keychain,
-so rebuilds keep their permissions. With no certificate it falls back to an
-ad-hoc signature, which changes every build and makes macOS ask again. Force a
-specific identity with `CODESIGN_IDENTITY="Developer ID Application: …"` or
-`CODESIGN_IDENTITY=-` for ad-hoc.
+## How it works
 
-## Layout
+```
+hold key ──► microphone opens, pill shows your level
+release  ──► Parakeet transcribes on the Neural Engine
+         ──► your dictionary fixes names and terms
+         ──► text is pasted at the cursor, clipboard restored
+```
+
+The pill at the bottom of the screen tells you what is happening: a red dot and live level bars while recording, a spinner while transcribing, a tick when the text is in. It never takes focus from the app you are typing into.
+
+## Customising
+
+Open **Settings…** from the menu bar icon.
+
+| Tab | What you can change |
+|---|---|
+| **General** | Engine, push-to-talk key (Right Option, Right Command, Right Control, Fn), trailing space, sounds, launch at login. Shows permission status with a one-click fix. |
+| **Dictionary** | Replacement rules: what the model hears, what you want written, and whether case must match. Whole-word matching, longer phrases win, capitalisation carries over at the start of a sentence. Import and export as JSON. A test field shows the effect of your rules live. |
+| **Processing** | Toggle each post-processing step. Dictionary and whitespace tidying are on by default. **Apple Intelligence cleanup** uses the on-device Foundation Models framework to fix punctuation and capitalisation; it adds about a second and is off by default. |
+
+<p align="center">
+  <img src="docs/images/settings-general.png" width="300" alt="General settings"> &nbsp;
+  <img src="docs/images/settings-dictionary.png" width="300" alt="Dictionary settings"> &nbsp;
+  <img src="docs/images/settings-processing.png" width="300" alt="Processing settings">
+</p>
+
+Settings are stored as plain JSON in `~/Library/Application Support/SpeakUp/settings.json`.
+
+## Building from source
+
+Xcode 26 (Swift 6.2 or later) is the only dependency. The project is a Swift package with no Xcode project file; open `Package.swift` in Xcode if you prefer an IDE.
+
+```sh
+swift build                      # debug build of everything
+swift test                       # 34 unit tests, run in well under a second
+./scripts/bundle.sh              # release build → dist/SpeakUp.app, signed
+./scripts/bundle.sh --run        # …and launch it
+./scripts/bundle.sh --install    # …and copy to /Applications
+swift run speakup-cli audio.wav  # transcribe a file from the terminal
+```
+
+### Signing
+
+macOS ties the Microphone and Accessibility grants to the app's code signature. The bundle script looks for an **Apple Development** or **Developer ID Application** certificate in your keychain and signs with the first one it finds, which gives the app a stable identity across rebuilds. Without a certificate it falls back to an ad-hoc signature, which changes on every build and makes macOS ask for both permissions again.
+
+```sh
+CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" ./scripts/bundle.sh
+CODESIGN_IDENTITY=- ./scripts/bundle.sh     # force ad-hoc
+```
+
+### Icon
+
+The app icon is rendered from code so it can be regenerated at any size:
+
+```sh
+swift scripts/make-icon.swift Assets     # writes Assets/icon_1024.png
+```
+
+`Assets/AppIcon.icns` is built from it with `iconutil` and copied into the bundle.
+
+### Command-line transcriber
+
+`speakup-cli` loads the same engine and prints the transcript for any audio file. It is the quickest way to check the model without the GUI, and prints timing so you can see the real-time factor on your machine.
+
+## Architecture
+
+SpeakUp is deliberately small and built around a few protocols so the pieces can be swapped without touching the rest.
 
 ```
 Sources/
-  SpeakUpCore/     protocols, models, state machine, dictionary. Foundation only.
-  SpeakUpAudio/    AVAudioEngine capture, resampling to 16 kHz mono, level meter
-  SpeakUpEngines/  FluidAudioEngine (Parakeet). Add new engines here.
-  SpeakUpSystem/   global hotkey, pasteboard paste, permissions, Foundation Models processor
-  SpeakUp/         the menu bar app: composition root, overlay pill, settings
-  SpeakUpCLI/      developer tool for transcribing files
-Tests/             Swift Testing suites for Core and Audio
-scripts/bundle.sh  builds and signs dist/SpeakUp.app
+  SpeakUpCore/     the state machine, protocols, dictionary, settings. Foundation only, fully unit tested.
+  SpeakUpAudio/    AVAudioEngine capture, resampling to 16 kHz mono, level metering
+  SpeakUpEngines/  FluidAudioEngine (Parakeet). New engines go here.
+  SpeakUpSystem/   global hotkey, pasteboard output, permissions, Foundation Models processor
+  SpeakUp/         the menu bar app: composition root, Liquid Glass overlay, settings window
+  SpeakUpCLI/      developer transcriber
 ```
 
-## Adding an engine
+**Adding a speech engine.** Implement `TranscriptionEngine`, an actor with `load()` and `transcribe(_ samples: [Float])`, then register it in `AppModel` with one `EngineRegistry.Entry`. It appears in the settings picker automatically. Apple's SpeechAnalyzer or WhisperKit would fit without changes elsewhere.
 
-1. Implement `TranscriptionEngine` (an actor) in `Sources/SpeakUpEngines/`.
-   `load()` should download and warm the model and report progress through
-   `status`; `transcribe(_:)` takes 16 kHz mono Float32 samples.
-2. Register it in `AppModel.init` with an `EngineRegistry.Entry`. The settings
-   picker and the coordinator read the registry; nothing else changes.
+**Adding a processing step.** Implement `TextProcessor` and append it to the pipeline in `AppModel`. It gets a toggle in the Processing tab for free.
 
-## Adding a text processor
+`docs/PLAN.md` has the design notes, the decisions behind them, and what was verified.
 
-1. Implement `TextProcessor` with a stable `id`.
-2. Append it to the `ProcessorPipeline` in `AppModel.init` in the position you
-   want it to run.
-3. Add a toggle row in `SettingsView`'s Processing tab if it should be optional.
-   Toggles work by adding the `id` to `Settings.disabledProcessors`.
+## Privacy
 
-See `PLAN.md` for the design notes and the decisions behind them.
+SpeakUp makes exactly one kind of network request: downloading the speech model from Hugging Face on first launch. After that it works offline. Nothing you say is stored; the transcript exists only long enough to be pasted, and your previous clipboard contents are restored afterwards.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
+
+Parakeet TDT is by NVIDIA (CC-BY-4.0). FluidAudio is by FluidInference (Apache-2.0).

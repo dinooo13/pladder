@@ -5,8 +5,11 @@
 # signature, which macOS needs to remember the Accessibility and Microphone
 # grants across launches.
 #
-# Usage: scripts/bundle.sh [--run]
-#   SCRATCH=<dir>  optional swift build --scratch-path
+# Usage: scripts/bundle.sh [--run] [--install]
+#   --run              launch dist/SpeakUp.app when done
+#   --install          copy the app to /Applications (replacing an old copy)
+#   SCRATCH=<dir>      optional swift build --scratch-path
+#   CODESIGN_IDENTITY  signing identity; auto-detected, "-" forces ad-hoc
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -14,9 +17,11 @@ cd "$ROOT"
 
 SCRATCH="${SCRATCH:-.build}"
 RUN=0
+INSTALL=0
 for arg in "$@"; do
 	case "$arg" in
 	--run) RUN=1 ;;
+	--install) INSTALL=1 ;;
 	*)
 		echo "unknown argument: $arg" >&2
 		exit 2
@@ -27,10 +32,9 @@ done
 APP="$ROOT/dist/SpeakUp.app"
 CONTENTS="$APP/Contents"
 
-# Info.plist lives under Sources/SpeakUp/Resources. SwiftPM forbids a resource
-# literally named Info.plist, so the checked-in file is AppInfo.plist.
+# Info.plist lives under Sources/SpeakUp/Resources and is excluded from the
+# SwiftPM resource bundle in Package.swift; it is copied straight into the app.
 PLIST="$ROOT/Sources/SpeakUp/Resources/Info.plist"
-[[ -f "$PLIST" ]] || PLIST="$ROOT/Sources/SpeakUp/Resources/AppInfo.plist"
 
 swift build -c release --product SpeakUp --scratch-path "$SCRATCH"
 BIN_DIR="$(swift build -c release --product SpeakUp --scratch-path "$SCRATCH" --show-bin-path)"
@@ -41,6 +45,8 @@ mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 cp "$BIN_DIR/SpeakUp" "$CONTENTS/MacOS/SpeakUp"
 cp "$PLIST" "$CONTENTS/Info.plist"
 printf 'APPL????' > "$CONTENTS/PkgInfo"
+# App icon, rendered by scripts/make-icon.swift and packed with iconutil.
+cp "$ROOT/Assets/AppIcon.icns" "$CONTENTS/Resources/AppIcon.icns"
 
 # SwiftPM emits one .bundle per target that declares resources.
 shopt -s nullglob
@@ -69,6 +75,14 @@ codesign --force --sign "$CODESIGN_IDENTITY" \
 	"$APP"
 
 echo "Built $APP"
+
+if [[ "$INSTALL" -eq 1 ]]; then
+	pkill -x SpeakUp 2>/dev/null || true
+	rm -rf /Applications/SpeakUp.app
+	cp -R "$APP" /Applications/SpeakUp.app
+	APP=/Applications/SpeakUp.app
+	echo "Installed $APP"
+fi
 
 if [[ "$RUN" -eq 1 ]]; then
 	open "$APP"
