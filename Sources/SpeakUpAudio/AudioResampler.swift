@@ -160,8 +160,12 @@ public struct AudioResampler: Sendable {
         }
         let rms = (sumOfSquares / Double(samples.count)).squareRoot()
         guard rms > 0 else { return 0 }
+        // -60 dBFS maps to 0 and 0 dBFS to 1. Conversational speech through a
+        // laptop microphone sits around -35...-20 dBFS, so the square root lifts
+        // that band into the upper half of the meter instead of leaving it flat.
         let dBFS = 20 * log10(rms)
-        return Float(min(1, max(0, (dBFS + 50) / 50)))
+        let linear = min(1, max(0, (dBFS + 60) / 60))
+        return Float(linear.squareRoot())
     }
 
     /// Convenience overload for an array of samples.

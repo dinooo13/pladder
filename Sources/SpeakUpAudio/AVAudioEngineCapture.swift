@@ -3,10 +3,12 @@ import SpeakUpCore
 
 /// Microphone capture built on `AVAudioEngine`.
 ///
-/// Lifetime: the engine is created once and kept running for the life of the app.
-/// `warmUp()` starts it at launch so the first push-to-talk press has no hardware
-/// start-up latency; the tap is the only thing installed and removed per recording,
-/// and an idle running engine with no tap costs nothing measurable.
+/// Lifetime: the engine is created once and lives for the life of the app, but it
+/// only *runs* while a recording is in flight. A running input engine makes macOS
+/// show the orange "microphone in use" indicator, which would otherwise be on
+/// permanently. `warmUp()` attaches the input node and prepares the graph so the
+/// first `start()` only pays for `AVAudioEngine.start()`, which is a few
+/// milliseconds; `stop()` pauses the engine again once the tap is removed.
 ///
 /// Threading: the tap block runs on a realtime audio thread. It must never touch
 /// actor state, allocate unpredictably, or `await` anything. Everything it needs
@@ -54,12 +56,16 @@ public actor AVAudioEngineCapture: AudioCapture {
 
     // MARK: AudioCapture
 
-    /// Starts the engine ahead of time. Throws if the engine will not start, which on
-    /// a first launch usually means microphone permission has not been granted yet;
-    /// `start()` retries, so a throw here is not fatal.
+    /// Prepares the engine ahead of time without running it. Throws if there is no
+    /// usable input, which on a first launch usually means microphone permission has
+    /// not been granted yet; `start()` retries, so a throw here is not fatal.
     public func warmUp() async throws {
         observeConfigurationChanges()
-        try startEngineIfNeeded()
+        let format = engine.inputNode.inputFormat(forBus: 0)
+        guard format.sampleRate > 0, format.channelCount > 0 else {
+            throw CaptureError.noInputDevice
+        }
+        engine.prepare()
     }
 
     public func start() async throws -> AsyncStream<Float> {
@@ -101,7 +107,8 @@ public actor AVAudioEngineCapture: AudioCapture {
         levelContinuation?.finish()
         levelContinuation = nil
 
-        // The engine keeps running so the next recording starts instantly.
+        // Release the microphone so the system recording indicator goes away.
+        engine.pause()
         return CapturedAudio(samples: samples)
     }
 
@@ -171,6 +178,7 @@ public actor AVAudioEngineCapture: AudioCapture {
             self.processor = nil
         }
 
+        guard wasRecording, isRecording, let continuation = levelContinuation else { return }
         do {
             try startEngineIfNeeded()
         } catch {
@@ -178,8 +186,6 @@ public actor AVAudioEngineCapture: AudioCapture {
             // whatever was captured before the change.
             return
         }
-
-        guard wasRecording, isRecording, let continuation = levelContinuation else { return }
         try? installTap(continuation: continuation)
     }
 

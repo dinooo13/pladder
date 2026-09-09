@@ -141,20 +141,21 @@ struct AudioResamplerTests {
         #expect(AudioResampler.rmsLevel(square) == 1)
     }
 
-    @Test("A -20 dBFS sine meters at about 0.6")
+    @Test("A -20 dBFS sine meters at about 0.82")
     func quietSineLevel() {
         // -20 dBFS means an RMS of 0.1, so a sine needs a peak of 0.1 * sqrt(2).
+        // (-20 + 60) / 60 = 0.667, square root = 0.816.
         let amplitude = Float(0.1 * 2.0.squareRoot())
         let sine = (0..<16_000).map { amplitude * Float(sin(2 * Double.pi * 440 * Double($0) / 16_000)) }
 
         let level = AudioResampler.rmsLevel(sine)
 
-        #expect(abs(level - 0.6) < 0.02, "level was \(level)")
+        #expect(abs(level - 0.816) < 0.02, "level was \(level)")
     }
 
-    @Test("Levels below -50 dBFS clamp to zero")
+    @Test("Levels below -60 dBFS clamp to zero")
     func floorClamps() {
-        let veryQuiet = [Float](repeating: 0.0001, count: 1024)
+        let veryQuiet = [Float](repeating: 0.0005, count: 1024)  // -66 dBFS
         #expect(AudioResampler.rmsLevel(veryQuiet) == 0)
     }
 }

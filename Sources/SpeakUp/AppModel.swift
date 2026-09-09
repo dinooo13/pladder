@@ -62,7 +62,11 @@ final class AppModel {
 
         let store = SettingsStore(
             url: Self.settingsURL,
-            defaults: Settings(engineID: FluidAudioEngine.engineID)
+            // Apple Intelligence cleanup is opt-in: it adds about a second.
+            defaults: Settings(
+                engineID: FluidAudioEngine.engineID,
+                disabledProcessors: [FoundationModelProcessor.processorID]
+            )
         )
         self.store = store
 
@@ -74,8 +78,11 @@ final class AppModel {
             output: PasteboardOutput(),
             hotkeyMonitor: GlobalHotkeyMonitor(),
             makePipeline: { s in
+                // Order matters: the dictionary runs first so its output is what
+                // the optional language model sees, and whitespace is tidied last.
                 ProcessorPipeline([
                     DictionaryReplacer(entries: s.dictionary),
+                    FoundationModelProcessor(),
                     WhitespaceNormalizer(),
                 ])
             },

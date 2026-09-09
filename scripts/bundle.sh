@@ -49,9 +49,23 @@ for bundle in "$BIN_DIR"/*.bundle; do
 done
 shopt -u nullglob
 
-codesign --force --sign - \
+# Sign with a real certificate when one is available. An ad-hoc signature
+# changes with every build, and macOS keys Accessibility and Microphone
+# permission on the signature, so the user would have to re-grant both after
+# each rebuild. A developer certificate gives a stable identity instead.
+# Override with CODESIGN_IDENTITY=- to force ad-hoc, or set it to a specific
+# identity name or hash.
+if [[ -z "${CODESIGN_IDENTITY:-}" ]]; then
+	CODESIGN_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null \
+		| grep -E '"(Developer ID Application|Apple Development)' \
+		| head -1 | sed -E 's/^[^"]*"([^"]+)".*$/\1/')
+	CODESIGN_IDENTITY=${CODESIGN_IDENTITY:--}
+fi
+echo "Signing with: $CODESIGN_IDENTITY"
+codesign --force --sign "$CODESIGN_IDENTITY" \
 	--entitlements "$ROOT/scripts/SpeakUp.entitlements" \
 	--options runtime \
+	--timestamp=none \
 	"$APP"
 
 echo "Built $APP"
