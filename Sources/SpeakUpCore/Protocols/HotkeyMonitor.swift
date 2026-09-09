@@ -15,7 +15,7 @@ public enum HotkeyEvent: Sendable, Equatable {
 
 /// Describes the push-to-talk key. Either a single modifier held alone, or a
 /// regular key with a modifier mask.
-public struct Hotkey: Codable, Sendable, Equatable {
+public struct Hotkey: Codable, Sendable, Hashable {
     public enum Kind: String, Codable, Sendable {
         /// A lone modifier such as Right Option. Press = modifier down, release = up.
         case modifier
