@@ -13,8 +13,7 @@
   <a href="#install">Install</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#building-from-source">Build</a> ·
-  <a href="#customising">Customise</a> ·
-  <a href="#architecture">Architecture</a>
+  <a href="#customising">Customise</a>
 </p>
 
 ---
@@ -28,10 +27,6 @@
 - **Native.** A menu bar app with a Liquid Glass status pill and a standard settings window. It looks and behaves like it shipped with the system.
 - **Multilingual.** Parakeet v3 handles 25 European languages and switches automatically. Dictate in English, German or Spanish in the same session.
 
-<p align="center">
-  <img src="docs/images/pill-recording.png" width="360" alt="Recording pill"> &nbsp;
-  <img src="docs/images/pill-transcribing.png" width="360" alt="Transcribing pill">
-</p>
 
 ## Install
 
@@ -76,11 +71,6 @@ Open **Settings…** from the menu bar icon.
 | **Dictionary** | Replacement rules: what the model hears, what you want written, and whether case must match. Whole-word matching, longer phrases win, capitalisation carries over at the start of a sentence. Import and export as JSON. A test field shows the effect of your rules live. |
 | **Processing** | Toggle each post-processing step. Dictionary and whitespace tidying are on by default. **Apple Intelligence cleanup** uses the on-device Foundation Models framework to fix punctuation and capitalisation; it adds about a second and is off by default. |
 
-<p align="center">
-  <img src="docs/images/settings-general.png" width="300" alt="General settings"> &nbsp;
-  <img src="docs/images/settings-dictionary.png" width="300" alt="Dictionary settings"> &nbsp;
-  <img src="docs/images/settings-processing.png" width="300" alt="Processing settings">
-</p>
 
 Settings are stored as plain JSON in `~/Library/Application Support/SpeakUp/settings.json`.
 
@@ -119,26 +109,6 @@ swift scripts/make-icon.swift Assets     # writes Assets/icon_1024.png
 ### Command-line transcriber
 
 `speakup-cli` loads the same engine and prints the transcript for any audio file. It is the quickest way to check the model without the GUI, and prints timing so you can see the real-time factor on your machine.
-
-## Architecture
-
-SpeakUp is deliberately small and built around a few protocols so the pieces can be swapped without touching the rest.
-
-```
-Sources/
-  SpeakUpCore/     the state machine, protocols, dictionary, settings. Foundation only, fully unit tested.
-  SpeakUpAudio/    AVAudioEngine capture, resampling to 16 kHz mono, level metering
-  SpeakUpEngines/  FluidAudioEngine (Parakeet). New engines go here.
-  SpeakUpSystem/   global hotkey, pasteboard output, permissions, Foundation Models processor
-  SpeakUp/         the menu bar app: composition root, Liquid Glass overlay, settings window
-  SpeakUpCLI/      developer transcriber
-```
-
-**Adding a speech engine.** Implement `TranscriptionEngine`, an actor with `load()` and `transcribe(_ samples: [Float])`, then register it in `AppModel` with one `EngineRegistry.Entry`. It appears in the settings picker automatically. Apple's SpeechAnalyzer or WhisperKit would fit without changes elsewhere.
-
-**Adding a processing step.** Implement `TextProcessor` and append it to the pipeline in `AppModel`. It gets a toggle in the Processing tab for free.
-
-`docs/PLAN.md` has the design notes, the decisions behind them, and what was verified.
 
 ## Privacy
 
