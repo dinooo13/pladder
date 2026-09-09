@@ -18,8 +18,12 @@ struct SettingsView: View {
             ProcessingSettingsView(model: model)
                 .tabItem { Label("Processing", systemImage: "wand.and.sparkles") }
         }
-        // Fixed size for every tab, so switching tabs never resizes the window.
-        .frame(width: 520, height: 420)
+        // Deliberately no material or glass on the window itself: Apple's own
+        // settings windows are plain, and Liquid Glass belongs on the controls
+        // and the overlay pill. The fixed width keeps switching tabs from
+        // resizing the window sideways; height follows the tallest content.
+        .frame(width: 540)
+        .frame(minHeight: 540)
     }
 }
 
@@ -37,22 +41,19 @@ private struct GeneralSettingsView: View {
             } header: {
                 Text("Engine")
             } footer: {
-                Text(model.registry.entry(for: model.settings.engineID)?.detail ?? "")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                FootnoteText(model.registry.entry(for: model.settings.engineID)?.detail ?? "")
             }
 
-            Section("Push to talk") {
+            Section {
                 Picker("Key", selection: $model.settings.hotkey) {
                     ForEach(Hotkey.presets, id: \.hotkey) { preset in
                         Text(preset.name).tag(preset.hotkey)
                     }
                 }
-                Text("Hold to record, release to insert. Holding it together with another key does nothing, so shortcuts keep working.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+            } header: {
+                Text("Push to Talk")
+            } footer: {
+                FootnoteText("Hold to record, release to insert. Holding it together with another key does nothing, so shortcuts keep working.")
             }
 
             Section("Output") {
@@ -62,7 +63,7 @@ private struct GeneralSettingsView: View {
                     Toggle("Launch at login", isOn: launchAtLogin)
                     if let error = model.launchAtLoginError {
                         Text(error)
-                            .font(.caption)
+                            .font(.callout)
                             .foregroundStyle(.red)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -111,21 +112,21 @@ private struct ProcessingSettingsView: View {
         Form {
             Section {
                 ForEach(model.processors, id: \.id) { processor in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Toggle(processor.displayName, isOn: binding(for: processor.id))
-                            .disabled(isDisabled(processor))
-                        Text(unavailabilityReason(for: processor) ?? processor.detail)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                    Toggle(isOn: binding(for: processor.id)) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(processor.displayName)
+                            Text(unavailabilityReason(for: processor) ?? processor.detail)
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
+                    .disabled(isDisabled(processor))
                 }
             } header: {
                 Text("Processors")
             } footer: {
-                Text("Each dictation runs through these in order before it is inserted.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                FootnoteText("Each dictation runs through these in order before it is inserted.")
             }
         }
         .formStyle(.grouped)
@@ -156,19 +157,39 @@ private struct PermissionRow: View {
     let action: @MainActor () -> Void
 
     var body: some View {
-        HStack {
-            Image(systemName: granted ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-                .foregroundStyle(granted ? .green : .orange)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
+        LabeledContent {
             if !granted {
                 Button("Open Settings…") { action() }
+                    .buttonStyle(.glass)
+            }
+        } label: {
+            Label {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                    Text(detail)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } icon: {
+                Image(systemName: granted ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                    .foregroundStyle(granted ? .green : .orange)
             }
         }
+    }
+}
+
+/// Section footer styling, the native macOS pattern: secondary colour, callout
+/// size, wrapping instead of truncating.
+struct FootnoteText: View {
+    private let text: String
+
+    init(_ text: String) { self.text = text }
+
+    var body: some View {
+        Text(text)
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }

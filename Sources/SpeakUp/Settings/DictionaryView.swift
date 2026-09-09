@@ -22,19 +22,21 @@ struct DictionaryView: View {
     private var entries: [DictionaryEntry] { model.settings.dictionary }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            table
-            toolbar
-            Text("Whole words only. Longer phrases win. Case is carried over at the start of a sentence unless Match case is on.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+        Form {
+            Section {
+                table
+                toolbar
+            } header: {
+                Text("Rules")
+            } footer: {
+                FootnoteText("Whole words only. Longer phrases win. Case is carried over at the start of a sentence unless Match case is on.")
+            }
 
-            Divider()
-            testArea
+            Section("Try a sentence") {
+                testArea
+            }
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .formStyle(.grouped)
         .alert(
             "Dictionary",
             isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })
@@ -78,7 +80,7 @@ struct DictionaryView: View {
         // Without this an empty table paints a stack of striped placeholder
         // rows, which reads as broken when the dictionary is empty.
         .alternatingRowBackgrounds(.disabled)
-        .frame(minHeight: 140)
+        .frame(minHeight: 220)
         .onDeleteCommand(perform: removeSelected)
     }
 
@@ -86,17 +88,6 @@ struct DictionaryView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
-            Button(action: addEntry) {
-                Image(systemName: "plus")
-            }
-            .help("Add a rule")
-
-            Button(action: removeSelected) {
-                Image(systemName: "minus")
-            }
-            .disabled(selection.isEmpty)
-            .help("Remove the selected rules")
-
             if entries.isEmpty {
                 Button("Add examples", action: addExamples)
                     .buttonStyle(.link)
@@ -105,18 +96,33 @@ struct DictionaryView: View {
             Spacer()
 
             Button("Import…", action: importEntries)
+                .buttonStyle(.glass)
             Button("Export…", action: exportEntries)
+                .buttonStyle(.glass)
                 .disabled(entries.isEmpty)
+
+            Button(action: addEntry) {
+                Image(systemName: "plus")
+            }
+            .buttonStyle(.glass)
+            .help("Add a rule")
+
+            Button(action: removeSelected) {
+                Image(systemName: "minus")
+            }
+            .buttonStyle(.glass)
+            .disabled(selection.isEmpty)
+            .help("Remove the selected rules")
         }
-        .buttonStyle(.bordered)
         .controlSize(.small)
     }
 
     // MARK: Test field
 
     private var testArea: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            TextField("Test a sentence", text: $sample)
+        VStack(alignment: .leading, spacing: 6) {
+            TextField("", text: $sample, prompt: Text("Type a sentence to see how the rules change it"))
+                .labelsHidden()
                 .textFieldStyle(.roundedBorder)
             Text(testResult.isEmpty ? "—" : testResult)
                 .font(.callout)
@@ -238,7 +244,10 @@ private struct DictionaryField: View {
     @State private var draft = ""
 
     var body: some View {
-        TextField(prompt, text: $draft)
+        // Inside a grouped Form a TextField renders its title as a label, so
+        // pass the placeholder as `prompt` and hide the label.
+        TextField("", text: $draft, prompt: Text(prompt))
+            .labelsHidden()
             .textFieldStyle(.plain)
             .focused(focus, equals: cell)
             .onAppear { draft = text }

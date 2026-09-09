@@ -28,6 +28,9 @@ struct SpeakUpApp: App {
         Settings {
             SettingsView(model: model)
         }
+        // The settings view sizes itself; without this the window opens at a
+        // default size and lets the user squash the forms.
+        .windowResizability(.contentSize)
     }
 }
 

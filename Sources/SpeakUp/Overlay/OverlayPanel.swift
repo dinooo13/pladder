@@ -9,9 +9,10 @@ import SwiftUI
 /// becomes the key window, and `ignoresMouseEvents` so clicks fall through to
 /// whatever is underneath.
 final class OverlayPanel: NSPanel {
-    /// Includes room around the capsule for its own drop shadow; the window
-    /// itself draws nothing, so nothing is clipped.
-    private static let size = NSSize(width: 260, height: 92)
+    /// Includes room around the capsule for its soft shadow and for the
+    /// widest error message; the window itself draws nothing, so nothing is
+    /// clipped and the pill sizes itself to its content inside this box.
+    private static let size = NSSize(width: 320, height: 96)
 
     /// Bumped on every show/hide so a fade-out that is superseded by a new
     /// show does not order the window out afterwards.
