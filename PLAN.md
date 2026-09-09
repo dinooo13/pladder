@@ -30,7 +30,7 @@ speakup/
     SpeakUpCore/          pure logic, no Apple frameworks beyond Foundation
       Protocols/
         TranscriptionEngine.swift   load(), transcribe([Float]) -> Transcript, isReady
-        AudioCapture.swift          start() -> AsyncStream<AudioChunk>, stop() -> [Float]
+        AudioCapture.swift          start() -> AsyncStream<level>, stop() -> CapturedAudio
         TextProcessor.swift         process(String) async -> String
         TextOutput.swift            insert(String) async throws
         HotkeyMonitor.swift         events: AsyncStream<HotkeyEvent> (.pressed/.released)
@@ -63,13 +63,12 @@ speakup/
       Settings/
         SettingsView.swift          engine picker, hotkey, processor toggles
         DictionaryView.swift        editable table, import/export JSON
-      ModelStatusView.swift         download / warm-up progress
   Tests/
     SpeakUpCoreTests/
       DictionaryReplacerTests.swift
       DictationCoordinatorTests.swift   uses fake engine, fake output, fake capture
   scripts/
-    bundle.sh                       builds release, assembles SpeakUp.app, ad-hoc codesign
+    bundle.sh                       builds release, assembles SpeakUp.app, signs with a developer certificate when available
 ```
 
 ### Data flow
@@ -121,8 +120,9 @@ runs it with the real modules.
 - **First launch.** FluidAudio downloads a few hundred MB from Hugging Face and
   CoreML compiles on first load. The menu shows progress and the hotkey is disabled
   until `engine.isReady`.
-- **Cold latency.** Engine loads at launch and stays resident. Audio engine is
-  started once and kept running with the tap installed only while recording.
+- **Cold latency.** Engine loads at launch and stays resident. The audio engine is
+  prepared at launch and only runs while the key is held, so the system
+  microphone indicator is off when idle.
 - **Clipboard clobbering.** Output saves the pasteboard, pastes, then restores it
   after a short delay.
 - **Permissions.** Mic prompt fires on first record, Accessibility is checked at
@@ -130,6 +130,29 @@ runs it with the real modules.
   identifier and signature, which `bundle.sh` supplies.
 - **Foundation Models latency.** Roughly a second per utterance, so it is opt-in and
   runs after the dictionary step.
+
+## Status (2026-09-09)
+
+All four milestones are implemented and committed. Verified on this Mac:
+
+- 34 unit tests pass (`swift test`): state machine, dictionary replacer, settings
+  migration, audio resampling and level metering.
+- Parakeet transcribes a synthesized 6 s clip in about 180 ms via `speakup-cli`.
+- Full push-to-talk cycle observed end to end: simulated Right Option hold,
+  overlay pill with level meter, Parakeet transcription of live microphone audio,
+  paste into TextEdit with trailing space.
+- Idle state no longer holds the microphone, so the orange system recording
+  indicator only shows while the key is held.
+- Settings window: engine and hotkey pickers, dictionary editor with examples,
+  import/export and live preview, processor toggles; settings persist as JSON.
+- A Fable review pass found four correctness issues (settings wiped on schema
+  change, mic left on when settings change mid-recording, hotkey events queued
+  during transcription, pasteboard restore on the critical path). All fixed and
+  covered by tests.
+
+Not verifiable here: the Apple Intelligence cleanup step, because Apple
+Intelligence is switched off on this machine. It falls through and returns the
+text unchanged, which is the tested path.
 
 ## Out of scope for now
 
