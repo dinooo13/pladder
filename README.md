@@ -20,7 +20,7 @@
 
 ## Why SpeakUp
 
-- **Hold to talk.** One key, no toggles, no windows to click. Hold Right Option (or Fn, or Right Command), speak, release. Works in every app that takes text.
+- **Hold to talk.** One key, no toggles, no windows to click. Hold Right Command, or any key or combination you choose, speak, release. Works in every app that takes text.
 - **Fast.** NVIDIA's Parakeet TDT v3 runs on the Neural Engine through [FluidAudio](https://github.com/FluidInference/FluidAudio). A ten second sentence transcribes in well under half a second. The model stays loaded, so the first word is as quick as the last.
 - **Private.** Audio never leaves your Mac. There is no account, no cloud, no telemetry. The microphone is only open while the key is held, and macOS shows the orange indicator only then.
 - **Accurate with your words.** A dictionary fixes the names and jargon speech models get wrong. "clode code" becomes "Claude Code" every time.
@@ -48,7 +48,7 @@ On first launch:
 2. **Grant Accessibility** in System Settings when prompted. That is what lets SpeakUp see the push-to-talk key in other apps and paste the result.
 3. Wait for the model. The first run downloads about 700 MB of CoreML models from Hugging Face into `~/Library/Application Support/FluidAudio/Models`. The menu bar shows progress. This happens once.
 
-Then click into any text field, hold **Right Option**, say something, and let go.
+Then click into any text field, hold **Right Command**, say something, and let go.
 
 ## How it works
 
@@ -67,7 +67,7 @@ Open **Settings…** from the menu bar icon.
 
 | Tab | What you can change |
 |---|---|
-| **General** | Engine, push-to-talk key (Right Option, Right Command, Right Control, Fn), trailing space, sounds, launch at login. Shows permission status with a one-click fix. |
+| **General** | Engine, push-to-talk key (any key or combination, recorded by pressing it; Right Command by default), trailing space, sounds, launch at login. Shows permission status with a one-click fix. |
 | **Dictionary** | Replacement rules: what the model hears, what you want written, and whether case must match. Whole-word matching, longer phrases win, capitalisation carries over at the start of a sentence. Import and export as JSON. A test field shows the effect of your rules live. |
 | **Processing** | Toggle each post-processing step. Dictionary and whitespace tidying are on by default. **Apple Intelligence cleanup** uses the on-device Foundation Models framework to fix punctuation and capitalisation; it adds about a second and is off by default. |
 

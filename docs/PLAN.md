@@ -14,7 +14,7 @@ sits behind the same processor interface and is off by default.
 | Language | Swift 6.3, strict concurrency, SwiftUI | Current toolchain on this machine |
 | Build | SwiftPM package + `scripts/bundle.sh` that wraps the binary in `SpeakUp.app` | No Xcode project file to maintain, opens in Xcode via `Package.swift`. XcodeGen is the fallback if we want Xcode-native debugging later |
 | Engine | FluidAudio, Parakeet TDT 0.6B v3 | Fastest Swift-native option, runs on ANE |
-| Hotkey | Hold **Right Option** by default, configurable | Modifier keys need no Input Monitoring permission, only Accessibility |
+| Hotkey | Hold **Right Command** by default; any key or chord can be recorded | A CGEvent tap (Accessibility, no Input Monitoring) matches the chord and swallows its regular key so it never reaches the target app |
 | Output | Clipboard + simulated Cmd+V, restore old clipboard | Universal, fast |
 | Post-processing | Dictionary replacer only by default | No latency, no network |
 
@@ -33,7 +33,8 @@ speakup/
         AudioCapture.swift          start() -> AsyncStream<level>, stop() -> CapturedAudio
         TextProcessor.swift         process(String) async -> String
         TextOutput.swift            insert(String) async throws
-        HotkeyMonitor.swift         events: AsyncStream<HotkeyEvent> (.pressed/.released)
+        HotkeyMonitor.swift         events: AsyncStream<HotkeyEvent> (.pressed/.released); Hotkey = chord of key codes
+      HotkeyChordTracker.swift      pure press/release state machine for a chord
       Models/
         Transcript.swift            text, language, duration, engineID
         DictationState.swift        idle / recording(level) / transcribing / inserting / error
@@ -52,7 +53,7 @@ speakup/
       (later) AppleSpeechEngine.swift, WhisperKitEngine.swift
     SpeakUpSystem/
       PasteboardOutput.swift        NSPasteboard + CGEvent Cmd+V
-      GlobalHotkeyMonitor.swift     NSEvent global monitor on flagsChanged / keyDown
+      GlobalHotkeyMonitor.swift     CGEvent tap feeding HotkeyChordTracker; swallows the chord's regular key
       Permissions.swift             mic + accessibility checks and prompts
       FoundationModelProcessor.swift  optional, FoundationModels framework, availability-gated
     SpeakUp/                        the app target
