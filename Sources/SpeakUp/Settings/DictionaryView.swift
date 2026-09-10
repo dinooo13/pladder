@@ -96,21 +96,17 @@ struct DictionaryView: View {
             Spacer()
 
             Button("Import…", action: importEntries)
-                .buttonStyle(.glass)
             Button("Export…", action: exportEntries)
-                .buttonStyle(.glass)
                 .disabled(entries.isEmpty)
 
             Button(action: addEntry) {
                 Image(systemName: "plus")
             }
-            .buttonStyle(.glass)
             .help("Add a rule")
 
             Button(action: removeSelected) {
                 Image(systemName: "minus")
             }
-            .buttonStyle(.glass)
             .disabled(selection.isEmpty)
             .help("Remove the selected rules")
         }

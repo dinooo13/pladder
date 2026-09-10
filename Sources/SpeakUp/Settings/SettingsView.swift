@@ -175,7 +175,6 @@ private struct PermissionRow: View {
         LabeledContent {
             if !granted {
                 Button("Open Settings…") { action() }
-                    .buttonStyle(.glass)
             }
         } label: {
             Label {

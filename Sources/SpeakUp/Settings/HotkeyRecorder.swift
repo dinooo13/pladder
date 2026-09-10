@@ -32,7 +32,6 @@ struct HotkeyRecorderField: View {
                 .frame(minWidth: 140)
                 .contentTransition(.numericText())
         }
-        .buttonStyle(.glass)
         .tint(recorder.isRecording ? .accentColor : nil)
         .help(recorder.isRecording
             ? "Press the key or combination to use. Escape cancels."
