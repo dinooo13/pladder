@@ -251,10 +251,17 @@ final class AppModel {
         return false
     }
 
-    /// First 60 characters of the most recent transcript, for the menu.
+    /// A short, word-boundary-aware summary of the most recent transcript for
+    /// the menu; longer previews make the menu bar menu comically wide.
     var lastTranscriptSummary: String? {
         guard let text = coordinator.lastTranscript?.text, !text.isEmpty else { return nil }
-        return text.count > 60 ? String(text.prefix(60)) + "…" : text
+        let limit = 32
+        guard text.count > limit else { return text }
+        let head = String(text.prefix(limit))
+        if let space = head.lastIndex(of: " "), head.distance(from: head.startIndex, to: space) > 20 {
+            return String(head[..<space]) + "…"
+        }
+        return head + "…"
     }
 }
 

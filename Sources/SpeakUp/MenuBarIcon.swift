@@ -25,8 +25,11 @@ enum MenuBarIcon {
             switch state {
             case .idle: self = .idle
             case .recording(let level):
-                let clamped = min(max(CGFloat(level), 0), 1)
-                self = .recording(step: Int((clamped * CGFloat(Self.levelSteps - 1)).rounded()))
+                // Quantise the same shared amplitude curve the overlay's
+                // meter uses, so glyph and overlay wave agree on what the
+                // input level means.
+                let amp = CGFloat(WaveformMeter.amplitude(for: level))
+                self = .recording(step: Int((amp * CGFloat(Self.levelSteps - 1)).rounded()))
             case .transcribing, .inserting: self = .busy
             case .unavailable, .error: self = .off
             }
@@ -62,7 +65,7 @@ enum MenuBarIcon {
         switch variant {
         case .recording(let step):
             // Quiet input flattens the glyph to a line; louder input grows it
-            // back towards the full envelope, like the overlay's level meter.
+            // back towards the full envelope, matching the overlay's meter.
             let amount = CGFloat(step) / CGFloat(Variant.levelSteps - 1)
             let floor = envelope.min()!
             return envelope.map { floor + ($0 - floor) * amount }

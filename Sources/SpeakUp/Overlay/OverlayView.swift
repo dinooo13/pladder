@@ -109,9 +109,9 @@ struct OverlayView: View {
     }
 }
 
-/// Fourteen bars whose heights follow the input level. Bars near the middle are
-/// taller, and each new level is blended into the previous heights so the meter
-/// breathes instead of flickering.
+/// Bars whose heights follow the input level. The shaping (amplitude curve,
+/// bell envelope, wobble, rise/fall blend) lives in the shared
+/// `WaveformMeter`, so this wave matches the menu bar glyph exactly.
 private struct LevelBars: View {
     let level: Float
 
@@ -119,8 +119,8 @@ private struct LevelBars: View {
     private static let minScale: CGFloat = 0.1
     private static let maxHeight: CGFloat = 32
 
+    @State private var meter = WaveformMeter(count: count)
     @State private var heights: [CGFloat] = Array(repeating: minScale, count: LevelBars.count)
-    @State private var tick = 0
 
     var body: some View {
         HStack(alignment: .center, spacing: 3) {
@@ -132,30 +132,10 @@ private struct LevelBars: View {
         }
         .frame(height: Self.maxHeight)
         .onChange(of: level) { _, new in
-            tick &+= 1
+            let next = meter.update(level: new)
             withAnimation(.easeOut(duration: 0.1)) {
-                heights = Self.blend(previous: heights, level: new, tick: tick)
+                heights = next.map { max(Self.minScale, CGFloat($0)) }
             }
-        }
-    }
-
-    private static func blend(previous: [CGFloat], level: Float, tick: Int) -> [CGFloat] {
-        // Boost the mid range so ordinary speech swings the bars most of the
-        // way, and let loud peaks saturate.
-        let amplitude = min(1, pow(CGFloat(min(max(level, 0), 1)), 0.7) * 1.3)
-        let centre = CGFloat(count - 1) / 2
-        let phase = CGFloat(tick) * 0.9
-        return (0..<count).map { index in
-            // Soft envelope: full height in the middle, half at the ends.
-            let distance = abs(CGFloat(index) - centre) / centre
-            let envelope = 1 - distance * distance * 0.5
-            // Each bar follows its own slow wave so the shape moves while the
-            // level is steady, and the wave shifts on every update.
-            let wobble = 0.65 + 0.35 * (0.5 + 0.5 * sin(CGFloat(index) * 1.7 + phase))
-            let target = minScale + amplitude * envelope * wobble * (1 - minScale)
-            // Rise fast, fall slower, so peaks read clearly.
-            let weight: CGFloat = target > previous[index] ? 0.7 : 0.45
-            return previous[index] * (1 - weight) + target * weight
         }
     }
 }
