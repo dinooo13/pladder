@@ -70,24 +70,19 @@ final class AppModel {
 
         let store = SettingsStore(
             url: Self.settingsURL,
-            // Apple Intelligence cleanup is opt-in: it adds about a second.
-            defaults: Settings(
-                engineID: FluidAudioEngine.engineID,
-                disabledProcessors: [FoundationModelProcessor.processorID]
-            )
+            defaults: Settings(engineID: FluidAudioEngine.engineID)
         )
         self.store = store
 
         // Processors, in pipeline order: the dictionary runs first so its
-        // output is what the optional language model sees, and whitespace is
-        // tidied last. This is the single place that order is defined; both
-        // the settings toggles and `makePipeline` below derive from it.
+        // output is what gets inserted, and whitespace is tidied last. This
+        // is the single place that order is defined; both the settings
+        // toggles and `makePipeline` below derive from it.
         // `DictionaryReplacer`'s entries here are unused placeholders — its
         // `id`/`displayName`/`detail` don't depend on them, and `makePipeline`
         // rebuilds it from the live settings on every dictation.
         let processorOrder: [any TextProcessor] = [
             DictionaryReplacer(entries: []),
-            FoundationModelProcessor(),
             WhitespaceNormalizer(),
         ]
         self.processors = processorOrder

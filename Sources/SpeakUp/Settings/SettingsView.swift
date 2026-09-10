@@ -129,13 +129,12 @@ private struct ProcessingSettingsView: View {
                     Toggle(isOn: binding(for: processor.id)) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(processor.displayName)
-                            Text(unavailabilityReason(for: processor) ?? processor.detail)
+                            Text(processor.detail)
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
-                    .disabled(isDisabled(processor))
                 }
             } header: {
                 Text("Processors")
@@ -160,15 +159,6 @@ private struct ProcessingSettingsView: View {
             get: { !model.settings.disabledProcessors.contains(id) },
             set: { model.settings.setProcessor(id, enabled: $0) }
         )
-    }
-
-    private func isDisabled(_ processor: any TextProcessor) -> Bool {
-        unavailabilityReason(for: processor) != nil
-    }
-
-    private func unavailabilityReason(for processor: any TextProcessor) -> String? {
-        guard processor.id == FoundationModelProcessor.processorID else { return nil }
-        return FoundationModelProcessor.availability
     }
 }
 
