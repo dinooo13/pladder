@@ -274,7 +274,11 @@ public final class DictationCoordinator {
                 return
             }
             state = .inserting
-            let final = settings.appendTrailingSpace ? processed + " " : processed
+            // Don't double the junction: a transcript that already ends in
+            // whitespace (e.g. "Tidy whitespace" disabled) carries its own
+            // separator, so appending another makes a double space.
+            let needsSpace = settings.appendTrailingSpace && !processed.last!.isWhitespace
+            let final = needsSpace ? processed + " " : processed
             try await output.insert(final)
             var inserted = transcript
             inserted.text = processed

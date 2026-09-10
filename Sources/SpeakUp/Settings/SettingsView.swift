@@ -60,11 +60,10 @@ private struct GeneralSettingsView: View {
             } header: {
                 Text("Push to Talk")
             } footer: {
-                FootnoteText("Hold to record, release to insert. Click the key and press any key or combination, then let go. Left and right modifiers are different keys, so Right Command on its own works. Pressing anything else while holding it stops the recording, so shortcuts keep working.")
+                FootnoteText("Hold to record, release to insert. Click the field and press any key combination to assign it.")
             }
 
-            Section("Output") {
-                Toggle("Append a space after each dictation", isOn: $model.settings.appendTrailingSpace)
+            Section("Sounds & Startup") {
                 Toggle("Play start and stop sounds", isOn: $model.settings.playSounds)
                 VStack(alignment: .leading, spacing: 2) {
                     Toggle("Launch at login", isOn: launchAtLogin)
@@ -142,6 +141,14 @@ private struct ProcessingSettingsView: View {
                 Text("Processors")
             } footer: {
                 FootnoteText("Each dictation runs through these in order before it is inserted.")
+            }
+
+            Section {
+                Toggle("Append a space after each dictation", isOn: $model.settings.appendTrailingSpace)
+            } header: {
+                Text("Output")
+            } footer: {
+                FootnoteText("Separates consecutive dictations so pasted runs stay readable.")
             }
         }
         .formStyle(.grouped)
