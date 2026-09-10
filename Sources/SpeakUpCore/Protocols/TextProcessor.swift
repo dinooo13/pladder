@@ -15,5 +15,14 @@ public protocol TextProcessor: Sendable {
     /// One-line description shown under the toggle in settings.
     var detail: String { get }
 
+    /// Optional warm-up, called when recording starts so expensive setup
+    /// overlaps with the user speaking. Must not throw, must not block long.
+    func prepare() async
+
     func process(_ text: String) async throws -> String
+}
+
+extension TextProcessor {
+    /// Most processors have nothing to warm up.
+    public func prepare() async {}
 }

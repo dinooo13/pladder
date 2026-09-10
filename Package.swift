@@ -42,8 +42,9 @@ let package = Package(
             exclude: ["Resources/Info.plist"]
         ),
 
-        // Developer tool: transcribe a file from the terminal to verify engines.
-        .executableTarget(name: "SpeakUpCLI", dependencies: ["SpeakUpCore", "SpeakUpEngines", "SpeakUpAudio"]),
+        // Developer tool: transcribe a file from the terminal to verify engines,
+        // or run the tidy pass over a fixtures file to review its output.
+        .executableTarget(name: "SpeakUpCLI", dependencies: ["SpeakUpCore", "SpeakUpEngines", "SpeakUpAudio", "SpeakUpSystem"]),
 
         .testTarget(name: "SpeakUpCoreTests", dependencies: ["SpeakUpCore"]),
         .testTarget(name: "SpeakUpAudioTests", dependencies: ["SpeakUpAudio"]),

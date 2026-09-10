@@ -111,25 +111,62 @@ private struct ProcessingSettingsView: View {
     var body: some View {
         Form {
             Section {
-                ForEach(model.processors, id: \.id) { processor in
-                    Toggle(isOn: binding(for: processor.id)) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(processor.displayName)
-                            Text(unavailabilityReason(for: processor) ?? processor.detail)
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
+                Toggle(isOn: binding(for: model.dictionaryProcessor.id)) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(model.dictionaryProcessor.displayName)
+                        Text(model.dictionaryProcessor.detail)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    .disabled(isDisabled(processor))
                 }
-            } header: {
-                Text("Processors")
             } footer: {
-                FootnoteText("Each dictation runs through these in order before it is inserted.")
+                FootnoteText("Runs first, so the optional cleanup step below sees your fixed-up terms.")
+            }
+
+            Section {
+                Toggle("Clean up transcripts", isOn: $model.settings.cleanupEnabled)
+
+                Picker("Using", selection: $model.settings.cleanupProviderID) {
+                    ForEach(model.cleanupRegistry.available) { entry in
+                        Text(entry.displayName).tag(entry.id)
+                    }
+                }
+                .disabled(!model.settings.cleanupEnabled)
+            } header: {
+                Text("Cleanup")
+            } footer: {
+                Text(cleanupFooter)
+                    .font(.callout)
+                    .foregroundStyle(model.cleanupAvailability != nil ? .red : .secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Section {
+                Toggle(isOn: binding(for: model.whitespaceProcessor.id)) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(model.whitespaceProcessor.displayName)
+                        Text(model.whitespaceProcessor.detail)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            } footer: {
+                FootnoteText("Runs last, right before the text is inserted.")
             }
         }
         .formStyle(.grouped)
+    }
+
+    /// Text shown under the "Using" picker: the selected provider's
+    /// unavailability reason when it has one, otherwise its detail line.
+    private var cleanupFooter: String {
+        if let reason = model.cleanupAvailability {
+            return reason
+        }
+        let selected = model.cleanupRegistry.entry(for: model.settings.cleanupProviderID)
+        return selected?.detail ?? ""
     }
 
     /// Settings stores the *disabled* IDs, so absence means on.
@@ -138,15 +175,6 @@ private struct ProcessingSettingsView: View {
             get: { !model.settings.disabledProcessors.contains(id) },
             set: { model.settings.setProcessor(id, enabled: $0) }
         )
-    }
-
-    private func isDisabled(_ processor: any TextProcessor) -> Bool {
-        unavailabilityReason(for: processor) != nil
-    }
-
-    private func unavailabilityReason(for processor: any TextProcessor) -> String? {
-        guard processor.id == FoundationModelProcessor.processorID else { return nil }
-        return FoundationModelProcessor.availability
     }
 }
 

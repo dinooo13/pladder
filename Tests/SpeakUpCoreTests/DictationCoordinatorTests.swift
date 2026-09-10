@@ -321,3 +321,169 @@ private func waitUntil(_ timeout: Duration = .seconds(2), _ condition: @MainActo
         try? FileManager.default.removeItem(at: dir)
     }
 }
+
+// MARK: - Prewarm
+
+/// Counts `prepare()` and `process()` so the tests can see when the pipeline
+/// was warmed relative to the release.
+actor RecordingProcessor: TextProcessor {
+    nonisolated let id = "recording"
+    nonisolated let displayName = "Recording"
+    nonisolated let detail = ""
+
+    private(set) var prepareCount = 0
+    private(set) var processCount = 0
+
+    func prepare() async { prepareCount += 1 }
+
+    func process(_ text: String) async throws -> String {
+        processCount += 1
+        return text
+    }
+}
+
+/// Polls a condition that has to hop to an actor to be read. Separate name
+/// from `waitUntil` so the two closures never overload-resolve against each
+/// other.
+private func waitUntilAsync(
+    _ timeout: Duration = .seconds(2), _ condition: @Sendable () async -> Bool
+) async -> Bool {
+    let deadline = ContinuousClock.now + timeout
+    while ContinuousClock.now < deadline {
+        if await condition() { return true }
+        try? await Task.sleep(for: .milliseconds(10))
+    }
+    return await condition()
+}
+
+/// Counts pipeline builds from the `@Sendable` factory, which runs on the main
+/// actor but is typed as if it could run anywhere.
+final class BuildCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _count = 0
+    var count: Int { lock.withLock { _count } }
+    func increment() { lock.withLock { _count += 1 } }
+}
+
+@MainActor
+private func makePrewarmCoordinator(
+    settings: Settings? = nil,
+    capture: FakeCapture = FakeCapture()
+) -> (DictationCoordinator, FakeOutput, FakeCapture, RecordingProcessor, BuildCounter) {
+    let registry = EngineRegistry([
+        .init(id: EchoEngine.engineID, displayName: "Echo", detail: "") {
+            EchoEngine(text: "hello world", delay: .milliseconds(5))
+        }
+    ])
+    let output = FakeOutput()
+    let recorder = RecordingProcessor()
+    let builds = BuildCounter()
+    let coordinator = DictationCoordinator(
+        settings: settings ?? Settings(engineID: EchoEngine.engineID),
+        registry: registry,
+        capture: capture,
+        output: output,
+        hotkeyMonitor: FakeHotkey(),
+        makePipeline: { s in
+            builds.increment()
+            return ProcessorPipeline([DictionaryReplacer(entries: s.dictionary), recorder])
+        }
+    )
+    return (coordinator, output, capture, recorder, builds)
+}
+
+@MainActor
+@Suite struct DictationCoordinatorPrewarmTests {
+    @Test func prepareIsCalledOnPressBeforeRelease() async {
+        let (c, _, _, recorder, _) = makePrewarmCoordinator()
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+
+        await c.hotkeyPressed()
+        // Warm-up runs in a detached task, so poll rather than assume it is
+        // already done when the press returns.
+        #expect(await waitUntilAsync { await recorder.prepareCount == 1 })
+        #expect(await recorder.processCount == 0)
+
+        c.hotkeyReleased()
+        await c.inFlight?.value
+        #expect(await recorder.prepareCount == 1)
+        #expect(await recorder.processCount == 1)
+    }
+
+    @Test func pipelineIsBuiltOncePerCycle() async {
+        let (c, _, _, recorder, builds) = makePrewarmCoordinator()
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed()
+        c.hotkeyReleased()
+        await c.inFlight?.value
+        #expect(builds.count == 1)
+        #expect(await recorder.prepareCount == 1)
+        #expect(await recorder.processCount == 1)
+    }
+
+    @Test func cancelDiscardsPreparedPipeline() async {
+        let (c, _, _, recorder, builds) = makePrewarmCoordinator()
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+
+        await c.hotkeyPressed()
+        #expect(await waitUntilAsync { await recorder.prepareCount == 1 })
+        await c.cancelRecording()
+        #expect(c.state == .idle)
+
+        await c.hotkeyPressed()
+        #expect(await waitUntilAsync { await recorder.prepareCount == 2 })
+        c.hotkeyReleased()
+        await c.inFlight?.value
+
+        #expect(builds.count == 2)
+        #expect(await recorder.prepareCount == 2)
+        #expect(await recorder.processCount == 1)
+    }
+
+    @Test func settingsChangeBetweenPressAndReleaseUsesPressPipeline() async {
+        var settings = Settings(engineID: EchoEngine.engineID)
+        settings.dictionary = [DictionaryEntry(from: "hello", to: "bye")]
+        settings.appendTrailingSpace = false
+        let (c, output, _, _, builds) = makePrewarmCoordinator(settings: settings)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+
+        await c.hotkeyPressed()
+        // The dictionary the user had when they started speaking is the one
+        // that applies to this utterance.
+        c.settings.dictionary = []
+        c.hotkeyReleased()
+        await c.inFlight?.value
+
+        #expect(output.inserted == ["bye world"])
+        #expect(builds.count == 1)
+    }
+
+    @Test func shortTapDiscardsPreparedPipeline() async {
+        let capture = FakeCapture()
+        await capture.setSamples(Array(repeating: 0, count: 1_600)) // 0.1 s
+        let (c, output, _, recorder, builds) = makePrewarmCoordinator(capture: capture)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+
+        await c.hotkeyPressed()
+        #expect(await waitUntilAsync { await recorder.prepareCount == 1 })
+        c.hotkeyReleased()
+        await c.inFlight?.value
+        #expect(c.state == .idle)
+        #expect(output.inserted.isEmpty)
+        #expect(await recorder.processCount == 0)
+
+        // The next press starts from scratch: new pipeline, warmed again.
+        await capture.setSamples(Array(repeating: 0.1, count: 16_000))
+        await c.hotkeyPressed()
+        #expect(await waitUntilAsync { await recorder.prepareCount == 2 })
+        c.hotkeyReleased()
+        await c.inFlight?.value
+        #expect(builds.count == 2)
+        #expect(await recorder.processCount == 1)
+    }
+}

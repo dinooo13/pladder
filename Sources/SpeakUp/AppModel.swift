@@ -15,10 +15,23 @@ final class AppModel {
     let registry: EngineRegistry
     let coordinator: DictationCoordinator
 
-    /// Text processors in pipeline order. The single source of truth for both
-    /// the settings toggles (ids, display names, details) and the runtime
-    /// pipeline `makePipeline` builds below.
-    let processors: [any TextProcessor]
+    /// Cleanup backends the Processing tab's "Using" picker lists. The app
+    /// registers Apple Intelligence at launch; another backend can be added
+    /// here later without touching settings or the pipeline.
+    let cleanupRegistry: CleanupRegistry
+
+    /// Stand-ins for the Processing tab's dictionary and whitespace toggles.
+    /// Their `id`/`displayName`/`detail` don't depend on live settings, so
+    /// these placeholders are enough for the UI; `makePipeline` below rebuilds
+    /// the real processors from the live settings on every dictation.
+    let dictionaryProcessor: any TextProcessor = DictionaryReplacer(entries: [])
+    let whitespaceProcessor: any TextProcessor = WhitespaceNormalizer()
+
+    /// `nil` when the selected cleanup provider is usable, otherwise the
+    /// reason shown under the "Using" picker.
+    var cleanupAvailability: String? {
+        cleanupRegistry.entry(for: settings.cleanupProviderID)?.availability()
+    }
 
     /// Mirrored permission state, refreshed on a timer so the menu and the
     /// settings window stay correct after the user flips a switch in System
@@ -67,29 +80,30 @@ final class AppModel {
         #endif
         self.registry = registry
 
-        let store = SettingsStore(
-            url: Self.settingsURL,
-            // Apple Intelligence cleanup is opt-in: it adds about a second.
-            defaults: Settings(
-                engineID: FluidAudioEngine.engineID,
-                disabledProcessors: [FoundationModelProcessor.processorID]
+        // Cleanup backends, mirroring the engine registry above. Apple
+        // Intelligence cleanup is opt-in: it adds about a second, so
+        // `cleanupEnabled` defaults to false until the tidy pass has been
+        // reviewed with the CLI harness.
+        var mutableCleanupRegistry = CleanupRegistry()
+        mutableCleanupRegistry.register(
+            CleanupRegistry.Entry(
+                id: FoundationModelProcessor.processorID,
+                displayName: "Apple Intelligence",
+                detail: "Adds punctuation, fixes capitalisation and drops filler sounds. About a second. Runs on device.",
+                availability: { FoundationModelProcessor.availability },
+                make: { FoundationModelProcessor() }
             )
         )
-        self.store = store
+        // Captured by the `@Sendable` closure below, so pin it to a `let`
+        // before self exists.
+        let cleanupRegistry = mutableCleanupRegistry
+        self.cleanupRegistry = cleanupRegistry
 
-        // Processors, in pipeline order: the dictionary runs first so its
-        // output is what the optional language model sees, and whitespace is
-        // tidied last. This is the single place that order is defined; both
-        // the settings toggles and `makePipeline` below derive from it.
-        // `DictionaryReplacer`'s entries here are unused placeholders — its
-        // `id`/`displayName`/`detail` don't depend on them, and `makePipeline`
-        // rebuilds it from the live settings on every dictation.
-        let processorOrder: [any TextProcessor] = [
-            DictionaryReplacer(entries: []),
-            FoundationModelProcessor(),
-            WhitespaceNormalizer(),
-        ]
-        self.processors = processorOrder
+        let store = SettingsStore(
+            url: Self.settingsURL,
+            defaults: Settings(engineID: FluidAudioEngine.engineID)
+        )
+        self.store = store
 
         let events = self.events
         coordinator = DictationCoordinator(
@@ -98,13 +112,7 @@ final class AppModel {
             capture: AVAudioEngineCapture(),
             output: PasteboardOutput(),
             hotkeyMonitor: GlobalHotkeyMonitor(),
-            makePipeline: { s in
-                ProcessorPipeline(processorOrder.map { processor in
-                    processor.id == DictionaryReplacer.processorID
-                        ? DictionaryReplacer(entries: s.dictionary)
-                        : processor
-                })
-            },
+            makePipeline: { s in ProcessorPipeline.standard(settings: s, cleanup: cleanupRegistry) },
             onEvent: { [events] event in events.send(event) }
         )
 

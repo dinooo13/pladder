@@ -1,0 +1,70 @@
+# Tests/Fixtures/tidy.txt
+#
+# Raw Parakeet-style transcripts for manual review with
+#   swift run speakup-cli --tidy Tests/Fixtures/tidy.txt
+#
+# One utterance per line, lowercase, sparse punctuation, occasional filler
+# sounds and stutters, exactly as the engine would hand them to the tidy
+# pass. Lines starting with # and blank lines are ignored by the CLI.
+
+# --- questions ---
+um what time is it
+uh do you know if the the meeting got moved to friday
+so is this the right version of the file
+can you uh remind me what we decided on tuesday
+wait what was that command again
+is it just me or is the wifi uh really slow today
+
+# --- imperatives ---
+delete all files in the downloads folder
+uh open the terminal and run the build script
+stop the recording now
+send this to the whole team please
+go back two paragraphs and uh delete the last sentence
+turn off notifications for the next hour
+remind me to call the dentist tomorrow morning
+
+# --- numbers and dates ---
+we're meeting on march third at uh nine thirty in the morning
+the invoice total came out to two thousand four hundred and fifty dollars
+um it took about three point five hours to finish
+the flight leaves at six forty five and lands at eleven fifteen
+we had twelve people on the call and uh three of them were late
+the release is scheduled for twenty twenty six oh one fifteen
+
+# --- dictionary terms ---
+i've been using claude code for most of the refactor this week
+uh open clode code and run the tests again
+we switched the transcription engine to parakeet tdt v three
+the fluid audio models are about seven hundred megabytes
+um speak up runs entirely on device with no cloud calls
+
+# --- like and so as real words ---
+so i was like really surprised it actually worked on the first try
+it's like a a normal tuesday so nothing special happened
+so like what do you think we should do about the deadline
+i mean it's fine i guess so let's just go with it
+like honestly i don't think it matters that much so let's move on
+
+# --- german ---
+äh ich glaube wir wir sollten das morgen machen
+kannst du mir bitte die datei noch einmal schicken
+öhm wo ist eigentlich das meeting heute
+wir treffen uns um vierzehn uhr im büro
+das hat äh ziemlich lange gedauert muss ich sagen
+
+# --- mixed language ---
+also let's ähm let's just ship it heute noch okay
+can you send mir das dokument bitte auf englisch
+we need um ein neues design für die startseite honestly
+
+# --- one-word inputs ---
+hello
+yes
+uh
+stop
+okay
+danke
+
+# --- 300+ word ramble ---
+okay so um i wanted to talk through the whole plan for the release because i think uh there's a lot of moving pieces and i'm a little worried we're going to miss something so let me just walk through it out loud um first there's the the backend migration which is supposed to land by wednesday but honestly i think it's more like thursday or even friday given how the last two sprints went so we should probably tell the team now instead of surprising them later um then there's the the mobile app which needs a new build uploaded to testflight and uh someone needs to actually test it on a real device not just the simulator because last time the simulator looked fine and then it crashed immediately on an actual phone which was uh pretty embarrassing honestly so let's not repeat that um on top of that we've got the marketing site copy that's still not finalized i think sarah was working on it but um i haven't seen an update in like four days so i should probably ping her today and ask where that stands because if it's not done by friday we can't do the announcement on monday like we planned and that pushes basically everything else back a week which is uh not great given how much we've already told people um also i almost forgot the pricing page needs to reflect the new tier so someone has to update that before we go live otherwise people are going to see the old numbers and get confused and start emailing support and that's just a mess we don't need right now so um let's make sure that's on someone's list today not next week um i guess my main worry honestly is that we're treating this like a normal release when it's actually got like five or six dependencies that all have to land in order and if even one of them slips a day the whole thing slips so uh maybe we should just build in a buffer day on thursday where nobody starts anything new and everyone just finishes what's already in flight um yeah i think that's basically it let's talk through it more at standup tomorrow but uh i wanted to get this out of my head before i forgot it

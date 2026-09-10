@@ -44,6 +44,10 @@ public final class DictationCoordinator {
     private var statusTask: Task<Void, Never>?
     private var errorResetTask: Task<Void, Never>?
     private var maxDurationTask: Task<Void, Never>?
+    /// The pipeline built when the hotkey went down, reused on release so a
+    /// settings change mid-utterance cannot swap the processors under us.
+    private var preparedPipeline: ProcessorPipeline?
+    private var prepareTask: Task<Void, Never>?
 
     public enum Event: Sendable {
         case recordingStarted
@@ -90,6 +94,7 @@ public final class DictationCoordinator {
         levelTask?.cancel()
         errorResetTask?.cancel()
         maxDurationTask?.cancel()
+        discardPreparedPipeline()
         if state.isRecording {
             Task { await cancelRecording() }
         }
@@ -199,6 +204,13 @@ public final class DictationCoordinator {
         // Flip state before the await so the overlay reacts on key-down and a
         // second concurrent press cannot start capture twice.
         state = .recording(level: 0)
+        // Warm the processors up while the user speaks: an on-device model can
+        // take a second to load and that second is free during recording.
+        let pipeline = makePipeline(settings)
+        preparedPipeline = pipeline
+        prepareTask?.cancel()
+        let disabled = settings.disabledProcessors
+        prepareTask = Task.detached(priority: .userInitiated) { await pipeline.prepare(disabled: disabled) }
         do {
             let levels = try await capture.start()
             guard state.isRecording else {
@@ -221,6 +233,7 @@ public final class DictationCoordinator {
                 self.hotkeyReleased()
             }
         } catch {
+            discardPreparedPipeline()
             fail("Microphone: \(error.localizedDescription)")
         }
     }
@@ -242,6 +255,7 @@ public final class DictationCoordinator {
 
     private func finish(_ audio: CapturedAudio) async {
         guard audio.duration >= minimumDuration else {
+            discardPreparedPipeline()
             state = .idle
             return
         }
@@ -249,8 +263,11 @@ public final class DictationCoordinator {
             let transcript = try await engine.transcribe(audio.samples)
             lastTranscript = transcript
             let settings = self.settings
-            let processed = try await makePipeline(settings)
-                .run(transcript.text, disabled: settings.disabledProcessors)
+            // Built and warmed at press; settings changed since then do not
+            // apply to this utterance.
+            let pipeline = preparedPipeline ?? makePipeline(settings)
+            preparedPipeline = nil
+            let processed = try await pipeline.run(transcript.text, disabled: settings.disabledProcessors)
             guard !processed.isEmpty else {
                 state = .idle
                 return
@@ -273,8 +290,17 @@ public final class DictationCoordinator {
         guard state.isRecording else { return }
         levelTask?.cancel()
         maxDurationTask?.cancel()
+        discardPreparedPipeline()
         state = .idle
         _ = await capture.stop()
+    }
+
+    /// Drops the pipeline warmed at press when the utterance never reaches
+    /// `finish`, so the next press builds a fresh one from current settings.
+    private func discardPreparedPipeline() {
+        prepareTask?.cancel()
+        prepareTask = nil
+        preparedPipeline = nil
     }
 
     private func fail(_ message: String) {

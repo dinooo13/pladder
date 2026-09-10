@@ -2,6 +2,11 @@ import Foundation
 
 /// Everything the user can change. Persisted as JSON by `SettingsStore`.
 public struct Settings: Codable, Sendable, Equatable {
+    /// The ID the cleanup step used before it became a pluggable slot. Only
+    /// read during migration; never written back.
+    public static let legacyFoundationModelProcessorID = "foundation-model"
+    public static let defaultCleanupProviderID = "apple-intelligence"
+
     public var engineID: EngineID
     public var hotkey: Hotkey
     /// Processor IDs that are turned off. Absent means enabled.
@@ -13,6 +18,10 @@ public struct Settings: Codable, Sendable, Equatable {
     public var launchAtLogin: Bool
     /// Play a short sound on record start/stop.
     public var playSounds: Bool
+    /// Run the selected cleanup provider between dictionary and whitespace.
+    public var cleanupEnabled: Bool
+    /// Which `CleanupRegistry` entry the cleanup slot uses.
+    public var cleanupProviderID: String
 
     public init(
         engineID: EngineID,
@@ -21,7 +30,9 @@ public struct Settings: Codable, Sendable, Equatable {
         dictionary: [DictionaryEntry] = [],
         appendTrailingSpace: Bool = true,
         launchAtLogin: Bool = false,
-        playSounds: Bool = true
+        playSounds: Bool = true,
+        cleanupEnabled: Bool = false,
+        cleanupProviderID: String = Settings.defaultCleanupProviderID
     ) {
         self.engineID = engineID
         self.hotkey = hotkey
@@ -30,19 +41,31 @@ public struct Settings: Codable, Sendable, Equatable {
         self.appendTrailingSpace = appendTrailingSpace
         self.launchAtLogin = launchAtLogin
         self.playSounds = playSounds
+        self.cleanupEnabled = cleanupEnabled
+        self.cleanupProviderID = cleanupProviderID
     }
 
     // Decoding tolerates missing keys so adding a field in a later version
     // never makes an existing settings file unreadable.
     private enum CodingKeys: String, CodingKey {
         case engineID, hotkey, disabledProcessors, dictionary, appendTrailingSpace, launchAtLogin, playSounds
+        case cleanupEnabled, cleanupProviderID
     }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         engineID = try c.decode(EngineID.self, forKey: .engineID)
         hotkey = try c.decodeIfPresent(Hotkey.self, forKey: .hotkey) ?? .rightOption
-        disabledProcessors = try c.decodeIfPresent(Set<String>.self, forKey: .disabledProcessors) ?? []
+        // The cleanup step used to be a plain processor toggled through
+        // `disabledProcessors`. Files written before the slot existed carry
+        // its ID there; strip it and fold it into `cleanupEnabled` so the
+        // user's choice survives. An explicit key always wins.
+        var disabled = try c.decodeIfPresent(Set<String>.self, forKey: .disabledProcessors) ?? []
+        let legacyOff = disabled.remove(Self.legacyFoundationModelProcessorID) != nil
+        disabledProcessors = disabled
+        cleanupEnabled = try c.decodeIfPresent(Bool.self, forKey: .cleanupEnabled) ?? !legacyOff
+        cleanupProviderID = try c.decodeIfPresent(String.self, forKey: .cleanupProviderID)
+            ?? Self.defaultCleanupProviderID
         dictionary = try c.decodeIfPresent([DictionaryEntry].self, forKey: .dictionary) ?? []
         appendTrailingSpace = try c.decodeIfPresent(Bool.self, forKey: .appendTrailingSpace) ?? true
         launchAtLogin = try c.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
