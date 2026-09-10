@@ -1,3 +1,4 @@
+import AppKit
 import AVFoundation
 import Foundation
 import Observation
@@ -217,13 +218,9 @@ final class AppModel {
 
     // MARK: Menu presentation
 
-    var menuBarSymbol: String {
-        switch coordinator.state {
-        case .recording: "mic.fill"
-        case .transcribing, .inserting: "waveform"
-        case .unavailable, .error: "mic.slash"
-        case .idle: "mic"
-        }
+    /// The app icon's waveform glyph, varied by state (see `MenuBarIcon`).
+    var menuBarImage: NSImage {
+        MenuBarIcon.image(for: coordinator.state)
     }
 
     /// One line describing what the app is doing right now.

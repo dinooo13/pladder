@@ -21,7 +21,7 @@ struct SpeakUpApp: App {
         MenuBarExtra {
             MenuContent(model: model)
         } label: {
-            Image(systemName: model.menuBarSymbol)
+            Image(nsImage: model.menuBarImage)
         }
         .menuBarExtraStyle(.menu)
 
