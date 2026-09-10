@@ -16,7 +16,7 @@ public struct Settings: Codable, Sendable, Equatable {
 
     public init(
         engineID: EngineID,
-        hotkey: Hotkey = .rightOption,
+        hotkey: Hotkey = .rightCommand,
         disabledProcessors: Set<String> = [],
         dictionary: [DictionaryEntry] = [],
         appendTrailingSpace: Bool = true,
@@ -41,7 +41,9 @@ public struct Settings: Codable, Sendable, Equatable {
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         engineID = try c.decode(EngineID.self, forKey: .engineID)
-        hotkey = try c.decodeIfPresent(Hotkey.self, forKey: .hotkey) ?? .rightOption
+        // An empty chord can never fire, so treat it like a missing key.
+        let decodedHotkey = try c.decodeIfPresent(Hotkey.self, forKey: .hotkey)
+        hotkey = decodedHotkey.flatMap { $0.keyCodes.isEmpty ? nil : $0 } ?? .rightCommand
         disabledProcessors = try c.decodeIfPresent(Set<String>.self, forKey: .disabledProcessors) ?? []
         dictionary = try c.decodeIfPresent([DictionaryEntry].self, forKey: .dictionary) ?? []
         appendTrailingSpace = try c.decodeIfPresent(Bool.self, forKey: .appendTrailingSpace) ?? true

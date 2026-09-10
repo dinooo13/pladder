@@ -45,15 +45,22 @@ private struct GeneralSettingsView: View {
             }
 
             Section {
-                Picker("Key", selection: $model.settings.hotkey) {
-                    ForEach(Hotkey.presets, id: \.hotkey) { preset in
-                        Text(preset.name).tag(preset.hotkey)
-                    }
+                LabeledContent("Key") {
+                    HotkeyRecorderField(
+                        hotkey: $model.settings.hotkey,
+                        onRecordingChanged: { model.coordinator.isHotkeySuspended = $0 }
+                    )
+                }
+                if let warning = hotkeyWarning {
+                    Label(warning, systemImage: "exclamationmark.triangle")
+                        .font(.callout)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             } header: {
                 Text("Push to Talk")
             } footer: {
-                FootnoteText("Hold to record, release to insert. Holding it together with another key does nothing, so shortcuts keep working.")
+                FootnoteText("Hold to record, release to insert. Click the key and press any key or combination, then let go. Left and right modifiers are different keys, so Right Command on its own works. Pressing anything else while holding it stops the recording, so shortcuts keep working.")
             }
 
             Section("Output") {
@@ -87,6 +94,14 @@ private struct GeneralSettingsView: View {
         }
         .formStyle(.grouped)
         .onAppear { model.refreshPermissions() }
+    }
+
+    /// A chord without a modifier is swallowed system wide, so a plain letter
+    /// or Space would become untypeable while SpeakUp runs.
+    private var hotkeyWarning: String? {
+        let hotkey = model.settings.hotkey
+        guard hotkey.modifierKeyCodes.isEmpty, !hotkey.keyCodes.isEmpty else { return nil }
+        return "Without a modifier, \(hotkey.displayName) can no longer be typed in other apps while SpeakUp is running."
     }
 
     private var launchAtLogin: Binding<Bool> {

@@ -236,7 +236,7 @@ private func waitUntil(_ timeout: Duration = .seconds(2), _ condition: @MainActo
         #expect(await waitUntil { c.state == .idle })
         await c.hotkeyPressed()
         #expect(c.state.isRecording)
-        c.settings.hotkey = .rightCommand
+        c.settings.hotkey = .rightOption
         #expect(await waitUntil { c.state == .idle })
         #expect(await capture.stopCount == 1)
         #expect(output.inserted.isEmpty)
@@ -293,7 +293,7 @@ private func waitUntil(_ timeout: Duration = .seconds(2), _ condition: @MainActo
         #expect(store.load() == defaults)
 
         var changed = defaults
-        changed.hotkey = .rightCommand
+        changed.hotkey = .rightOption
         changed.dictionary = [DictionaryEntry(from: "a", to: "b")]
         try store.save(changed)
         #expect(store.load() == changed)
@@ -305,7 +305,7 @@ private func waitUntil(_ timeout: Duration = .seconds(2), _ condition: @MainActo
         let decoded = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
         #expect(decoded.engineID == EchoEngine.engineID)
         #expect(decoded.dictionary.count == 1)
-        #expect(decoded.hotkey == .rightOption)
+        #expect(decoded.hotkey == .rightCommand)
         #expect(decoded.appendTrailingSpace == true)
     }
 

@@ -21,6 +21,24 @@ public final class DictationCoordinator {
         didSet { settingsChanged(from: oldValue) }
     }
 
+    /// True while the settings window is recording a new chord. The monitor
+    /// is taken down so the keys the user presses to define the new hotkey
+    /// cannot fire the old one, and a recording in progress is dropped.
+    public var isHotkeySuspended = false {
+        didSet {
+            guard isHotkeySuspended != oldValue else { return }
+            if isHotkeySuspended {
+                hotkeyTask?.cancel()
+                hotkeyMonitor.stop()
+                if state.isRecording {
+                    Task { await cancelRecording() }
+                }
+            } else {
+                startHotkey()
+            }
+        }
+    }
+
     /// Minimum recording length worth transcribing. Taps shorter than this are
     /// treated as accidental.
     public var minimumDuration: TimeInterval = 0.3
@@ -78,7 +96,7 @@ public final class DictationCoordinator {
 
     /// Loads the engine, warms the mic, and starts listening for the hotkey.
     public func start() {
-        startHotkey()
+        if !isHotkeySuspended { startHotkey() }
         Task { try? await capture.warmUp() }
         loadEngine()
     }
@@ -161,7 +179,7 @@ public final class DictationCoordinator {
             if state.isRecording {
                 Task { await cancelRecording() }
             }
-            startHotkey()
+            if !isHotkeySuspended { startHotkey() }
         }
         if old.engineID != settings.engineID, let next = registry.make(settings.engineID) {
             let previous = engine
