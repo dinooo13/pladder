@@ -69,7 +69,7 @@ Open **Settings…** from the menu bar icon.
 |---|---|
 | **General** | Engine, push-to-talk key (any key or combination, recorded by pressing it; Right Command by default), trailing space, sounds, launch at login. Shows permission status with a one-click fix. |
 | **Dictionary** | Replacement rules: what the model hears, what you want written, and whether case must match. Whole-word matching, longer phrases win, capitalisation carries over at the start of a sentence. Import and export as JSON. A test field shows the effect of your rules live. |
-| **Processing** | Toggle each post-processing step. Dictionary and whitespace tidying are on by default. **Apple Intelligence cleanup** uses the on-device Foundation Models framework to fix punctuation and capitalisation; it adds about a second and is off by default. |
+| **Processing** | Toggle each post-processing step. Dictionary and whitespace tidying are on by default. |
 
 
 Settings are stored as plain JSON in `~/Library/Application Support/SpeakUp/settings.json`.
