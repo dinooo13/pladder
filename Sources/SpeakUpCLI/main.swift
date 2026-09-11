@@ -10,6 +10,7 @@ import SpeakUpEngines
 //   speakup-cli <audio file>              load Parakeet, print the transcript and timing
 //   speakup-cli bench <fixtures dir>      run the benchmark (see docs/BENCHMARKS.md)
 //       [--runs N]                        runs per fixture, default 5; the first is discarded
+//       [--pause S]                       idle seconds before every run, default 10
 //
 // Fixtures are audio files with a sibling .txt holding the spoken script, as
 // produced by scripts/make-fixtures.sh.
@@ -17,7 +18,7 @@ import SpeakUpEngines
 func usage() -> Never {
     FileHandle.standardError.write(Data("""
     usage: speakup-cli <audio file>
-           speakup-cli bench <fixtures dir> [--runs N]
+           speakup-cli bench <fixtures dir> [--runs N] [--pause S]
 
     """.utf8))
     exit(2)
@@ -85,6 +86,24 @@ func physicalFootprintBytes() -> UInt64? {
     return result == KERN_SUCCESS ? info.phys_footprint : nil
 }
 
+/// One-minute load average, so the conditions of a run are on the record.
+func loadAverage() -> Double {
+    var loads = [Double](repeating: 0, count: 3)
+    return getloadavg(&loads, 3) > 0 ? loads[0] : 0
+}
+
+/// Empty when the chip is at its normal thermal state, else a tag for the
+/// run line, because a throttled run is not comparable.
+func thermalTag() -> String {
+    switch ProcessInfo.processInfo.thermalState {
+    case .nominal: return ""
+    case .fair: return " [thermal: fair]"
+    case .serious: return " [thermal: serious]"
+    case .critical: return " [thermal: critical]"
+    @unknown default: return " [thermal: unknown]"
+    }
+}
+
 // MARK: - Transcribe one file
 
 func transcribeFile(_ path: String) async throws {
@@ -124,9 +143,13 @@ func loadFixtures(in dir: URL) throws -> [Fixture] {
     return fixtures.sorted { $0.duration < $1.duration }
 }
 
-func runBench(dir: String, runs: Int) async throws {
+func runBench(dir: String, runs: Int, pause: Double) async throws {
     guard runs >= 2 else {
         FileHandle.standardError.write(Data("--runs must be at least 2 (the first run is discarded)\n".utf8))
+        exit(2)
+    }
+    guard pause >= 0 else {
+        FileHandle.standardError.write(Data("--pause must not be negative\n".utf8))
         exit(2)
     }
     let fixtures = try loadFixtures(in: URL(fileURLWithPath: dir))
@@ -142,6 +165,8 @@ func runBench(dir: String, runs: Int) async throws {
     print("machine: \(chip), macOS \(os)")
     print("model:   \(engine.id) (\(engine.displayName))")
     print("runs:    \(runs) per fixture, first discarded, median reported")
+    print(String(format: "pause:   %.0f s idle before every run, as between real dictations", pause))
+    print(String(format: "load:    %.2f (one-minute average at start)", loadAverage()))
     print("")
 
     let loadTime = try await loadEngine(engine)
@@ -154,15 +179,21 @@ func runBench(dir: String, runs: Int) async throws {
     struct Row { var name: String; var duration: Double; var engine: Double; var wer: Double }
     var rows: [Row] = []
     let clock = ContinuousClock()
+    var throttled = false
     for fixture in fixtures {
         var times: [Double] = []
         var errors: [Double] = []
         for run in 1...runs {
+            // Every run starts from idle, like a dictation does. Back-to-back
+            // runs would hand each other warm clocks and residual heat.
+            if pause > 0 { try await Task.sleep(for: .seconds(pause)) }
             let started = clock.now
             let transcript = try await engine.transcribe(fixture.samples)
             let elapsed = seconds(clock.now - started)
             let wer = WordErrorRate.compute(reference: fixture.reference, hypothesis: transcript.text)
-            let note = run == 1 ? " (warm-up, discarded)" : ""
+            let thermal = thermalTag()
+            throttled = throttled || !thermal.isEmpty
+            let note = (run == 1 ? " (warm-up, discarded)" : "") + thermal
             print(String(format: "%@ run %d: %.3f s, WER %.1f%%%@", fixture.name, run, elapsed, wer * 100, note))
             if run > 1 {
                 times.append(elapsed)
@@ -180,6 +211,11 @@ func runBench(dir: String, runs: Int) async throws {
             format: "| %@ | %.1f s | %.3f s | %.0fx | %.1f %% |",
             row.name, row.duration, row.engine, row.duration / row.engine, row.wer * 100))
     }
+    print("")
+    print(String(format: "load:    %.2f (one-minute average at end)", loadAverage()))
+    if throttled {
+        print("warning: the chip left its normal thermal state during the run; numbers are not comparable")
+    }
 }
 
 // MARK: - Entry
@@ -191,6 +227,7 @@ case nil, "-h", "--help":
 case "bench":
     arguments.removeFirst()
     var runs = 5
+    var pause = 10.0
     var dir: String?
     while let arg = arguments.first {
         arguments.removeFirst()
@@ -198,6 +235,10 @@ case "bench":
             guard let value = arguments.first, let n = Int(value) else { usage() }
             arguments.removeFirst()
             runs = n
+        } else if arg == "--pause" {
+            guard let value = arguments.first, let s = Double(value) else { usage() }
+            arguments.removeFirst()
+            pause = s
         } else if dir == nil {
             dir = arg
         } else {
@@ -205,7 +246,7 @@ case "bench":
         }
     }
     guard let dir else { usage() }
-    try await runBench(dir: dir, runs: runs)
+    try await runBench(dir: dir, runs: runs, pause: pause)
 case let path?:
     try await transcribeFile(path)
 }
