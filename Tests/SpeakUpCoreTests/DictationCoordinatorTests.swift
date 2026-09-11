@@ -308,6 +308,8 @@ private func waitUntil(_ timeout: Duration = .seconds(2), _ condition: @MainActo
         #expect(decoded.hotkey == .rightCommand)
         #expect(decoded.appendTrailingSpace == true)
         #expect(decoded.appearance == .system)
+        #expect(decoded.overlayStyle == .compact)
+        #expect(decoded.overlayGlass == true)
     }
 
     @Test func appearancePersists() throws {
@@ -317,6 +319,19 @@ private func waitUntil(_ timeout: Duration = .seconds(2), _ condition: @MainActo
         let store = SettingsStore(url: url, defaults: defaults)
         var changed = defaults
         changed.appearance = .dark
+        try store.save(changed)
+        #expect(store.load() == changed)
+        try? FileManager.default.removeItem(at: dir)
+    }
+
+    @Test func overlayStylePersists() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let url = dir.appendingPathComponent("settings.json")
+        let defaults = Settings(engineID: EchoEngine.engineID)
+        let store = SettingsStore(url: url, defaults: defaults)
+        var changed = defaults
+        changed.overlayStyle = .minimal
+        changed.overlayGlass = false
         try store.save(changed)
         #expect(store.load() == changed)
         try? FileManager.default.removeItem(at: dir)

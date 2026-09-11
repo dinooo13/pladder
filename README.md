@@ -67,7 +67,7 @@ Open **Settings…** from the menu bar icon.
 
 | Tab | What you can change |
 |---|---|
-| **General** | Engine, push-to-talk key (any key or combination, recorded by pressing it; Right Command by default), trailing space, sounds, launch at login. Shows permission status with a one-click fix. |
+| **General** | Engine, push-to-talk key (any key or combination, recorded by pressing it; Right Command by default), overlay style and background, appearance, trailing space, sounds, launch at login. Shows permission status with a one-click fix. |
 | **Dictionary** | Replacement rules: what the model hears, what you want written, and whether case must match. Whole-word matching, longer phrases win, capitalisation carries over at the start of a sentence. Import and export as JSON. A test field shows the effect of your rules live. |
 | **Processing** | Toggle each post-processing step. Dictionary and whitespace tidying are on by default. |
 

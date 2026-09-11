@@ -49,6 +49,7 @@ final class AppModel {
             guard newValue != coordinator.settings else { return }
             coordinator.settings = newValue
             applyAppearance(newValue.appearance)
+            overlay.applyStyle(newValue.overlayStyle, glass: newValue.overlayGlass)
             try? store.save(newValue)
         }
     }
@@ -137,6 +138,7 @@ final class AppModel {
 
     func start() {
         applyAppearance(settings.appearance)
+        overlay.applyStyle(settings.overlayStyle, glass: settings.overlayGlass)
         refreshPermissions()
         if !accessibilityTrusted && !didRequestAccessibility {
             didRequestAccessibility = true

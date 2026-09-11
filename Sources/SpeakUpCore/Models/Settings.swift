@@ -6,6 +6,12 @@ public enum Appearance: String, Codable, Sendable, CaseIterable, Equatable {
     case system, light, dark
 }
 
+/// Which overlay the pill shows while dictating. `liveTranscript` exists so
+/// the settings format is final; it is not selectable until #8 lands.
+public enum OverlayStyle: String, Codable, Sendable, CaseIterable, Equatable {
+    case menuBar, minimal, compact, liveTranscript
+}
+
 /// Everything the user can change. Persisted as JSON by `SettingsStore`.
 public struct Settings: Codable, Sendable, Equatable {
     public var engineID: EngineID
@@ -20,6 +26,10 @@ public struct Settings: Codable, Sendable, Equatable {
     /// Play a short sound on record start/stop.
     public var playSounds: Bool
     public var appearance: Appearance
+    public var overlayStyle: OverlayStyle
+    /// Liquid Glass behind the overlay pill; off gives a flat
+    /// window-background fill.
+    public var overlayGlass: Bool
 
     public init(
         engineID: EngineID,
@@ -29,7 +39,9 @@ public struct Settings: Codable, Sendable, Equatable {
         appendTrailingSpace: Bool = true,
         launchAtLogin: Bool = false,
         playSounds: Bool = true,
-        appearance: Appearance = .system
+        appearance: Appearance = .system,
+        overlayStyle: OverlayStyle = .compact,
+        overlayGlass: Bool = true
     ) {
         self.engineID = engineID
         self.hotkey = hotkey
@@ -39,12 +51,15 @@ public struct Settings: Codable, Sendable, Equatable {
         self.launchAtLogin = launchAtLogin
         self.playSounds = playSounds
         self.appearance = appearance
+        self.overlayStyle = overlayStyle
+        self.overlayGlass = overlayGlass
     }
 
     // Decoding tolerates missing keys so adding a field in a later version
     // never makes an existing settings file unreadable.
     private enum CodingKeys: String, CodingKey {
         case engineID, hotkey, disabledProcessors, dictionary, appendTrailingSpace, launchAtLogin, playSounds, appearance
+        case overlayStyle, overlayGlass
     }
 
     public init(from decoder: Decoder) throws {
@@ -59,6 +74,8 @@ public struct Settings: Codable, Sendable, Equatable {
         launchAtLogin = try c.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
         playSounds = try c.decodeIfPresent(Bool.self, forKey: .playSounds) ?? true
         appearance = try c.decodeIfPresent(Appearance.self, forKey: .appearance) ?? .system
+        overlayStyle = try c.decodeIfPresent(OverlayStyle.self, forKey: .overlayStyle) ?? .compact
+        overlayGlass = try c.decodeIfPresent(Bool.self, forKey: .overlayGlass) ?? true
     }
 
     public func isProcessorEnabled(_ id: String) -> Bool {

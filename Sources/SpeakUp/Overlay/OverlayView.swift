@@ -12,6 +12,11 @@ final class OverlayModel {
     /// AppKit's window propagation reaches a borderless panel inconsistently,
     /// so the color scheme is set in SwiftUI directly.
     var appearance: Appearance = .system
+    /// Which pill the user picked. `.menuBar` never presents except for
+    /// errors; the controller decides that, not the view.
+    var style: OverlayStyle = .compact
+    /// Liquid Glass behind the pill, or a flat window-background fill.
+    var glass: Bool = true
     init() {}
 }
 
@@ -45,39 +50,92 @@ private enum OverlayPhase: Equatable {
 struct OverlayView: View {
     let model: OverlayModel
 
-    @Namespace private var glassNamespace
-
     private var phase: OverlayPhase { OverlayPhase(model.state) }
+
+    var body: some View {
+        OverlayPill(state: model.state, style: model.style, glass: model.glass)
+            // Glass carries its own edge highlight; this is only enough shadow
+            // to lift the pill off a light desktop. The flat background gets
+            // the same treatment.
+            .compositingGroup()
+            .shadow(color: .black.opacity(0.16), radius: 8, y: 3)
+            .animation(.smooth(duration: 0.25), value: phase)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .modifier(ForcedScheme(appearance: model.appearance))
+    }
+}
+
+/// The pill itself, without the panel's shadow or forced scheme, so the
+/// settings previews can render a live replica of each style.
+struct OverlayPill: View {
+    let state: DictationState
+    let style: OverlayStyle
+    let glass: Bool
+    /// A static replica in settings: no dot timer, no pulse, seeded bars.
+    var isPreview: Bool = false
+
+    @Namespace private var glassNamespace
+    /// Minimal shows a pulsing dot for the first second, then the bars.
+    @State private var showDot = true
+    @State private var pulsing = false
+
+    private var phase: OverlayPhase { OverlayPhase(state) }
 
     var body: some View {
         GlassEffectContainer(spacing: 14) {
             content
-                .frame(minHeight: 32)
-                .padding(.horizontal, 18)
-                .padding(.vertical, 12)
-                .frame(minWidth: 140)
-                .glassEffect(.regular, in: Capsule())
-                .glassEffectID("pill", in: glassNamespace)
+                .modifier(PillBackground(glass: glass, namespace: glassNamespace))
         }
-        // Glass carries its own edge highlight; this is only enough shadow to
-        // lift the pill off a light desktop.
-        .compositingGroup()
-        .shadow(color: .black.opacity(0.16), radius: 8, y: 3)
-        .animation(.smooth(duration: 0.25), value: phase)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .modifier(ForcedScheme(appearance: model.appearance))
+        .task(id: phase) {
+            guard !isPreview else { return }
+            // Runs on every phase change, so leaving `.recording` is where
+            // the pulse is reset; otherwise the next take's dot would appear
+            // already at full scale with no animation left to run.
+            guard phase == .recording else {
+                pulsing = false
+                return
+            }
+            showDot = true
+            try? await Task.sleep(for: .seconds(1))
+            // A phase change cancels this task, which is exactly what should
+            // stop the swap; nothing else to unwind.
+            guard !Task.isCancelled else { return }
+            withAnimation(.smooth(duration: 0.3)) { showDot = false }
+        }
+    }
+
+    private var isError: Bool {
+        if case .error = state { return true }
+        return false
     }
 
     @ViewBuilder
     private var content: some View {
-        switch model.state {
+        // An error presents in every style (the controller makes sure of it),
+        // and the message needs the Compact row's width, so errors always
+        // render as the Compact row. `.menuBar` only ever reaches the view for
+        // errors; `.liveTranscript` renders as Compact until #8 lands.
+        if isError || style != .minimal {
+            compactContent
+                .frame(minHeight: 32)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
+                .frame(minWidth: 140)
+        } else {
+            minimalContent
+                .frame(minHeight: 20)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+        }
+    }
+
+    @ViewBuilder
+    private var compactContent: some View {
+        switch state {
         case .recording(let level):
             HStack(spacing: 10) {
-                Circle()
-                    .fill(.red)
-                    .frame(width: 8, height: 8)
-                    .shadow(color: .red.opacity(0.6), radius: 4)
-                LevelBars(level: level)
+                RecordingDot()
+                LevelBars(level: level, count: 14, maxHeight: 32, opacity: 1, seeded: isPreview)
             }
         case .transcribing:
             HStack(spacing: 10) {
@@ -112,30 +170,129 @@ struct OverlayView: View {
             Color.clear.frame(width: 100)
         }
     }
+
+    /// Just enough to say "recording", "working", "done": no text, no fixed
+    /// width. The dot marks the start of a take, then the bars take over so
+    /// the pill still shows the microphone is live.
+    @ViewBuilder
+    private var minimalContent: some View {
+        switch state {
+        case .recording(let level):
+            ZStack {
+                if showsDot {
+                    RecordingDot()
+                        .scaleEffect(pulsing ? 1.3 : 1.0)
+                        .onAppear {
+                            guard !isPreview else { return }
+                            withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
+                                pulsing = true
+                            }
+                        }
+                        .transition(.opacity)
+                } else {
+                    LevelBars(level: level, count: 8, maxHeight: 20, opacity: 0.8, seeded: isPreview)
+                        .transition(.opacity)
+                }
+            }
+        case .transcribing:
+            ProgressView()
+                .controlSize(.small)
+        case .inserting:
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 14))
+                .foregroundStyle(.green)
+        case .error, .idle, .unavailable:
+            Color.clear.frame(width: 40)
+        }
+    }
+
+    /// A replica has no timer, so it goes straight to the bars.
+    private var showsDot: Bool { isPreview ? false : showDot }
+}
+
+/// The red "live" dot, shared by Compact, Minimal and the settings replicas.
+struct RecordingDot: View {
+    var size: CGFloat = 8
+
+    var body: some View {
+        Circle()
+            .fill(.red)
+            .frame(width: size, height: size)
+            .shadow(color: .red.opacity(0.6), radius: 4)
+    }
+}
+
+/// What sits behind the pill: Liquid Glass, or a flat window-background
+/// capsule with a hairline border for people who want the desktop to stay
+/// still. The shadow is added by whoever hosts the pill.
+struct PillBackground: ViewModifier {
+    let glass: Bool
+    /// Only the live overlay morphs between states, so the glass identity is
+    /// optional; the settings replicas pass nothing.
+    var namespace: Namespace.ID?
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if glass {
+            if let namespace {
+                content
+                    .glassEffect(.regular, in: Capsule())
+                    .glassEffectID("pill", in: namespace)
+            } else {
+                content
+                    .glassEffect(.regular, in: Capsule())
+            }
+        } else {
+            content
+                .background(Color(nsColor: .windowBackgroundColor), in: Capsule())
+                .overlay(Capsule().strokeBorder(.separator, lineWidth: 1))
+        }
+    }
 }
 
 /// Bars whose heights follow the input level. The shaping (amplitude curve,
 /// bell envelope, wobble, rise/fall blend) lives in the shared
 /// `WaveformMeter`, so this wave matches the menu bar glyph exactly.
-private struct LevelBars: View {
+struct LevelBars: View {
     let level: Float
+    let count: Int
+    let maxHeight: CGFloat
+    let opacity: Double
 
-    private static let count = 14
     private static let minScale: CGFloat = 0.1
-    private static let maxHeight: CGFloat = 32
 
-    @State private var meter = WaveformMeter(count: count)
-    @State private var heights: [CGFloat] = Array(repeating: minScale, count: LevelBars.count)
+    @State private var meter: WaveformMeter
+    @State private var heights: [CGFloat]
+
+    /// `seeded` pre-rolls the meter so a static replica (the settings cards,
+    /// which never see a level change) shows a wave rather than a row of
+    /// stubs.
+    init(level: Float, count: Int, maxHeight: CGFloat, opacity: Double, seeded: Bool = false) {
+        self.level = level
+        self.count = count
+        self.maxHeight = maxHeight
+        self.opacity = opacity
+
+        var meter = WaveformMeter(count: count)
+        var initial = Array(repeating: Self.minScale, count: count)
+        if seeded {
+            var shaped: [Float] = []
+            for _ in 0..<8 { shaped = meter.update(level: level) }
+            initial = shaped.map { max(Self.minScale, CGFloat($0)) }
+        }
+        _meter = State(initialValue: meter)
+        _heights = State(initialValue: initial)
+    }
 
     var body: some View {
         HStack(alignment: .center, spacing: 3) {
-            ForEach(0..<Self.count, id: \.self) { index in
+            ForEach(0..<count, id: \.self) { index in
                 Capsule()
-                    .fill(.primary)
-                    .frame(width: 3, height: max(3, heights[index] * Self.maxHeight))
+                    .fill(.primary.opacity(opacity))
+                    .frame(width: 3, height: max(3, heights[index] * maxHeight))
             }
         }
-        .frame(height: Self.maxHeight)
+        .frame(height: maxHeight)
         .onChange(of: level) { _, new in
             let next = meter.update(level: new)
             withAnimation(.easeOut(duration: 0.1)) {

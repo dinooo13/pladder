@@ -37,6 +37,21 @@ private extension Appearance {
     }
 }
 
+private extension OverlayStyle {
+    var displayName: String {
+        switch self {
+        case .menuBar: "Menu Bar"
+        case .minimal: "Minimal"
+        case .compact: "Compact"
+        case .liveTranscript: "Live"
+        }
+    }
+
+    /// The live transcript pill is shown as a disabled card until #8 lands,
+    /// so the row already reads the way it finally will.
+    var isSelectable: Bool { self != .liveTranscript }
+}
+
 private struct GeneralSettingsView: View {
     @Bindable var model: AppModel
 
@@ -75,15 +90,59 @@ private struct GeneralSettingsView: View {
 
             Section {
                 LabeledContent("Appearance") {
-                    Picker("Appearance", selection: $model.settings.appearance) {
+                    HStack(spacing: 10) {
                         ForEach(Appearance.allCases, id: \.self) { appearance in
-                            Text(appearance.displayName).tag(appearance)
+                            OptionCard(
+                                title: appearance.displayName,
+                                isSelected: model.settings.appearance == appearance,
+                                action: { model.settings.appearance = appearance }
+                            ) {
+                                AppearanceThumbnail(appearance: appearance)
+                            }
                         }
                     }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .frame(width: 180)
                 }
+            }
+
+            Section {
+                LabeledContent("Style") {
+                    HStack(spacing: 10) {
+                        ForEach(OverlayStyle.allCases, id: \.self) { style in
+                            OptionCard(
+                                title: style.displayName,
+                                isSelected: model.settings.overlayStyle == style,
+                                isEnabled: style.isSelectable,
+                                action: { model.settings.overlayStyle = style }
+                            ) {
+                                OverlayStyleThumbnail(style: style, glass: model.settings.overlayGlass)
+                            }
+                        }
+                    }
+                }
+                LabeledContent("Background") {
+                    HStack(spacing: 10) {
+                        OptionCard(
+                            title: "Glass",
+                            isSelected: model.settings.overlayGlass,
+                            isEnabled: model.settings.overlayStyle != .menuBar,
+                            action: { model.settings.overlayGlass = true }
+                        ) {
+                            BackgroundThumbnail(glass: true)
+                        }
+                        OptionCard(
+                            title: "Flat",
+                            isSelected: !model.settings.overlayGlass,
+                            isEnabled: model.settings.overlayStyle != .menuBar,
+                            action: { model.settings.overlayGlass = false }
+                        ) {
+                            BackgroundThumbnail(glass: false)
+                        }
+                    }
+                }
+            } header: {
+                Text("Overlay")
+            } footer: {
+                FootnoteText("Shown while you dictate. Menu Bar only relies on the wave in the menu bar; errors still appear.")
             }
 
             Section("Sounds & Startup") {

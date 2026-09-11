@@ -41,6 +41,13 @@ final class OverlayController {
         panel.appearance = appearance == .system ? NSApp.appearance : NSAppearance(named: appearance == .dark ? .darkAqua : .aqua)
     }
 
+    /// Pushes the overlay style and background choice onto the model, which
+    /// the pill and the panel's size both read.
+    func applyStyle(_ style: OverlayStyle, glass: Bool) {
+        model.style = style
+        model.glass = glass
+    }
+
     /// `withObservationTracking` fires once per change, so we re-arm it every
     /// time. The callback runs *before* the new value is stored, hence the hop
     /// onto a task to read it.
@@ -59,10 +66,19 @@ final class OverlayController {
     private func apply(_ state: DictationState) {
         switch state {
         case .recording, .transcribing, .inserting:
+            // Menu Bar relies on the menu bar glyph alone, so nothing is
+            // presented. If the style was switched mid-dictation the pill may
+            // already be up; fade it out the same way idle does.
+            guard model.style != .menuBar else {
+                if visible { scheduleHide(after: .milliseconds(400)) }
+                return
+            }
             model.state = state
             cancelHide()
             present()
         case .error:
+            // Errors show in every style, Menu Bar included: a failed paste
+            // must never be silent.
             model.state = state
             cancelHide()
             present()
