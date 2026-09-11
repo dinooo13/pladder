@@ -75,7 +75,7 @@ struct OverlayPill: View {
     var isPreview: Bool = false
 
     @Namespace private var glassNamespace
-    /// Minimal shows a pulsing dot for the first second, then the bars.
+    /// Minimal shows a pulsing dot for the first 0.7 s, then the bars.
     @State private var showDot = true
     @State private var pulsing = false
 
@@ -96,7 +96,7 @@ struct OverlayPill: View {
                 return
             }
             showDot = true
-            try? await Task.sleep(for: .seconds(1))
+            try? await Task.sleep(for: .milliseconds(700))
             // A phase change cancels this task, which is exactly what should
             // stop the swap; nothing else to unwind.
             guard !Task.isCancelled else { return }
