@@ -8,6 +8,10 @@ import SpeakUpCore
 @Observable
 final class OverlayModel {
     var state: DictationState = .idle
+    /// Appearance forced by the Appearance setting; `.system` means follow.
+    /// AppKit's window propagation reaches a borderless panel inconsistently,
+    /// so the color scheme is set in SwiftUI directly.
+    var appearance: Appearance = .system
     init() {}
 }
 
@@ -61,6 +65,7 @@ struct OverlayView: View {
         .shadow(color: .black.opacity(0.16), radius: 8, y: 3)
         .animation(.smooth(duration: 0.25), value: phase)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .modifier(ForcedScheme(appearance: model.appearance))
     }
 
     @ViewBuilder
@@ -136,6 +141,22 @@ private struct LevelBars: View {
             withAnimation(.easeOut(duration: 0.1)) {
                 heights = next.map { max(Self.minScale, CGFloat($0)) }
             }
+        }
+    }
+}
+
+/// Overrides the SwiftUI color scheme under a forced appearance. AppKit's
+/// window-appearance propagation reaches a borderless panel inconsistently,
+/// so this sets the scheme in the environment directly, which is what
+/// `glassEffect` and the text colours follow.
+private struct ForcedScheme: ViewModifier {
+    let appearance: Appearance
+
+    func body(content: Content) -> some View {
+        switch appearance {
+        case .system: content
+        case .light: content.environment(\.colorScheme, .light)
+        case .dark: content.environment(\.colorScheme, .dark)
         }
     }
 }

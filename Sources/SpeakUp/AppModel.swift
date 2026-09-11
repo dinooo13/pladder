@@ -41,14 +41,26 @@ final class AppModel {
     private static let timing = Logger(subsystem: "de.speakup.app", category: "timing")
 
     /// Settings live in the coordinator (it reacts to hotkey/engine changes);
-    /// this forwards and persists.
+    /// this forwards and persists. Applying the appearance covers every
+    /// window and menu at once, so no view has to care.
     var settings: Settings {
         get { coordinator.settings }
         set {
             guard newValue != coordinator.settings else { return }
             coordinator.settings = newValue
+            applyAppearance(newValue.appearance)
             try? store.save(newValue)
         }
+    }
+
+    private func applyAppearance(_ appearance: Appearance) {
+        let resolved: NSAppearance? = switch appearance {
+        case .system: nil
+        case .light: NSAppearance(named: .aqua)
+        case .dark: NSAppearance(named: .darkAqua)
+        }
+        NSApp.appearance = resolved
+        overlay.applyAppearance(appearance)
     }
 
     init() {
@@ -124,6 +136,7 @@ final class AppModel {
     // MARK: Lifecycle
 
     func start() {
+        applyAppearance(settings.appearance)
         refreshPermissions()
         if !accessibilityTrusted && !didRequestAccessibility {
             didRequestAccessibility = true

@@ -1,5 +1,11 @@
 import Foundation
 
+/// Which interface style the app uses. `NSApp.appearance` maps this: `nil`
+/// for system, `.aqua` for light, `.darkAqua` for dark.
+public enum Appearance: String, Codable, Sendable, CaseIterable, Equatable {
+    case system, light, dark
+}
+
 /// Everything the user can change. Persisted as JSON by `SettingsStore`.
 public struct Settings: Codable, Sendable, Equatable {
     public var engineID: EngineID
@@ -13,6 +19,7 @@ public struct Settings: Codable, Sendable, Equatable {
     public var launchAtLogin: Bool
     /// Play a short sound on record start/stop.
     public var playSounds: Bool
+    public var appearance: Appearance
 
     public init(
         engineID: EngineID,
@@ -21,7 +28,8 @@ public struct Settings: Codable, Sendable, Equatable {
         dictionary: [DictionaryEntry] = [],
         appendTrailingSpace: Bool = true,
         launchAtLogin: Bool = false,
-        playSounds: Bool = true
+        playSounds: Bool = true,
+        appearance: Appearance = .system
     ) {
         self.engineID = engineID
         self.hotkey = hotkey
@@ -30,12 +38,13 @@ public struct Settings: Codable, Sendable, Equatable {
         self.appendTrailingSpace = appendTrailingSpace
         self.launchAtLogin = launchAtLogin
         self.playSounds = playSounds
+        self.appearance = appearance
     }
 
     // Decoding tolerates missing keys so adding a field in a later version
     // never makes an existing settings file unreadable.
     private enum CodingKeys: String, CodingKey {
-        case engineID, hotkey, disabledProcessors, dictionary, appendTrailingSpace, launchAtLogin, playSounds
+        case engineID, hotkey, disabledProcessors, dictionary, appendTrailingSpace, launchAtLogin, playSounds, appearance
     }
 
     public init(from decoder: Decoder) throws {
@@ -49,6 +58,7 @@ public struct Settings: Codable, Sendable, Equatable {
         appendTrailingSpace = try c.decodeIfPresent(Bool.self, forKey: .appendTrailingSpace) ?? true
         launchAtLogin = try c.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
         playSounds = try c.decodeIfPresent(Bool.self, forKey: .playSounds) ?? true
+        appearance = try c.decodeIfPresent(Appearance.self, forKey: .appearance) ?? .system
     }
 
     public func isProcessorEnabled(_ id: String) -> Bool {

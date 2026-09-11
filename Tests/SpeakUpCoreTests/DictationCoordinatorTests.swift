@@ -307,6 +307,19 @@ private func waitUntil(_ timeout: Duration = .seconds(2), _ condition: @MainActo
         #expect(decoded.dictionary.count == 1)
         #expect(decoded.hotkey == .rightCommand)
         #expect(decoded.appendTrailingSpace == true)
+        #expect(decoded.appearance == .system)
+    }
+
+    @Test func appearancePersists() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let url = dir.appendingPathComponent("settings.json")
+        let defaults = Settings(engineID: EchoEngine.engineID)
+        let store = SettingsStore(url: url, defaults: defaults)
+        var changed = defaults
+        changed.appearance = .dark
+        try store.save(changed)
+        #expect(store.load() == changed)
+        try? FileManager.default.removeItem(at: dir)
     }
 
     @Test func unreadableFileIsMovedAsideNotOverwritten() throws {
