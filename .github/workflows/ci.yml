@@ -5,14 +5,14 @@ on:
     branches: [main]
     paths-ignore:
       - 'docs/**'
-      - '.github/**'
+      - '.github/ISSUE_TEMPLATE/**'
       - 'README.md'
       - 'LICENSE'
       - '**/*.md'
   pull_request:
     paths-ignore:
       - 'docs/**'
-      - '.github/**'
+      - '.github/ISSUE_TEMPLATE/**'
       - 'README.md'
       - 'LICENSE'
       - '**/*.md'
