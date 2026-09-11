@@ -3,6 +3,7 @@ import AVFoundation
 import Foundation
 import Observation
 import SpeakUpCore
+import os
 
 import SpeakUpSystem
 import SpeakUpAudio
@@ -32,6 +33,12 @@ final class AppModel {
     private let overlay: OverlayController
     private var permissionTask: Task<Void, Never>?
     private var didRequestAccessibility = false
+
+    /// When the hotkey was released, for the release-to-paste measurement.
+    private var releaseInstant: ContinuousClock.Instant?
+    /// Release-to-paste time per dictation, the number the user feels. Read
+    /// it with: log show --last 1h --predicate 'subsystem == "de.beh.speakup"'
+    private static let timing = Logger(subsystem: "de.beh.speakup", category: "timing")
 
     /// Settings live in the coordinator (it reacts to hotkey/engine changes);
     /// this forwards and persists.
@@ -105,7 +112,7 @@ final class AppModel {
         )
 
         overlay = OverlayController(coordinator: coordinator)
-        events.handler = { [weak self] event in self?.handle(event) }
+        events.handler = { [weak self] event, at in self?.handle(event, at: at) }
     }
 
     static var settingsURL: URL {
@@ -133,13 +140,28 @@ final class AppModel {
         coordinator.stop()
     }
 
-    private func handle(_ event: DictationCoordinator.Event) {
-        guard settings.playSounds else { return }
+    private func handle(_ event: DictationCoordinator.Event, at instant: ContinuousClock.Instant) {
         switch event {
-        case .recordingStarted: SoundPlayer.playStart()
-        case .recordingStopped: SoundPlayer.playStop()
-        case .inserted, .failed: break
+        case .recordingStarted:
+            if settings.playSounds { SoundPlayer.playStart() }
+        case .recordingStopped:
+            releaseInstant = instant
+            if settings.playSounds { SoundPlayer.playStop() }
+        case .inserted(let transcript):
+            guard let released = releaseInstant else { return }
+            releaseInstant = nil
+            let total = Self.seconds(instant - released)
+            Self.timing.log(
+                "release-to-paste \(total, format: .fixed(precision: 3), privacy: .public) s, audio \(transcript.audioDuration, format: .fixed(precision: 1), privacy: .public) s, engine \(transcript.processingTime, format: .fixed(precision: 3), privacy: .public) s"
+            )
+        case .failed:
+            releaseInstant = nil
         }
+    }
+
+    private static func seconds(_ duration: Duration) -> Double {
+        let parts = duration.components
+        return Double(parts.seconds) + Double(parts.attoseconds) / 1e18
     }
 
     // MARK: Permissions
@@ -262,11 +284,16 @@ final class AppModel {
 
 /// Bridges the coordinator's nonisolated `onEvent` callback back onto the main
 /// actor, and lets us hand the coordinator a callback before `self` exists.
+///
+/// Each event is stamped when the coordinator emits it, not when the main
+/// actor gets around to handling it, so the release-to-paste measurement does
+/// not include scheduling delay.
 @MainActor
 final class EventRelay {
-    var handler: ((DictationCoordinator.Event) -> Void)?
+    var handler: ((DictationCoordinator.Event, ContinuousClock.Instant) -> Void)?
 
     nonisolated func send(_ event: DictationCoordinator.Event) {
-        Task { @MainActor in self.handler?(event) }
+        let at = ContinuousClock.now
+        Task { @MainActor in self.handler?(event, at) }
     }
 }
