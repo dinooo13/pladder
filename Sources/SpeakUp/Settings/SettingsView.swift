@@ -97,7 +97,7 @@ private struct GeneralSettingsView: View {
                                 isSelected: model.settings.appearance == appearance,
                                 action: { model.settings.appearance = appearance }
                             ) {
-                                AppearanceThumbnail(appearance: appearance)
+                                AppearanceThumbnail(appearance: appearance, glass: model.settings.overlayGlass)
                             }
                         }
                     }

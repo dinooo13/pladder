@@ -28,6 +28,9 @@ struct OptionCard<Thumbnail: View>: View {
                 thumbnail
                     .frame(width: Self.designSize.width, height: Self.designSize.height)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
+                    // A hairline edge, mostly for dark mode, where a dark
+                    // desktop otherwise sinks into the window behind it.
+                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.primary.opacity(0.2), lineWidth: 1.5))
                     .scaleEffect(Self.scale)
                     .frame(width: Self.cardSize.width, height: Self.cardSize.height)
                     // The ring sits in the padding, so selecting a card does
@@ -68,7 +71,7 @@ struct DesktopThumbnail<Content: View>: View {
     var body: some View {
         LinearGradient(
             colors: resolved == .dark
-                ? [Color(red: 0.16, green: 0.20, blue: 0.48), Color(red: 0.05, green: 0.06, blue: 0.18)]
+                ? [Color(red: 0.30, green: 0.36, blue: 0.70), Color(red: 0.10, green: 0.12, blue: 0.32)]
                 : [Color(red: 0.62, green: 0.78, blue: 0.97), Color(red: 0.24, green: 0.46, blue: 0.88)],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -83,10 +86,12 @@ struct DesktopThumbnail<Content: View>: View {
     }
 }
 
-/// Light, Dark and Auto, drawn as a miniature window on a desktop. Auto splits
+/// Light, Dark and Auto, shown on the Compact pill (the default overlay) so
+/// the card previews the thing the setting most visibly changes. Auto splits
 /// the card along the diagonal, the way System Settings does.
 struct AppearanceThumbnail: View {
     let appearance: Appearance
+    let glass: Bool
 
     @ViewBuilder
     var body: some View {
@@ -105,9 +110,8 @@ struct AppearanceThumbnail: View {
 
     private func desktop(_ scheme: ColorScheme) -> some View {
         DesktopThumbnail(scheme: scheme) {
-            window(scheme)
-                .padding(6)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+            OverlayPill(state: .recording(level: 0.55), style: .compact, glass: glass, isPreview: true)
+                .scaleEffect(0.5)
         }
         .overlay(alignment: .top) {
             // The menu bar, just enough of it to read as "a Mac".
@@ -115,28 +119,6 @@ struct AppearanceThumbnail: View {
                 .fill(.white.opacity(scheme == .dark ? 0.15 : 0.7))
                 .frame(height: 2)
         }
-    }
-
-    private func window(_ scheme: ColorScheme) -> some View {
-        RoundedRectangle(cornerRadius: 5)
-            .fill(scheme == .dark ? Color(white: 0.16) : Color(white: 0.96))
-            .frame(width: 60, height: 36)
-            .overlay(alignment: .topLeading) {
-                VStack(alignment: .leading, spacing: 0) {
-                    HStack(spacing: 4) {
-                        Circle().fill(.red).frame(width: 5, height: 5)
-                        Circle().fill(.yellow).frame(width: 5, height: 5)
-                        Circle().fill(.green).frame(width: 5, height: 5)
-                    }
-                    Spacer().frame(height: 10)
-                    // Stands in for a selected row, so the card shows what the
-                    // accent colour looks like against the window.
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color(red: 0.36, green: 0.58, blue: 0.98))
-                        .frame(height: 5)
-                }
-                .padding(5)
-            }
     }
 }
 
