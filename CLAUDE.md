@@ -13,7 +13,7 @@ Push-to-talk dictation for macOS 26 on Apple Silicon. Hold a key, speak, release
 Before and after any change that touches the code between `recordingStopped` and `inserted` in `DictationCoordinator`, run the benchmark and put both results in the pull request. The procedure and the M1 baseline are in [docs/BENCHMARKS.md](docs/BENCHMARKS.md). A difference under about ten percent is noise. The app also logs the release-to-paste time of every real dictation:
 
 ```sh
-/usr/bin/log show --last 1h --style compact --predicate 'subsystem == "de.beh.speakup"'
+/usr/bin/log show --last 1h --style compact --predicate 'subsystem == "de.speakup.app"'
 ```
 
 ## Commands

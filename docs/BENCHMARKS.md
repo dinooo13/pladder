@@ -114,7 +114,7 @@ Every dictation logs one line with the total release-to-paste time, the audio
 length and the engine's share of it:
 
 ```sh
-/usr/bin/log show --last 1h --style compact --predicate 'subsystem == "de.beh.speakup"'
+/usr/bin/log show --last 1h --style compact --predicate 'subsystem == "de.speakup.app"'
 ```
 
 The difference between the total and the engine time is capture stop,
