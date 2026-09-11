@@ -37,8 +37,8 @@ final class AppModel {
     /// When the hotkey was released, for the release-to-paste measurement.
     private var releaseInstant: ContinuousClock.Instant?
     /// Release-to-paste time per dictation, the number the user feels. Read
-    /// it with: log show --last 1h --predicate 'subsystem == "de.beh.speakup"'
-    private static let timing = Logger(subsystem: "de.beh.speakup", category: "timing")
+    /// it with: log show --last 1h --predicate 'subsystem == "de.speakup.app"'
+    private static let timing = Logger(subsystem: "de.speakup.app", category: "timing")
 
     /// Settings live in the coordinator (it reacts to hotkey/engine changes);
     /// this forwards and persists.
