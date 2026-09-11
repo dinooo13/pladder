@@ -90,7 +90,7 @@ private struct GeneralSettingsView: View {
 
             Section {
                 LabeledContent("Appearance") {
-                    HStack(spacing: 10) {
+                    HStack(spacing: 8) {
                         ForEach(Appearance.allCases, id: \.self) { appearance in
                             OptionCard(
                                 title: appearance.displayName,
@@ -106,7 +106,7 @@ private struct GeneralSettingsView: View {
 
             Section {
                 LabeledContent("Style") {
-                    HStack(spacing: 10) {
+                    HStack(spacing: 8) {
                         ForEach(OverlayStyle.allCases, id: \.self) { style in
                             OptionCard(
                                 title: style.displayName,
@@ -120,7 +120,7 @@ private struct GeneralSettingsView: View {
                     }
                 }
                 LabeledContent("Background") {
-                    HStack(spacing: 10) {
+                    HStack(spacing: 8) {
                         OptionCard(
                             title: "Glass",
                             isSelected: model.settings.overlayGlass,

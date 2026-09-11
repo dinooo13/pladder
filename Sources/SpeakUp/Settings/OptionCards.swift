@@ -13,18 +13,29 @@ struct OptionCard<Thumbnail: View>: View {
     let action: @MainActor () -> Void
     @ViewBuilder let thumbnail: Thumbnail
 
+    /// Thumbnails are laid out at this size and then scaled, so the mini
+    /// windows and pills keep their proportions whatever the card size.
+    /// (Computed, since a generic type cannot hold static stored values.)
+    private static var designSize: CGSize { CGSize(width: 88, height: 56) }
+    private static var scale: CGFloat { 2 / 3 }
+    private static var cardSize: CGSize {
+        CGSize(width: (designSize.width * scale).rounded(), height: (designSize.height * scale).rounded())
+    }
+
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 6) {
+            VStack(spacing: 5) {
                 thumbnail
-                    .frame(width: 88, height: 56)
+                    .frame(width: Self.designSize.width, height: Self.designSize.height)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .scaleEffect(Self.scale)
+                    .frame(width: Self.cardSize.width, height: Self.cardSize.height)
                     // The ring sits in the padding, so selecting a card does
                     // not move the picture or reflow the row.
                     .padding(3)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 11)
-                            .strokeBorder(Color.accentColor, lineWidth: 3)
+                        RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(Color.accentColor, lineWidth: 2.5)
                             .opacity(isSelected ? 1 : 0)
                     )
                 Text(title)
