@@ -3,7 +3,19 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '.github/**'
+      - 'README.md'
+      - 'LICENSE'
+      - '**/*.md'
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '.github/**'
+      - 'README.md'
+      - 'LICENSE'
+      - '**/*.md'
 
 jobs:
   build-and-test:
