@@ -80,7 +80,7 @@ Xcode 26 (Swift 6.2 or later) is the only dependency. The project is a Swift pac
 
 ```sh
 swift build                      # debug build of everything
-swift test                       # 34 unit tests, run in well under a second
+swift test                       # unit tests, run in well under a second
 ./scripts/bundle.sh              # release build → dist/SpeakUp.app, signed
 ./scripts/bundle.sh --run        # …and launch it
 ./scripts/bundle.sh --install    # …and copy to /Applications
@@ -109,6 +109,8 @@ swift scripts/make-icon.swift Assets     # writes Assets/icon_1024.png
 ### Command-line transcriber
 
 `speakup-cli` loads the same engine and prints the transcript for any audio file. It is the quickest way to check the model without the GUI, and prints timing so you can see the real-time factor on your machine.
+
+`speakup-cli bench <dir>` runs the benchmark over synthetic fixtures. See [docs/BENCHMARKS.md](docs/BENCHMARKS.md) for the procedure and the M1 baseline.
 
 ## Privacy
 
