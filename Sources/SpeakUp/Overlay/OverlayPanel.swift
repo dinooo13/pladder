@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import SpeakUpCore
 
 /// Borderless floating panel that shows dictation status without ever taking
 /// focus away from the app the user is typing into.
@@ -11,16 +12,28 @@ import SwiftUI
 final class OverlayPanel: NSPanel {
     /// Includes room around the capsule for its soft shadow and for the
     /// widest error message; the window itself draws nothing, so nothing is
-    /// clipped and the pill sizes itself to its content inside this box.
-    private static let size = NSSize(width: 320, height: 96)
+    /// clipped and the pill sizes itself to its content inside this box. A
+    /// smaller pill (Minimal) just centres in the invisible box, and every
+    /// style has to fit the error row, so only the live transcript — which
+    /// needs room for its text — asks for more.
+    private static func size(for style: OverlayStyle) -> NSSize {
+        switch style {
+        case .liveTranscript: NSSize(width: 480, height: 140)
+        case .menuBar, .minimal, .compact: NSSize(width: 320, height: 96)
+        }
+    }
+
+    private let model: OverlayModel
 
     /// Bumped on every show/hide so a fade-out that is superseded by a new
     /// show does not order the window out afterwards.
     private var generation = 0
 
     init(model: OverlayModel) {
+        self.model = model
+        let size = Self.size(for: model.style)
         super.init(
-            contentRect: NSRect(origin: .zero, size: Self.size),
+            contentRect: NSRect(origin: .zero, size: size),
             styleMask: [.nonactivatingPanel, .borderless, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -42,7 +55,7 @@ final class OverlayPanel: NSPanel {
         animationBehavior = .none
 
         let host = NSHostingView(rootView: OverlayView(model: model))
-        host.frame = NSRect(origin: .zero, size: Self.size)
+        host.frame = NSRect(origin: .zero, size: size)
         host.autoresizingMask = [.width, .height]
         contentView = host
 
@@ -94,10 +107,13 @@ final class OverlayPanel: NSPanel {
             ?? NSScreen.main
             ?? NSScreen.screens.first
         guard let frame = screen?.frame else { return }
+        // The style can change between showings; the hosting view's
+        // autoresizing mask follows `setFrame`.
+        let size = Self.size(for: model.style)
         let origin = NSPoint(
-            x: frame.midX - Self.size.width / 2,
+            x: frame.midX - size.width / 2,
             y: frame.minY + 64
         )
-        setFrame(NSRect(origin: origin, size: Self.size), display: false)
+        setFrame(NSRect(origin: origin, size: size), display: false)
     }
 }

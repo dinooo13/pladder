@@ -1,0 +1,234 @@
+import AppKit
+import SwiftUI
+import SpeakUpCore
+
+/// A System-Settings-style picker cell: a picture of the choice with its name
+/// under it and an accent ring when it is the current one. Used instead of a
+/// segmented control where the choice is visual and a word alone does not say
+/// what it looks like.
+struct OptionCard<Thumbnail: View>: View {
+    let title: String
+    let isSelected: Bool
+    var isEnabled: Bool = true
+    let action: @MainActor () -> Void
+    @ViewBuilder let thumbnail: Thumbnail
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                thumbnail
+                    .frame(width: 88, height: 56)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    // The ring sits in the padding, so selecting a card does
+                    // not move the picture or reflow the row.
+                    .padding(3)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 11)
+                            .strokeBorder(Color.accentColor, lineWidth: 3)
+                            .opacity(isSelected ? 1 : 0)
+                    )
+                Text(title)
+                    .font(.callout)
+                    .fontWeight(isSelected ? .semibold : .regular)
+                    .foregroundStyle(isSelected ? .primary : .secondary)
+            }
+        }
+        .buttonStyle(.plain)
+        .opacity(isEnabled ? 1 : 0.4)
+        .disabled(!isEnabled)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+    }
+}
+
+/// A stand-in desktop for a card: the same diagonal blue wash the stock
+/// wallpapers use, light or dark, with whatever the card is illustrating
+/// centred on top.
+struct DesktopThumbnail<Content: View>: View {
+    /// `nil` follows the settings window's own scheme; the Appearance cards
+    /// force theirs so both can be shown side by side.
+    var scheme: ColorScheme?
+    @ViewBuilder let content: Content
+
+    @Environment(\.colorScheme) private var environmentScheme
+
+    private var resolved: ColorScheme { scheme ?? environmentScheme }
+
+    var body: some View {
+        LinearGradient(
+            colors: resolved == .dark
+                ? [Color(red: 0.16, green: 0.20, blue: 0.48), Color(red: 0.05, green: 0.06, blue: 0.18)]
+                : [Color(red: 0.62, green: 0.78, blue: 0.97), Color(red: 0.24, green: 0.46, blue: 0.88)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        // Overlay rather than ZStack: a scaled-down pill still lays out at
+        // its full size, and in a ZStack that would stretch the gradient so
+        // the card only shows its middle. The card clips whatever hangs out.
+        .overlay {
+            content
+                .environment(\.colorScheme, resolved)
+        }
+    }
+}
+
+/// Light, Dark and Auto, drawn as a miniature window on a desktop. Auto splits
+/// the card along the diagonal, the way System Settings does.
+struct AppearanceThumbnail: View {
+    let appearance: Appearance
+
+    @ViewBuilder
+    var body: some View {
+        switch appearance {
+        case .light:
+            desktop(.light)
+        case .dark:
+            desktop(.dark)
+        case .system:
+            ZStack {
+                desktop(.light).mask { DiagonalHalf(leading: true) }
+                desktop(.dark).mask { DiagonalHalf(leading: false) }
+            }
+        }
+    }
+
+    private func desktop(_ scheme: ColorScheme) -> some View {
+        DesktopThumbnail(scheme: scheme) {
+            window(scheme)
+                .padding(6)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+        }
+        .overlay(alignment: .top) {
+            // The menu bar, just enough of it to read as "a Mac".
+            Rectangle()
+                .fill(.white.opacity(scheme == .dark ? 0.15 : 0.7))
+                .frame(height: 2)
+        }
+    }
+
+    private func window(_ scheme: ColorScheme) -> some View {
+        RoundedRectangle(cornerRadius: 5)
+            .fill(scheme == .dark ? Color(white: 0.16) : Color(white: 0.96))
+            .frame(width: 60, height: 36)
+            .overlay(alignment: .topLeading) {
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(spacing: 4) {
+                        Circle().fill(.red).frame(width: 5, height: 5)
+                        Circle().fill(.yellow).frame(width: 5, height: 5)
+                        Circle().fill(.green).frame(width: 5, height: 5)
+                    }
+                    Spacer().frame(height: 10)
+                    // Stands in for a selected row, so the card shows what the
+                    // accent colour looks like against the window.
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color(red: 0.36, green: 0.58, blue: 0.98))
+                        .frame(height: 5)
+                }
+                .padding(5)
+            }
+    }
+}
+
+/// Half the card, split by the diagonal that runs from the top-right corner to
+/// the bottom-left one.
+private struct DiagonalHalf: Shape {
+    let leading: Bool
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        if leading {
+            path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+            path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        } else {
+            path.move(to: CGPoint(x: rect.maxX, y: rect.minY))
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+            path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        }
+        path.closeSubpath()
+        return path
+    }
+}
+
+/// One overlay style, shown as it actually looks: the cards render the real
+/// `OverlayPill` scaled down rather than a hand-drawn imitation, so they can
+/// never drift from the pill itself.
+struct OverlayStyleThumbnail: View {
+    let style: OverlayStyle
+    let glass: Bool
+
+    @Environment(\.colorScheme) private var scheme
+
+    private static let previewLevel: Float = 0.55
+
+    var body: some View {
+        DesktopThumbnail {
+            content
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch style {
+        case .compact:
+            OverlayPill(state: .recording(level: Self.previewLevel), style: .compact, glass: glass, isPreview: true)
+                .scaleEffect(0.5)
+        case .minimal:
+            OverlayPill(state: .recording(level: Self.previewLevel), style: .minimal, glass: glass, isPreview: true)
+                .scaleEffect(0.6)
+        case .menuBar:
+            // Nothing on the desktop at all: the wave in the menu bar is the
+            // whole of this style.
+            menuBar
+        case .liveTranscript:
+            // Built by hand rather than from `OverlayPill`, which renders as
+            // Compact until #8 lands.
+            transcript
+                .scaleEffect(0.6)
+        }
+    }
+
+    private var menuBar: some View {
+        // The same strip the Appearance cards draw, tall enough to hold the
+        // wave glyph. The image is resized, not scaled: `scaleEffect` keeps
+        // the 22×16 layout and would push the strip to the icon's height.
+        Rectangle()
+            .fill(.white.opacity(scheme == .dark ? 0.15 : 0.7))
+            .frame(height: 9)
+            .overlay(alignment: .trailing) {
+                Image(nsImage: MenuBarIcon.image(for: .recording(level: Self.previewLevel)))
+                    .resizable()
+                    .renderingMode(.template)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(height: 7)
+                    .foregroundStyle(scheme == .dark ? .white : .black)
+                    .padding(.trailing, 5)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    private var transcript: some View {
+        HStack(spacing: 8) {
+            RecordingDot()
+            LevelBars(level: Self.previewLevel, count: 8, maxHeight: 20, opacity: 0.8, seeded: true)
+            Text("and that's all")
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .modifier(PillBackground(glass: glass))
+    }
+}
+
+/// Glass or flat, shown on the Compact pill since that is where the difference
+/// is easiest to see.
+struct BackgroundThumbnail: View {
+    let glass: Bool
+
+    var body: some View {
+        DesktopThumbnail {
+            OverlayPill(state: .recording(level: 0.55), style: .compact, glass: glass, isPreview: true)
+                .scaleEffect(0.5)
+        }
+    }
+}
