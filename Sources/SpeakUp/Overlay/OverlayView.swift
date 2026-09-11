@@ -84,7 +84,7 @@ struct OverlayPill: View {
     var body: some View {
         GlassEffectContainer(spacing: 14) {
             content
-                .modifier(PillBackground(glass: glass, namespace: glassNamespace))
+                .modifier(PillBackground(glass: glass, shape: shape, namespace: glassNamespace))
         }
         .task(id: phase) {
             guard !isPreview else { return }
@@ -102,6 +102,12 @@ struct OverlayPill: View {
             guard !Task.isCancelled else { return }
             withAnimation(.smooth(duration: 0.3)) { showDot = false }
         }
+    }
+
+    /// Minimal is a disc; everything else, including an error shown under
+    /// Minimal, is the capsule. Glass morphs between the two.
+    private var shape: AnyShape {
+        isError || style != .minimal ? AnyShape(Capsule()) : AnyShape(Circle())
     }
 
     private var isError: Bool {
@@ -122,10 +128,10 @@ struct OverlayPill: View {
                 .padding(.vertical, 12)
                 .frame(minWidth: 140)
         } else {
+            // A fixed square so the disc never changes size between the
+            // dot, the wave, the spinner and the tick.
             minimalContent
-                .frame(minHeight: 20)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
+                .frame(width: Self.minimalDiameter, height: Self.minimalDiameter)
         }
     }
 
@@ -171,9 +177,14 @@ struct OverlayPill: View {
         }
     }
 
-    /// Just enough to say "recording", "working", "done": no text, no fixed
-    /// width. The dot marks the start of a take, then the bars take over so
-    /// the pill still shows the microphone is live.
+    /// Diameter of the Minimal disc. Five bars at 3 pt with 3 pt gaps are
+    /// 27 pt wide and 20 pt tall, which sits inside the disc with room to
+    /// spare at the chord where the bars reach.
+    static let minimalDiameter: CGFloat = 44
+
+    /// Just enough to say "recording", "working", "done": no text, and a
+    /// disc rather than a pill. The dot marks the start of a take, then a
+    /// narrow wave takes over so the disc still shows the microphone is live.
     @ViewBuilder
     private var minimalContent: some View {
         switch state {
@@ -190,7 +201,7 @@ struct OverlayPill: View {
                         }
                         .transition(.opacity)
                 } else {
-                    LevelBars(level: level, count: 8, maxHeight: 20, opacity: 0.8, seeded: isPreview)
+                    LevelBars(level: level, count: 5, maxHeight: 20, opacity: 0.8, seeded: isPreview)
                         .transition(.opacity)
                 }
             }
@@ -202,7 +213,7 @@ struct OverlayPill: View {
                 .font(.system(size: 14))
                 .foregroundStyle(.green)
         case .error, .idle, .unavailable:
-            Color.clear.frame(width: 40)
+            Color.clear
         }
     }
 
@@ -227,6 +238,8 @@ struct RecordingDot: View {
 /// still. The shadow is added by whoever hosts the pill.
 struct PillBackground: ViewModifier {
     let glass: Bool
+    /// Capsule for the rows, circle for the Minimal disc.
+    var shape: AnyShape = AnyShape(Capsule())
     /// Only the live overlay morphs between states, so the glass identity is
     /// optional; the settings replicas pass nothing.
     var namespace: Namespace.ID?
@@ -236,16 +249,16 @@ struct PillBackground: ViewModifier {
         if glass {
             if let namespace {
                 content
-                    .glassEffect(.regular, in: Capsule())
+                    .glassEffect(.regular, in: shape)
                     .glassEffectID("pill", in: namespace)
             } else {
                 content
-                    .glassEffect(.regular, in: Capsule())
+                    .glassEffect(.regular, in: shape)
             }
         } else {
             content
-                .background(Color(nsColor: .windowBackgroundColor), in: Capsule())
-                .overlay(Capsule().strokeBorder(.separator, lineWidth: 1))
+                .background(Color(nsColor: .windowBackgroundColor), in: shape)
+                .overlay(shape.stroke(Color(nsColor: .separatorColor), lineWidth: 1))
         }
     }
 }

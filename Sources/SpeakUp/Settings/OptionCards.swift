@@ -174,8 +174,10 @@ struct OverlayStyleThumbnail: View {
             OverlayPill(state: .recording(level: Self.previewLevel), style: .compact, glass: glass, isPreview: true)
                 .scaleEffect(0.5)
         case .minimal:
+            // The disc is 44 pt; at 0.75 it reads as a disc without turning
+            // into a dot.
             OverlayPill(state: .recording(level: Self.previewLevel), style: .minimal, glass: glass, isPreview: true)
-                .scaleEffect(0.6)
+                .scaleEffect(0.75)
         case .menuBar:
             // Nothing on the desktop at all: the wave in the menu bar is the
             // whole of this style.
