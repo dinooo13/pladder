@@ -43,13 +43,23 @@ final class AppModel {
     /// Settings live in the coordinator (it reacts to hotkey/engine changes);
     /// this forwards and persists. Applying the appearance covers every
     /// window and menu at once, so no view has to care.
+    ///
+    /// Each side effect runs only when its own keys changed. Re-assigning
+    /// `NSApp.appearance` is not free: with a forced Light or Dark it makes
+    /// AppKit re-theme every window, so doing it on every click of a settings
+    /// card made the card rows lag behind the click.
     var settings: Settings {
         get { coordinator.settings }
         set {
-            guard newValue != coordinator.settings else { return }
+            let old = coordinator.settings
+            guard newValue != old else { return }
             coordinator.settings = newValue
-            applyAppearance(newValue.appearance)
-            overlay.applyStyle(newValue.overlayStyle, glass: newValue.overlayGlass)
+            if newValue.appearance != old.appearance {
+                applyAppearance(newValue.appearance)
+            }
+            if newValue.overlayStyle != old.overlayStyle || newValue.overlayGlass != old.overlayGlass {
+                overlay.applyStyle(newValue.overlayStyle, glass: newValue.overlayGlass)
+            }
             try? store.save(newValue)
         }
     }
