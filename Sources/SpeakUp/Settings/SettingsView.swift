@@ -27,6 +27,16 @@ struct SettingsView: View {
     }
 }
 
+private extension Appearance {
+    var displayName: String {
+        switch self {
+        case .system: "Auto"
+        case .light: "Light"
+        case .dark: "Dark"
+        }
+    }
+}
+
 private struct GeneralSettingsView: View {
     @Bindable var model: AppModel
 
@@ -61,6 +71,19 @@ private struct GeneralSettingsView: View {
                 Text("Push to Talk")
             } footer: {
                 FootnoteText("Hold to record, release to insert. Click the field and press any key combination to assign it.")
+            }
+
+            Section {
+                LabeledContent("Appearance") {
+                    Picker("Appearance", selection: $model.settings.appearance) {
+                        ForEach(Appearance.allCases, id: \.self) { appearance in
+                            Text(appearance.displayName).tag(appearance)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(width: 180)
+                }
             }
 
             Section("Sounds & Startup") {

@@ -54,6 +54,11 @@ final class OverlayPanel: NSPanel {
 
     func show() {
         generation &+= 1
+        // A borderless panel that is never key or main does not reliably
+        // inherit an appearance changed through `NSApp.appearance` after it
+        // was created, so re-sync on every show. The settings window restyles
+        // itself; the panel only exists between its appearances.
+        appearance = NSApp.appearance
         reposition()
         // `orderFrontRegardless` avoids requiring SpeakUp to be active, which
         // an accessory app never is.
