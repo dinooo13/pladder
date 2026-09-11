@@ -116,7 +116,7 @@ struct AppearanceThumbnail: View {
         .overlay(alignment: .top) {
             // The menu bar, just enough of it to read as "a Mac".
             Rectangle()
-                .fill(.white.opacity(scheme == .dark ? 0.15 : 0.7))
+                .fill(.white.opacity(0.2))
                 .frame(height: 2)
         }
     }
@@ -188,7 +188,7 @@ struct OverlayStyleThumbnail: View {
         // wave glyph. The image is resized, not scaled: `scaleEffect` keeps
         // the 22×16 layout and would push the strip to the icon's height.
         Rectangle()
-            .fill(.white.opacity(scheme == .dark ? 0.15 : 0.7))
+            .fill(.white.opacity(0.2))
             .frame(height: 9)
             .overlay(alignment: .trailing) {
                 Image(nsImage: MenuBarIcon.image(for: .recording(level: Self.previewLevel)))
@@ -196,7 +196,7 @@ struct OverlayStyleThumbnail: View {
                     .renderingMode(.template)
                     .aspectRatio(contentMode: .fit)
                     .frame(height: 7)
-                    .foregroundStyle(scheme == .dark ? .white : .black)
+                    .foregroundStyle(.white)
                     .padding(.trailing, 5)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
