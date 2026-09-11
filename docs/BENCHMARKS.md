@@ -58,15 +58,18 @@ benchmark reports the actual length.
    Numbers jitter with thermal state and other load.
 2. Generate the fixtures once: `./scripts/make-fixtures.sh`
 3. Run: `swift run -c release speakup-cli bench bench/fixtures`. It takes
-   about six minutes; leave the machine alone while it runs.
+   about seven minutes; leave the machine alone while it runs.
 4. Runs never overlap, and every run is preceded by ten seconds of idle so
    it starts from the same state a real dictation does, rather than with
    warm clocks and residual heat from the previous run. `--pause` changes
    the idle time; `--pause 0` gives back-to-back runs, which are faster but
    flatter the numbers.
-5. Five runs per fixture (`--runs` changes it). The first, which pays
-   CoreML's first-call warm-up, is discarded and the median of the rest is
-   reported. Fixtures run shortest to longest.
+5. Six runs per fixture. The first, which pays CoreML's first-call warm-up,
+   is discarded and the median of the remaining five is reported, with the
+   spread of those five (largest minus smallest, relative to the median) as
+   the noise floor for that fixture. Fixtures run shortest to longest. When
+   a result lands near the noise line and you need to know, `--runs 11`
+   keeps ten and takes about twelve minutes.
 6. The tool prints the one-minute load average at start and end and tags
    any run during which the chip left its normal thermal state. A run with
    a thermal tag or a load average well above one is not comparable.

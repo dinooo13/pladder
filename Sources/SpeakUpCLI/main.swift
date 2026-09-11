@@ -10,7 +10,8 @@ import SpeakUpEngines
 //
 //   speakup-cli <audio file>              load Parakeet, print the transcript and timing
 //   speakup-cli bench <fixtures dir>      run the benchmark (see docs/BENCHMARKS.md)
-//       [--runs N]                        runs per fixture, default 5; the first is discarded
+//       [--runs N]                        runs per fixture, default 6; the first is discarded.
+//                                         Use 11 to settle a result near the noise line.
 //       [--pause S]                       idle seconds before every run, default 10
 //
 // Fixtures are audio files with a sibling .txt holding the spoken script, as
@@ -177,7 +178,7 @@ func runBench(dir: String, runs: Int, pause: Double) async throws {
     }
     print("")
 
-    struct Row { var name: String; var duration: Double; var engine: Double; var wer: Double }
+    struct Row { var name: String; var duration: Double; var engine: Double; var spread: Double; var wer: Double }
     var rows: [Row] = []
     let clock = ContinuousClock()
     var throttled = false
@@ -201,16 +202,20 @@ func runBench(dir: String, runs: Int, pause: Double) async throws {
                 errors.append(wer)
             }
         }
-        rows.append(Row(name: fixture.name, duration: fixture.duration, engine: median(times), wer: median(errors)))
+        let engineTime = median(times)
+        // Spread of the kept runs relative to the median: the noise floor
+        // for this fixture, so a difference smaller than it means nothing.
+        let spread = (times.max()! - times.min()!) / engineTime
+        rows.append(Row(name: fixture.name, duration: fixture.duration, engine: engineTime, spread: spread, wer: median(errors)))
     }
 
     print("")
-    print("| Fixture | Audio | Engine (median) | Realtime | WER |")
-    print("|---|---:|---:|---:|---:|")
+    print("| Fixture | Audio | Engine (median) | Spread | Realtime | WER |")
+    print("|---|---:|---:|---:|---:|---:|")
     for row in rows {
         print(String(
-            format: "| %@ | %.1f s | %.3f s | %.0fx | %.1f %% |",
-            row.name, row.duration, row.engine, row.duration / row.engine, row.wer * 100))
+            format: "| %@ | %.1f s | %.3f s | %.0f %% | %.0fx | %.1f %% |",
+            row.name, row.duration, row.engine, row.spread * 100, row.duration / row.engine, row.wer * 100))
     }
     print("")
     print(String(format: "load:    %.2f (one-minute average at end)", loadAverage()))
@@ -227,7 +232,7 @@ case nil, "-h", "--help":
     usage()
 case "bench":
     arguments.removeFirst()
-    var runs = 5
+    var runs = 6
     var pause = 10.0
     var dir: String?
     while let arg = arguments.first {
