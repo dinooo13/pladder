@@ -42,10 +42,19 @@ let package = Package(
             exclude: ["Resources/Info.plist"]
         ),
 
-        // Developer tool: transcribe a file from the terminal to verify engines.
-        .executableTarget(name: "SpeakUpCLI", dependencies: ["SpeakUpCore", "SpeakUpEngines", "SpeakUpAudio"]),
+        // Benchmark helpers (word error rate). Only the CLI links this; the
+        // app carries nothing benchmark-related.
+        .target(name: "SpeakUpBench"),
+
+        // Developer tool: transcribe a file from the terminal to verify
+        // engines, or run the benchmark (see docs/BENCHMARKS.md).
+        .executableTarget(
+            name: "SpeakUpCLI",
+            dependencies: ["SpeakUpCore", "SpeakUpEngines", "SpeakUpAudio", "SpeakUpBench"]
+        ),
 
         .testTarget(name: "SpeakUpCoreTests", dependencies: ["SpeakUpCore"]),
         .testTarget(name: "SpeakUpAudioTests", dependencies: ["SpeakUpAudio"]),
+        .testTarget(name: "SpeakUpBenchTests", dependencies: ["SpeakUpBench"]),
     ]
 )

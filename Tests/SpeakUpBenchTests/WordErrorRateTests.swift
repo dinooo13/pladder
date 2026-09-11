@@ -1,5 +1,5 @@
 import Testing
-@testable import SpeakUpCore
+@testable import SpeakUpBench
 
 @Suite struct WordErrorRateTests {
     @Test func identicalTextIsZero() {
