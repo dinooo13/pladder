@@ -82,13 +82,13 @@ separate table with chip, macOS version and model version.
 ## Baseline
 
 Reference machine: Apple M1, 16 GB, macOS 26.6.2 (25G83), FluidAudio 0.15.6,
-model `parakeet-tdt-0.6b-v3` (CoreML). Recorded 2026-09-11. The M1 is the
-least powerful chip SpeakUp supports: if it is fast enough here, it is fast
-enough everywhere.
+model `parakeet-tdt-0.6b-v3` (CoreML). Recorded 2026-09-11 with `--runs 11`,
+ten kept runs per fixture. The M1 is the least powerful chip SpeakUp
+supports: if it is fast enough here, it is fast enough everywhere.
 
 | Measurement | Value |
 |---|---:|
-| Model load, fresh process | 0.18 s (0.18 to 0.32 s across four runs) |
+| Model load, fresh process | 0.26 s (0.18 to 0.32 s across five runs) |
 | Physical footprint after load | 98 MB |
 
 The load time is with CoreML's compiled-model cache warm. The very first load
@@ -97,19 +97,26 @@ the models and takes far longer; that is a one-time cost and not what this
 number tracks. The weights run on the Neural Engine and are held outside the
 process, so the footprint understates total memory use.
 
-| Fixture | Audio | Engine (median) | Realtime | WER |
-|---|---:|---:|---:|---:|
-| 10s | 9.7 s | 0.252 s | 38x | 0.0 % |
-| 30s | 31.8 s | 0.398 s | 80x | 0.0 % |
-| 60s | 60.8 s | 0.558 s | 109x | 1.4 % |
-| 2m | 125.1 s | 0.915 s | 137x | 0.9 % |
-| 5m | 315.6 s | 1.963 s | 161x | 0.6 % |
-| 10m | 631.4 s | 3.698 s | 171x | 0.6 % |
+| Fixture | Audio | Engine (median) | Spread | Realtime | WER |
+|---|---:|---:|---:|---:|---:|
+| 10s | 9.7 s | 0.237 s | 20 % | 41x | 0.0 % |
+| 30s | 31.8 s | 0.399 s | 11 % | 80x | 0.0 % |
+| 60s | 60.8 s | 0.563 s | 29 % | 108x | 1.4 % |
+| 2m | 125.1 s | 0.908 s | 11 % | 138x | 0.9 % |
+| 5m | 315.6 s | 1.976 s | 6 % | 160x | 0.6 % |
+| 10m | 631.4 s | 3.704 s | 3 % | 170x | 0.6 % |
 
-Ten seconds of idle before every run; load average 2.1 at the start and 2.5
-at the end from other processes on the machine; no thermal tags. Within each
-fixture the four kept runs spread by less than ten percent (the 10 s fixture:
-0.237 to 0.257 s).
+Ten seconds of idle before every run; load average 1.6 at the start and 3.3
+at the end from other processes on the machine; no thermal tags.
+
+How to read the spread: it is the full range of the kept runs, so it grows
+with the run count and is set by the outliers. Eight of the ten 60 s runs
+sit between 0.547 and 0.573 s; the other two, at 0.645 and 0.712 s, landed
+while the load average was climbing. The medians are the stable part. A
+six-run pass under the same procedure gave 0.252, 0.398, 0.558, 0.915,
+1.963 and 3.698 s: within six percent of this table on the 10 s fixture and
+within one percent everywhere else. Compare medians; use the spread to judge
+whether the machine was quiet enough for the comparison to mean anything.
 
 Engine time grows close to linearly with audio length; the realtime factor
 rises because the fixed cost per call is amortised and long audio keeps four
