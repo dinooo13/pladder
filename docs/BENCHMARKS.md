@@ -66,10 +66,9 @@ separate table with chip, macOS version and model version.
 ## Baseline
 
 Reference machine: Apple M1, 16 GB, macOS 26.6.2 (25G83), FluidAudio 0.15.6,
-model `parakeet-tdt-0.6b-v3` (CoreML). Recorded 2026-09-11 with a load
-average of about 2.5 from other work on the machine, so a quiet machine may
-come in slightly lower. The M1 is the least powerful chip SpeakUp supports:
-if it is fast enough here, it is fast enough everywhere.
+model `parakeet-tdt-0.6b-v3` (CoreML). Recorded 2026-09-11. The M1 is the
+least powerful chip SpeakUp supports: if it is fast enough here, it is fast
+enough everywhere.
 
 | Measurement | Value |
 |---|---:|
@@ -92,8 +91,18 @@ process, so the footprint understates total memory use.
 | 10m | 631.4 s | 3.739 s | 169x | 0.6 % |
 
 Engine time grows close to linearly with audio length; the realtime factor
-rises because the fixed cost per call is amortised. Run-to-run spread within
-a fixture was under ten percent. The 60 s fixture's errors are two
+rises because the fixed cost per call is amortised.
+
+The table is the first of two passes. The first ran with a load average of
+about 2.5 from other work on the machine; the second started at 1.1 and rose
+to 4.6 while it ran. The second pass gave medians of 0.150, 0.361, 0.495,
+0.977, 1.955 and 3.792 s with identical word error rates. Everything but the
+2 min fixture agrees within three percent, and that one had a single
+disturbed run (1.16 s against about 0.9 s for the others). That is the noise
+floor to keep in mind: a change has to move a number by more than that to
+mean anything.
+
+The 60 s fixture's errors are two
 mishearings, "flowers" heard as "flours" and "rye loaf" merged into one word.
 The sentence with "flowers" is transcribed correctly in the 30 s fixture,
 where it does not sit near a window boundary, which is the kind of seam
