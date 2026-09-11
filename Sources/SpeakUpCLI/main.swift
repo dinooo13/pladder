@@ -2,6 +2,7 @@
 import Darwin
 import Foundation
 import SpeakUpAudio
+import SpeakUpBench
 import SpeakUpCore
 import SpeakUpEngines
 

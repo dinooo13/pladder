@@ -13,7 +13,8 @@ benchmark that fails on noise gets ignored.
   seconds.
 - **Word error rate** per fixture against the known script, so a change that
   is faster but worse is caught. Case and punctuation are ignored; only the
-  words count.
+  words count. The calculation lives in the `SpeakUpBench` target, which
+  only the CLI links; the app carries nothing benchmark-related.
 - **Model load time** (cold start, one measurement per process, the time the
   app spends before the hotkey is enabled) and **physical memory footprint**
   after load, the number Activity Monitor shows.
