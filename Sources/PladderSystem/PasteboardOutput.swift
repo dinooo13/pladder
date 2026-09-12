@@ -28,6 +28,13 @@ public actor PasteboardOutput: TextOutput {
     /// enough for slow Electron apps while still feeling instant to the user.
     public let restoreDelay: Duration
 
+    /// How long to wait between Cmd+V and the Return keystroke when the caller
+    /// asked for submit. The target app handles the paste on its own run loop
+    /// and some Electron apps read the pasteboard a turn later, so Return waits
+    /// a little. It is off the critical path: `insert` has already returned by
+    /// the time this elapses.
+    public let submitDelay: Duration
+
     /// Time between writing the pasteboard and posting Cmd+V. `NSPasteboard`
     /// writes are synchronous with the pasteboard server, so this only needs to
     /// cover the target app noticing the change count; 10 ms is plenty and keeps
@@ -36,6 +43,9 @@ public actor PasteboardOutput: TextOutput {
 
     /// kVK_ANSI_V. Hard-coded so this module does not need to import Carbon.
     private static let virtualKeyV: CGKeyCode = 0x09
+
+    /// kVK_Return, same story.
+    private static let virtualKeyReturn: CGKeyCode = 0x24
 
     /// A restore that has been scheduled but has not run yet.
     private struct Pending {
@@ -52,11 +62,12 @@ public actor PasteboardOutput: TextOutput {
 
     private var pending: Pending?
 
-    public init(restoreDelay: Duration = .milliseconds(400)) {
+    public init(restoreDelay: Duration = .milliseconds(400), submitDelay: Duration = .milliseconds(50)) {
         self.restoreDelay = restoreDelay
+        self.submitDelay = submitDelay
     }
 
-    public func insert(_ text: String) async throws {
+    public func insert(_ text: String, submit: Bool) async throws {
         // Posting to the HID event tap is what needs Accessibility. Check first
         // so the user gets a real message instead of a silently dropped paste.
         guard AXIsProcessTrusted() else { throw OutputError.accessibilityDenied }
@@ -73,12 +84,23 @@ public actor PasteboardOutput: TextOutput {
 
         do {
             try await Task.sleep(for: Self.propagationDelay)
-            try Self.postPasteShortcut()
+            try Self.postKey(Self.virtualKeyV, flags: .maskCommand)
         } catch {
             // Never leave the user's clipboard holding our transcript.
             if pending?.changeCount == ourChangeCount { pending = nil }
             snapshot.restore(ifChangeCountIs: ourChangeCount)
             throw error
+        }
+
+        if submit {
+            // The paste has been posted, so the Return follows it whatever
+            // happens to this insert from here on. Detached so cancelling the
+            // caller cannot skip it.
+            let submitDelay = self.submitDelay
+            Task.detached(priority: .userInitiated) {
+                try? await Task.sleep(for: submitDelay)
+                try? Self.postKey(Self.virtualKeyReturn, flags: [])
+            }
         }
 
         // A concurrent `insert` may have superseded us across the sleep above; it
@@ -107,16 +129,17 @@ public actor PasteboardOutput: TextOutput {
         pending.snapshot.restore(ifChangeCountIs: changeCount)
     }
 
-    /// Sends Cmd+V down/up to the HID event tap, i.e. the same place a real
-    /// keyboard would inject it, so every app sees it.
-    private static func postPasteShortcut() throws {
+    /// Sends one key down/up to the HID event tap, i.e. the same place a real
+    /// keyboard would inject it, so every app sees it. `flags` carries the
+    /// modifiers; an empty set types the bare key.
+    private static func postKey(_ key: CGKeyCode, flags: CGEventFlags) throws {
         let source = CGEventSource(stateID: .combinedSessionState)
-        guard let down = CGEvent(keyboardEventSource: source, virtualKey: virtualKeyV, keyDown: true),
-              let up = CGEvent(keyboardEventSource: source, virtualKey: virtualKeyV, keyDown: false)
+        guard let down = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: true),
+              let up = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: false)
         else { throw OutputError.eventCreationFailed }
 
-        down.flags = .maskCommand
-        up.flags = .maskCommand
+        down.flags = flags
+        up.flags = flags
         down.post(tap: .cghidEventTap)
         up.post(tap: .cghidEventTap)
     }

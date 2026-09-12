@@ -54,7 +54,7 @@ public final class GlobalHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
 
     // MARK: HotkeyMonitor
 
-    public func start(hotkey: Hotkey) -> AsyncStream<HotkeyEvent> {
+    public func start(hotkey: Hotkey, submitKey: Hotkey) -> AsyncStream<HotkeyEvent> {
         // Starting twice replaces the previous session rather than stacking taps.
         stop()
 
@@ -64,7 +64,7 @@ public final class GlobalHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
         let generation: UInt64 = lock.withLock {
             state.generation &+= 1
             state.continuation = continuation
-            state.tracker = HotkeyChordTracker(hotkey: hotkey)
+            state.tracker = HotkeyChordTracker(hotkey: hotkey, submitKey: submitKey)
             state.modifiers = ModifierKeyState()
             return state.generation
         }

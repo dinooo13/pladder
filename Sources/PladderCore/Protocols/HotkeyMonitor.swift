@@ -2,15 +2,19 @@ import Foundation
 
 /// Watches for the push-to-talk chord system wide and reports press and release.
 public protocol HotkeyMonitor: Sendable {
-    /// Starts monitoring and returns a stream of events. Cancelling the consuming
-    /// task or calling `stop()` ends monitoring.
-    func start(hotkey: Hotkey) -> AsyncStream<HotkeyEvent>
+    /// Starts monitoring and returns a stream of events. `submitKey` is the
+    /// chord that, pressed while the hotkey is held, asks for Return after the
+    /// paste; an empty chord turns that off. Cancelling the consuming task or
+    /// calling `stop()` ends monitoring.
+    func start(hotkey: Hotkey, submitKey: Hotkey) -> AsyncStream<HotkeyEvent>
     func stop()
 }
 
 public enum HotkeyEvent: Sendable, Equatable {
     case pressed
-    case released
+    /// `submit` is true when the submit key was pressed at some point while the
+    /// chord was held, in which case the text is followed by Return.
+    case released(submit: Bool)
 }
 
 /// The push-to-talk chord: one or more physical keys that must be held together.
@@ -51,6 +55,8 @@ public struct Hotkey: Codable, Sendable, Hashable {
     public var modifierKeyCodes: Set<UInt16> { keyCodes.filter(Self.isModifierKeyCode) }
     public var regularKeyCodes: Set<UInt16> { keyCodes.filter { !Self.isModifierKeyCode($0) } }
     public var isModifierOnly: Bool { !keyCodes.isEmpty && regularKeyCodes.isEmpty }
+    /// A chord with no keys never fires. Used to turn the submit key off.
+    public var isEmpty: Bool { keyCodes.isEmpty }
 
     // MARK: Well-known chords
 
