@@ -50,7 +50,7 @@
 
 ## The name
 
-*Pladder* is Low German — Plattdeutsch, the flatland dialect of the north, where this app is built. It means to babble, to rattle on, the easy stream of talk that pours out when nobody is taking notes. That is exactly the input side of dictation: you pladder into the microphone, loose and unpolished, and what lands at the cursor is clean text.
+*Pladder* is Low German (*Plattdeutsch*) for "to babble". You pladder into the microphone, loose and unpolished, and clean text comes out at the cursor.
 
 ## Why Pladder
 
