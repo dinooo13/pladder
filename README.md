@@ -57,6 +57,7 @@
 You type long prompts all day. Speech is three to four times faster than typing, and the thing that has always made dictation annoying is waiting for it. Pladder is built around one number: the time between letting go of the key and the text appearing. On the slowest supported Mac, a ten second sentence transcribes in about a quarter of a second.
 
 - **One key, everywhere.** Hold Right Command, or any key or chord you record. Speak. Release. The words land at the cursor in any app that takes text. No window to open, no button to click, no mode to leave.
+- **Two keys, and it is sent.** Tap Right Option while you speak and the dictation goes out with Return the moment you let go. A prompt to an agent, a chat message, a shell command, without touching the keyboard again.
 - **Nothing leaves your Mac.** The speech model runs on the Neural Engine. There is no account, no server, no telemetry, and the app makes no network requests after the one-time model download.
 - **It knows your words.** A dictionary turns what the model hears into what you meant. "clode code" becomes "Claude Code", "get hub" becomes "GitHub", every time, at zero cost in latency.
 - **It skips over the ums.** Hesitation sounds — "uh", "um", German "äh"/"ähm", Spanish "eh" — are dropped before the text is pasted. Still no cost in latency. Only English, German and Spanish fillers are covered for now; other languages pass through unchanged.
@@ -68,9 +69,11 @@ You type long prompts all day. Speech is three to four times faster than typing,
 
 Pladder pastes into whatever has focus, so it works with every editor and terminal. It was made for the loop where you talk to an agent, it works, and you talk again:
 
-- **Claude Code**, **Codex** and **OpenCode** in the terminal. Hold the key, describe the change, release. The prompt is in the input line and you press Enter.
+- **Claude Code**, **Codex** and **OpenCode** in the terminal. Hold the key, describe the change, release. The prompt is in the input line. Tap the send key while you talk and it is already running when you let go.
 - **Cursor** and any other editor. Dictate into chat, into a comment, into a commit message.
 - **Anything else with a text field.** Slack, Mail, a browser, a form.
+
+The send key closes the loop. Hold the push-to-talk key, and at any point while you speak, tap the send key, Right Option by default. When you let go the prompt is pasted and Return is pressed, so the agent starts on it while your hands are still off the keyboard. Release without the tap and the prompt waits in the input line for you to read it first. Both keys are yours to change.
 
 Two things make dictation into a terminal work where general dictation apps stumble. The latency is short enough that you stay in the conversation instead of waiting for it. And the dictionary fixes the names that speech models get wrong: product names, libraries, commands, your own project's jargon.
 
@@ -112,7 +115,7 @@ A small pill at the bottom of the screen tells you what is happening: a red dot 
 - **Minimal.** A small disc with a pulse. Enough to see it is on, not enough to look at.
 - **Menu Bar.** Nothing on the desktop at all. The wave in the menu bar is the only sign.
 
-Each comes in Liquid Glass or a flat fill, in light, dark or whatever the system is doing. Pick a different push-to-talk key by pressing it. Teach it your words in the dictionary, and share the rules with your team as a JSON file.
+Each comes in Liquid Glass or a flat fill, in light, dark or whatever the system is doing. Pick a different push-to-talk key or send key by pressing it. Teach it your words in the dictionary, and share the rules with your team as a JSON file.
 
 ## Install
 
