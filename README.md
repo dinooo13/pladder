@@ -7,7 +7,7 @@
 <p align="center">
   <strong>Talk to your agents.</strong><br>
   Push-to-talk dictation for macOS. Hold a key, say the prompt, let go.<br>
-  It is in Claude Code, Codex, Cursor or OpenCode before you can reach for the Enter key.<br>
+  It's already in Claude Code, Codex, Cursor or OpenCode before you can reach for the Enter key.<br>
   <br>
   Insanely fast · 100% private · No data leaves your Mac
 </p>
@@ -62,7 +62,7 @@ You type long prompts all day. Speech is three to four times faster than typing,
 - **It knows your words.** A dictionary turns what the model hears into what you meant. "clode code" becomes "Claude Code", "get hub" becomes "GitHub", every time, at zero cost in latency.
 - **It skips over the ums.** Hesitation sounds — "uh", "um", German "äh"/"ähm", Spanish "eh" — are dropped before the text is pasted. Still no cost in latency. Only English, German and Spanish fillers are covered for now; other languages pass through unchanged.
 - **It behaves like part of macOS.** A menu bar app with a Liquid Glass status pill, a standard settings window, and nothing in the Dock.
-- **Twenty-five languages, switched automatically.** English, German, Spanish, French and the rest of Europe in the same session, with no setting to flip.
+- **Twenty-five languages, detected automatically.** English, German, Spanish, French and the rest of Europe in the same session, with no setting to flip.
 - **Free and MIT.** The source is here. Read it, build it, change it.
 
 ## Built for agents
@@ -72,8 +72,6 @@ Pladder pastes into whatever has focus, so it works with every editor and termin
 - **Claude Code**, **Codex** and **OpenCode** in the terminal. Hold the key, describe the change, release. The prompt is in the input line. Tap the send key while you talk and it is already running when you let go.
 - **Cursor** and any other editor. Dictate into chat, into a comment, into a commit message.
 - **Anything else with a text field.** Slack, Mail, a browser, a form.
-
-The send key closes the loop. Hold the push-to-talk key, and at any point while you speak, tap the send key, Right Option by default. When you let go the prompt is pasted and Return is pressed, so the agent starts on it while your hands are still off the keyboard. Release without the tap and the prompt waits in the input line for you to read it first. Both keys are yours to change.
 
 Two things make dictation into a terminal work where general dictation apps stumble. The latency is short enough that you stay in the conversation instead of waiting for it. And the dictionary fixes the names that speech models get wrong: product names, libraries, commands, your own project's jargon.
 
