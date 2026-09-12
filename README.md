@@ -50,7 +50,7 @@
 
 ## The name
 
-*Pladder* is Low German (*Plattdeutsch*) for "to babble". You pladder into the microphone, and text comes out.
+*Pladder* is Low German (*Plattdeutsch*) for "to babble". You pladder into the microphone, text comes out, it gets pasted.
 
 ## Why Pladder
 
