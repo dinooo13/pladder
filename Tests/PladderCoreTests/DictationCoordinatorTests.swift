@@ -58,6 +58,28 @@ final class FakeHotkey: HotkeyMonitor, @unchecked Sendable {
     func release(submit: Bool = false) { continuation?.yield(.released(submit: submit)) }
 }
 
+/// Fails `load()` a set number of times, then succeeds.
+actor FlakyEngine: TranscriptionEngine {
+    nonisolated let id = EngineID("flaky")
+    nonisolated let displayName = "Flaky"
+    private(set) var status: EngineStatus = .unloaded
+    private var failuresRemaining: Int
+    init(failures: Int) { failuresRemaining = failures }
+    struct LoadFailed: LocalizedError { var errorDescription: String? { "boom" } }
+    func load() async throws {
+        if failuresRemaining > 0 {
+            failuresRemaining -= 1
+            status = .failed(message: "boom")
+            throw LoadFailed()
+        }
+        status = .ready
+    }
+    func transcribe(_ samples: [Float]) async throws -> Transcript {
+        Transcript(text: "flaky", audioDuration: 1, processingTime: 0, engineID: id)
+    }
+    func unload() { status = .unloaded }
+}
+
 // MARK: - Helpers
 
 @MainActor
@@ -248,6 +270,33 @@ private func waitUntil(_ timeout: Duration = .seconds(2), _ condition: @MainActo
         #expect(output.inserted.isEmpty)
     }
 
+    @Test func engineChangeWhileRecordingUsesTheEngineThatRecorded() async {
+        var registry = EngineRegistry([
+            .init(id: EchoEngine.engineID, displayName: "Echo", detail: "") { EchoEngine(text: "one", delay: .milliseconds(5)) }
+        ])
+        registry.register(.init(id: EngineID("two"), displayName: "Two", detail: "") { EchoEngine(text: "two", delay: .milliseconds(500)) })
+        let output = FakeOutput()
+        let capture = FakeCapture()
+        var settings = Settings(engineID: EchoEngine.engineID)
+        settings.appendTrailingSpace = false
+        let c = DictationCoordinator(
+            settings: settings, registry: registry, capture: capture, output: output,
+            hotkeyMonitor: FakeHotkey(), makePipeline: { _ in ProcessorPipeline([]) })
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed()
+        c.settings.engineID = EngineID("two")
+        c.hotkeyReleased()
+        await c.inFlight?.value
+        // The dictation goes to the engine that was ready at release, not
+        // the one the settings switched to mid-recording.
+        #expect(output.inserted == ["one"])
+        // The cycle ends in a terminal state; "two" may still be loading.
+        #expect(c.state == .unavailable(reason: "Loading model") || c.state == .idle)
+        #expect(await waitUntil { c.engineStatus == .ready })
+        #expect(await waitUntil { c.state == .idle })
+    }
+
     @Test func engineChangeWhileRecordingKeepsTheCycleAlive() async {
         var registry = EngineRegistry([
             .init(id: EchoEngine.engineID, displayName: "Echo", detail: "") { EchoEngine(text: "one", delay: .milliseconds(5)) }
@@ -325,6 +374,97 @@ private func waitUntil(_ timeout: Duration = .seconds(2), _ condition: @MainActo
         await c.inFlight?.value
         #expect(output.submitted == [true])
         #expect(output.inserted.count == 1)
+    }
+
+    @Test func insertedEventCarriesCycleTiming() async {
+        final class EventRecorder: @unchecked Sendable {
+            private let lock = NSLock()
+            private var _events: [DictationCoordinator.Event] = []
+            var events: [DictationCoordinator.Event] { lock.withLock { _events } }
+            func append(_ e: DictationCoordinator.Event) { lock.withLock { _events.append(e) } }
+        }
+        let recorder = EventRecorder()
+        let output = FakeOutput()
+        let registry = EngineRegistry([
+            .init(id: EchoEngine.engineID, displayName: "Echo", detail: "") {
+                EchoEngine(text: "hello world", delay: .milliseconds(50))
+            }
+        ])
+        var settings = Settings(engineID: EchoEngine.engineID)
+        settings.appendTrailingSpace = false
+        let capture = FakeCapture()
+        let timed = DictationCoordinator(
+            settings: settings, registry: registry, capture: capture, output: output,
+            hotkeyMonitor: FakeHotkey(), makePipeline: { _ in ProcessorPipeline([]) },
+            onEvent: { recorder.append($0) })
+        timed.start()
+        #expect(await waitUntil { timed.state == .idle })
+        await timed.hotkeyPressed()
+        timed.hotkeyReleased()
+        await timed.inFlight?.value
+        guard case .inserted(_, let timing) = recorder.events.last else {
+            Issue.record("expected an inserted event, got \(String(describing: recorder.events.last))")
+            return
+        }
+        #expect(timing.engine >= .milliseconds(50))
+        #expect(output.inserted == ["hello world"])
+    }
+
+    @Test func engineLoadFailureShowsTheEngineMessage() async {
+        let registry = EngineRegistry([
+            .init(id: EngineID("flaky"), displayName: "Flaky", detail: "") { FlakyEngine(failures: 1) }
+        ])
+        let c = DictationCoordinator(
+            settings: Settings(engineID: EngineID("flaky")), registry: registry,
+            capture: FakeCapture(), output: FakeOutput(),
+            hotkeyMonitor: FakeHotkey(), makePipeline: { _ in ProcessorPipeline([]) })
+        c.start()
+        #expect(await waitUntil { c.state == .unavailable(reason: "boom") })
+        #expect(c.engineStatus == .failed(message: "boom"))
+    }
+
+    @Test func reloadAfterLoadFailureRecovers() async {
+        let registry = EngineRegistry([
+            .init(id: EngineID("flaky"), displayName: "Flaky", detail: "") { FlakyEngine(failures: 1) }
+        ])
+        let c = DictationCoordinator(
+            settings: Settings(engineID: EngineID("flaky")), registry: registry,
+            capture: FakeCapture(), output: FakeOutput(),
+            hotkeyMonitor: FakeHotkey(), makePipeline: { _ in ProcessorPipeline([]) })
+        c.start()
+        #expect(await waitUntil { c.state == DictationState.unavailable(reason: "boom") })
+        c.reloadEngine()
+        #expect(await waitUntil { c.state == DictationState.idle })
+    }
+
+    @Test func suspendingTheHotkeyDropsTheRecording() async {
+        let hotkey = FakeHotkey()
+        let (c, output, capture) = makeCoordinator(hotkeyMonitor: hotkey)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed()
+        #expect(c.state.isRecording)
+        c.isHotkeySuspended = true
+        #expect(await waitUntil { c.state == .idle })
+        #expect(await capture.stopCount == 1)
+        #expect(output.inserted.isEmpty)
+        c.isHotkeySuspended = false
+        hotkey.press()
+        #expect(await waitUntil { c.state.isRecording })
+    }
+
+    @Test func dictionaryChangeAfterStartIsUsedByTheNextDictation() async {
+        var settings = Settings(engineID: EchoEngine.engineID)
+        settings.dictionary = []
+        settings.appendTrailingSpace = false
+        let (c, output, _) = makeCoordinator(settings: settings)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        c.settings.dictionary = [DictionaryEntry(from: "hello", to: "bye")]
+        await c.hotkeyPressed()
+        c.hotkeyReleased()
+        await c.inFlight?.value
+        #expect(output.inserted == ["bye world"])
     }
 
     @Test func submitKeyChangeWhileRecordingStopsTheMicrophone() async {

@@ -46,8 +46,8 @@ swift run -c release pladder-cli bench bench/fixtures   # run the benchmark
 ## Pluggability rules
 
 - `PladderCore` imports Foundation only. It never imports FluidAudio, AVFoundation or AppKit, so tests compile fast and engines are truly swappable.
-- Adding an engine: implement `TranscriptionEngine` in its own file under `PladderEngines`, register it in the `EngineRegistry` built in `AppModel`. One file plus one registry line; the settings picker reads the registry.
-- Adding a processor: implement `TextProcessor` in its own file, append it to `processorOrder` in `AppModel`. The order is explicit and visible in one place. A processor sits on the critical path, so the benchmark rule applies.
+- Adding an engine: implement `TranscriptionEngine` in its own file under `PladderEngines`, register it in the `EngineRegistry` built in `AppModel`. One file plus one registry line; the settings picker reads the registry. The engine lifecycle — building, loading, status polling and swapping — lives in `EngineLoader`.
+- Adding a processor: implement `TextProcessor` in its own file, append a factory to `processorFactories` in `AppModel`. The pipeline is rebuilt when settings change, never per dictation. A processor sits on the critical path, so the benchmark rule applies.
 - Engine and capture are actors. The coordinator is `@MainActor` because it drives UI. It owns the state machine and nothing else; every dependency is injected, so tests run it with in-memory fakes.
 
 ## Risks

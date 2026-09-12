@@ -136,12 +136,31 @@ effect the longer fixtures exist to expose.
 
 ## Reading the app's release-to-paste log
 
-Every dictation logs one line with the total release-to-paste time, the audio
-length and the engine's share of it:
+Every dictation logs one line with the total release-to-paste time, its
+per-stage breakdown and the audio length:
 
 ```sh
 /usr/bin/log show --last 1h --style compact --predicate 'subsystem == "de.dinooo13.pladder"'
 ```
 
-The difference between the total and the engine time is capture stop,
-processors and paste. If that gap grows, something new is on the path.
+The line looks like:
+
+```
+release-to-paste 0.312 s: stop 0.012, engine 0.250, process 0.003, paste 0.014; audio 4.2 s
+```
+
+What each stage contains:
+
+- `stop` is `AudioCapture.stop()`: removing the tap and collecting the
+  captured samples.
+- `engine` is `TranscriptionEngine.transcribe`.
+- `process` is the processor pipeline run.
+- `paste` is `TextOutput.insert`.
+
+The remainder of the total after these four stages is actor scheduling: the
+coordinator resumes on the main actor between stages. If the remainder grows,
+something new is contending with the main actor.
+
+The engine's own `processingTime` is logged beside the stages as
+`engine-time`; a large gap between `engine` and `engine-time` means the engine
+actor was busy with something else.

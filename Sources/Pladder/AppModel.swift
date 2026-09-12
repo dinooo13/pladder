@@ -105,34 +105,26 @@ final class AppModel {
         Self.migrateLegacySettings(to: Self.settingsURL)
         self.store = store
 
-        // Processors, in pipeline order: fillers go first so the dictionary
-        // sees cleaned text, and whitespace is tidied last. This is the single
-        // place that order is defined; both the settings toggles and
-        // `makePipeline` below derive from it.
-        // `DictionaryReplacer`'s entries here are unused placeholders — its
-        // `id`/`displayName`/`detail` don't depend on them, and `makePipeline`
-        // rebuilds it from the live settings on every dictation.
-        let processorOrder: [any TextProcessor] = [
-            FillerRemover(),
-            DictionaryReplacer(entries: []),
-            WhitespaceNormalizer(),
+        // Processors, in pipeline order: fillers go first so the dictionary sees
+        // cleaned text, and whitespace is tidied last. Each entry is a factory so
+        // a processor that needs settings builds itself from them; nothing here
+        // knows which processor that is.
+        let processorFactories: [@Sendable (Settings) -> any TextProcessor] = [
+            { _ in FillerRemover() },
+            { DictionaryReplacer(entries: $0.dictionary) },
+            { _ in WhitespaceNormalizer() },
         ]
-        self.processors = processorOrder
+        self.processors = processorFactories.map { $0(store.load()) }
 
         let events = self.events
+        let initial = store.load()
         coordinator = DictationCoordinator(
-            settings: store.load(),
+            settings: initial,
             registry: registry,
             capture: AVAudioEngineCapture(),
             output: PasteboardOutput(),
             hotkeyMonitor: GlobalHotkeyMonitor(),
-            makePipeline: { s in
-                ProcessorPipeline(processorOrder.map { processor in
-                    processor.id == DictionaryReplacer.processorID
-                        ? DictionaryReplacer(entries: s.dictionary)
-                        : processor
-                })
-            },
+            makePipeline: { s in ProcessorPipeline(processorFactories.map { $0(s) }) },
             onEvent: { [events] event in events.send(event) }
         )
 
@@ -180,18 +172,28 @@ final class AppModel {
     }
 
     private func handle(_ event: DictationCoordinator.Event, at instant: ContinuousClock.Instant) {
+        func fmt(_ duration: Duration) -> String {
+            let d = Self.seconds(duration)
+            return String(format: "%.3f", d)
+        }
         switch event {
         case .recordingStarted:
             if settings.playSounds { SoundPlayer.playStart() }
         case .recordingStopped:
             releaseInstant = instant
             if settings.playSounds { SoundPlayer.playStop() }
-        case .inserted(let transcript):
+        case .inserted(let transcript, let timing):
             guard let released = releaseInstant else { return }
             releaseInstant = nil
             let total = Self.seconds(instant - released)
+            let stages = "stop \(fmt(timing.captureStop)), engine \(fmt(timing.engine)), " +
+                "process \(fmt(timing.processing)), paste \(fmt(timing.insert))"
             Self.timing.log(
-                "release-to-paste \(total, format: .fixed(precision: 3), privacy: .public) s, audio \(transcript.audioDuration, format: .fixed(precision: 1), privacy: .public) s, engine \(transcript.processingTime, format: .fixed(precision: 3), privacy: .public) s"
+                """
+                release-to-paste \(total, format: .fixed(precision: 3), privacy: .public) s: \(stages); \
+                audio \(transcript.audioDuration, format: .fixed(precision: 1), privacy: .public) s, \
+                engine-time \(transcript.processingTime, format: .fixed(precision: 3), privacy: .public) s
+                """
             )
         case .failed:
             releaseInstant = nil
