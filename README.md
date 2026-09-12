@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="Assets/icon_1024.png" width="128" alt="SpeakUp icon">
+  <img src="Assets/icon_1024.png" width="128" alt="Pladder icon">
 </p>
 
-<h1 align="center">SpeakUp</h1>
+<h1 align="center">Pladder</h1>
 
 <p align="center">
   <strong>Talk to your agents.</strong><br>
@@ -16,12 +16,12 @@
   <a href="INSTALL.md"><img src="https://img.shields.io/badge/macOS-26%2B-000000?logo=apple&logoColor=white" alt="macOS 26 or later"></a>
   <a href="INSTALL.md"><img src="https://img.shields.io/badge/Apple%20Silicon-M1%20and%20up-000000?logo=apple&logoColor=white" alt="Apple Silicon"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
-  <a href="https://github.com/dinooo13/speakup/actions/workflows/ci.yml"><img src="https://github.com/dinooo13/speakup/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/dinooo13/pladder/actions/workflows/ci.yml"><img src="https://github.com/dinooo13/pladder/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 </p>
 
 <p align="center">
   <a href="INSTALL.md">Install</a> ·
-  <a href="#why-speakup">Why</a> ·
+  <a href="#why-pladder">Why</a> ·
   <a href="#built-for-agents">Agents</a> ·
   <a href="#speed">Speed</a> ·
   <a href="#private-by-construction">Privacy</a> ·
@@ -34,13 +34,13 @@
   prompt into Claude Code, letting go, the text landing, the agent starting.
   Record with QuickTime or `screencapture -v`, convert with ffmpeg + gifski.
   Replace the picture below with:
-  <p align="center"><img src="docs/images/hero.gif" width="800" alt="Dictating a prompt into Claude Code with SpeakUp"></p>
+  <p align="center"><img src="docs/images/hero.gif" width="800" alt="Dictating a prompt into Claude Code with Pladder"></p>
 -->
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/flow-dark.png">
-    <img src="docs/images/flow-light.png" width="900" alt="The SpeakUp pill in its three states: recording with a live level meter, transcribing, done">
+    <img src="docs/images/flow-light.png" width="900" alt="The Pladder pill in its three states: recording with a live level meter, transcribing, done">
   </picture>
 </p>
 
@@ -48,9 +48,13 @@
 
 ---
 
-## Why SpeakUp
+## The name
 
-You type long prompts all day. Speech is three to four times faster than typing, and the thing that has always made dictation annoying is waiting for it. SpeakUp is built around one number: the time between letting go of the key and the text appearing. On the slowest supported Mac, a ten second sentence transcribes in about a quarter of a second.
+*Pladder* is Low German — Plattdeutsch, the flatland dialect of the north, where this app is built. It means to babble, to rattle on, the easy stream of talk that pours out when nobody is taking notes. That is exactly the input side of dictation: you pladder into the microphone, loose and unpolished, and what lands at the cursor is clean text.
+
+## Why Pladder
+
+You type long prompts all day. Speech is three to four times faster than typing, and the thing that has always made dictation annoying is waiting for it. Pladder is built around one number: the time between letting go of the key and the text appearing. On the slowest supported Mac, a ten second sentence transcribes in about a quarter of a second.
 
 - **One key, everywhere.** Hold Right Command, or any key or chord you record. Speak. Release. The words land at the cursor in any app that takes text. No window to open, no button to click, no mode to leave.
 - **Nothing leaves your Mac.** The speech model runs on the Neural Engine. There is no account, no server, no telemetry, and the app makes no network requests after the one-time model download.
@@ -61,7 +65,7 @@ You type long prompts all day. Speech is three to four times faster than typing,
 
 ## Built for agents
 
-SpeakUp pastes into whatever has focus, so it works with every editor and terminal. It was made for the loop where you talk to an agent, it works, and you talk again:
+Pladder pastes into whatever has focus, so it works with every editor and terminal. It was made for the loop where you talk to an agent, it works, and you talk again:
 
 - **Claude Code**, **Codex** and **OpenCode** in the terminal. Hold the key, describe the change, release. The prompt is in the input line and you press Enter.
 - **Cursor** and any other editor. Dictate into chat, into a comment, into a commit message.
@@ -71,7 +75,7 @@ Two things make dictation into a terminal work where general dictation apps stum
 
 ## Speed
 
-The time from letting go of the key to the text appearing is the whole product, and it is measured before and after every change that touches it. Engine times on an Apple M1, the least powerful chip SpeakUp supports:
+The time from letting go of the key to the text appearing is the whole product, and it is measured before and after every change that touches it. Engine times on an Apple M1, the least powerful chip Pladder supports:
 
 | Speech | Engine time | Realtime factor |
 |---|---:|---:|
@@ -88,7 +92,7 @@ Privacy here is not a policy, it is how the thing is built.
 
 - **Audio never leaves the Mac.** The microphone is open only while the key is held, and macOS shows the orange indicator only then. Audio goes from the microphone to the Neural Engine and is discarded.
 - **Text never leaves the Mac.** The transcript exists long enough to be pasted. Your previous clipboard is put back afterwards.
-- **No network.** The only request SpeakUp ever makes is the one-time download of the speech model from Hugging Face, about 700 MB, on first launch. After that it works with Wi-Fi off. There is no update check, no crash reporter, no analytics.
+- **No network.** The only request Pladder ever makes is the one-time download of the speech model from Hugging Face, about 700 MB, on first launch. After that it works with Wi-Fi off. There is no update check, no crash reporter, no analytics.
 - **No account.** Nothing to sign up for, nothing to log in to, nothing to cancel.
 - **Auditable.** The app is about five thousand lines of Swift under the MIT license, and none of them open a network connection. The model download is FluidAudio's, and it runs once.
 
@@ -114,8 +118,8 @@ Each comes in Liquid Glass or a flat fill, in light, dark or whatever the system
 macOS 26 or later on Apple Silicon. Build from source in about a minute:
 
 ```sh
-git clone https://github.com/dinooo13/speakup.git
-cd speakup
+git clone https://github.com/dinooo13/pladder.git
+cd pladder
 ./scripts/bundle.sh --install --run
 ```
 
@@ -123,17 +127,17 @@ Grant Microphone and Accessibility when asked, wait for the model to download on
 
 ## FAQ
 
-**Does SpeakUp work with Claude Code?**
+**Does Pladder work with Claude Code?**
 Yes. Hold the key while the terminal has focus, speak, release. The text is pasted into the prompt. The same goes for Codex, OpenCode, Cursor and any other terminal or editor.
 
 **Does my audio leave my Mac?**
-No. Transcription runs on the Neural Engine. SpeakUp makes no network requests after the one-time model download and has no account or telemetry.
+No. Transcription runs on the Neural Engine. Pladder makes no network requests after the one-time model download and has no account or telemetry.
 
-**Is SpeakUp free?**
+**Is Pladder free?**
 Yes. MIT license, no tiers, no trial.
 
 **How is it different from Wispr Flow, Superwhisper or macOS dictation?**
-SpeakUp does one thing: push-to-talk, on-device, into any app, as fast as the hardware allows. There is no cloud path, no subscription and no account. It is open source, and the speed is benchmarked in the repository rather than claimed.
+Pladder does one thing: push-to-talk, on-device, into any app, as fast as the hardware allows. There is no cloud path, no subscription and no account. It is open source, and the speed is benchmarked in the repository rather than claimed.
 
 **Which languages?**
 The 25 European languages Parakeet TDT v3 supports, including English, German, French, Spanish, Italian, Portuguese, Dutch, Polish and Ukrainian. It detects the language as you speak.

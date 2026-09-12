@@ -1,6 +1,6 @@
 ---
 name: Issue
-about: SpeakUp issue — required shape
+about: Pladder issue — required shape
 labels: ''
 ---
 

@@ -1,6 +1,6 @@
 # Benchmarks
 
-How SpeakUp's speed is measured, and the baseline to compare against. The
+How Pladder's speed is measured, and the baseline to compare against. The
 benchmark is run by hand before and after any change on the release-to-paste
 path (see [CLAUDE.md](../CLAUDE.md)). It is not part of the test suite: a
 benchmark that fails on noise gets ignored.
@@ -13,7 +13,7 @@ benchmark that fails on noise gets ignored.
   seconds.
 - **Word error rate** per fixture against the known script, so a change that
   is faster but worse is caught. Case and punctuation are ignored; only the
-  words count. The calculation lives in the `SpeakUpBench` target, which
+  words count. The calculation lives in the `PladderBench` target, which
   only the CLI links; the app carries nothing benchmark-related.
 - **Model load time** (cold start, one measurement per process, the time the
   app spends before the hotkey is enabled) and **physical memory footprint**
@@ -57,7 +57,7 @@ benchmark reports the actual length.
 1. Close other heavy work and check that `uptime` shows a low load average.
    Numbers jitter with thermal state and other load.
 2. Generate the fixtures once: `./scripts/make-fixtures.sh`
-3. Run: `swift run -c release speakup-cli bench bench/fixtures`. It takes
+3. Run: `swift run -c release pladder-cli bench bench/fixtures`. It takes
    about seven minutes; leave the machine alone while it runs.
 4. Runs never overlap, and every run is preceded by ten seconds of idle so
    it starts from the same state a real dictation does, rather than with
@@ -83,7 +83,7 @@ separate table with chip, macOS version and model version.
 
 Reference machine: Apple M1, 16 GB, macOS 26.6.2 (25G83), FluidAudio 0.15.6,
 model `parakeet-tdt-0.6b-v3` (CoreML). Recorded 2026-09-11 with `--runs 11`,
-ten kept runs per fixture. The M1 is the least powerful chip SpeakUp
+ten kept runs per fixture. The M1 is the least powerful chip Pladder
 supports: if it is fast enough here, it is fast enough everywhere.
 
 | Measurement | Value |
@@ -140,7 +140,7 @@ Every dictation logs one line with the total release-to-paste time, the audio
 length and the engine's share of it:
 
 ```sh
-/usr/bin/log show --last 1h --style compact --predicate 'subsystem == "de.speakup.app"'
+/usr/bin/log show --last 1h --style compact --predicate 'subsystem == "de.dinooo13.pladder"'
 ```
 
 The difference between the total and the engine time is capture stop,

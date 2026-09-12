@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Builds SpeakUp in release and wraps the executable in dist/SpeakUp.app.
+# Builds Pladder in release and wraps the executable in dist/Pladder.app.
 #
 # The app bundle (not a bare binary) is what gives us a stable bundle ID and
 # signature, which macOS needs to remember the Accessibility and Microphone
 # grants across launches.
 #
 # Usage: scripts/bundle.sh [--run] [--install]
-#   --run              launch dist/SpeakUp.app when done
+#   --run              launch dist/Pladder.app when done
 #   --install          copy the app to /Applications (replacing an old copy)
 #   SCRATCH=<dir>      optional swift build --scratch-path
 #   CODESIGN_IDENTITY  signing identity; auto-detected, "-" forces ad-hoc
@@ -29,20 +29,20 @@ for arg in "$@"; do
 	esac
 done
 
-APP="$ROOT/dist/SpeakUp.app"
+APP="$ROOT/dist/Pladder.app"
 CONTENTS="$APP/Contents"
 
-# Info.plist lives under Sources/SpeakUp/Resources and is excluded from the
+# Info.plist lives under Sources/Pladder/Resources and is excluded from the
 # SwiftPM resource bundle in Package.swift; it is copied straight into the app.
-PLIST="$ROOT/Sources/SpeakUp/Resources/Info.plist"
+PLIST="$ROOT/Sources/Pladder/Resources/Info.plist"
 
-swift build -c release --product SpeakUp --scratch-path "$SCRATCH"
-BIN_DIR="$(swift build -c release --product SpeakUp --scratch-path "$SCRATCH" --show-bin-path)"
+swift build -c release --product Pladder --scratch-path "$SCRATCH"
+BIN_DIR="$(swift build -c release --product Pladder --scratch-path "$SCRATCH" --show-bin-path)"
 
 rm -rf "$APP"
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 
-cp "$BIN_DIR/SpeakUp" "$CONTENTS/MacOS/SpeakUp"
+cp "$BIN_DIR/Pladder" "$CONTENTS/MacOS/Pladder"
 cp "$PLIST" "$CONTENTS/Info.plist"
 printf 'APPL????' > "$CONTENTS/PkgInfo"
 # App icon, rendered by scripts/make-icon.swift and packed with iconutil.
@@ -69,7 +69,7 @@ if [[ -z "${CODESIGN_IDENTITY:-}" ]]; then
 fi
 echo "Signing with: $CODESIGN_IDENTITY"
 codesign --force --sign "$CODESIGN_IDENTITY" \
-	--entitlements "$ROOT/scripts/SpeakUp.entitlements" \
+	--entitlements "$ROOT/scripts/Pladder.entitlements" \
 	--options runtime \
 	--timestamp=none \
 	"$APP"
@@ -77,10 +77,10 @@ codesign --force --sign "$CODESIGN_IDENTITY" \
 echo "Built $APP"
 
 if [[ "$INSTALL" -eq 1 ]]; then
-	pkill -x SpeakUp 2>/dev/null || true
-	rm -rf /Applications/SpeakUp.app
-	cp -R "$APP" /Applications/SpeakUp.app
-	APP=/Applications/SpeakUp.app
+	pkill -x Pladder 2>/dev/null || true
+	rm -rf /Applications/Pladder.app
+	cp -R "$APP" /Applications/Pladder.app
+	APP=/Applications/Pladder.app
 	echo "Installed $APP"
 fi
 
