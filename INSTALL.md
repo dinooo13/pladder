@@ -1,4 +1,4 @@
-# Installing SpeakUp
+# Installing Pladder
 
 ## Requirements
 
@@ -15,12 +15,12 @@ cd speakup
 ./scripts/bundle.sh --install --run
 ```
 
-This compiles a release build, wraps it into `SpeakUp.app`, signs it, copies it to `/Applications` and launches it. SpeakUp lives in the menu bar; there is no Dock icon.
+This compiles a release build, wraps it into `Pladder.app`, signs it, copies it to `/Applications` and launches it. Pladder lives in the menu bar; there is no Dock icon.
 
 ## First launch
 
 1. **Grant Microphone** when macOS asks. That is what records your voice.
-2. **Grant Accessibility** when prompted. System Settings opens on the Accessibility list; switch SpeakUp on. That is what lets SpeakUp see the push-to-talk key in other apps and paste the result. It does not need Input Monitoring.
+2. **Grant Accessibility** when prompted. System Settings opens on the Accessibility list; switch Pladder on. That is what lets Pladder see the push-to-talk key in other apps and paste the result. It does not need Input Monitoring.
 3. **Wait for the model.** The first run downloads the Parakeet TDT v3 CoreML models from Hugging Face into `~/Library/Application Support/FluidAudio/Models` and compiles them. The menu bar icon shows progress, and the push-to-talk key is disabled until the engine is ready. This happens once; later launches load in well under a second.
 
 Then click into any text field, hold **Right Command**, say something, and let go.
@@ -40,10 +40,10 @@ The install step quits the running copy and replaces it. Because the app is sign
 
 ## Uninstalling
 
-1. Quit SpeakUp from the menu bar.
-2. Delete `/Applications/SpeakUp.app`.
-3. Optionally delete the settings in `~/Library/Application Support/SpeakUp` and the models in `~/Library/Application Support/FluidAudio`.
-4. Optionally remove SpeakUp from Privacy & Security > Accessibility and > Microphone in System Settings.
+1. Quit Pladder from the menu bar.
+2. Delete `/Applications/Pladder.app`.
+3. Optionally delete the settings in `~/Library/Application Support/Pladder` and the models in `~/Library/Application Support/FluidAudio`.
+4. Optionally remove Pladder from Privacy & Security > Accessibility and > Microphone in System Settings.
 
 ## Building for development
 
@@ -52,10 +52,10 @@ The project is a Swift package with no Xcode project file; open `Package.swift` 
 ```sh
 swift build                      # debug build of everything
 swift test                       # unit tests, run in well under a second
-./scripts/bundle.sh              # release build → dist/SpeakUp.app, signed
+./scripts/bundle.sh              # release build → dist/Pladder.app, signed
 ./scripts/bundle.sh --run        # …and launch it
 ./scripts/bundle.sh --install    # …and copy to /Applications
-swift run speakup-cli audio.wav  # transcribe a file from the terminal
+swift run pladder-cli audio.wav  # transcribe a file from the terminal
 ```
 
 ### Signing
@@ -71,13 +71,13 @@ A free Apple ID is enough for an Apple Development certificate: sign in to Xcode
 
 ### Command-line transcriber
 
-`speakup-cli` loads the same engine and prints the transcript for any audio file. It is the quickest way to check the model without the GUI, and prints timing so you can see the real-time factor on your machine.
+`pladder-cli` loads the same engine and prints the transcript for any audio file. It is the quickest way to check the model without the GUI, and prints timing so you can see the real-time factor on your machine.
 
 ```sh
-swift run -c release speakup-cli recording.wav
+swift run -c release pladder-cli recording.wav
 ```
 
-`speakup-cli bench <dir>` runs the benchmark over synthetic fixtures. See [docs/BENCHMARKS.md](docs/BENCHMARKS.md) for the procedure and the M1 baseline.
+`pladder-cli bench <dir>` runs the benchmark over synthetic fixtures. See [docs/BENCHMARKS.md](docs/BENCHMARKS.md) for the procedure and the M1 baseline.
 
 ### Icon and screenshots
 
@@ -102,17 +102,17 @@ The app was signed ad-hoc. Install a development certificate so the signature st
 The menu offers **Retry Model Download**. The files come from Hugging Face; a proxy or firewall that blocks it will stop the download. Once the models are in `~/Library/Application Support/FluidAudio/Models`, no network is needed again.
 
 **Text is pasted into the wrong app.**
-SpeakUp pastes into whatever has keyboard focus when the key is released. Click into the target field before holding the key.
+Pladder pastes into whatever has keyboard focus when the key is released. Click into the target field before holding the key.
 
 **A plain key stops working in other apps.**
-A push-to-talk key without a modifier is swallowed system wide while SpeakUp runs, so a bare letter or Space would become untypeable. Settings warns about this; use a modifier or a chord.
+A push-to-talk key without a modifier is swallowed system wide while Pladder runs, so a bare letter or Space would become untypeable. Settings warns about this; use a modifier or a chord.
 
 **Where are the settings?**
-`~/Library/Application Support/SpeakUp/settings.json`, plain JSON. The dictionary can also be imported and exported from the Dictionary tab.
+`~/Library/Application Support/Pladder/settings.json`, plain JSON. The dictionary can also be imported and exported from the Dictionary tab.
 
 **How do I see the release-to-paste time?**
 Every dictation logs one line:
 
 ```sh
-/usr/bin/log show --last 1h --style compact --predicate 'subsystem == "de.speakup.app"'
+/usr/bin/log show --last 1h --style compact --predicate 'subsystem == "de.dinooo13.pladder"'
 ```

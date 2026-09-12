@@ -21,7 +21,7 @@ on:
 
 jobs:
   build-and-test:
-    # SpeakUp targets macOS 26 and needs Xcode 26.
+    # Pladder targets macOS 26 and needs Xcode 26.
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
@@ -37,5 +37,5 @@ jobs:
         run: CODESIGN_IDENTITY=- ./scripts/bundle.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: SpeakUp.app
-          path: dist/SpeakUp.app
+          name: Pladder.app
+          path: dist/Pladder.app

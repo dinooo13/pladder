@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "SpeakUp",
+    name: "Pladder",
     platforms: [.macOS(.v26)],
     products: [
-        .executable(name: "SpeakUp", targets: ["SpeakUp"]),
-        .executable(name: "speakup-cli", targets: ["SpeakUpCLI"]),
-        .library(name: "SpeakUpCore", targets: ["SpeakUpCore"]),
+        .executable(name: "Pladder", targets: ["Pladder"]),
+        .executable(name: "pladder-cli", targets: ["PladderCLI"]),
+        .library(name: "PladderCore", targets: ["PladderCore"]),
     ],
     dependencies: [
         .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.15.6"),
@@ -15,28 +15,28 @@ let package = Package(
     targets: [
         // Pure logic. Imports Foundation only, so tests stay fast and engines
         // remain swappable.
-        .target(name: "SpeakUpCore"),
+        .target(name: "PladderCore"),
 
         // Microphone capture and resampling.
-        .target(name: "SpeakUpAudio", dependencies: ["SpeakUpCore"]),
+        .target(name: "PladderAudio", dependencies: ["PladderCore"]),
 
         // Hotkey, pasteboard output, permissions, optional Foundation Models
         // processor. AppKit lives here.
-        .target(name: "SpeakUpSystem", dependencies: ["SpeakUpCore"]),
+        .target(name: "PladderSystem", dependencies: ["PladderCore"]),
 
         // Concrete transcription engines.
         .target(
-            name: "SpeakUpEngines",
+            name: "PladderEngines",
             dependencies: [
-                "SpeakUpCore",
+                "PladderCore",
                 .product(name: "FluidAudio", package: "FluidAudio"),
             ]
         ),
 
         // The menu bar app.
         .executableTarget(
-            name: "SpeakUp",
-            dependencies: ["SpeakUpCore", "SpeakUpAudio", "SpeakUpSystem", "SpeakUpEngines"],
+            name: "Pladder",
+            dependencies: ["PladderCore", "PladderAudio", "PladderSystem", "PladderEngines"],
             // Info.plist is copied into the .app by scripts/bundle.sh; SwiftPM
             // refuses to treat it as a resource, so keep it out of the bundle.
             exclude: ["Resources/Info.plist"]
@@ -44,17 +44,17 @@ let package = Package(
 
         // Benchmark helpers (word error rate). Only the CLI links this; the
         // app carries nothing benchmark-related.
-        .target(name: "SpeakUpBench"),
+        .target(name: "PladderBench"),
 
         // Developer tool: transcribe a file from the terminal to verify
         // engines, or run the benchmark (see docs/BENCHMARKS.md).
         .executableTarget(
-            name: "SpeakUpCLI",
-            dependencies: ["SpeakUpCore", "SpeakUpEngines", "SpeakUpAudio", "SpeakUpBench"]
+            name: "PladderCLI",
+            dependencies: ["PladderCore", "PladderEngines", "PladderAudio", "PladderBench"]
         ),
 
-        .testTarget(name: "SpeakUpCoreTests", dependencies: ["SpeakUpCore"]),
-        .testTarget(name: "SpeakUpAudioTests", dependencies: ["SpeakUpAudio"]),
-        .testTarget(name: "SpeakUpBenchTests", dependencies: ["SpeakUpBench"]),
+        .testTarget(name: "PladderCoreTests", dependencies: ["PladderCore"]),
+        .testTarget(name: "PladderAudioTests", dependencies: ["PladderAudio"]),
+        .testTarget(name: "PladderBenchTests", dependencies: ["PladderBench"]),
     ]
 )

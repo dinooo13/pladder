@@ -1,4 +1,4 @@
-// Renders the SpeakUp app icon: a deep blue-to-violet squircle with a white
+// Renders the Pladder app icon: a deep blue-to-violet squircle with a white
 // voice waveform, echoing the level meter in the dictation pill.
 // Usage: swift scripts/make-icon.swift <output-dir>   (writes icon_1024.png)
 import AppKit
