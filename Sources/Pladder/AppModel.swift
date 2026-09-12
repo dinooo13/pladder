@@ -105,6 +105,10 @@ final class AppModel {
         Self.migrateLegacySettings(to: Self.settingsURL)
         self.store = store
 
+        // One read: the store moves an undecodable file aside on load, so a
+        // second read could see different settings than the first.
+        let initial = store.load()
+
         // Processors, in pipeline order: fillers go first so the dictionary sees
         // cleaned text, and whitespace is tidied last. Each entry is a factory so
         // a processor that needs settings builds itself from them; nothing here
@@ -114,10 +118,9 @@ final class AppModel {
             { DictionaryReplacer(entries: $0.dictionary) },
             { _ in WhitespaceNormalizer() },
         ]
-        self.processors = processorFactories.map { $0(store.load()) }
+        self.processors = processorFactories.map { $0(initial) }
 
         let events = self.events
-        let initial = store.load()
         coordinator = DictationCoordinator(
             settings: initial,
             registry: registry,
