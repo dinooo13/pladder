@@ -7,7 +7,9 @@
 <p align="center">
   <strong>Talk to your agents.</strong><br>
   Push-to-talk dictation for macOS. Hold a key, say the prompt, let go.<br>
-  It is in Claude Code, Codex, Cursor or OpenCode before you can reach for the Enter key.
+  It is in Claude Code, Codex, Cursor or OpenCode before you can reach for the Enter key.<br>
+  <br>
+  Insanely fast · 100% private · No data leaves your Mac
 </p>
 
 <p align="center">
