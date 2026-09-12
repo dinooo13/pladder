@@ -7,7 +7,7 @@
 <p align="center">
   <strong>Talk to your agents.</strong><br>
   Push-to-talk dictation for macOS. Hold a key, say the prompt, let go.<br>
-  It is in Claude Code, Codex, Cursor or OpenCode before you can reach for the keyboard.
+  It is in Claude Code, Codex, Cursor or OpenCode before you can reach for the Enter key.
 </p>
 
 <p align="center">
@@ -23,6 +23,7 @@
   <a href="#built-for-agents">Agents</a> ·
   <a href="#speed">Speed</a> ·
   <a href="#private-by-construction">Privacy</a> ·
+  <a href="#choose-your-style">Styles</a> ·
   <a href="#faq">FAQ</a>
 </p>
 
@@ -68,7 +69,7 @@ Two things make dictation into a terminal work where general dictation apps stum
 
 ## Speed
 
-The release-to-paste path is the whole product, and it is measured before and after every change that touches it. These are engine times on an Apple M1 with 16 GB, the least powerful chip SpeakUp supports, using the procedure in [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+The time from letting go of the key to the text appearing is the whole product, and it is measured before and after every change that touches it. Engine times on an Apple M1, the least powerful chip SpeakUp supports:
 
 | Speech | Engine time | Realtime factor |
 |---|---:|---:|
@@ -77,11 +78,7 @@ The release-to-paste path is the whole product, and it is measured before and af
 | 60 s | 0.56 s | 108× |
 | 2 min | 0.91 s | 138× |
 
-The model loads in about a quarter of a second and stays resident, so the first dictation after launch is as quick as the hundredth. The app's physical footprint after load is under 100 MB. Every real dictation logs its own release-to-paste time, so you can check the number on your own machine:
-
-```sh
-/usr/bin/log show --last 1h --style compact --predicate 'subsystem == "de.speakup.app"'
-```
+The engine is NVIDIA's Parakeet TDT v3, running on the Neural Engine through [FluidAudio](https://github.com/FluidInference/FluidAudio). It stays loaded, so the first dictation after launch is as quick as the hundredth. Procedure and baseline are in [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
 ## Private by construction
 
@@ -93,18 +90,9 @@ Privacy here is not a policy, it is how the thing is built.
 - **No account.** Nothing to sign up for, nothing to log in to, nothing to cancel.
 - **Auditable.** The app is about five thousand lines of Swift under the MIT license, and none of them open a network connection. The model download is FluidAudio's, and it runs once.
 
-## How it works
+## Choose your style
 
-```
-hold key ──► microphone opens, the pill shows your level
-release  ──► Parakeet TDT transcribes on the Neural Engine
-         ──► your dictionary fixes names and terms
-         ──► text is pasted at the cursor, clipboard restored
-```
-
-The speech model is NVIDIA's Parakeet TDT 0.6B v3, running as CoreML through [FluidAudio](https://github.com/FluidInference/FluidAudio). It is the fastest Swift-native engine on Apple Silicon and it handles 25 European languages without being told which one you are speaking.
-
-The pill sits at the bottom of the screen and never takes focus. Choose how much of it you want to see:
+A small pill at the bottom of the screen tells you what is happening: a red dot and a live level meter while you speak, a spinner while it thinks, a tick when the text is in. It never takes focus from the app you are typing into. Show as much or as little of it as you like.
 
 <p align="center">
   <picture>
@@ -113,7 +101,11 @@ The pill sits at the bottom of the screen and never takes focus. Choose how much
   </picture>
 </p>
 
-Settings cover the push-to-talk key, the overlay style, appearance, sounds, launch at login and the dictionary, which imports and exports as JSON so a team can share one. Settings are a plain JSON file.
+- **Compact.** The full pill with the level meter. You always know it is listening.
+- **Minimal.** A small disc with a pulse. Enough to see it is on, not enough to look at.
+- **Menu Bar.** Nothing on the desktop at all. The wave in the menu bar is the only sign.
+
+Each comes in Liquid Glass or a flat fill, in light, dark or whatever the system is doing. Pick a different push-to-talk key by pressing it. Teach it your words in the dictionary, and share the rules with your team as a JSON file.
 
 ## Install
 
