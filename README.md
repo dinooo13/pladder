@@ -1,38 +1,123 @@
 <p align="center">
-  <img src="Assets/icon_1024.png" width="160" alt="SpeakUp icon">
+  <img src="Assets/icon_1024.png" width="128" alt="SpeakUp icon">
 </p>
 
 <h1 align="center">SpeakUp</h1>
+
 <p align="center">
-  Push-to-talk dictation for your agents. Hold a key, speak, let go. Transcription pastes almost instant.
-  <br>
-  <br>
-  Insanely fast · 100% private · No data leaves your Mac
+  <strong>Talk to your agents.</strong><br>
+  Push-to-talk dictation for macOS. Hold a key, say the prompt, let go.<br>
+  It is in Claude Code, Codex, Cursor or OpenCode before you can reach for the keyboard.
 </p>
 
 <p align="center">
-  <a href="#install">Install</a> ·
-  <a href="#how-it-works">How it works</a> ·
-  <a href="#building-from-source">Build</a> ·
+  <a href="INSTALL.md"><img src="https://img.shields.io/badge/macOS-26%2B-000000?logo=apple&logoColor=white" alt="macOS 26 or later"></a>
+  <a href="INSTALL.md"><img src="https://img.shields.io/badge/Apple%20Silicon-M1%20and%20up-000000?logo=apple&logoColor=white" alt="Apple Silicon"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
+  <a href="https://github.com/dinooo13/speakup/actions/workflows/ci.yml"><img src="https://github.com/dinooo13/speakup/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 </p>
+
+<p align="center">
+  <a href="INSTALL.md">Install</a> ·
+  <a href="#why-speakup">Why</a> ·
+  <a href="#built-for-agents">Agents</a> ·
+  <a href="#speed">Speed</a> ·
+  <a href="#private-by-construction">Privacy</a> ·
+  <a href="#faq">FAQ</a>
+</p>
+
+<!--
+  Hero GIF goes here: six to eight seconds of holding Right Command, saying a
+  prompt into Claude Code, letting go, the text landing, the agent starting.
+  Record with QuickTime or `screencapture -v`, convert with ffmpeg + gifski.
+  Replace the picture below with:
+  <p align="center"><img src="docs/images/hero.gif" width="800" alt="Dictating a prompt into Claude Code with SpeakUp"></p>
+-->
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/flow-dark.png">
+    <img src="docs/images/flow-light.png" width="900" alt="The SpeakUp pill in its three states: recording with a live level meter, transcribing, done">
+  </picture>
+</p>
+
+<p align="center"><em>Hold. Release. Pasted.</em></p>
 
 ---
 
 ## Why SpeakUp
 
-- **Push to talk.** One action, configurable by hotkey. Right Command is the default. Hold, speak, release. Works in every app that takes text.
-- **Fast.** NVIDIA's Parakeet TDT v3 runs on the Neural Engine through [FluidAudio](https://github.com/FluidInference/FluidAudio). A 30-second sentence transcribes in well under half a second. The model stays loaded, so the first word is as quick as the last.
-- **Private.** Audio never leaves your Mac. There is no account, no cloud, no telemetry. The microphone is only open while the key is held.
-- **Accurate with your words.** A dictionary fixes the names and jargon speech models get wrong. "clode code" becomes "Claude Code" every time.
-- **Native.** A menu bar app with a recording overlay and a settings window. It looks and behaves like it shipped with the system.
-- **Multilingual.** Parakeet v3 handles 25 European languages and switches automatically. Dictate in English, German or Spanish in the same sentence.
+You type long prompts all day. Speech is three to four times faster than typing, and the thing that has always made dictation annoying is waiting for it. SpeakUp is built around one number: the time between letting go of the key and the text appearing. On the slowest supported Mac, a ten second sentence transcribes in about a quarter of a second.
 
+- **One key, everywhere.** Hold Right Command, or any key or chord you record. Speak. Release. The words land at the cursor in any app that takes text. No window to open, no button to click, no mode to leave.
+- **Nothing leaves your Mac.** The speech model runs on the Neural Engine. There is no account, no server, no telemetry, and the app makes no network requests after the one-time model download.
+- **It knows your words.** A dictionary turns what the model hears into what you meant. "clode code" becomes "Claude Code", "get hub" becomes "GitHub", every time, at zero cost in latency.
+- **It behaves like part of macOS.** A menu bar app with a Liquid Glass status pill, a standard settings window, and nothing in the Dock.
+- **Twenty-five languages, switched automatically.** English, German, Spanish, French and the rest of Europe in the same session, with no setting to flip.
+- **Free and MIT.** The source is here. Read it, build it, change it.
+
+## Built for agents
+
+SpeakUp pastes into whatever has focus, so it works with every editor and terminal. It was made for the loop where you talk to an agent, it works, and you talk again:
+
+- **Claude Code**, **Codex** and **OpenCode** in the terminal. Hold the key, describe the change, release. The prompt is in the input line and you press Enter.
+- **Cursor** and any other editor. Dictate into chat, into a comment, into a commit message.
+- **Anything else with a text field.** Slack, Mail, a browser, a form.
+
+Two things make dictation into a terminal work where general dictation apps stumble. The latency is short enough that you stay in the conversation instead of waiting for it. And the dictionary fixes the names that speech models get wrong: product names, libraries, commands, your own project's jargon.
+
+## Speed
+
+The release-to-paste path is the whole product, and it is measured before and after every change that touches it. These are engine times on an Apple M1 with 16 GB, the least powerful chip SpeakUp supports, using the procedure in [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+
+| Speech | Engine time | Realtime factor |
+|---|---:|---:|
+| 10 s | 0.24 s | 41× |
+| 30 s | 0.40 s | 80× |
+| 60 s | 0.56 s | 108× |
+| 2 min | 0.91 s | 138× |
+
+The model loads in about a quarter of a second and stays resident, so the first dictation after launch is as quick as the hundredth. The app's physical footprint after load is under 100 MB. Every real dictation logs its own release-to-paste time, so you can check the number on your own machine:
+
+```sh
+/usr/bin/log show --last 1h --style compact --predicate 'subsystem == "de.speakup.app"'
+```
+
+## Private by construction
+
+Privacy here is not a policy, it is how the thing is built.
+
+- **Audio never leaves the Mac.** The microphone is open only while the key is held, and macOS shows the orange indicator only then. Audio goes from the microphone to the Neural Engine and is discarded.
+- **Text never leaves the Mac.** The transcript exists long enough to be pasted. Your previous clipboard is put back afterwards.
+- **No network.** The only request SpeakUp ever makes is the one-time download of the speech model from Hugging Face, about 700 MB, on first launch. After that it works with Wi-Fi off. There is no update check, no crash reporter, no analytics.
+- **No account.** Nothing to sign up for, nothing to log in to, nothing to cancel.
+- **Auditable.** The app is about five thousand lines of Swift under the MIT license, and none of them open a network connection. The model download is FluidAudio's, and it runs once.
+
+## How it works
+
+```
+hold key ──► microphone opens, the pill shows your level
+release  ──► Parakeet TDT transcribes on the Neural Engine
+         ──► your dictionary fixes names and terms
+         ──► text is pasted at the cursor, clipboard restored
+```
+
+The speech model is NVIDIA's Parakeet TDT 0.6B v3, running as CoreML through [FluidAudio](https://github.com/FluidInference/FluidAudio). It is the fastest Swift-native engine on Apple Silicon and it handles 25 European languages without being told which one you are speaking.
+
+The pill sits at the bottom of the screen and never takes focus. Choose how much of it you want to see:
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/styles-dark.png">
+    <img src="docs/images/styles-light.png" width="900" alt="The three overlay styles: Compact pill with level meter, Minimal disc, and Menu Bar glyph only">
+  </picture>
+</p>
+
+Settings cover the push-to-talk key, the overlay style, appearance, sounds, launch at login and the dictionary, which imports and exports as JSON so a team can share one. Settings are a plain JSON file.
 
 ## Install
 
-**Requirements:** macOS 26 or later on Apple Silicon.
-
-There is no packaged release yet. Build it yourself like so:
+macOS 26 or later on Apple Silicon. Build from source in about a minute:
 
 ```sh
 git clone https://github.com/dinooo13/speakup.git
@@ -40,34 +125,37 @@ cd speakup
 ./scripts/bundle.sh --install --run
 ```
 
-That compiles a release build, wraps it into `SpeakUp.app`, signs it, copies it to `/Applications`, and launches it. SpeakUp lives in the menu bar; there is no Dock icon.
+Grant Microphone and Accessibility when asked, wait for the model to download once, then hold **Right Command** in any text field and speak. The full walkthrough, signing, troubleshooting and the command-line tool are in [INSTALL.md](INSTALL.md).
 
-On first launch:
+## FAQ
 
-1. **Grant Microphone** when macOS asks. That is what records your voice.
-2. **Grant Accessibility** in System Settings when prompted. That is what lets SpeakUp see the push-to-talk key in other apps and paste the result.
-3. Wait for the model. The first run downloads about 700 MB of CoreML models from Hugging Face into `~/Library/Application Support/FluidAudio/Models`. The menu bar shows progress. This happens once.
+**Does SpeakUp work with Claude Code?**
+Yes. Hold the key while the terminal has focus, speak, release. The text is pasted into the prompt. The same goes for Codex, OpenCode, Cursor and any other terminal or editor.
 
-Then click into any text field, hold **Right Command**, say something, and let go.
+**Does my audio leave my Mac?**
+No. Transcription runs on the Neural Engine. SpeakUp makes no network requests after the one-time model download and has no account or telemetry.
 
-### Signing
+**Is SpeakUp free?**
+Yes. MIT license, no tiers, no trial.
 
-macOS ties the Microphone and Accessibility grants to the app's code signature. The bundle script looks for an **Apple Development** or **Developer ID Application** certificate in your keychain and signs with the first one it finds, which gives the app a stable identity across rebuilds. Without a certificate it falls back to an ad-hoc signature, which changes on every build and makes macOS ask for both permissions again.
+**How is it different from Wispr Flow, Superwhisper or macOS dictation?**
+SpeakUp does one thing: push-to-talk, on-device, into any app, as fast as the hardware allows. There is no cloud path, no subscription and no account. It is open source, and the speed is benchmarked in the repository rather than claimed.
 
-```sh
-CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" ./scripts/bundle.sh
-CODESIGN_IDENTITY=- ./scripts/bundle.sh     # force ad-hoc
-```
+**Which languages?**
+The 25 European languages Parakeet TDT v3 supports, including English, German, French, Spanish, Italian, Portuguese, Dutch, Polish and Ukrainian. It detects the language as you speak.
 
-### Command-line transcriber
+**Which Macs?**
+Any Apple Silicon Mac on macOS 26 or later. Benchmarks are taken on an M1, so every newer chip is faster.
 
-`speakup-cli` loads the same engine and prints the transcript for any audio file. It is the quickest way to check the model without the GUI, and prints timing so you can see the real-time factor on your machine.
+**Can I change the key?**
+Yes. Any key or combination, recorded by pressing it in Settings. Right Command is the default because nothing else uses it.
 
-`speakup-cli bench <dir>` runs the benchmark over synthetic fixtures. See [docs/BENCHMARKS.md](docs/BENCHMARKS.md) for the procedure and the M1 baseline.
+**What about long dictations?**
+Recordings stop at 120 seconds, so a lost key-up never leaves the microphone on. Audio longer than 15 seconds is transcribed in overlapping windows.
 
-## Privacy
+## Contributing
 
-SpeakUp makes exactly one kind of network request: downloading the speech model from Hugging Face on first launch. After that it works offline. Nothing you say is stored; the transcript exists only long enough to be pasted, and your previous clipboard contents are restored afterwards.
+Issues and pull requests are welcome. The [CLAUDE.md](CLAUDE.md) file states what the project optimises for and the rule that every change on the release-to-paste path ships with a benchmark. [docs/BENCHMARKS.md](docs/BENCHMARKS.md) has the procedure.
 
 ## License
 
