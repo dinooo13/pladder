@@ -49,24 +49,41 @@ public final class DictationCoordinator {
     /// How long an error stays on screen before returning to idle.
     public var errorDisplayDuration: Duration = .seconds(2)
 
-    private var engine: any TranscriptionEngine
+    private let loader: EngineLoader
     private let capture: any AudioCapture
     private let output: any TextOutput
     private let hotkeyMonitor: any HotkeyMonitor
     private let registry: EngineRegistry
     private let makePipeline: @Sendable (Settings) -> ProcessorPipeline
+    /// Rebuilt when settings change so that no processor is constructed on the
+    /// release-to-paste path; `DictionaryReplacer` compiles a regex per entry.
+    private var pipeline: ProcessorPipeline
     private let onEvent: @Sendable (Event) -> Void
 
     private var hotkeyTask: Task<Void, Never>?
     private var levelTask: Task<Void, Never>?
-    private var statusTask: Task<Void, Never>?
     private var errorResetTask: Task<Void, Never>?
     private var maxDurationTask: Task<Void, Never>?
+
+    /// Wall-clock time of each stage between the hotkey release and the paste.
+    public struct CycleTiming: Sendable, Equatable {
+        public var captureStop: Duration
+        public var engine: Duration
+        public var processing: Duration
+        public var insert: Duration
+
+        public init(captureStop: Duration, engine: Duration, processing: Duration, insert: Duration) {
+            self.captureStop = captureStop
+            self.engine = engine
+            self.processing = processing
+            self.insert = insert
+        }
+    }
 
     public enum Event: Sendable {
         case recordingStarted
         case recordingStopped
-        case inserted(Transcript)
+        case inserted(Transcript, CycleTiming)
         case failed(String)
     }
 
@@ -85,11 +102,10 @@ public final class DictationCoordinator {
         self.output = output
         self.hotkeyMonitor = hotkeyMonitor
         self.makePipeline = makePipeline
+        self.pipeline = makePipeline(settings)
         self.onEvent = onEvent
-        guard let engine = registry.make(settings.engineID) else {
-            preconditionFailure("EngineRegistry has no engines")
-        }
-        self.engine = engine
+        loader = EngineLoader(registry: registry, engineID: settings.engineID)
+        loader.onStatusChange = { [weak self] in self?.setEngineStatus($0) }
     }
 
     // MARK: Lifecycle
@@ -98,13 +114,13 @@ public final class DictationCoordinator {
     public func start() {
         if !isHotkeySuspended { startHotkey() }
         Task { try? await capture.warmUp() }
-        loadEngine()
+        loader.load()
     }
 
     public func stop() {
         hotkeyTask?.cancel()
         hotkeyMonitor.stop()
-        statusTask?.cancel()
+        loader.stop()
         levelTask?.cancel()
         errorResetTask?.cancel()
         maxDurationTask?.cancel()
@@ -115,50 +131,7 @@ public final class DictationCoordinator {
 
     /// Re-run engine load, for example after a failed download.
     public func reloadEngine() {
-        loadEngine()
-    }
-
-    private func loadEngine() {
-        statusTask?.cancel()
-        let engine = self.engine
-        // The poll is the single writer of `engineStatus` while loading, so the
-        // failure text always comes from the engine itself.
-        statusTask = Task { [weak self] in
-            guard let self else { return }
-            await self.pollStatus(of: engine)
-        }
-        Task { [weak self] in
-            guard let self else { return }
-            do {
-                try await engine.load()
-            } catch {
-                let status = await engine.status
-                if case .failed = status {
-                    self.setEngineStatus(status)
-                } else {
-                    self.setEngineStatus(.failed(message: error.localizedDescription))
-                }
-                self.statusTask?.cancel()
-                return
-            }
-            self.setEngineStatus(await engine.status)
-            self.statusTask?.cancel()
-        }
-    }
-
-    /// Cheap polling of the engine's status while it loads, so the UI can show
-    /// download progress without every engine needing to expose a stream.
-    private func pollStatus(of engine: any TranscriptionEngine) async {
-        while !Task.isCancelled {
-            let status = await engine.status
-            guard !Task.isCancelled else { return }
-            setEngineStatus(status)
-            switch status {
-            case .ready, .failed: return
-            default: break
-            }
-            try? await Task.sleep(for: .milliseconds(250))
-        }
+        loader.load()
     }
 
     private func setEngineStatus(_ status: EngineStatus) {
@@ -174,6 +147,11 @@ public final class DictationCoordinator {
     }
 
     private func settingsChanged(from old: Settings) {
+        // Rebuilt here so that no processor is constructed on the
+        // release-to-paste path; `DictionaryReplacer` compiles a regex per
+        // entry. `AppModel.settings` ignores assignments that change nothing,
+        // so this runs only on real changes.
+        pipeline = makePipeline(settings)
         if old.hotkey != settings.hotkey || old.submitKey != settings.submitKey {
             // The old key's release will never arrive on the new stream.
             // The submit key counts too: the restarted monitor would never
@@ -183,15 +161,34 @@ public final class DictationCoordinator {
             }
             if !isHotkeySuspended { startHotkey() }
         }
-        if old.engineID != settings.engineID, let next = registry.make(settings.engineID) {
-            let previous = engine
-            Task { await previous.unload() }
-            engine = next
-            engineStatus = .unloaded
-            // Leave a recording or transcription alone; the poll moves the
-            // state once the new engine reports.
-            if !state.isBusy { state = .unavailable(reason: "Loading model") }
-            loadEngine()
+        if old.engineID != settings.engineID, let previous = loader.select(settings.engineID) {
+            // The replaced engine is unloaded only once nothing is using it:
+            // the running cycle transcribes with the engine that was ready at
+            // press, and unloading it mid-cycle would lose the dictation.
+            // The new engine's "Loading model" state arrives through
+            // `onStatusChange`.
+            if state.isBusy {
+                pendingUnloads.append(previous)
+            } else {
+                Task { await previous.unload() }
+            }
+        }
+    }
+
+    /// Engines replaced by a settings change while a cycle was still running.
+    /// Unloaded when the cycle ends.
+    private var pendingUnloads: [any TranscriptionEngine] = []
+
+    /// The engine that was ready when the current recording started. Nil
+    /// between cycles.
+    private var cycleEngine: (any TranscriptionEngine)?
+
+    private func drainPendingUnloads() {
+        guard !pendingUnloads.isEmpty else { return }
+        let engines = pendingUnloads
+        pendingUnloads = []
+        Task {
+            for engine in engines { await engine.unload() }
         }
     }
 
@@ -216,6 +213,9 @@ public final class DictationCoordinator {
     public func hotkeyPressed() async {
         guard case .idle = state else { return }
         guard engineStatus.isReady else { return }
+        // The engine that was ready at press transcribes this cycle, even if
+        // the settings switch engines mid-recording.
+        cycleEngine = loader.engine
         // Flip state before the await so the overlay reacts on key-down and a
         // second concurrent press cannot start capture twice.
         state = .recording(level: 0)
@@ -256,42 +256,72 @@ public final class DictationCoordinator {
         maxDurationTask?.cancel()
         state = .transcribing
         onEvent(.recordingStopped)
+        let engine = cycleEngine ?? loader.engine
+        cycleEngine = nil
         inFlight = Task { [weak self] in
             guard let self else { return }
+            let stopped = ContinuousClock.now
             let audio = await self.capture.stop()
-            await self.finish(audio, submit: submit)
+            let captureStop = ContinuousClock.now - stopped
+            await self.finish(audio, with: engine, submit: submit, captureStop: captureStop)
         }
     }
 
-    private func finish(_ audio: CapturedAudio, submit: Bool) async {
+    private func finish(
+        _ audio: CapturedAudio,
+        with engine: any TranscriptionEngine,
+        submit: Bool,
+        captureStop: Duration
+    ) async {
         guard audio.duration >= minimumDuration else {
-            state = .idle
+            becomeIdle()
+            drainPendingUnloads()
             return
         }
         do {
+            var timing = CycleTiming(captureStop: captureStop, engine: .zero, processing: .zero, insert: .zero)
+            var started = ContinuousClock.now
             let transcript = try await engine.transcribe(audio.samples)
+            timing.engine = ContinuousClock.now - started
             lastTranscript = transcript
             let settings = self.settings
-            let processed = try await makePipeline(settings)
+            started = ContinuousClock.now
+            let processed = try await pipeline
                 .run(transcript.text, disabled: settings.disabledProcessors)
+            timing.processing = ContinuousClock.now - started
             guard !processed.isEmpty else {
-                state = .idle
+                becomeIdle()
                 return
             }
             state = .inserting
             // Don't double the junction: a transcript that already ends in
             // whitespace (e.g. "Tidy whitespace" disabled) carries its own
             // separator, so appending another makes a double space.
-            let needsSpace = settings.appendTrailingSpace && !processed.last!.isWhitespace
+            let needsSpace = settings.appendTrailingSpace && processed.last?.isWhitespace != true
             let final = needsSpace ? processed + " " : processed
+            started = ContinuousClock.now
             try await output.insert(final, submit: submit)
+            timing.insert = ContinuousClock.now - started
             var inserted = transcript
             inserted.text = processed
             lastTranscript = inserted
-            onEvent(.inserted(inserted))
-            state = .idle
+            onEvent(.inserted(inserted, timing))
+            becomeIdle()
         } catch {
             fail(error.localizedDescription)
+            drainPendingUnloads()
+            return
+        }
+        drainPendingUnloads()
+    }
+
+    /// Idle if the engine can take another dictation, otherwise unavailable
+    /// with the engine's own reason.
+    private func becomeIdle() {
+        switch engineStatus {
+        case .ready: state = .idle
+        case .failed(let message): state = .unavailable(reason: message)
+        case .unloaded, .downloading, .loading: state = .unavailable(reason: "Loading model")
         }
     }
 
@@ -300,8 +330,10 @@ public final class DictationCoordinator {
         guard state.isRecording else { return }
         levelTask?.cancel()
         maxDurationTask?.cancel()
-        state = .idle
+        becomeIdle()
+        cycleEngine = nil
         _ = await capture.stop()
+        drainPendingUnloads()
     }
 
     private func fail(_ message: String) {
@@ -312,7 +344,7 @@ public final class DictationCoordinator {
         errorResetTask = Task { [weak self, errorDisplayDuration] in
             try? await Task.sleep(for: errorDisplayDuration)
             guard let self, !Task.isCancelled, case .error = self.state else { return }
-            self.state = self.engineStatus.isReady ? .idle : .unavailable(reason: "Model not loaded")
+            self.becomeIdle()
         }
     }
 }
