@@ -16,6 +16,10 @@ public enum OverlayStyle: String, Codable, Sendable, CaseIterable, Equatable {
 public struct Settings: Codable, Sendable, Equatable {
     public var engineID: EngineID
     public var hotkey: Hotkey
+    /// Pressed at any point while `hotkey` is held, this makes the dictation
+    /// end with Return, which sends a chat message or runs a command. Empty
+    /// turns it off.
+    public var submitKey: Hotkey
     /// Processor IDs that are turned off. Absent means enabled.
     public var disabledProcessors: Set<String>
     public var dictionary: [DictionaryEntry]
@@ -34,6 +38,7 @@ public struct Settings: Codable, Sendable, Equatable {
     public init(
         engineID: EngineID,
         hotkey: Hotkey = .rightCommand,
+        submitKey: Hotkey = .rightOption,
         disabledProcessors: Set<String> = [],
         dictionary: [DictionaryEntry] = [],
         appendTrailingSpace: Bool = true,
@@ -45,6 +50,7 @@ public struct Settings: Codable, Sendable, Equatable {
     ) {
         self.engineID = engineID
         self.hotkey = hotkey
+        self.submitKey = submitKey
         self.disabledProcessors = disabledProcessors
         self.dictionary = dictionary
         self.appendTrailingSpace = appendTrailingSpace
@@ -58,7 +64,7 @@ public struct Settings: Codable, Sendable, Equatable {
     // Decoding tolerates missing keys so adding a field in a later version
     // never makes an existing settings file unreadable.
     private enum CodingKeys: String, CodingKey {
-        case engineID, hotkey, disabledProcessors, dictionary, appendTrailingSpace, launchAtLogin, playSounds, appearance
+        case engineID, hotkey, submitKey, disabledProcessors, dictionary, appendTrailingSpace, launchAtLogin, playSounds, appearance
         case overlayStyle, overlayGlass
     }
 
@@ -68,6 +74,9 @@ public struct Settings: Codable, Sendable, Equatable {
         // An empty chord can never fire, so treat it like a missing key.
         let decodedHotkey = try c.decodeIfPresent(Hotkey.self, forKey: .hotkey)
         hotkey = decodedHotkey.flatMap { $0.keyCodes.isEmpty ? nil : $0 } ?? .rightCommand
+        // Unlike the hotkey, an empty submit key is meaningful: it is how the
+        // feature is switched off.
+        submitKey = try c.decodeIfPresent(Hotkey.self, forKey: .submitKey) ?? .rightOption
         disabledProcessors = try c.decodeIfPresent(Set<String>.self, forKey: .disabledProcessors) ?? []
         dictionary = try c.decodeIfPresent([DictionaryEntry].self, forKey: .dictionary) ?? []
         appendTrailingSpace = try c.decodeIfPresent(Bool.self, forKey: .appendTrailingSpace) ?? true

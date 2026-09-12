@@ -32,25 +32,30 @@ actor FakeCapture: AudioCapture {
 final class FakeOutput: TextOutput, @unchecked Sendable {
     private let lock = NSLock()
     private var _inserted: [String] = []
+    private var _submitted: [Bool] = []
     var inserted: [String] { lock.withLock { _inserted } }
+    var submitted: [Bool] { lock.withLock { _submitted } }
     var shouldFail = false
 
-    func insert(_ text: String) async throws {
+    func insert(_ text: String, submit: Bool) async throws {
         if shouldFail { throw NSError(domain: "fake", code: 1, userInfo: [NSLocalizedDescriptionKey: "paste failed"]) }
-        lock.withLock { _inserted.append(text) }
+        lock.withLock {
+            _inserted.append(text)
+            _submitted.append(submit)
+        }
     }
 }
 
 final class FakeHotkey: HotkeyMonitor, @unchecked Sendable {
     private var continuation: AsyncStream<HotkeyEvent>.Continuation?
-    func start(hotkey: Hotkey) -> AsyncStream<HotkeyEvent> {
+    func start(hotkey: Hotkey, submitKey: Hotkey) -> AsyncStream<HotkeyEvent> {
         let (stream, cont) = AsyncStream<HotkeyEvent>.makeStream()
         continuation = cont
         return stream
     }
     func stop() { continuation?.finish() }
     func press() { continuation?.yield(.pressed) }
-    func release() { continuation?.yield(.released) }
+    func release(submit: Bool = false) { continuation?.yield(.released(submit: submit)) }
 }
 
 // MARK: - Helpers
@@ -60,7 +65,8 @@ private func makeCoordinator(
     engineText: String = "hello world",
     settings: Settings? = nil,
     output: FakeOutput = FakeOutput(),
-    capture: FakeCapture = FakeCapture()
+    capture: FakeCapture = FakeCapture(),
+    hotkeyMonitor: FakeHotkey? = nil
 ) -> (DictationCoordinator, FakeOutput, FakeCapture) {
     let registry = EngineRegistry([
         .init(id: EchoEngine.engineID, displayName: "Echo", detail: "") {
@@ -73,7 +79,7 @@ private func makeCoordinator(
         registry: registry,
         capture: capture,
         output: output,
-        hotkeyMonitor: FakeHotkey(),
+        hotkeyMonitor: hotkeyMonitor ?? FakeHotkey(),
         makePipeline: { s in
             ProcessorPipeline([DictionaryReplacer(entries: s.dictionary), WhitespaceNormalizer()])
         }
@@ -281,6 +287,56 @@ private func waitUntil(_ timeout: Duration = .seconds(2), _ condition: @MainActo
         await c.inFlight?.value
         #expect(await capture.stopCount == 1)
         #expect(output.inserted.count == 1)
+        #expect(output.submitted == [false])
+    }
+
+    @Test func submittedReleaseIsPassedToTheOutput() async {
+        let (c, output, _) = makeCoordinator()
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed()
+        c.hotkeyReleased(submit: true)
+        await c.inFlight?.value
+        #expect(output.inserted.count == 1)
+        #expect(output.submitted == [true])
+    }
+
+    @Test func shortTapWithSubmitInsertsNothing() async {
+        let (c, output, capture) = makeCoordinator()
+        await capture.setSamples(Array(repeating: 0, count: 1_600)) // 0.1 s
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed()
+        c.hotkeyReleased(submit: true)
+        await c.inFlight?.value
+        #expect(output.inserted.isEmpty)
+        #expect(output.submitted.isEmpty)
+    }
+
+    @Test func eventStreamReleaseCarriesSubmitFlag() async {
+        let hotkey = FakeHotkey()
+        let (c, output, _) = makeCoordinator(hotkeyMonitor: hotkey)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        hotkey.press()
+        #expect(await waitUntil { c.state.isRecording })
+        hotkey.release(submit: true)
+        #expect(await waitUntil { c.inFlight != nil })
+        await c.inFlight?.value
+        #expect(output.submitted == [true])
+        #expect(output.inserted.count == 1)
+    }
+
+    @Test func submitKeyChangeWhileRecordingStopsTheMicrophone() async {
+        let (c, output, capture) = makeCoordinator()
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed()
+        #expect(c.state.isRecording)
+        c.settings.submitKey = Hotkey(0x24)
+        #expect(await waitUntil { c.state == .idle })
+        #expect(await capture.stopCount == 1)
+        #expect(output.inserted.isEmpty)
     }
 }
 
@@ -294,6 +350,7 @@ private func waitUntil(_ timeout: Duration = .seconds(2), _ condition: @MainActo
 
         var changed = defaults
         changed.hotkey = .rightOption
+        changed.submitKey = Hotkey(0x24)
         changed.dictionary = [DictionaryEntry(from: "a", to: "b")]
         try store.save(changed)
         #expect(store.load() == changed)
@@ -306,6 +363,7 @@ private func waitUntil(_ timeout: Duration = .seconds(2), _ condition: @MainActo
         #expect(decoded.engineID == EchoEngine.engineID)
         #expect(decoded.dictionary.count == 1)
         #expect(decoded.hotkey == .rightCommand)
+        #expect(decoded.submitKey == .rightOption)
         #expect(decoded.appendTrailingSpace == true)
         #expect(decoded.appearance == .system)
         #expect(decoded.overlayStyle == .compact)

@@ -174,8 +174,10 @@ public final class DictationCoordinator {
     }
 
     private func settingsChanged(from old: Settings) {
-        if old.hotkey != settings.hotkey {
+        if old.hotkey != settings.hotkey || old.submitKey != settings.submitKey {
             // The old key's release will never arrive on the new stream.
+            // The submit key counts too: the restarted monitor would never
+            // deliver the pending release for the old configuration.
             if state.isRecording {
                 Task { await cancelRecording() }
             }
@@ -198,13 +200,13 @@ public final class DictationCoordinator {
     private func startHotkey() {
         hotkeyTask?.cancel()
         hotkeyMonitor.stop()
-        let stream = hotkeyMonitor.start(hotkey: settings.hotkey)
+        let stream = hotkeyMonitor.start(hotkey: settings.hotkey, submitKey: settings.submitKey)
         hotkeyTask = Task { [weak self] in
             for await event in stream {
                 guard let self else { return }
                 switch event {
                 case .pressed: await self.hotkeyPressed()
-                case .released: self.hotkeyReleased()
+                case .released(let submit): self.hotkeyReleased(submit: submit)
                 }
             }
         }
@@ -236,7 +238,9 @@ public final class DictationCoordinator {
             maxDurationTask = Task { [weak self, maximumDuration] in
                 try? await Task.sleep(for: maximumDuration)
                 guard let self, !Task.isCancelled, self.state.isRecording else { return }
-                self.hotkeyReleased()
+                // Lost key-up, not an intentional release: submitting would
+                // send a message unattended, so never submit here.
+                self.hotkeyReleased(submit: false)
             }
         } catch {
             fail("Microphone: \(error.localizedDescription)")
@@ -245,7 +249,8 @@ public final class DictationCoordinator {
 
     /// Returns immediately; the transcription runs in `inFlight`. Presses that
     /// arrive while it runs are dropped by the `.idle` guard rather than queued.
-    public func hotkeyReleased() {
+    /// With `submit`, Return follows the pasted text.
+    public func hotkeyReleased(submit: Bool = false) {
         guard state.isRecording else { return }
         levelTask?.cancel()
         maxDurationTask?.cancel()
@@ -254,11 +259,11 @@ public final class DictationCoordinator {
         inFlight = Task { [weak self] in
             guard let self else { return }
             let audio = await self.capture.stop()
-            await self.finish(audio)
+            await self.finish(audio, submit: submit)
         }
     }
 
-    private func finish(_ audio: CapturedAudio) async {
+    private func finish(_ audio: CapturedAudio, submit: Bool) async {
         guard audio.duration >= minimumDuration else {
             state = .idle
             return
@@ -279,7 +284,7 @@ public final class DictationCoordinator {
             // separator, so appending another makes a double space.
             let needsSpace = settings.appendTrailingSpace && !processed.last!.isWhitespace
             let final = needsSpace ? processed + " " : processed
-            try await output.insert(final)
+            try await output.insert(final, submit: submit)
             var inserted = transcript
             inserted.text = processed
             lastTranscript = inserted

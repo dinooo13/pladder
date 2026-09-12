@@ -37,6 +37,7 @@ swift run -c release pladder-cli bench bench/fixtures   # run the benchmark
 | Build | SwiftPM package + `scripts/bundle.sh` wrapping the binary in `Pladder.app` | No Xcode project to maintain; `Package.swift` opens in Xcode |
 | Engine | FluidAudio, Parakeet TDT 0.6B v3 | Fastest Swift-native option, runs on the Neural Engine |
 | Hotkey | Hold Right Command by default; any key or chord can be recorded | A CGEvent tap (Accessibility, no Input Monitoring) matches the chord and swallows its regular key so it never reaches the target app |
+| Send key | Press Right Option (configurable) while the hotkey is held and Return is posted 50 ms after Cmd+V | Sends a chat message or runs a command without a second trip to the keyboard; the Return is posted from a detached task so it stays off the release-to-paste path |
 | Output | Clipboard + simulated Cmd+V; the old clipboard is restored off the critical path | Universal, fast |
 | Post-processing | Dictionary replacer and whitespace normaliser only | No latency, no network. The Apple Intelligence cleanup step was removed because it sat on the critical path without anyone measuring what it cost |
 | Recording cap | 120 s | Keeps the microphone from staying on when a key-up is lost |

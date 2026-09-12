@@ -82,10 +82,22 @@ private struct GeneralSettingsView: View {
                         .foregroundStyle(.orange)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                LabeledContent("Send key") {
+                    HotkeyRecorderField(
+                        hotkey: $model.settings.submitKey,
+                        onRecordingChanged: { model.coordinator.isHotkeySuspended = $0 }
+                    )
+                }
+                if let warning = submitKeyWarning {
+                    Label(warning, systemImage: "exclamationmark.triangle")
+                        .font(.callout)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             } header: {
                 Text("Push to Talk")
             } footer: {
-                FootnoteText("Hold to record, release to insert. Click the field and press any key combination to assign it.")
+                FootnoteText("Hold to record, release to insert. Press the send key while recording and Return is pressed after the text. Click a field and press any key combination to assign it.")
             }
 
             Section {
@@ -183,6 +195,14 @@ private struct GeneralSettingsView: View {
         let hotkey = model.settings.hotkey
         guard hotkey.modifierKeyCodes.isEmpty, !hotkey.keyCodes.isEmpty else { return nil }
         return "Without a modifier, \(hotkey.displayName) can no longer be typed in other apps while Pladder is running."
+    }
+
+    /// A send key the chord already contains can never be pressed on its own.
+    private var submitKeyWarning: String? {
+        let submitKey = model.settings.submitKey
+        guard !submitKey.keyCodes.isEmpty,
+              submitKey.keyCodes.isSubset(of: model.settings.hotkey.keyCodes) else { return nil }
+        return "\(submitKey.displayName) is part of the push-to-talk key, so it can never be pressed separately."
     }
 
     private var launchAtLogin: Binding<Bool> {
