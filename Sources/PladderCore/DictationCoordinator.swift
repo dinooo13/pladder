@@ -53,7 +53,6 @@ public final class DictationCoordinator {
     private let capture: any AudioCapture
     private let output: any TextOutput
     private let hotkeyMonitor: any HotkeyMonitor
-    private let registry: EngineRegistry
     private let makePipeline: @Sendable (Settings) -> ProcessorPipeline
     /// Rebuilt when settings change so that no processor is constructed on the
     /// release-to-paste path; `DictionaryReplacer` compiles a regex per entry.
@@ -97,7 +96,6 @@ public final class DictationCoordinator {
         onEvent: @escaping @Sendable (Event) -> Void = { _ in }
     ) {
         self.settings = settings
-        self.registry = registry
         self.capture = capture
         self.output = output
         self.hotkeyMonitor = hotkeyMonitor
@@ -273,9 +271,9 @@ public final class DictationCoordinator {
         submit: Bool,
         captureStop: Duration
     ) async {
+        defer { drainPendingUnloads() }
         guard audio.duration >= minimumDuration else {
             becomeIdle()
-            drainPendingUnloads()
             return
         }
         do {
@@ -309,10 +307,7 @@ public final class DictationCoordinator {
             becomeIdle()
         } catch {
             fail(error.localizedDescription)
-            drainPendingUnloads()
-            return
         }
-        drainPendingUnloads()
     }
 
     /// Idle if the engine can take another dictation, otherwise unavailable
