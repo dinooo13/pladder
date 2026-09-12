@@ -3,36 +3,36 @@
 </p>
 
 <h1 align="center">SpeakUp</h1>
-
 <p align="center">
-  Push-to-talk dictation for macOS. Hold a key, speak, let go. The words land where your cursor is.<br>
-  Fast, private, and entirely on your Mac.
+  Push-to-talk dictation for your agents. Hold a key, speak, let go. Transcription pastes almost instant.
+  <br>
+  <br>
+  Insanely fast · 100% private · No data leaves your Mac
 </p>
 
 <p align="center">
   <a href="#install">Install</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#building-from-source">Build</a> ·
-  <a href="#customising">Customise</a>
 </p>
 
 ---
 
 ## Why SpeakUp
 
-- **Hold to talk.** One key, no toggles, no windows to click. Hold Right Command, or any key or combination you choose, speak, release. Works in every app that takes text.
-- **Fast.** NVIDIA's Parakeet TDT v3 runs on the Neural Engine through [FluidAudio](https://github.com/FluidInference/FluidAudio). A ten second sentence transcribes in well under half a second. The model stays loaded, so the first word is as quick as the last.
-- **Private.** Audio never leaves your Mac. There is no account, no cloud, no telemetry. The microphone is only open while the key is held, and macOS shows the orange indicator only then.
+- **Push to talk.** One action, configurable by hotkey. Right Command is the default. Hold, speak, release. Works in every app that takes text.
+- **Fast.** NVIDIA's Parakeet TDT v3 runs on the Neural Engine through [FluidAudio](https://github.com/FluidInference/FluidAudio). A 30-second sentence transcribes in well under half a second. The model stays loaded, so the first word is as quick as the last.
+- **Private.** Audio never leaves your Mac. There is no account, no cloud, no telemetry. The microphone is only open while the key is held.
 - **Accurate with your words.** A dictionary fixes the names and jargon speech models get wrong. "clode code" becomes "Claude Code" every time.
-- **Native.** A menu bar app with a Liquid Glass status pill and a standard settings window. It looks and behaves like it shipped with the system.
-- **Multilingual.** Parakeet v3 handles 25 European languages and switches automatically. Dictate in English, German or Spanish in the same session.
+- **Native.** A menu bar app with a recording overlay and a settings window. It looks and behaves like it shipped with the system.
+- **Multilingual.** Parakeet v3 handles 25 European languages and switches automatically. Dictate in English, German or Spanish in the same sentence.
 
 
 ## Install
 
 **Requirements:** macOS 26 or later on Apple Silicon.
 
-There is no binary release yet. Build it yourself in about a minute:
+There is no packaged release yet. Build it yourself like so:
 
 ```sh
 git clone https://github.com/dinooo13/speakup.git
@@ -50,43 +50,6 @@ On first launch:
 
 Then click into any text field, hold **Right Command**, say something, and let go.
 
-## How it works
-
-```
-hold key ──► microphone opens, pill shows your level
-release  ──► Parakeet transcribes on the Neural Engine
-         ──► your dictionary fixes names and terms
-         ──► text is pasted at the cursor, clipboard restored
-```
-
-The pill at the bottom of the screen tells you what is happening: a red dot and live level bars while recording, a spinner while transcribing, a tick when the text is in. It never takes focus from the app you are typing into.
-
-## Customising
-
-Open **Settings…** from the menu bar icon.
-
-| Tab | What you can change |
-|---|---|
-| **General** | Engine, push-to-talk key (any key or combination, recorded by pressing it; Right Command by default), overlay style and background, appearance, trailing space, sounds, launch at login. Shows permission status with a one-click fix. |
-| **Dictionary** | Replacement rules: what the model hears, what you want written, and whether case must match. Whole-word matching, longer phrases win, capitalisation carries over at the start of a sentence. Import and export as JSON. A test field shows the effect of your rules live. |
-| **Processing** | Toggle each post-processing step. Dictionary and whitespace tidying are on by default. |
-
-
-Settings are stored as plain JSON in `~/Library/Application Support/SpeakUp/settings.json`.
-
-## Building from source
-
-Xcode 26 (Swift 6.2 or later) is the only dependency. The project is a Swift package with no Xcode project file; open `Package.swift` in Xcode if you prefer an IDE.
-
-```sh
-swift build                      # debug build of everything
-swift test                       # unit tests, run in well under a second
-./scripts/bundle.sh              # release build → dist/SpeakUp.app, signed
-./scripts/bundle.sh --run        # …and launch it
-./scripts/bundle.sh --install    # …and copy to /Applications
-swift run speakup-cli audio.wav  # transcribe a file from the terminal
-```
-
 ### Signing
 
 macOS ties the Microphone and Accessibility grants to the app's code signature. The bundle script looks for an **Apple Development** or **Developer ID Application** certificate in your keychain and signs with the first one it finds, which gives the app a stable identity across rebuilds. Without a certificate it falls back to an ad-hoc signature, which changes on every build and makes macOS ask for both permissions again.
@@ -95,16 +58,6 @@ macOS ties the Microphone and Accessibility grants to the app's code signature. 
 CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" ./scripts/bundle.sh
 CODESIGN_IDENTITY=- ./scripts/bundle.sh     # force ad-hoc
 ```
-
-### Icon
-
-The app icon is rendered from code so it can be regenerated at any size:
-
-```sh
-swift scripts/make-icon.swift Assets     # writes Assets/icon_1024.png
-```
-
-`Assets/AppIcon.icns` is built from it with `iconutil` and copied into the bundle.
 
 ### Command-line transcriber
 
