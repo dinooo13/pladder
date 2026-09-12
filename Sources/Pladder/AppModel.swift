@@ -105,14 +105,15 @@ final class AppModel {
         Self.migrateLegacySettings(to: Self.settingsURL)
         self.store = store
 
-        // Processors, in pipeline order: the dictionary runs first so its
-        // output is what gets inserted, and whitespace is tidied last. This
-        // is the single place that order is defined; both the settings
-        // toggles and `makePipeline` below derive from it.
+        // Processors, in pipeline order: fillers go first so the dictionary
+        // sees cleaned text, and whitespace is tidied last. This is the single
+        // place that order is defined; both the settings toggles and
+        // `makePipeline` below derive from it.
         // `DictionaryReplacer`'s entries here are unused placeholders — its
         // `id`/`displayName`/`detail` don't depend on them, and `makePipeline`
         // rebuilds it from the live settings on every dictation.
         let processorOrder: [any TextProcessor] = [
+            FillerRemover(),
             DictionaryReplacer(entries: []),
             WhitespaceNormalizer(),
         ]
