@@ -24,7 +24,8 @@ swift test                                    # unit tests, well under a second
 ./scripts/bundle.sh [--run] [--install]       # release build → dist/Pladder.app, signed
 swift run -c release pladder-cli <audio file> # transcribe one file, print timing
 ./scripts/make-fixtures.sh                    # synthesise benchmark fixtures into bench/fixtures (gitignored)
-swift run -c release pladder-cli bench bench/fixtures   # run the benchmark
+swift run -c release pladder-cli bench bench/fixtures            # whole-buffer benchmark
+swift run -c release pladder-cli bench bench/fixtures --paced     # feed at real time, time endUtterance, check identity
 ```
 
 ## Decisions
@@ -35,7 +36,8 @@ swift run -c release pladder-cli bench bench/fixtures   # run the benchmark
 | Distribution | Direct, not sandboxed, not App Store | Global hotkey and synthetic paste do not work sandboxed |
 | Language | Swift 6.2 tools, strict concurrency, SwiftUI | Current toolchain |
 | Build | SwiftPM package + `scripts/bundle.sh` wrapping the binary in `Pladder.app` | No Xcode project to maintain; `Package.swift` opens in Xcode |
-| Engine | FluidAudio, Parakeet TDT 0.6B v3 | Fastest Swift-native option, runs on the Neural Engine |
+| Engine | FluidAudio, Parakeet TDT 0.6B v3, one engine only | Fastest Swift-native option, runs on the Neural Engine. The recording is transcribed in windows while the key is held, so only the last window and the merge are left at release |
+| FluidAudio | A fork, branch `incremental-chunks`, pinned in `Package.resolved` | Adds `IncrementalChunkProcessor`: the same windows the batch path uses, run as the audio arrives. Offered upstream; goes back to the release line when it lands |
 | Hotkey | Hold Right Command by default; any key or chord can be recorded | A CGEvent tap (Accessibility, no Input Monitoring) matches the chord and swallows its regular key so it never reaches the target app |
 | Send key | Press Right Option (configurable) while the hotkey is held and Return is posted 50 ms after Cmd+V | Sends a chat message or runs a command without a second trip to the keyboard; the Return is posted from a detached task so it stays off the release-to-paste path |
 | Output | Clipboard + simulated Cmd+V; the old clipboard is restored off the critical path | Universal, fast |
@@ -54,8 +56,8 @@ swift run -c release pladder-cli bench bench/fixtures   # run the benchmark
 
 - **Audio format.** The microphone delivers 48 kHz; the engine wants 16 kHz mono Float32. Conversion is isolated in `AudioResampler` and unit tested against synthesised buffers.
 - **First launch.** About 700 MB of CoreML models download from Hugging Face and compile on first load. The menu shows progress and the hotkey is disabled until the engine is ready.
-- **Cold latency.** The engine loads at launch and stays resident. The audio engine is prepared at launch and runs only while the key is held, so the system microphone indicator is off when idle.
-- **Long recordings.** FluidAudio's encoder window is 15 s. Longer audio is split into 15 s windows with 2 s overlap and stitched; seams can drop or duplicate words, which FluidAudio's own notes flag for the v3 model. The 30 s to 10 min fixtures watch for this.
+- **Cold latency.** The engine loads at launch and stays resident. The audio engine is prepared at launch and runs only while the key is held, so the system microphone indicator is off when idle. A cold encoder pass costs about 110 ms more than a warm one, which is more than every other stage together, so the coordinator warms the Neural Engine every two seconds while the key is held. A release that lands inside a warm pass waits for it: the signature is `engine` well above `engine-time`.
+- **Long recordings.** FluidAudio's encoder window is 15 s. Longer audio is split into windows and stitched, and seams can drop or duplicate words. Those windows now run while the key is held rather than at release, so the wait is flat with length, but the seam risk is unchanged: it is the same layout and the same merge. The paced benchmark guards it by requiring the text to be byte-identical to transcribing the whole recording at once, and the 30 s to 10 min fixtures watch the word error rate.
 - **Clipboard clobbering.** Output saves the pasteboard, pastes, and restores it after a short delay.
 - **Permissions.** Accessibility and Microphone grants are keyed to the code signature. `bundle.sh` signs with an Apple Development or Developer ID certificate when one is in the keychain; an ad-hoc signature changes on every build and resets both grants.
 - **Lost key-up.** When the 120 s watchdog fires, the coordinator transcribes and pastes as if the user had released. Discarding is probably the right behaviour; tracked separately.
