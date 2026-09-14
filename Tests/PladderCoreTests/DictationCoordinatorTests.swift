@@ -559,6 +559,28 @@ func waitUntil(_ timeout: Duration = .seconds(2), _ condition: @MainActor () -> 
         #expect(await capture.stopCount == 1)
     }
 
+    @Test func theEngineKeepsWarmingWhileTheKeyIsHeld() async {
+        let (c, _, _, engine) = makeCountingCoordinator()
+        // A real dictation warms every two seconds; the interval is settable
+        // so the test does not have to wait that long.
+        c.warmupInterval = .milliseconds(10)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed()
+        // One pass at key-down is not enough for a long dictation: the chip
+        // goes idle between them, and a cold pass costs far more than the rest
+        // of the path together.
+        #expect(await waitUntil { engine.calls.filter { $0 == 8_000 }.count >= 3 })
+        c.hotkeyReleased()
+        await c.inFlight?.value
+        // The loop stops at release, so nothing is queued ahead of the real
+        // call, and the last thing the engine saw is the utterance itself.
+        let afterRelease = engine.calls.count
+        #expect(engine.calls.last == 16_000)
+        try? await Task.sleep(for: .milliseconds(60))
+        #expect(engine.calls.count == afterRelease)
+    }
+
     @Test func releaseDuringWarmupStillInserts() async {
         let (c, output, _, _) = makeCountingCoordinator(engineDelay: .milliseconds(200))
         c.start()

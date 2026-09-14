@@ -77,16 +77,22 @@ Two things make dictation into a terminal work where general dictation apps stum
 
 ## Speed
 
-The time from letting go of the key to the text appearing is the whole product, and it is measured before and after every change that touches it. Engine times on an Apple M1, the least powerful chip Pladder supports:
+The time from letting go of the key to the text appearing is the whole product, and it is measured before and after every change that touches it. Most of it is the engine. Engine times on an Apple M1, the least powerful chip Pladder supports, with the realtime factor beside each:
 
-| Speech | Engine time | Realtime factor |
-|---|---:|---:|
-| 10 s | 0.24 s | 41× |
-| 30 s | 0.40 s | 80× |
-| 60 s | 0.56 s | 108× |
-| 2 min | 0.91 s | 138× |
+| Speech | Default engine | Realtime | Incremental engine (opt-in) | Realtime |
+|---|---:|---:|---:|---:|
+| 10 s | 0.21 s | 47× | 0.26 s | 38× |
+| 30 s | 0.42 s | 76× | 0.25 s | 126× |
+| 60 s | 0.52 s | 117× | 0.28 s | 219× |
+| 2 min | 0.94 s | 133× | 0.25 s | 493× |
+| 5 min | 2.01 s | 157× | 0.28 s | 1148× |
+| 10 min | 3.67 s | 172× | 0.32 s | 1955× |
 
-The engine is NVIDIA's Parakeet TDT v3, running on the Neural Engine through [FluidAudio](https://github.com/FluidInference/FluidAudio). It stays loaded, so the first dictation after launch is as quick as the hundredth. Procedure and baseline are in [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+The engine is NVIDIA's Parakeet TDT v3, running on the Neural Engine through [FluidAudio](https://github.com/FluidInference/FluidAudio). It loads at launch and stays loaded, so the first dictation after launch is as quick as the hundredth.
+
+The default engine transcribes the whole recording when you let go, so its time grows with the length. The incremental engine, which you switch on in Settings, runs the same windows while you are still speaking and leaves one window and the merge for the release, so the wait is flat at any length. Its text is identical to the default engine's on every fixture above. At ten seconds both engines do the same single pass, so that row is measurement noise rather than a difference.
+
+Why it is fast is written up in [docs/PERFORMANCE.md](docs/PERFORMANCE.md). The measurement procedure and the full baseline are in [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
 ## Private by construction
 
