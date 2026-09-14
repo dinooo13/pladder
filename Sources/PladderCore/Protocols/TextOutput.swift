@@ -7,4 +7,13 @@ public protocol TextOutput: Sendable {
     /// second trip to the keyboard. The Return happens after this returns; it
     /// is not on the release-to-paste path.
     func insert(_ text: String, submit: Bool) async throws
+
+    /// Lets the output do slow preparation, such as snapshotting the
+    /// clipboard, while the user is still speaking. Called at key-down; not
+    /// on the release-to-paste path.
+    func prepare() async
+}
+
+extension TextOutput {
+    public func prepare() async {}
 }

@@ -8,22 +8,75 @@ import PladderEngines
 
 // Developer tool.
 //
-//   pladder-cli <audio file>              load Parakeet, print the transcript and timing
+//   pladder-cli [--engine streaming|incremental] <audio file>
+//                                         load Parakeet, print the transcript and timing
 //   pladder-cli bench <fixtures dir>      run the benchmark (see docs/BENCHMARKS.md)
 //       [--runs N]                        runs per fixture, default 6; the first is discarded.
 //                                         Use 11 to settle a result near the noise line.
 //       [--pause S]                       idle seconds before every run, default 10
+//       [--engine streaming|incremental]  push fixtures in one-second chunks paced at
+//                                         real time and time `endUtterance` instead.
+//                                         Also runs the batch engine once per fixture and
+//                                         reports whether the two texts are identical.
+//                                         Fixtures under 13 s are skipped unless --all.
+//       [--all]                           paced bench only: keep the short fixtures too.
 //
 // Fixtures are audio files with a sibling .txt holding the spoken script, as
 // produced by scripts/make-fixtures.sh.
 
 func usage() -> Never {
     FileHandle.standardError.write(Data("""
-    usage: pladder-cli <audio file>
+    usage: pladder-cli [--engine streaming|incremental] <audio file>
            pladder-cli bench <fixtures dir> [--runs N] [--pause S]
+           pladder-cli bench <fixtures dir> --engine streaming|incremental [--runs N] [--pause S] [--all]
 
     """.utf8))
     exit(2)
+}
+
+/// Which engine a command runs. `streaming` and `incremental` both conform to
+/// `StreamingTranscriptionEngine`, so the paced bench treats them alike.
+enum EngineChoice: String {
+    case batch
+    case streaming
+    case incremental
+
+    init?(argument: String) {
+        guard let choice = EngineChoice(rawValue: argument), choice != .batch else { return nil }
+        self = choice
+    }
+
+    func make() -> any TranscriptionEngine {
+        switch self {
+        case .batch: return FluidAudioEngine()
+        case .streaming: return FluidAudioStreamingEngine()
+        case .incremental: return FluidAudioIncrementalEngine()
+        }
+    }
+
+    func makePaced() -> any StreamingTranscriptionEngine {
+        switch self {
+        case .batch: fatalError("the batch engine has no paced path")
+        case .streaming: return FluidAudioStreamingEngine()
+        case .incremental: return FluidAudioIncrementalEngine()
+        }
+    }
+}
+
+/// The first word where two raw engine transcripts diverge, for the identity
+/// gate. Nil when they are the same word sequence.
+func firstWordDifference(
+    batch: String,
+    paced: String
+) -> (index: Int, batch: String, paced: String)? {
+    let left = batch.split(whereSeparator: \.isWhitespace).map(String.init)
+    let right = paced.split(whereSeparator: \.isWhitespace).map(String.init)
+    for index in 0..<max(left.count, right.count) {
+        let a = index < left.count ? left[index] : "<end>"
+        let b = index < right.count ? right[index] : "<end>"
+        if a != b { return (index, a, b) }
+    }
+    return nil
 }
 
 func loadSamples(_ url: URL) throws -> [Float] {
@@ -37,7 +90,7 @@ func loadSamples(_ url: URL) throws -> [Float] {
 
 /// Loads the engine, printing download progress, and returns the wall-clock
 /// load time. In a fresh process this is the cold start the app pays at launch.
-func loadEngine(_ engine: FluidAudioEngine) async throws -> Duration {
+func loadEngine(_ engine: any TranscriptionEngine) async throws -> Duration {
     let clock = ContinuousClock()
     let started = clock.now
     var lastPrinted = -1
@@ -108,8 +161,8 @@ func thermalTag() -> String {
 
 // MARK: - Transcribe one file
 
-func transcribeFile(_ path: String) async throws {
-    let engine = FluidAudioEngine()
+func transcribeFile(_ path: String, choice: EngineChoice) async throws {
+    let engine = choice.make()
     let loadTime = try await loadEngine(engine)
     print(String(format: "model ready in %.1fs", seconds(loadTime)))
 
@@ -224,6 +277,140 @@ func runBench(dir: String, runs: Int, pause: Double) async throws {
     }
 }
 
+/// Paced bench variant: pushes each fixture in one-second chunks paced at real
+/// time, like a live recording, then times `endUtterance` alone. Pacing takes
+/// as long as the audio, so keep the fixture set small.
+///
+/// Every fixture also goes through the batch engine once, whole, and the two
+/// raw engine texts are compared before any processor runs. For the
+/// incremental engine that line is the identity gate; for the sliding-window
+/// engine it is a record of how far its seams drift.
+func runPacedBench(dir: String, choice: EngineChoice, runs: Int, pause: Double, includeShort: Bool) async throws {
+    guard runs >= 2 else {
+        FileHandle.standardError.write(Data("--runs must be at least 2 (the first run is discarded)\n".utf8))
+        exit(2)
+    }
+    guard pause >= 0 else {
+        FileHandle.standardError.write(Data("--pause must not be negative\n".utf8))
+        exit(2)
+    }
+    var fixtures = try loadFixtures(in: URL(fileURLWithPath: dir))
+    // Below ~13 s both paths run one padded window, so there is nothing paced
+    // about the result; --all keeps them anyway.
+    if !includeShort { fixtures = fixtures.filter { $0.duration >= 13 } }
+    guard !fixtures.isEmpty else {
+        FileHandle.standardError.write(Data("no paced fixtures in \(dir)\n".utf8))
+        exit(1)
+    }
+
+    let chip = sysctlString("machdep.cpu.brand_string") ?? "unknown chip"
+    let os = ProcessInfo.processInfo.operatingSystemVersionString
+    let engine = choice.makePaced()
+    let batch = FluidAudioEngine()
+    print("Pladder benchmark (paced)")
+    print("machine: \(chip), macOS \(os)")
+    print("model:   \(engine.id) (\(engine.displayName))")
+    print("runs:    \(runs) per fixture, first discarded, median of `endUtterance` reported")
+    print(String(format: "pause:   %.0f s idle before every run", pause))
+    print("compare: \(batch.id) once per fixture, whole, raw engine text")
+    print("")
+
+    let loadTime = try await loadEngine(engine)
+    print(String(format: "model load (cold): %.2f s", seconds(loadTime)))
+    let batchLoadTime = try await loadEngine(batch)
+    print(String(format: "batch model load:  %.2f s", seconds(batchLoadTime)))
+    print("")
+
+    struct Row {
+        var name: String
+        var duration: Double
+        var engine: Double
+        var spread: Double
+        var wer: Double
+        var identical: Bool
+    }
+    var rows: [Row] = []
+    let clock = ContinuousClock()
+    var throttled = false
+    for fixture in fixtures {
+        var times: [Double] = []
+        var errors: [Double] = []
+        var lastText = ""
+        for run in 1...runs {
+            if pause > 0 { try await Task.sleep(for: .seconds(pause)) }
+            try await engine.beginUtterance()
+            // One-second chunks paced at real time, as the coordinator's
+            // feed task would deliver them.
+            var offset = 0
+            let oneSecond = Int(CapturedAudio.sampleRate)
+            while offset + oneSecond < fixture.samples.count {
+                await engine.feed(Array(fixture.samples[offset..<offset + oneSecond]))
+                try await Task.sleep(for: .seconds(1))
+                offset += oneSecond
+            }
+            let tail = Array(fixture.samples[offset...])
+            let started = clock.now
+            let transcript = try await engine.endUtterance(tail)
+            let elapsed = seconds(clock.now - started)
+            var final = transcript
+            final.audioDuration = fixture.duration
+            lastText = final.text
+            let wer = WordErrorRate.compute(reference: fixture.reference, hypothesis: final.text)
+            let thermal = thermalTag()
+            throttled = throttled || !thermal.isEmpty
+            let note = (run == 1 ? " (warm-up, discarded)" : "") + thermal
+            print(String(format: "%@ run %d: %.3f s, WER %.1f%%%@", fixture.name, run, elapsed, wer * 100, note))
+            if run > 1 {
+                times.append(elapsed)
+                errors.append(wer)
+            }
+        }
+
+        // The identity gate: the same samples through the batch engine, whole.
+        //
+        // Timed the same way as the paced runs above, and after the same idle
+        // pause. Both matter: the engine's own `processingTime` starts inside
+        // FluidAudio and so misses the actor hop, the decoder-state allocation
+        // and the padding copy, and a call made straight after a paced run
+        // finds the Neural Engine warm when every release the bench models is
+        // cold. Either alone is worth more than the difference between the two
+        // engines on short audio, where they run the same code.
+        if pause > 0 { try await Task.sleep(for: .seconds(pause)) }
+        let batchStarted = clock.now
+        let batchTranscript = try await batch.transcribe(fixture.samples)
+        let batchElapsed = seconds(clock.now - batchStarted)
+        let batchWer = WordErrorRate.compute(reference: fixture.reference, hypothesis: batchTranscript.text)
+        print(String(format: "%@ batch: %.3f s, WER %.1f%%", fixture.name, batchElapsed, batchWer * 100))
+        let difference = firstWordDifference(batch: batchTranscript.text, paced: lastText)
+        if let difference {
+            print("\(fixture.name) identical: no, first differing word \(difference.index): batch \"\(difference.batch)\" vs \(choice.rawValue) \"\(difference.paced)\"")
+        } else {
+            print("\(fixture.name) identical: yes")
+        }
+
+        let engineTime = median(times)
+        let spread = (times.max()! - times.min()!) / engineTime
+        rows.append(Row(
+            name: fixture.name, duration: fixture.duration, engine: engineTime,
+            spread: spread, wer: median(errors), identical: difference == nil))
+    }
+
+    print("")
+    print("| Fixture | Audio | endUtterance (median) | Spread | Realtime | WER | Identical to batch |")
+    print("|---|---:|---:|---:|---:|---:|---|")
+    for row in rows {
+        print(String(
+            format: "| %@ | %.1f s | %.3f s | %.0f %% | %.0fx | %.1f %% | %@ |",
+            row.name, row.duration, row.engine, row.spread * 100, row.duration / row.engine,
+            row.wer * 100, row.identical ? "yes" : "no"))
+    }
+    print("")
+    print(String(format: "load:    %.2f (one-minute average at end)", loadAverage()))
+    if throttled {
+        print("warning: the chip left its normal thermal state during the run; numbers are not comparable")
+    }
+}
+
 // MARK: - Entry
 
 var arguments = Array(CommandLine.arguments.dropFirst())
@@ -234,6 +421,8 @@ case "bench":
     arguments.removeFirst()
     var runs = 6
     var pause = 10.0
+    var paced: EngineChoice?
+    var includeShort = false
     var dir: String?
     while let arg = arguments.first {
         arguments.removeFirst()
@@ -245,6 +434,12 @@ case "bench":
             guard let value = arguments.first, let s = Double(value) else { usage() }
             arguments.removeFirst()
             pause = s
+        } else if arg == "--engine" {
+            guard let value = arguments.first, let choice = EngineChoice(argument: value) else { usage() }
+            arguments.removeFirst()
+            paced = choice
+        } else if arg == "--all" {
+            includeShort = true
         } else if dir == nil {
             dir = arg
         } else {
@@ -252,7 +447,15 @@ case "bench":
         }
     }
     guard let dir else { usage() }
-    try await runBench(dir: dir, runs: runs, pause: pause)
+    if let paced {
+        try await runPacedBench(dir: dir, choice: paced, runs: runs, pause: pause, includeShort: includeShort)
+    } else {
+        if includeShort { usage() }
+        try await runBench(dir: dir, runs: runs, pause: pause)
+    }
+case "--engine":
+    guard arguments.count >= 3, let choice = EngineChoice(argument: arguments[1]) else { usage() }
+    try await transcribeFile(arguments[2], choice: choice)
 case let path?:
-    try await transcribeFile(path)
+    try await transcribeFile(path, choice: .batch)
 }

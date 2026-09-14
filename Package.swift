@@ -10,7 +10,11 @@ let package = Package(
         .library(name: "PladderCore", targets: ["PladderCore"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.15.6"),
+        // A fork of FluidAudio 0.15.6 (four commits on top of the revision this
+        // used to pin) adding `IncrementalChunkProcessor`: the batch engine's
+        // own windows, run while the user is still speaking. Offered upstream;
+        // when it lands, this goes back to the release line.
+        .package(url: "https://github.com/dinooo13/FluidAudio.git", branch: "incremental-chunks"),
     ],
     targets: [
         // Pure logic. Imports Foundation only, so tests stay fast and engines

@@ -86,6 +86,22 @@ final class AppModel {
                 make: { FluidAudioEngine() }
             )
         )
+        registry.register(
+            EngineRegistry.Entry(
+                id: FluidAudioStreamingEngine.engineID,
+                displayName: "Parakeet TDT v3 (streaming)",
+                detail: "Same models, transcribed while speaking. Wins on dictations over ~13 s.",
+                make: { FluidAudioStreamingEngine() }
+            )
+        )
+        registry.register(
+            EngineRegistry.Entry(
+                id: FluidAudioIncrementalEngine.engineID,
+                displayName: "Parakeet TDT v3 (incremental)",
+                detail: "Same models and the same text as Parakeet TDT v3, with its windows run while speaking.",
+                make: { FluidAudioIncrementalEngine() }
+            )
+        )
         #if DEBUG
         registry.register(
             EngineRegistry.Entry(

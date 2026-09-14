@@ -39,7 +39,7 @@ public actor FluidAudioEngine: TranscriptionEngine {
                 Task { await self.report(progress) }
             }
             status = .loading
-            let manager = AsrManager(config: .default)
+            let manager = AsrManager(config: ASRConfig(seamGapRepair: false))
             try await manager.loadModels(models)
             self.manager = manager
             status = .ready

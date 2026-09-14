@@ -181,6 +181,69 @@ public final class DictationCoordinator {
     /// between cycles.
     private var cycleEngine: (any TranscriptionEngine)?
 
+    /// Half a second of silence. Transcribing it at key-down brings the
+    /// Neural Engine up from idle while the user is still speaking; every
+    /// utterance is padded to the model's full window, so this is the same
+    /// encoder pass the real call makes.
+    private static let warmupSamples = [Float](repeating: 0, count: 8_000)
+
+    /// Streaming state for the current recording. Non-nil only when
+    /// `cycleEngine` is a `StreamingTranscriptionEngine`.
+    private var feedTask: Task<Void, Never>?
+    /// Samples handed to the streaming engine so far; the tail from `stop()`
+    /// completes the utterance at release.
+    private var fedSampleCount = 0
+
+    /// Feeds a second of captured audio at a time to the engine while the
+    /// user is still speaking, so the sliding-window engine confirms chunks
+    /// before release. Skipped chunks are not a loss: `stop()` returns only
+    /// what came after the last drain, and anything a `drain()` raced is
+    /// recovered by the tail.
+    private func startStreamingFeed(_ engine: any StreamingTranscriptionEngine) {
+        fedSampleCount = 0
+        feedTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                guard let self, !Task.isCancelled, self.state.isRecording else { return }
+                let chunk = await self.capture.drain()
+                guard !chunk.isEmpty else { continue }
+                await engine.feed(chunk)
+                fedSampleCount += chunk.count
+            }
+        }
+    }
+
+    /// Stops the feed and tells the streaming engine the utterance was
+    /// discarded. Safe to call when nothing streaming was started.
+    private func abandonStreaming() {
+        feedTask?.cancel()
+        feedTask = nil
+        fedSampleCount = 0
+        let engine = cycleEngine
+        Task {
+            if let streaming = engine as? (any StreamingTranscriptionEngine) {
+                await streaming.abandonUtterance()
+            }
+        }
+    }
+
+    /// Wraps the two engine entry points behind one call so `finish` can
+    /// transcribe with either kind. For a streaming engine only the tail is
+    /// pushed through `endUtterance`; the rest went through `feed` while the
+    /// user was speaking. The returned Transcript carries the whole
+    /// utterance's audio duration either way.
+    private func transcribeCycle(
+        tailSamples: [Float],
+        with engine: any TranscriptionEngine
+    ) async throws -> Transcript {
+        guard let streaming = engine as? (any StreamingTranscriptionEngine) else {
+            return try await engine.transcribe(tailSamples)
+        }
+        return try await streaming.endUtterance(tailSamples)
+    }
+
+    // MARK: Hotkey
+
     private func drainPendingUnloads() {
         guard !pendingUnloads.isEmpty else { return }
         let engines = pendingUnloads
@@ -189,8 +252,6 @@ public final class DictationCoordinator {
             for engine in engines { await engine.unload() }
         }
     }
-
-    // MARK: Hotkey
 
     private func startHotkey() {
         hotkeyTask?.cancel()
@@ -222,9 +283,30 @@ public final class DictationCoordinator {
             guard state.isRecording else {
                 // Cancelled or superseded while the mic was starting.
                 _ = await capture.stop()
+                abandonStreaming()
                 return
             }
             onEvent(.recordingStarted)
+            // Work that keeps the release-to-paste path short: the clipboard
+            // snapshot and, for batch engines, a Neural Engine warm-up (the
+            // feed below does that for streaming engines). Both run while the
+            // user is still speaking.
+            Task { [weak self] in await self?.output.prepare() }
+            if let streaming = cycleEngine as? (any StreamingTranscriptionEngine) {
+                // The sliding windows idle until the first ~13 s chunk is
+                // complete, so warm the engine at key-down like a batch
+                // engine; the hybrid's batch manager pays exactly the same
+                // encoder pass the batch-engine dictation would.
+                Task.detached(priority: .utility) {
+                    await streaming.warmPass()
+                }
+                try? await streaming.beginUtterance()
+                startStreamingFeed(streaming)
+            } else if let engine = cycleEngine {
+                Task.detached(priority: .utility) { [warmupSamples = Self.warmupSamples] in
+                    _ = try? await engine.transcribe(warmupSamples)
+                }
+            }
             levelTask?.cancel()
             levelTask = Task { [weak self] in
                 for await level in levels {
@@ -252,35 +334,51 @@ public final class DictationCoordinator {
         guard state.isRecording else { return }
         levelTask?.cancel()
         maxDurationTask?.cancel()
+        feedTask?.cancel()
+        feedTask = nil
         state = .transcribing
         onEvent(.recordingStopped)
         let engine = cycleEngine ?? loader.engine
+        let fedSamples = fedSampleCount
+        fedSampleCount = 0
         cycleEngine = nil
         inFlight = Task { [weak self] in
             guard let self else { return }
             let stopped = ContinuousClock.now
             let audio = await self.capture.stop()
             let captureStop = ContinuousClock.now - stopped
-            await self.finish(audio, with: engine, submit: submit, captureStop: captureStop)
+            await self.finish(audio, fedSamples: fedSamples, with: engine, submit: submit, captureStop: captureStop)
         }
     }
 
     private func finish(
         _ audio: CapturedAudio,
+        fedSamples: Int,
         with engine: any TranscriptionEngine,
         submit: Bool,
         captureStop: Duration
     ) async {
         defer { drainPendingUnloads() }
-        guard audio.duration >= minimumDuration else {
+        // Streaming engines were already fed `fedSamples` while recording;
+        // only the tail came through `stop()`.
+        let totalDuration = Double(fedSamples + audio.samples.count) / CapturedAudio.sampleRate
+        guard totalDuration >= minimumDuration else {
+            if let streaming = engine as? (any StreamingTranscriptionEngine) {
+                await streaming.abandonUtterance()
+            }
             becomeIdle()
             return
         }
         do {
             var timing = CycleTiming(captureStop: captureStop, engine: .zero, processing: .zero, insert: .zero)
             var started = ContinuousClock.now
-            let transcript = try await engine.transcribe(audio.samples)
+            var transcript = try await transcribeCycle(tailSamples: audio.samples, with: engine)
             timing.engine = ContinuousClock.now - started
+            // The streaming engine only ever saw the tail; the coordinator
+            // knows the whole utterance.
+            if transcript.audioDuration == 0 {
+                transcript.audioDuration = totalDuration
+            }
             lastTranscript = transcript
             let settings = self.settings
             started = ContinuousClock.now
@@ -326,8 +424,13 @@ public final class DictationCoordinator {
         levelTask?.cancel()
         maxDurationTask?.cancel()
         becomeIdle()
+        abandonStreaming()
         cycleEngine = nil
+        let engine = loader.engine
         _ = await capture.stop()
+        if let streaming = engine as? (any StreamingTranscriptionEngine) {
+            await streaming.abandonUtterance()
+        }
         drainPendingUnloads()
     }
 
