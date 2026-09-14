@@ -209,7 +209,7 @@ final class AppModel {
                 "process \(fmt(timing.processing)), paste \(fmt(timing.insert))"
             Self.timing.log(
                 """
-                release-to-paste \(total, format: .fixed(precision: 3), privacy: .public) s: \(stages); \
+                release-to-paste \(total, format: .fixed(precision: 3), privacy: .public) s: \(stages, privacy: .public); \
                 audio \(transcript.audioDuration, format: .fixed(precision: 1), privacy: .public) s, \
                 engine-time \(transcript.processingTime, format: .fixed(precision: 3), privacy: .public) s
                 """

@@ -187,6 +187,23 @@ public final class DictationCoordinator {
     /// encoder pass the real call makes.
     private static let warmupSamples = [Float](repeating: 0, count: 8_000)
 
+    /// How long the Neural Engine is left idle between warm passes. One pass
+    /// at key-down is not enough for a long dictation: on an M1 a pass after
+    /// ten seconds of idle costs about 110 ms more than one made back to back,
+    /// and that is larger than the capture stop, the processors and the paste
+    /// together. Settable so tests do not have to wait seconds.
+    public var warmupInterval: Duration = .seconds(2)
+
+    /// Keeps the engine warm for as long as the key is held.
+    ///
+    /// Cancelled at release, but cancellation cannot abort a CoreML call that
+    /// has already started, so a release landing inside a warm pass waits for
+    /// it. That is bounded by one pass and shows in the log as `engine`
+    /// exceeding `engine-time`. The interval trades that risk against the cold
+    /// penalty: longer means more dictations start cold, shorter means more
+    /// land on a pass in flight.
+    private var warmupTask: Task<Void, Never>?
+
     /// Streaming state for the current recording. Non-nil only when
     /// `cycleEngine` is a `StreamingTranscriptionEngine`.
     private var feedTask: Task<Void, Never>?
@@ -211,6 +228,25 @@ public final class DictationCoordinator {
                 fedSampleCount += chunk.count
             }
         }
+    }
+
+    /// Warms once immediately, so a short dictation still gets the key-down
+    /// pass, then keeps warming until cancelled. Detached and at utility
+    /// priority so it never competes with the feed or the UI.
+    private func startWarmupLoop(_ warm: @escaping @Sendable () async -> Void) {
+        warmupTask?.cancel()
+        warmupTask = Task.detached(priority: .utility) { [interval = warmupInterval] in
+            while !Task.isCancelled {
+                await warm()
+                if Task.isCancelled { return }
+                try? await Task.sleep(for: interval)
+            }
+        }
+    }
+
+    private func stopWarmupLoop() {
+        warmupTask?.cancel()
+        warmupTask = nil
     }
 
     /// Stops the feed and tells the streaming engine the utterance was
@@ -293,17 +329,11 @@ public final class DictationCoordinator {
             // user is still speaking.
             Task { [weak self] in await self?.output.prepare() }
             if let streaming = cycleEngine as? (any StreamingTranscriptionEngine) {
-                // The sliding windows idle until the first ~13 s chunk is
-                // complete, so warm the engine at key-down like a batch
-                // engine; the hybrid's batch manager pays exactly the same
-                // encoder pass the batch-engine dictation would.
-                Task.detached(priority: .utility) {
-                    await streaming.warmPass()
-                }
                 try? await streaming.beginUtterance()
                 startStreamingFeed(streaming)
+                startWarmupLoop { await streaming.warmPass() }
             } else if let engine = cycleEngine {
-                Task.detached(priority: .utility) { [warmupSamples = Self.warmupSamples] in
+                startWarmupLoop { [warmupSamples = Self.warmupSamples] in
                     _ = try? await engine.transcribe(warmupSamples)
                 }
             }
@@ -336,6 +366,9 @@ public final class DictationCoordinator {
         maxDurationTask?.cancel()
         feedTask?.cancel()
         feedTask = nil
+        // Before the state flip, so no further pass is queued ahead of the
+        // real call.
+        stopWarmupLoop()
         state = .transcribing
         onEvent(.recordingStopped)
         let engine = cycleEngine ?? loader.engine
@@ -423,6 +456,7 @@ public final class DictationCoordinator {
         guard state.isRecording else { return }
         levelTask?.cancel()
         maxDurationTask?.cancel()
+        stopWarmupLoop()
         becomeIdle()
         abandonStreaming()
         cycleEngine = nil

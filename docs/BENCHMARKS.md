@@ -3,7 +3,8 @@
 How Pladder's speed is measured, and the baseline to compare against. The
 benchmark is run by hand before and after any change on the release-to-paste
 path (see [CLAUDE.md](../CLAUDE.md)). It is not part of the test suite: a
-benchmark that fails on noise gets ignored.
+benchmark that fails on noise gets ignored. For why the numbers look the way
+they do, see [PERFORMANCE.md](PERFORMANCE.md).
 
 ## What is measured
 
