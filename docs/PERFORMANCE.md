@@ -1,10 +1,7 @@
 # Performance
 
-Why Pladder is fast. This file explains the design.
-[BENCHMARKS.md](BENCHMARKS.md) explains how the numbers are taken, and
-[PERFORMANCE-PLAN.md](PERFORMANCE-PLAN.md) has the step-by-step engineering
-behind each change, with the code and the gate that decided whether it
-stayed.
+Why Pladder is fast. This file explains the design;
+[BENCHMARKS.md](BENCHMARKS.md) explains how the numbers are taken.
 
 ## The only number
 
