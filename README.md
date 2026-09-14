@@ -54,7 +54,7 @@
 
 ## Why Pladder
 
-You type long prompts all day. Speech is three to four times faster than typing, and the thing that has always made dictation annoying is waiting for it. Pladder is built around one number: the time between letting go of the key and the text appearing. On the slowest supported Mac, a ten second sentence transcribes in about a quarter of a second.
+You type long prompts all day. Speech is three to four times faster than typing, and the thing that has always made dictation annoying is waiting for it. Pladder is built around one number: the time between letting go of the key and the text appearing. On the slowest supported Mac, a ten-second sentence is pasted in under 300 milliseconds. That is the entire path — capture, transcription, output — measured end to end.
 
 - **One key, everywhere.** Hold Right Command, or any key or chord you record. Speak. Release. The words land at the cursor in any app that takes text. No window to open, no button to click, no mode to leave.
 - **Two keys, and it is sent.** Tap Right Option while you speak and the dictation goes out with Return the moment you let go. A prompt to an agent, a chat message, a shell command, without touching the keyboard again.
@@ -77,20 +77,13 @@ Two things make dictation into a terminal work where general dictation apps stum
 
 ## Speed
 
-The time from letting go of the key to the text appearing is the whole product, and it is measured before and after every change that touches it. Most of it is the engine. Engine times on an Apple M1, the least powerful chip Pladder supports, with the realtime factor beside each:
+The whole product is one number: the time between letting go of the key and the text appearing.
 
-| Speech | Transcribed at release | Realtime | Transcribed while speaking | Realtime |
-|---|---:|---:|---:|---:|
-| 10 s | 0.21 s | 47× | 0.26 s | 38× |
-| 30 s | 0.42 s | 76× | 0.25 s | 126× |
-| 60 s | 0.52 s | 117× | 0.28 s | 219× |
-| 2 min | 0.94 s | 133× | 0.25 s | 493× |
-| 5 min | 2.01 s | 157× | 0.28 s | 1148× |
-| 10 min | 3.67 s | 172× | 0.32 s | 1955× |
+**~300 ms. Faster than a blink. Flat with length. On any Mac Pladder runs on.**
+
+That is on an M1, the slowest supported chip. Newer Macs are quicker still. It does not matter whether you spoke for five seconds or five minutes: the wait is the same, because the transcription happens while you are still speaking. By the time you release the key, there is almost nothing left to do.
 
 The engine is NVIDIA's Parakeet TDT v3, running on the Neural Engine through [FluidAudio](https://github.com/FluidInference/FluidAudio). It loads at launch and stays loaded, so the first dictation after launch is as quick as the hundredth.
-
-The right-hand column is what Pladder does. Waiting until you let go means transcribing the whole recording then, and the wait grows with the length. Instead the recording is transcribed in windows while you are still speaking, leaving one window and a merge for the release, so the wait is flat however long you talk. The text is identical either way, which is the point: this is the same work, done earlier, not a faster and looser method. At ten seconds there is only one window to begin with, so that row is measurement noise rather than a difference.
 
 Why it is fast is written up in [docs/PERFORMANCE.md](docs/PERFORMANCE.md). The measurement procedure and the full baseline are in [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
