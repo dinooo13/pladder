@@ -1,5 +1,6 @@
 import AVFoundation
 import PladderCore
+import os
 
 /// Microphone capture built on `AVAudioEngine`.
 ///
@@ -87,10 +88,30 @@ public actor AVAudioEngineCapture: AudioCapture {
             throw error
         }
         isRecording = true
+        Self.startMarker()
         return stream
     }
 
+    private static func startMarker() {
+        log.log("capture started")
+    }
+
+    /// Takes everything captured so far — carried samples from device changes
+    /// plus what the tap accumulated — and keeps recording. Only the samples
+    /// since the last `drain()` or `start()` are returned; `stop()` then sees
+    /// just the tail.
+    public func drain() async -> [Float] {
+        guard isRecording else { return [] }
+        var samples = carriedSamples
+        carriedSamples.removeAll(keepingCapacity: false)
+        if let processor {
+            samples.append(contentsOf: processor.drain())
+        }
+        return samples
+    }
+
     public func stop() async -> CapturedAudio {
+        Self.log.log("capture stop called, isRecording=\(self.isRecording)")
         guard isRecording else { return CapturedAudio(samples: []) }
         isRecording = false
 
@@ -107,9 +128,28 @@ public actor AVAudioEngineCapture: AudioCapture {
         levelContinuation?.finish()
         levelContinuation = nil
 
-        // Release the microphone so the system recording indicator goes away.
+        // Off the release-to-paste path: the samples are complete, and the
+        // pause blocks on the current hardware I/O cycle. The microphone
+        // indicator going off a few milliseconds later is invisible; the
+        // pause blocking here is not.
+        Task { [weak self] in await self?.pauseIfIdle() }
+        let logged = CapturedAudio(samples: samples)
+        Self.log.log("capture stop: \(logged.samples.count) samples (\(logged.duration, format: .fixed(precision: 2)) s), pause deferred")
+        return logged
+    }
+
+    private static let log = Logger(subsystem: "de.dinooo13.pladder", category: "capture")
+
+    /// Pauses the engine unless a new recording started while the pause was
+    /// queued. `startEngineIfNeeded` skips `start()` when the engine is still
+    /// running, so a back-to-back recording stays live either way.
+    private func pauseIfIdle() {
+        guard !isRecording else {
+            Self.log.log("pause skipped: a recording is active")
+            return
+        }
         engine.pause()
-        return CapturedAudio(samples: samples)
+        Self.log.log("engine paused")
     }
 
     // MARK: Engine

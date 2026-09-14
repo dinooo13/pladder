@@ -17,6 +17,10 @@ actor FakeCapture: AudioCapture {
         return stream
     }
 
+    func drain() async -> [Float] {
+        []
+    }
+
     func stop() async -> CapturedAudio {
         stopCount += 1
         levelContinuation?.finish()
@@ -33,8 +37,10 @@ final class FakeOutput: TextOutput, @unchecked Sendable {
     private let lock = NSLock()
     private var _inserted: [String] = []
     private var _submitted: [Bool] = []
+    private var _prepareCount = 0
     var inserted: [String] { lock.withLock { _inserted } }
     var submitted: [Bool] { lock.withLock { _submitted } }
+    var prepareCount: Int { lock.withLock { _prepareCount } }
     var shouldFail = false
 
     func insert(_ text: String, submit: Bool) async throws {
@@ -43,6 +49,10 @@ final class FakeOutput: TextOutput, @unchecked Sendable {
             _inserted.append(text)
             _submitted.append(submit)
         }
+    }
+
+    func prepare() async {
+        lock.withLock { _prepareCount += 1 }
     }
 }
 
@@ -80,6 +90,36 @@ actor FlakyEngine: TranscriptionEngine {
     func unload() { status = .unloaded }
 }
 
+/// Like `EchoEngine`, but records the sample count of every `transcribe` call
+/// and can delay the transcription to simulate a long engine pass.
+actor CountingEngine: TranscriptionEngine {
+    static let engineID = EngineID("counting")
+    nonisolated let id = CountingEngine.engineID
+    nonisolated let displayName = "Counting"
+    private(set) var status: EngineStatus = .unloaded
+    private let recorder = SampleRecorder()
+    private let delay: Duration
+
+    init(delay: Duration = .zero) { self.delay = delay }
+    nonisolated var calls: [Int] { recorder.callCounts }
+
+    func load() async throws { status = .ready }
+    func transcribe(_ samples: [Float]) async throws -> Transcript {
+        recorder.append(samples.count)
+        if delay > .zero { try? await Task.sleep(for: delay) }
+        return Transcript(text: "counted", audioDuration: Double(samples.count) / CapturedAudio.sampleRate, processingTime: 0, engineID: id)
+    }
+    func unload() { status = .unloaded }
+}
+
+/// Lock-protected so `calls` can be read synchronously from test assertions.
+private final class SampleRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _callCounts: [Int] = []
+    var callCounts: [Int] { lock.withLock { _callCounts } }
+    func append(_ count: Int) { lock.withLock { _callCounts.append(count) } }
+}
+
 // MARK: - Helpers
 
 @MainActor
@@ -107,6 +147,30 @@ private func makeCoordinator(
         }
     )
     return (coordinator, output, capture)
+}
+
+/// Builds a coordinator around a CountingEngine.
+@MainActor
+private func makeCountingCoordinator(
+    engineDelay: Duration = .zero
+) -> (DictationCoordinator, FakeOutput, FakeCapture, CountingEngine) {
+    let output = FakeOutput()
+    let capture = FakeCapture()
+    let engine = CountingEngine(delay: engineDelay)
+    let registry = EngineRegistry([
+        .init(id: CountingEngine.engineID, displayName: "Counting", detail: "") { engine }
+    ])
+    var settings = Settings(engineID: CountingEngine.engineID)
+    settings.appendTrailingSpace = false
+    let coordinator = DictationCoordinator(
+        settings: settings,
+        registry: registry,
+        capture: capture,
+        output: output,
+        hotkeyMonitor: FakeHotkey(),
+        makePipeline: { s in ProcessorPipeline([DictionaryReplacer(entries: s.dictionary), WhitespaceNormalizer()]) }
+    )
+    return (coordinator, output, capture, engine)
 }
 
 @MainActor
@@ -477,6 +541,44 @@ func waitUntil(_ timeout: Duration = .seconds(2), _ condition: @MainActor () -> 
         #expect(await waitUntil { c.state == .idle })
         #expect(await capture.stopCount == 1)
         #expect(output.inserted.isEmpty)
+    }
+
+    @Test func keyDownWarmsTheEngine() async {
+        let (c, output, capture, engine) = makeCountingCoordinator()
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed()
+        // Half a second of silence was sent to the engine while recording.
+        #expect(await waitUntil { engine.calls == [8_000] })
+        c.hotkeyReleased()
+        await c.inFlight?.value
+        // The real utterance follows the warm-up and is inserted once.
+        #expect(engine.calls.count == 2)
+        #expect(engine.calls.last == 16_000)
+        #expect(output.inserted.count == 1)
+        #expect(await capture.stopCount == 1)
+    }
+
+    @Test func releaseDuringWarmupStillInserts() async {
+        let (c, output, _, _) = makeCountingCoordinator(engineDelay: .milliseconds(200))
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed()
+        c.hotkeyReleased()
+        await c.inFlight?.value
+        // The warm-up discarded its result; exactly one transcript lands.
+        #expect(output.inserted.count == 1)
+        #expect(c.state == .idle)
+    }
+
+    @Test func keyDownPreparesTheOutput() async {
+        let (c, output, _) = makeCoordinator()
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed()
+        #expect(await waitUntil { output.prepareCount == 1 })
+        c.hotkeyReleased()
+        await c.inFlight?.value
     }
 }
 

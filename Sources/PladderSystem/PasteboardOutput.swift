@@ -35,11 +35,14 @@ public actor PasteboardOutput: TextOutput {
     /// the time this elapses.
     public let submitDelay: Duration
 
-    /// Time between writing the pasteboard and posting Cmd+V. `NSPasteboard`
-    /// writes are synchronous with the pasteboard server, so this only needs to
-    /// cover the target app noticing the change count; 10 ms is plenty and keeps
-    /// the paste on the critical path short.
-    private static let propagationDelay: Duration = .milliseconds(10)
+    /// Time between writing the pasteboard and posting Cmd+V. The write is a
+    /// synchronous call to the pasteboard server, so it has landed when the
+    /// call returns, and the key event still has to travel through the window
+    /// server afterwards; zero is therefore the default and adds no sleep to
+    /// the release-to-paste path. If an app with an unusual pasteboard user
+    /// ever pastes stale content, raise this in the app's wiring (keep the
+    /// smallest value that never fails).
+    public let propagationDelay: Duration
 
     /// kVK_ANSI_V. Hard-coded so this module does not need to import Carbon.
     private static let virtualKeyV: CGKeyCode = 0x09
@@ -62,9 +65,25 @@ public actor PasteboardOutput: TextOutput {
 
     private var pending: Pending?
 
-    public init(restoreDelay: Duration = .milliseconds(400), submitDelay: Duration = .milliseconds(50)) {
+    /// The clipboard as it was at key-down, ready for `insert` to carry
+    /// forward. Nil when already used. Reading every representation can take
+    /// tens of milliseconds, so `prepare()` does it at key-down instead of
+    /// on the release-to-paste path.
+    private var prepared: (snapshot: Snapshot, changeCount: Int)?
+
+    public init(
+        restoreDelay: Duration = .milliseconds(400),
+        submitDelay: Duration = .milliseconds(50),
+        propagationDelay: Duration = .zero
+    ) {
         self.restoreDelay = restoreDelay
         self.submitDelay = submitDelay
+        self.propagationDelay = propagationDelay
+    }
+
+    /// Called at key-down, while the user is still speaking.
+    public func prepare() {
+        prepared = (Snapshot.capture(), NSPasteboard.general.changeCount)
     }
 
     public func insert(_ text: String, submit: Bool) async throws {
@@ -77,13 +96,28 @@ public actor PasteboardOutput: TextOutput {
         // transcript, which is *our* text, not the user's clipboard.
         let carried = pending
         carried?.task?.cancel()
-        let snapshot = carried?.snapshot ?? Snapshot.capture()
+        let snapshot: Snapshot
+        if let carried {
+            snapshot = carried.snapshot
+        } else {
+            // The snapshot from key-down is only valid if nobody touched the
+            // pasteboard in between; anything the user copied since wins.
+            let prep = prepared
+            prepared = nil
+            if let prep, prep.changeCount == NSPasteboard.general.changeCount {
+                snapshot = prep.snapshot
+            } else {
+                snapshot = Snapshot.capture()
+            }
+        }
 
         let ourChangeCount = Snapshot.write(text)
         pending = Pending(snapshot: snapshot, changeCount: ourChangeCount, task: nil)
 
         do {
-            try await Task.sleep(for: Self.propagationDelay)
+            if propagationDelay > .zero {
+                try await Task.sleep(for: propagationDelay)
+            }
             try Self.postKey(Self.virtualKeyV, flags: .maskCommand)
         } catch {
             // Never leave the user's clipboard holding our transcript.
@@ -150,14 +184,11 @@ public actor PasteboardOutput: TextOutput {
     private struct Snapshot: Sendable {
         var items: [[String: Data]]
 
-        /// Items bigger than this are skipped: reading them out of the pasteboard
-        /// server happens *before* the paste, so a 40 MB screenshot on the
-        /// clipboard would delay the user's text by hundreds of milliseconds.
-        ///
-        /// Consequence, by design: very large clipboard contents are not
-        /// restored. After such a paste the clipboard is left empty rather than
-        /// holding the transcript.
-        private static let maximumItemBytes = 4 * 1024 * 1024
+        /// Items up to this size are kept. `prepare()` reads this at key-down,
+        /// off the release-to-paste path, so the cap no longer bounds the
+        /// paste; it only bounds the memory a snapshot can hold, so large
+        /// clipboards are still restored instead of dropped.
+        private static let maximumItemBytes = 64 * 1024 * 1024
 
         static func capture() -> Snapshot {
             let pasteboard = NSPasteboard.general
