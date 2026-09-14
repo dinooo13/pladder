@@ -82,22 +82,25 @@ separate table with chip, macOS version and model version.
 
 ### The paced bench, for engines that transcribe while speaking
 
-`--engine streaming` and `--engine incremental` replace the whole-buffer call
-with the live one: each fixture is pushed in one-second chunks paced at real
-time, as the coordinator's feed task delivers them, and only `endUtterance`
-is timed. That is the part left on the release-to-paste path.
+`--paced` replaces the whole-buffer call with the live one: each fixture is
+pushed in one-second chunks paced at real time, as the coordinator's feed
+task delivers them, and only `endUtterance` is timed. That is the part left
+on the release-to-paste path.
 
 ```sh
-swift run -c release pladder-cli bench bench/fixtures --engine incremental --runs 2 --pause 2
+swift run -c release pladder-cli bench bench/fixtures --paced --runs 2 --pause 2
 ```
 
-Pacing takes as long as the audio, so fixtures under 13 s are skipped — below
-one encoder window both paths make the same single padded pass anyway. `--all`
-keeps them. Every fixture also goes through the batch engine once, whole, and
-the two raw engine texts are compared before any processor runs; the line
-reads `identical: yes`, or `identical: no` with the first differing word and
-its index. For the incremental engine that line is a gate, not a metric: it
-runs the batch engine's own windows, so anything but `yes` is a bug.
+Pacing takes as long as the audio, so fixtures under 13 s are skipped: below
+one encoder window there is only one window either way, so nothing is paced
+about the result. `--all` keeps them.
+
+Every fixture also goes through the same engine once with the whole buffer,
+after the same idle pause and timed the same way, and the two raw texts are
+compared before any processor runs. The line reads `identical: yes`, or
+`identical: no` with the first differing word and its index. That line is a
+gate, not a metric: transcribing while speaking runs the same windows the
+whole-buffer path would have run, so anything but `yes` is a bug.
 
 ## Baseline
 
