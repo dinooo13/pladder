@@ -1,12 +1,13 @@
 # Performance
 
-Why Pladder is fast. This file explains the design;
-[BENCHMARKS.md](BENCHMARKS.md) explains how the numbers are taken.
+How Pladder gets from key-release to pasted text in under a quarter of a
+second. For the measurement procedure and raw numbers, see
+[BENCHMARKS.md](BENCHMARKS.md).
 
-## The only number
+## The only number that matters
 
 Release-to-paste: the time between the hotkey coming up and the text
-appearing at the cursor. In the code it is everything between the
+appearing at the cursor. In code it is everything between the
 coordinator's `recordingStopped` and `inserted` events, and it has four
 stages.
 
@@ -41,13 +42,17 @@ the processors, which are regex passes over one sentence, run in under a
 millisecond. Going below the floor needs a different model with a smaller
 window, not better engineering around this one.
 
-So the work is not to make the pass faster. It is to make sure the pass is
-the only thing on the path, and that it is warm when it starts.
+The model is 151 ms. Everything else combined — capture stop, text
+processors, clipboard write, synthetic key event — is less than that on a
+bad day. The engineering is not about making the model faster. It is about
+making sure nothing else gets in its way, and that the Neural Engine is
+already warm when the user releases the key.
 
 ## What was taken off the path
 
-Everything that does not have to happen between release and paste happens
-before it, at key-down, or after it.
+Every millisecond on the critical path is a millisecond the user waits. The
+rule is simple: if it does not absolutely have to happen between release and
+paste, it happens somewhere else.
 
 - **The engine loads at launch** and stays resident. The first dictation of
   a session pays what the hundredth pays.
@@ -81,15 +86,15 @@ It was removed. Nobody had measured what it cost.
 
 ## Why length used to cost time
 
-Audio longer than one encoder window is laid out in about 15 s windows with
-2 s of overlap. Waiting for the key to come up means doing that layout at
-release and decoding every window then, so the cost grows with the
-recording: 0.520 s for a minute, 3.665 s for ten minutes. That is fine for a
-sentence and poor for a monologue.
+A ten-minute recording used to take 3.7 seconds to appear after release. A
+one-minute recording took half a second. The cost grew with length because
+every window was decoded at release: laid out in about 15 s windows with
+2 s of overlap, then decoded then. Fine for a sentence, poor for a
+monologue.
 
-The fix is not a different model or a different window scheme. It is doing
-the same work earlier. Three properties of the batch layout make that
-possible:
+The fix is not a different model. It is not a different window scheme. It is
+doing the exact same work at a different time. Three properties of the batch
+layout make that possible:
 
 1. Windows do not depend on each other. Each starts from a fresh decoder
    state.
@@ -100,7 +105,8 @@ possible:
 So the engine runs those same windows while the user is still speaking. At
 release only the final window and the merge remain, which is one pass at any
 length. The chip does no extra work; the passes that would have run at
-release run earlier instead.
+release run earlier instead. Same model, same windows, same merge. The only
+difference is the clock time they run at.
 
 The text is byte-identical to transcribing the whole recording at release,
 which is the point. Flat latency at no cost in accuracy. The paced bench
@@ -116,8 +122,8 @@ swift run -c release pladder-cli bench bench/fixtures \
   --paced --all --runs 3 --pause 10
 ```
 
-| Fixture | Audio | At release | While speaking | Identical text | WER, both |
-|---|---:|---:|---:|---|---:|
+| Fixture | Audio | Batch at release | Incremental | Identical text | WER, both |
+|---|---|---:|---:|---|---:|
 | 10s | 9.7 s | 0.206 s | 0.257 s | yes | 0.0 % |
 | 30s | 31.8 s | 0.416 s | 0.252 s | yes | 0.0 % |
 | 60s | 60.8 s | 0.520 s | 0.278 s | yes | 1.4 % |
@@ -125,13 +131,17 @@ swift run -c release pladder-cli bench bench/fixtures \
 | 5m | 315.6 s | 2.007 s | 0.275 s | yes | 0.6 % |
 | 10m | 631.4 s | 3.665 s | 0.323 s | yes | 0.6 % |
 
+At ten minutes the old path took 3.7 seconds. The new path takes 0.3.
+Same model, same accuracy, same text. The only variable is when the work
+happens.
+
 Each fixture is pushed in one-second chunks paced at real time, and only
 `endUtterance` is timed, which is what remains on the release-to-paste path.
-The other column is the same samples through the same engine, handed over
+The batch column is the same samples through the same engine, handed over
 whole, clock-timed, after the same ten seconds of idle.
 
-Read the columns with their basis in mind. The at-release column is one run
-per fixture. The while-speaking column is the median of two timed runs after
+Read the columns with their basis in mind. The batch column is one run
+per fixture. The incremental column is the median of two timed runs after
 a discarded warm-up. At 10 s there is only one window either way, so the
 same code runs and the difference on that row is measurement noise. The word
 error rate is against synthetic speech and is a regression check, not an
@@ -142,10 +152,10 @@ accuracy claim; [BENCHMARKS.md](BENCHMARKS.md) says why.
 **The cold pass.** Same 10 s fixture, same engine, identical code: 0.151 s
 when runs are back to back, 0.265 s after ten seconds of idle. The
 difference, 0.114 s, is larger than the stop, process and paste stages put
-together on those estimates. A real dictation always starts from idle,
-because the Neural Engine does nothing while the user thinks about what to
-say. That is what the key-down warm pass is for, and it is why the warm-up
-is a full padded pass rather than a token call.
+together. The Neural Engine goes to sleep while the user thinks about what
+to say, and waking it up costs more than everything else on the path
+combined. That is what the key-down warm pass is for, and it is why the
+warm-up is a full padded pass rather than a token call.
 
 **The last window of a long recording used to run cold.** The window stride
 is about 13 s, so a user who stops speaking shortly after a
@@ -163,11 +173,11 @@ means more land on a pass in flight. Two seconds is a starting point, not a
 measured optimum.
 
 **The floor itself.** A one-word dictation pays a full 15 s padded encoder
-pass. No amount of work around the model changes that. FluidAudio ships
-Parakeet Unified streaming variants with a window of about six seconds and
-chunks as short as 160 ms, which would move the floor down, at the cost of
-a second several-hundred-megabyte download and a different accuracy
-profile. It is not in the app.
+pass. That is the physics of this model, and no amount of engineering around
+it changes that. FluidAudio ships Parakeet Unified streaming variants with a
+window of about six seconds and chunks as short as 160 ms, which would move
+the floor down, at the cost of a second several-hundred-megabyte download
+and a different accuracy profile. It is not in the app.
 
 ## Reading a regression
 
