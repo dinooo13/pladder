@@ -79,7 +79,7 @@ Two things make dictation into a terminal work where general dictation apps stum
 
 The time from letting go of the key to the text appearing is the whole product, and it is measured before and after every change that touches it. Most of it is the engine. Engine times on an Apple M1, the least powerful chip Pladder supports, with the realtime factor beside each:
 
-| Speech | Default engine | Realtime | Incremental engine (opt-in) | Realtime |
+| Speech | Transcribed at release | Realtime | Transcribed while speaking | Realtime |
 |---|---:|---:|---:|---:|
 | 10 s | 0.21 s | 47× | 0.26 s | 38× |
 | 30 s | 0.42 s | 76× | 0.25 s | 126× |
@@ -90,7 +90,7 @@ The time from letting go of the key to the text appearing is the whole product, 
 
 The engine is NVIDIA's Parakeet TDT v3, running on the Neural Engine through [FluidAudio](https://github.com/FluidInference/FluidAudio). It loads at launch and stays loaded, so the first dictation after launch is as quick as the hundredth.
 
-The default engine transcribes the whole recording when you let go, so its time grows with the length. The incremental engine, which you switch on in Settings, runs the same windows while you are still speaking and leaves one window and the merge for the release, so the wait is flat at any length. Its text is identical to the default engine's on every fixture above. At ten seconds both engines do the same single pass, so that row is measurement noise rather than a difference.
+The right-hand column is what Pladder does. Waiting until you let go means transcribing the whole recording then, and the wait grows with the length. Instead the recording is transcribed in windows while you are still speaking, leaving one window and a merge for the release, so the wait is flat however long you talk. The text is identical either way, which is the point: this is the same work, done earlier, not a faster and looser method. At ten seconds there is only one window to begin with, so that row is measurement noise rather than a difference.
 
 Why it is fast is written up in [docs/PERFORMANCE.md](docs/PERFORMANCE.md). The measurement procedure and the full baseline are in [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 

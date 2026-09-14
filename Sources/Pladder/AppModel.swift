@@ -80,25 +80,9 @@ final class AppModel {
         var registry = EngineRegistry()
         registry.register(
             EngineRegistry.Entry(
-                id: FluidAudioEngine.engineID,
+                id: FluidAudioIncrementalEngine.engineID,
                 displayName: "Parakeet TDT v3",
                 detail: "NVIDIA Parakeet via FluidAudio, runs on the Neural Engine. ~700 MB download on first use.",
-                make: { FluidAudioEngine() }
-            )
-        )
-        registry.register(
-            EngineRegistry.Entry(
-                id: FluidAudioStreamingEngine.engineID,
-                displayName: "Parakeet TDT v3 (streaming)",
-                detail: "Same models, transcribed while speaking. Wins on dictations over ~13 s.",
-                make: { FluidAudioStreamingEngine() }
-            )
-        )
-        registry.register(
-            EngineRegistry.Entry(
-                id: FluidAudioIncrementalEngine.engineID,
-                displayName: "Parakeet TDT v3 (incremental)",
-                detail: "Same models and the same text as Parakeet TDT v3, with its windows run while speaking.",
                 make: { FluidAudioIncrementalEngine() }
             )
         )
@@ -116,14 +100,23 @@ final class AppModel {
 
         let store = SettingsStore(
             url: Self.settingsURL,
-            defaults: Settings(engineID: FluidAudioEngine.engineID)
+            defaults: Settings(engineID: FluidAudioIncrementalEngine.engineID)
         )
         Self.migrateLegacySettings(to: Self.settingsURL)
         self.store = store
 
         // One read: the store moves an undecodable file aside on load, so a
         // second read could see different settings than the first.
-        let initial = store.load()
+        var initial = store.load()
+
+        // An engine that was removed in an update leaves a stale ID behind.
+        // `EngineRegistry.make` already falls back to the first entry, so the
+        // app works either way; rewriting the ID keeps the settings picker
+        // showing what is actually running.
+        if registry.entry(for: initial.engineID) == nil,
+            let fallback = registry.available.first {
+            initial.engineID = fallback.id
+        }
 
         // Processors, in pipeline order: fillers go first so the dictionary sees
         // cleaned text, and whitespace is tidied last. Each entry is a factory so
