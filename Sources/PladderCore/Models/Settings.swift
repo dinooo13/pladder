@@ -6,8 +6,9 @@ public enum Appearance: String, Codable, Sendable, CaseIterable, Equatable {
     case system, light, dark
 }
 
-/// Which overlay the pill shows while dictating. `liveTranscript` exists so
-/// the settings format is final; it is not selectable until #8 lands.
+/// Which overlay the pill shows while dictating. `liveTranscript` is the only
+/// one that costs anything: it runs a pass over the audio so far four times a
+/// second, in place of the warm pass the other styles run every two seconds.
 public enum OverlayStyle: String, Codable, Sendable, CaseIterable, Equatable {
     case menuBar, minimal, compact, liveTranscript
 }

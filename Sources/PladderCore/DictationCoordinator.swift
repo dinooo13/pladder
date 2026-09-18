@@ -13,6 +13,11 @@ public final class DictationCoordinator {
     public private(set) var lastTranscript: Transcript?
     public private(set) var lastError: String?
 
+    /// What the engine makes of the recording so far, for the Live Transcript
+    /// overlay. Display only: it is never processed and never inserted, and it
+    /// is cleared the moment the key is released. Nil in every other style.
+    public private(set) var partialTranscript: String?
+
     /// The transcribe → process → insert work for the most recent release.
     /// Exposed so callers (and tests) can await completion of a cycle.
     public private(set) var inFlight: Task<Void, Never>?
@@ -212,6 +217,13 @@ public final class DictationCoordinator {
     /// together. Settable so tests do not have to wait seconds.
     public var warmupInterval: Duration = .seconds(2)
 
+    /// How often the Live Transcript style asks the engine what it has heard
+    /// so far. A live pass costs what a warm pass costs, so this is the warm
+    /// interval with a much shorter fuse: four times a second of Neural Engine
+    /// time buys text that keeps up with the speaker, at the price of a
+    /// release being more likely to land inside a pass. Settable for tests.
+    public var livePassInterval: Duration = .milliseconds(500)
+
     /// Keeps the engine warm for as long as the key is held.
     ///
     /// Cancelled at release, but cancellation cannot abort a CoreML call that
@@ -219,7 +231,8 @@ public final class DictationCoordinator {
     /// it. That is bounded by one pass and shows in the log as `engine`
     /// exceeding `engine-time`. The interval trades that risk against the cold
     /// penalty: longer means more dictations start cold, shorter means more
-    /// land on a pass in flight.
+    /// land on a pass in flight. The live pass in the feed loop has exactly
+    /// the same property, at its own cadence.
     private var warmupTask: Task<Void, Never>?
 
     /// Streaming state for the current recording. Non-nil only when
@@ -234,16 +247,30 @@ public final class DictationCoordinator {
     /// before release. Skipped chunks are not a loss: `stop()` returns only
     /// what came after the last drain, and anything a `drain()` raced is
     /// recovered by the tail.
-    private func startStreamingFeed(_ engine: any StreamingTranscriptionEngine) {
+    ///
+    /// In `live` mode the same loop also asks the engine for the text so far
+    /// and publishes it, on the `livePassInterval` cadence. One loop and not
+    /// two: two would drain the same chunks against each other, and a live
+    /// pass could overlap the next one.
+    private func startStreamingFeed(_ engine: any StreamingTranscriptionEngine, live: Bool) {
         fedSampleCount = 0
         feedTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(1))
+                if !live { try? await Task.sleep(for: .seconds(1)) }
                 guard let self, !Task.isCancelled, self.state.isRecording else { return }
                 let chunk = await self.capture.drain()
-                guard !chunk.isEmpty else { continue }
-                await engine.feed(chunk)
-                fedSampleCount += chunk.count
+                if !chunk.isEmpty {
+                    await engine.feed(chunk)
+                    self.fedSampleCount += chunk.count
+                }
+                guard live else { continue }
+                let text = await engine.livePass()
+                // A pass that finishes after the release belongs to a
+                // recording that is already on its way to the clipboard;
+                // publishing it would put stale text back on screen.
+                guard !Task.isCancelled, self.state.isRecording else { return }
+                self.partialTranscript = text
+                try? await Task.sleep(for: self.livePassInterval)
             }
         }
     }
@@ -335,6 +362,10 @@ public final class DictationCoordinator {
         // The engine that was ready at press transcribes this cycle, even if
         // the settings switch engines mid-recording.
         cycleEngine = loader.engine
+        partialTranscript = nil
+        // Read once, at press: switching the style mid-recording must not
+        // leave the loop half live, with nothing warming the engine.
+        let live = settings.overlayStyle == .liveTranscript
         // Flip state before the await so the overlay reacts on key-down and a
         // second concurrent press cannot start capture twice.
         state = .recording(level: 0)
@@ -354,8 +385,10 @@ public final class DictationCoordinator {
             Task { [weak self] in await self?.output.prepare() }
             if let streaming = cycleEngine as? (any StreamingTranscriptionEngine) {
                 try? await streaming.beginUtterance()
-                startStreamingFeed(streaming)
-                startWarmupLoop { await streaming.warmPass() }
+                startStreamingFeed(streaming, live: live)
+                // The live loop's pass is the warm pass, so a second loop
+                // would only compete with it for the Neural Engine.
+                if !live { startWarmupLoop { await streaming.warmPass() } }
             } else if let engine = cycleEngine {
                 startWarmupLoop { [warmupSamples = Self.warmupSamples] in
                     _ = try? await engine.transcribe(warmupSamples)
@@ -394,6 +427,11 @@ public final class DictationCoordinator {
         // real call.
         stopWarmupLoop()
         state = .transcribing
+        // The partial was a picture of the recording, and the recording is
+        // over. The only statement this feature adds to the release path, and
+        // it runs before `recordingStopped`, so it is not even inside the
+        // measured window.
+        partialTranscript = nil
         onEvent(.recordingStopped)
         let engine = cycleEngine ?? loader.engine
         let fedSamples = fedSampleCount
@@ -481,6 +519,7 @@ public final class DictationCoordinator {
         levelTask?.cancel()
         maxDurationTask?.cancel()
         stopWarmupLoop()
+        partialTranscript = nil
         becomeIdle()
         abandonStreaming()
         cycleEngine = nil

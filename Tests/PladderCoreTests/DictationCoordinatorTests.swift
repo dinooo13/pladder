@@ -6,6 +6,9 @@ import Testing
 
 actor FakeCapture: AudioCapture {
     var samplesToReturn: [Float] = Array(repeating: 0.1, count: 16_000)
+    /// What each `drain()` hands the streaming feed. Empty by default, so the
+    /// batch tests see the path they always saw.
+    var drainSamples: [Float] = []
     var startCount = 0
     var stopCount = 0
     var levelContinuation: AsyncStream<Float>.Continuation?
@@ -18,7 +21,7 @@ actor FakeCapture: AudioCapture {
     }
 
     func drain() async -> [Float] {
-        []
+        drainSamples
     }
 
     func stop() async -> CapturedAudio {
@@ -30,6 +33,7 @@ actor FakeCapture: AudioCapture {
     func warmUp() async throws {}
 
     func setSamples(_ s: [Float]) { samplesToReturn = s }
+    func setDrainSamples(_ s: [Float]) { drainSamples = s }
     func emitLevel(_ l: Float) { levelContinuation?.yield(l) }
 }
 
@@ -123,6 +127,70 @@ actor CountingEngine: TranscriptionEngine {
     func unload() { status = .unloaded }
 }
 
+/// A streaming engine that counts everything the coordinator asks of it, so a
+/// test can tell a live loop from a warm one. `livePass` answers
+/// "partial <n>"; only `endUtterance` produces the text that gets inserted.
+actor FakeStreamingEngine: StreamingTranscriptionEngine {
+    static let engineID = EngineID("fake-streaming")
+    nonisolated let id = FakeStreamingEngine.engineID
+    nonisolated let displayName = "Fake streaming"
+    private(set) var status: EngineStatus = .unloaded
+
+    private let counters = StreamingCounters()
+    private let livePassDelay: Duration
+
+    init(livePassDelay: Duration = .zero) { self.livePassDelay = livePassDelay }
+
+    nonisolated var feedCounts: [Int] { counters.feedCounts }
+    nonisolated var livePassCount: Int { counters.livePassCount }
+    nonisolated var warmPassCount: Int { counters.warmPassCount }
+    nonisolated var endCount: Int { counters.endCount }
+
+    func load() async throws { status = .ready }
+    func unload() { status = .unloaded }
+
+    func transcribe(_ samples: [Float]) async throws -> Transcript {
+        Transcript(text: "final", audioDuration: 0, processingTime: 0, engineID: id)
+    }
+
+    func beginUtterance() async throws {}
+
+    func feed(_ samples: [Float]) async { counters.fed(samples.count) }
+
+    func endUtterance(_ tail: [Float]) async throws -> Transcript {
+        counters.ended()
+        return Transcript(text: "final", audioDuration: 0, processingTime: 0, engineID: id)
+    }
+
+    func abandonUtterance() async {}
+
+    func warmPass() async { counters.warmed() }
+
+    func livePass() async -> String? {
+        let n = counters.lived()
+        // Counted before the delay, so a test can catch a pass in flight.
+        if livePassDelay > .zero { try? await Task.sleep(for: livePassDelay) }
+        return "partial \(n)"
+    }
+}
+
+/// Lock-protected so the counters can be read synchronously from a `waitUntil`.
+private final class StreamingCounters: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _feedCounts: [Int] = []
+    private var _livePassCount = 0
+    private var _warmPassCount = 0
+    private var _endCount = 0
+    var feedCounts: [Int] { lock.withLock { _feedCounts } }
+    var livePassCount: Int { lock.withLock { _livePassCount } }
+    var warmPassCount: Int { lock.withLock { _warmPassCount } }
+    var endCount: Int { lock.withLock { _endCount } }
+    func fed(_ count: Int) { lock.withLock { _feedCounts.append(count) } }
+    func warmed() { lock.withLock { _warmPassCount += 1 } }
+    func ended() { lock.withLock { _endCount += 1 } }
+    func lived() -> Int { lock.withLock { _livePassCount += 1; return _livePassCount } }
+}
+
 /// Lock-protected so `calls` can be read synchronously from test assertions.
 private final class SampleRecorder: @unchecked Sendable {
     private let lock = NSLock()
@@ -181,6 +249,37 @@ private func makeCountingCoordinator(
         hotkeyMonitor: FakeHotkey(),
         makePipeline: { s in ProcessorPipeline([DictionaryReplacer(entries: s.dictionary), WhitespaceNormalizer()]) }
     )
+    return (coordinator, output, capture, engine)
+}
+
+/// Builds a coordinator around a streaming engine, with the capture handing
+/// the feed loop half a second of audio per drain.
+@MainActor
+private func makeStreamingCoordinator(
+    style: OverlayStyle,
+    livePassDelay: Duration = .zero
+) async -> (DictationCoordinator, FakeOutput, FakeCapture, FakeStreamingEngine) {
+    let output = FakeOutput()
+    let capture = FakeCapture()
+    await capture.setDrainSamples(Array(repeating: 0.1, count: 8_000))
+    let engine = FakeStreamingEngine(livePassDelay: livePassDelay)
+    let registry = EngineRegistry([
+        .init(id: FakeStreamingEngine.engineID, displayName: "Fake streaming", detail: "") { engine }
+    ])
+    var settings = Settings(engineID: FakeStreamingEngine.engineID)
+    settings.appendTrailingSpace = false
+    settings.overlayStyle = style
+    let coordinator = DictationCoordinator(
+        settings: settings,
+        registry: registry,
+        capture: capture,
+        output: output,
+        hotkeyMonitor: FakeHotkey(),
+        makePipeline: { _ in ProcessorPipeline([]) }
+    )
+    // Both loops on a short fuse so the tests do not have to wait seconds.
+    coordinator.livePassInterval = .milliseconds(10)
+    coordinator.warmupInterval = .milliseconds(10)
     return (coordinator, output, capture, engine)
 }
 
@@ -733,6 +832,85 @@ final class EventLog: @unchecked Sendable {
         c.hotkeyReleased()
         await c.inFlight?.value
     }
+
+    // MARK: Live transcript
+
+    @Test func liveStylePublishesPartialsAndInsertsOnce() async {
+        let (c, output, _, engine) = await makeStreamingCoordinator(style: .liveTranscript)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed()
+        #expect(await waitUntil { engine.livePassCount >= 3 })
+        #expect(c.partialTranscript?.hasPrefix("partial") == true)
+        // The live pass is the warm pass; running both would put two callers
+        // on the Neural Engine at once.
+        #expect(engine.warmPassCount == 0)
+        c.hotkeyReleased()
+        await c.inFlight?.value
+        #expect(output.inserted == ["final"])
+        #expect(engine.endCount == 1)
+        #expect(c.partialTranscript == nil)
+    }
+
+    @Test func partialTranscriptNeverReachesTheOutput() async {
+        let (c, output, _, engine) = await makeStreamingCoordinator(style: .liveTranscript)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed()
+        #expect(await waitUntil { engine.livePassCount >= 2 })
+        c.hotkeyReleased()
+        await c.inFlight?.value
+        #expect(output.inserted == ["final"])
+        #expect(!output.inserted.contains { $0.contains("partial") })
+        #expect(c.lastTranscript?.text == "final")
+    }
+
+    @Test func releaseDuringLivePassStillInsertsExactlyOnce() async {
+        let (c, output, _, engine) = await makeStreamingCoordinator(
+            style: .liveTranscript, livePassDelay: .milliseconds(200))
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed()
+        #expect(await waitUntil { engine.livePassCount == 1 })
+        c.hotkeyReleased()
+        await c.inFlight?.value
+        #expect(output.inserted.count == 1)
+        #expect(c.state == .idle)
+        // The pass that was in flight at release finishes afterwards; its text
+        // belongs to a recording that has already been pasted, so it must not
+        // reappear on screen.
+        try? await Task.sleep(for: .milliseconds(250))
+        #expect(c.partialTranscript == nil)
+    }
+
+    @Test func livePassesDoNotRunForOtherStyles() async {
+        for style in [OverlayStyle.compact, .minimal, .menuBar] {
+            let (c, output, _, engine) = await makeStreamingCoordinator(style: style)
+            c.start()
+            #expect(await waitUntil { c.state == .idle })
+            await c.hotkeyPressed()
+            #expect(await waitUntil { engine.warmPassCount >= 1 })
+            #expect(engine.livePassCount == 0)
+            #expect(c.partialTranscript == nil)
+            c.hotkeyReleased()
+            await c.inFlight?.value
+            #expect(engine.livePassCount == 0)
+            #expect(output.inserted == ["final"])
+        }
+    }
+
+    @Test func cancelRecordingClearsThePartialTranscript() async {
+        let (c, output, _, engine) = await makeStreamingCoordinator(style: .liveTranscript)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed()
+        #expect(await waitUntil { c.partialTranscript != nil })
+        await c.cancelRecording()
+        #expect(c.partialTranscript == nil)
+        #expect(c.state == .idle)
+        #expect(output.inserted.isEmpty)
+        #expect(engine.endCount == 0)
+    }
 }
 
 @Suite struct SettingsStoreTests {
@@ -787,6 +965,11 @@ final class EventLog: @unchecked Sendable {
         changed.overlayGlass = false
         try store.save(changed)
         #expect(store.load() == changed)
+
+        changed.overlayStyle = .liveTranscript
+        try store.save(changed)
+        #expect(store.load() == changed)
+        #expect(store.load().overlayStyle == .liveTranscript)
         try? FileManager.default.removeItem(at: dir)
     }
 
