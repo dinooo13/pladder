@@ -17,6 +17,10 @@ struct HotkeyRecorderField: View {
     /// Called with `true` while recording. The caller suspends the global
     /// monitor so the keys used to define the new chord cannot fire the old one.
     var onRecordingChanged: (Bool) -> Void
+    /// Set while Accessibility is missing: a chord is then registered with
+    /// Carbon, which needs exactly one regular key, so modifier-only chords
+    /// are refused instead of being stored and silently never firing.
+    var requiresRegularKey = false
 
     @State private var recorder = HotkeyRecorder()
 
@@ -25,7 +29,7 @@ struct HotkeyRecorderField: View {
             if recorder.isRecording {
                 recorder.cancel()
             } else {
-                recorder.begin { hotkey = $0 }
+                recorder.begin(requiresRegularKey: requiresRegularKey) { hotkey = $0 }
             }
         } label: {
             Text(label)
@@ -33,16 +37,24 @@ struct HotkeyRecorderField: View {
                 .contentTransition(.numericText())
         }
         .tint(recorder.isRecording ? .accentColor : nil)
-        .help(recorder.isRecording
-            ? "Press the key or combination to use. Escape cancels."
-            : "Click, then press the key or combination to use.")
+        .help(help)
         .onChange(of: recorder.isRecording) { _, isRecording in onRecordingChanged(isRecording) }
         .onDisappear { recorder.cancel() }
     }
 
     private var label: String {
         guard recorder.isRecording else { return hotkey.displayName }
+        if recorder.refusedModifierOnly { return "Needs a regular key…" }
         return recorder.pending?.displayName ?? "Press keys…"
+    }
+
+    private var help: String {
+        let base = recorder.isRecording
+            ? "Press the key or combination to use. Escape cancels."
+            : "Click, then press the key or combination to use."
+        guard requiresRegularKey else { return base }
+        return base + " Without Accessibility the key must include a regular key, "
+            + "for example Control+Shift+Space."
     }
 }
 
@@ -58,6 +70,9 @@ final class HotkeyRecorder {
     /// The chord that will be committed: the keys held at the last moment a
     /// key went down. Releasing keys never shrinks it.
     private(set) var pending: Hotkey?
+    /// The user let go of a modifier-only chord while one was not allowed.
+    /// The recording stays open so they can simply try again.
+    private(set) var refusedModifierOnly = false
 
     private var heldModifiers: Set<UInt16> = []
     private var heldKeys: Set<UInt16> = []
@@ -65,10 +80,12 @@ final class HotkeyRecorder {
     private var monitor: Any?
     private var resignObserver: (any NSObjectProtocol)?
     private var commit: ((Hotkey) -> Void)?
+    private var requiresRegularKey = false
 
-    func begin(commit: @escaping (Hotkey) -> Void) {
+    func begin(requiresRegularKey: Bool = false, commit: @escaping (Hotkey) -> Void) {
         cancel()
         self.commit = commit
+        self.requiresRegularKey = requiresRegularKey
         isRecording = true
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp, .flagsChanged]) { event in
             // Local monitors run on the main thread, but `NSEvent` is not
@@ -132,6 +149,14 @@ final class HotkeyRecorder {
         let held = heldModifiers.union(heldKeys)
         if held.isEmpty {
             if let pending {
+                guard !requiresRegularKey || pending.canBeRegisteredWithoutAccessibility else {
+                    // Carbon cannot register this, so storing it would leave
+                    // the user with a key that does nothing. Keep recording;
+                    // Escape still cancels.
+                    self.pending = nil
+                    refusedModifierOnly = true
+                    return
+                }
                 let commit = self.commit
                 end()
                 commit?(pending)
@@ -140,6 +165,7 @@ final class HotkeyRecorder {
             // A key went down that is not part of the chord so far: the chord
             // is whatever is held now.
             pending = Hotkey(keyCodes: held)
+            refusedModifierOnly = false
         }
     }
 
@@ -149,6 +175,8 @@ final class HotkeyRecorder {
         if let resignObserver { NotificationCenter.default.removeObserver(resignObserver) }
         resignObserver = nil
         commit = nil
+        requiresRegularKey = false
+        refusedModifierOnly = false
         pending = nil
         heldKeys = []
         heldModifiers = []

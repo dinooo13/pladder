@@ -21,6 +21,8 @@ This compiles a release build, wraps it into `Pladder.app`, signs it, copies it 
 
 1. **Grant Microphone** when macOS asks. That is what records your voice.
 2. **Grant Accessibility** when prompted. System Settings opens on the Accessibility list; switch Pladder on. That is what lets Pladder see the push-to-talk key in other apps and paste the result. It does not need Input Monitoring.
+
+   On a standard (non-administrator) account, ticking that box asks for an administrator password, so ask an admin to do it once — the grant is keyed to the app's code signature and survives updates. Without it Pladder still works in a reduced form: the push-to-talk key has to contain a regular key, such as Control+Shift+Space, and the transcript is left on the clipboard for you to paste with ⌘V. Managed Macs can pre-approve Accessibility for Pladder with an MDM Privacy Preferences Policy Control (PPPC) profile, which needs no prompt at all.
 3. **Wait for the model.** The first run downloads the Parakeet TDT v3 CoreML models from Hugging Face into `~/Library/Application Support/FluidAudio/Models` and compiles them. The menu bar icon shows progress, and the push-to-talk key is disabled until the engine is ready. This happens once; later launches load in well under a second.
 
 Then click into any text field, hold **Right Command**, say something, and let go.

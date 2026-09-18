@@ -73,7 +73,10 @@ private struct GeneralSettingsView: View {
                 LabeledContent("Key") {
                     HotkeyRecorderField(
                         hotkey: $model.settings.hotkey,
-                        onRecordingChanged: { model.coordinator.isHotkeySuspended = $0 }
+                        onRecordingChanged: { model.coordinator.isHotkeySuspended = $0 },
+                        // The send key is off without Accessibility anyway, so
+                        // only the push-to-talk key is constrained.
+                        requiresRegularKey: model.hotkeyNeedsRegularKey
                     )
                 }
                 if let warning = hotkeyWarning {
@@ -173,7 +176,7 @@ private struct GeneralSettingsView: View {
             Section("Permissions") {
                 PermissionRow(
                     title: "Accessibility",
-                    detail: "Needed for the global hotkey and pasting.",
+                    detail: "Needed for a modifier-only key and for pasting. Without it the key needs a regular key and the text is copied for you to paste with ⌘V; a standard account needs an administrator to switch it on.",
                     granted: model.accessibilityTrusted,
                     action: model.grantAccessibility
                 )
@@ -189,19 +192,29 @@ private struct GeneralSettingsView: View {
         .onAppear { model.refreshPermissions() }
     }
 
-    /// A chord without a modifier is swallowed system wide, so a plain letter
-    /// or Space would become untypeable while Pladder runs.
+    /// First: a chord that cannot be registered at all without Accessibility,
+    /// which leaves the user with a key that does nothing. Then the standing
+    /// warning that a chord without a modifier is swallowed system wide, so a
+    /// plain letter or Space would become untypeable while Pladder runs.
     private var hotkeyWarning: String? {
         let hotkey = model.settings.hotkey
+        if model.hotkeyNeedsRegularKey, !hotkey.canBeRegisteredWithoutAccessibility {
+            return "Without Accessibility, \(hotkey.displayName) cannot be detected. Choose a combination with a regular key, such as Control+Shift+Space."
+        }
         guard hotkey.modifierKeyCodes.isEmpty, !hotkey.keyCodes.isEmpty else { return nil }
         return "Without a modifier, \(hotkey.displayName) can no longer be typed in other apps while Pladder is running."
     }
 
-    /// A send key the chord already contains can never be pressed on its own.
+    /// The send key presses Return through the same synthetic event as the
+    /// paste, so it is off entirely without Accessibility. Otherwise: a send
+    /// key the chord already contains can never be pressed on its own.
     private var submitKeyWarning: String? {
         let submitKey = model.settings.submitKey
-        guard !submitKey.keyCodes.isEmpty,
-              submitKey.keyCodes.isSubset(of: model.settings.hotkey.keyCodes) else { return nil }
+        guard !submitKey.keyCodes.isEmpty else { return nil }
+        if !model.accessibilityTrusted {
+            return "The send key needs Accessibility."
+        }
+        guard submitKey.keyCodes.isSubset(of: model.settings.hotkey.keyCodes) else { return nil }
         return "\(submitKey.displayName) is part of the push-to-talk key, so it can never be pressed separately."
     }
 
