@@ -176,10 +176,17 @@ struct OverlayStyleThumbnail: View {
             // whole of this style.
             menuBar
         case .liveTranscript:
-            // Built by hand rather than from `OverlayPill`, which renders as
-            // Compact until #8 lands.
-            transcript
-                .scaleEffect(0.6)
+            // The live row hugs its text in a preview, so a sample partial is
+            // all it takes to show what the style looks like.
+            OverlayPill(
+                state: .recording(level: Self.previewLevel),
+                style: .liveTranscript,
+                glass: glass,
+                isPreview: true,
+                partial: "and that's all",
+                hugsContent: true
+            )
+            .scaleEffect(0.45)
         }
     }
 
@@ -200,18 +207,6 @@ struct OverlayStyleThumbnail: View {
                     .padding(.trailing, 5)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-    }
-
-    private var transcript: some View {
-        HStack(spacing: 8) {
-            RecordingDot()
-            LevelBars(level: Self.previewLevel, count: 8, maxHeight: 20, opacity: 0.8, seeded: true)
-            Text("and that's all")
-                .font(.system(size: 11, weight: .medium, design: .rounded))
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .modifier(PillBackground(glass: glass))
     }
 }
 

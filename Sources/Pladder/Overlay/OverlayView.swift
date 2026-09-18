@@ -17,6 +17,9 @@ final class OverlayModel {
     var style: OverlayStyle = .compact
     /// Liquid Glass behind the pill, or a flat window-background fill.
     var glass: Bool = true
+    /// What the engine has heard so far, for the Live Transcript style. Nil in
+    /// every other style, and nil again the moment the key is released.
+    var partialTranscript: String?
     init() {}
 }
 
@@ -55,7 +58,12 @@ struct OverlayView: View {
     private var phase: OverlayPhase { OverlayPhase(model.state) }
 
     var body: some View {
-        OverlayPill(state: model.state, style: model.style, glass: model.glass)
+        OverlayPill(
+            state: model.state,
+            style: model.style,
+            glass: model.glass,
+            partial: model.partialTranscript
+        )
             // Glass carries its own edge highlight; this is only enough shadow
             // to lift the pill off a light desktop. The flat background gets
             // the same treatment.
@@ -75,6 +83,12 @@ struct OverlayPill: View {
     let glass: Bool
     /// A static replica in settings: no dot timer, no pulse, seeded bars.
     var isPreview: Bool = false
+    /// The words so far, for the Live Transcript style. Ignored by the others.
+    var partial: String?
+    /// The live row is a fixed box on screen so the capsule cannot jitter as
+    /// the text grows. A settings card has no room for that box, so its
+    /// replica hugs its sample text instead.
+    var hugsContent: Bool = false
 
     @Namespace private var glassNamespace
     /// Minimal shows a pulsing dot for the first 0.7 s, then the bars.
@@ -130,8 +144,15 @@ struct OverlayPill: View {
         // and the message needs the Compact row's width, so errors always
         // render as the Compact row; the "press ⌘V" hint is text too and
         // follows the same rule. `.menuBar` only ever reaches the view for
-        // those two; `.liveTranscript` renders as Compact until #8 lands.
-        if needsRow {
+        // those two. Live has its own recording row and falls back to the
+        // Compact rows for everything else.
+        if style == .liveTranscript && !isError {
+            liveContent
+                .frame(minHeight: 32)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
+                .frame(minWidth: 140)
+        } else if needsRow {
             compactContent
                 .frame(minHeight: 32)
                 .padding(.horizontal, 18)
@@ -197,6 +218,32 @@ struct OverlayPill: View {
         }
     }
 
+    /// The words as they are recognised, beside a narrower meter. Only the
+    /// recording row differs from Compact: transcribing, done and the error
+    /// say the same thing in every style, and letting them keep the live row's
+    /// width would leave a mostly empty capsule on screen.
+    @ViewBuilder
+    private var liveContent: some View {
+        switch state {
+        case .recording(let level):
+            HStack(spacing: 10) {
+                RecordingDot()
+                LevelBars(level: level, count: 8, maxHeight: 24, opacity: 1, seeded: isPreview)
+                LiveTranscriptText(text: partial ?? "", fixedHeight: !hugsContent)
+            }
+            // A capsule that grew and shrank with the text would jitter on
+            // every pass, so the live row is a fixed box on screen.
+            .frame(width: hugsContent ? nil : Self.liveRowWidth, alignment: .leading)
+        default:
+            compactContent
+        }
+    }
+
+    /// Width of the live row's contents. With the 18 pt padding either side
+    /// the capsule comes to 440 pt, inside the 480 pt panel with room for its
+    /// shadow.
+    static let liveRowWidth: CGFloat = 404
+
     /// Diameter of the Minimal disc. Five bars at 3 pt with 3 pt gaps are
     /// 27 pt wide and 20 pt tall, which sits inside the disc with room to
     /// spare at the chord where the bars reach.
@@ -241,6 +288,69 @@ struct OverlayPill: View {
 
     /// A replica has no timer, so it goes straight to the bars.
     private var showsDot: Bool { isPreview ? false : showDot }
+}
+
+/// The words so far, with the part that has not settled yet in secondary.
+///
+/// Every live pass returns the whole window again, so successive texts share a
+/// long common prefix. Splitting on that prefix means the settled words are
+/// drawn identically from pass to pass and only the tail fades, which is what
+/// keeps a four-times-a-second update readable instead of flickering.
+struct LiveTranscriptText: View {
+    let text: String
+    /// The overlay pins the text to three lines so the capsule cannot jump
+    /// around; the settings replica hugs its one line.
+    var fixedHeight: Bool = true
+
+    /// 13 pt rounded, three lines, with the line spacing SwiftUI gives it.
+    private static let lineHeight: CGFloat = 16
+
+    @State private var stable: String
+    @State private var tail: String
+
+    init(text: String, fixedHeight: Bool = true) {
+        self.text = text
+        self.fixedHeight = fixedHeight
+        // The first text arrives before any change can be observed (the
+        // settings replica never gets a second one), so it starts settled.
+        _stable = State(initialValue: text)
+        _tail = State(initialValue: "")
+    }
+
+    /// The settled words in the primary colour, the unsettled tail in
+    /// secondary. One `AttributedString` rather than two concatenated `Text`s,
+    /// which macOS 26 deprecates.
+    private var attributed: AttributedString {
+        var settled = AttributedString(stable)
+        settled.foregroundColor = .primary
+        var unsettled = AttributedString(tail)
+        unsettled.foregroundColor = .secondary
+        return settled + unsettled
+    }
+
+    var body: some View {
+        Text(attributed)
+            .font(.system(size: 13, weight: .medium, design: .rounded))
+            .contentTransition(.opacity)
+            // Wrap rather than truncate, and let the text be as tall as it
+            // wants inside a frame that shows its last three lines: the newest
+            // words are the ones worth seeing, and no ScrollView is needed to
+            // keep them in view.
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: fixedHeight ? Self.lineHeight * 3 : nil,
+                alignment: .bottomLeading
+            )
+            .clipped()
+            .onChange(of: text) { _, new in
+                let settled = new.commonPrefix(with: stable + tail)
+                withAnimation(.easeOut(duration: 0.18)) {
+                    stable = settled
+                    tail = String(new.dropFirst(settled.count))
+                }
+            }
+    }
 }
 
 /// The red "live" dot, shared by Compact, Minimal and the settings replicas.

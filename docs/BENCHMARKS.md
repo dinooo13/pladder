@@ -102,6 +102,27 @@ compared before any processor runs. The line reads `identical: yes`, or
 gate, not a metric: transcribing while speaking runs the same windows the
 whole-buffer path would have run, so anything but `yes` is a bug.
 
+### `--live`, for the Live Transcript overlay
+
+The Live Transcript style asks the engine what it has heard so far every half
+second while the key is held, in place of the warm pass the other styles make
+every two seconds. `--paced --live` models exactly that: a second task calls
+`livePass()` on the same cadence while the fixture is paced in, and is
+cancelled just before the release, as the coordinator's feed loop is.
+
+```sh
+swift run -c release pladder-cli bench bench/fixtures --paced --live --runs 2 --pause 2
+```
+
+Two things come out of it. The run line and two extra table columns report how
+many live passes a fixture took and what the median pass cost, which is the
+duty cycle the style puts on the Neural Engine. And the `identical:` line now
+covers the live passes too: they transcribe a copy of the audio and never
+touch the session, so the windows the release merges must come out the same as
+without them. Run it beside a plain `--paced` run and compare the
+`endUtterance` medians: the difference is what a release that lands next to a
+live pass costs.
+
 ## Baseline
 
 Reference machine: Apple M1, 16 GB, macOS 26.6.2 (25G83), FluidAudio 0.15.6,

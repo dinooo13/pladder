@@ -23,7 +23,9 @@ enum Screenshots {
             let suffix = scheme == .dark ? "dark" : "light"
             await capture(FlowFigure(), size: CGSize(width: 960, height: 260), scheme: scheme,
                           to: directory.appending(path: "flow-\(suffix).png"))
-            await capture(StylesFigure(), size: CGSize(width: 960, height: 250), scheme: scheme,
+            // Four tiles of 290 pt with 24 pt between them and 16 pt of
+            // padding either side.
+            await capture(StylesFigure(), size: CGSize(width: 1264, height: 250), scheme: scheme,
                           to: directory.appending(path: "styles-\(suffix).png"))
         }
         await capture(SocialFigure(), size: CGSize(width: 1280, height: 640), scheme: .dark,
@@ -118,9 +120,11 @@ private struct Pill: View {
     let state: DictationState
     var style: OverlayStyle = .compact
     var scale: CGFloat = 1
+    /// The words so far, for the Live Transcript pill.
+    var partial: String?
 
     var body: some View {
-        OverlayPill(state: state, style: style, glass: true, isPreview: true)
+        OverlayPill(state: state, style: style, glass: true, isPreview: true, partial: partial)
             .compositingGroup()
             .shadow(color: .black.opacity(0.16), radius: 8, y: 3)
             .scaleEffect(scale)
@@ -142,7 +146,7 @@ private struct FlowFigure: View {
     }
 }
 
-/// The three overlay styles side by side, each on its own desktop.
+/// The four overlay styles side by side, each on its own desktop.
 private struct StylesFigure: View {
     @Environment(\.colorScheme) private var scheme
 
@@ -153,6 +157,16 @@ private struct StylesFigure: View {
             }
             tile("Minimal") {
                 Pill(state: .recording(level: 0.6), style: .minimal, scale: 1.15)
+            }
+            tile("Live") {
+                // The real live row, at its real width: 440 pt of capsule
+                // scaled to fit the tile.
+                Pill(
+                    state: .recording(level: 0.6),
+                    style: .liveTranscript,
+                    scale: 0.6,
+                    partial: "the words show up as you say them, right here"
+                )
             }
             tile("Menu Bar") {
                 Color.clear

@@ -54,6 +54,9 @@ final class OverlayController {
     private func observe() {
         withObservationTracking {
             _ = coordinator.state
+            // Read so a new partial re-arms this too: between two passes the
+            // state stays `.recording` and nothing else would fire.
+            _ = coordinator.partialTranscript
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self, self.running else { return }
@@ -74,6 +77,7 @@ final class OverlayController {
                 return
             }
             model.state = state
+            model.partialTranscript = coordinator.partialTranscript
             cancelHide()
             present()
         case .error:
