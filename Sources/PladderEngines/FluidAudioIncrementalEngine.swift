@@ -35,6 +35,11 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
     private var session: IncrementalChunkProcessor?
     /// Samples fed this utterance, for the transcript's audio duration only.
     private var fedSampleCount = 0
+    /// The samples themselves, kept only so `livePass` has something to
+    /// transcribe; the session holds its own copy for the real windows. At the
+    /// coordinator's 120 s cap this is 7.7 MB, and it is dropped the moment
+    /// the utterance ends, one way or the other.
+    private var liveAudio: [Float] = []
     private var loadTask: Task<Void, Error>?
 
     public init(version: AsrModelVersion = .v3) {
@@ -87,12 +92,14 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
         guard let manager, status.isReady else { throw EngineError.notLoaded }
         await session?.cancel()
         fedSampleCount = 0
+        liveAudio.removeAll(keepingCapacity: true)
         session = try await IncrementalChunkProcessor(manager: manager)
     }
 
     public func feed(_ samples: [Float]) async {
         guard !samples.isEmpty, let session else { return }
         fedSampleCount += samples.count
+        liveAudio.append(contentsOf: samples)
         // A window failing mid-recording must not take the dictation down:
         // `finish()` still runs the last window and merges what did succeed,
         // and it reports the failure itself if it cannot.
@@ -113,6 +120,7 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
         let result = try await session.finish()
         let elapsed = ContinuousClock.now - started
         self.session = nil
+        liveAudio.removeAll(keepingCapacity: true)
         return Transcript(
             text: result.text,
             audioDuration: Double(fedSampleCount) / CapturedAudio.sampleRate,
@@ -125,6 +133,7 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
         let session = self.session
         self.session = nil
         fedSampleCount = 0
+        liveAudio.removeAll(keepingCapacity: true)
         await session?.cancel()
     }
 
@@ -135,6 +144,43 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
         // costs what the real call costs and brings the Neural Engine up while
         // the user is still speaking.
         _ = try? await Self.transcribeWholeBuffer(Self.warmupSamples, using: manager)
+    }
+
+    /// The warm pass with the real audio in it.
+    ///
+    /// The window is padded to the model's fixed size either way, so a pass
+    /// over what has been said so far costs what the pass over half a second
+    /// of silence costs; this warms the Neural Engine exactly as `warmPass`
+    /// does and returns text as well. Nothing here touches the session: the
+    /// windows the release will merge are untouched by it, which the paced
+    /// benchmark's identity gate checks with `--live`.
+    ///
+    /// Before anything has been fed there is nothing to transcribe, so the
+    /// first pass of a recording is the plain warm pass; the key-down warm-up
+    /// is not lost by going live.
+    public func livePass() async -> String? {
+        guard let manager, status.isReady else { return nil }
+        let window = liveWindow()
+        guard !window.isEmpty else {
+            await warmPass()
+            return nil
+        }
+        guard let result = try? await Self.transcribeWholeBuffer(window, using: manager) else { return nil }
+        let text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? nil : text
+    }
+
+    /// The tail of the recording that fits the model's window, cut on a fixed
+    /// grid. A window wider than the model's is decoded in pieces, which
+    /// costs more than one pass and is not what a live view is worth; cutting
+    /// on a 5 s grid instead of at "the last 15 s" keeps the left edge still
+    /// between passes, so the text a reader is following does not shift under
+    /// them four times a second.
+    private func liveWindow() -> [Float] {
+        guard liveAudio.count > Self.maxWindowSamples else { return liveAudio }
+        let overflow = liveAudio.count - Self.maxWindowSamples
+        let start = ((overflow + Self.windowHopSamples - 1) / Self.windowHopSamples) * Self.windowHopSamples
+        return Array(liveAudio[start...])
     }
 
     // MARK: TranscriptionEngine
@@ -178,6 +224,15 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
     /// Half a second of silence for the warm pass. Matches the coordinator's
     /// warm-up so both paths pay for the same encoder pass.
     private static let warmupSamples = [Float](repeating: 0, count: 8_000)
+
+    /// The model's encoder window, 15 s at 16 kHz, taken from FluidAudio so
+    /// the two cannot drift. Audio longer than this is decoded in several
+    /// passes, which a live view has no business paying for, so it transcribes
+    /// the tail that fits.
+    private static let maxWindowSamples = ASRConstants.maxModelSamples
+    /// The grid the live window's left edge moves on, 5 s: long enough that
+    /// the window still holds 10 s of context at its narrowest.
+    private static let windowHopSamples = 80_000
 
     private static func seconds(_ duration: Duration) -> Double {
         let parts = duration.components
