@@ -21,6 +21,12 @@ import PladderEngines
 //                                         incremental path.
 //                                         Fixtures under 13 s are skipped unless --all.
 //       [--all]                           paced bench only: keep the short fixtures too.
+//       [--live]                          paced bench only: run the Live Transcript style's
+//                                         pass over the audio so far every 0.5 s while the
+//                                         fixture is paced, as the overlay does, and report
+//                                         how many there were and what they cost. The
+//                                         `identical:` column then also proves the live
+//                                         passes leave the release's windows alone.
 //
 // Fixtures are audio files with a sibling .txt holding the spoken script, as
 // produced by scripts/make-fixtures.sh.
@@ -29,7 +35,7 @@ func usage() -> Never {
     FileHandle.standardError.write(Data("""
     usage: pladder-cli <audio file>
            pladder-cli bench <fixtures dir> [--runs N] [--pause S]
-           pladder-cli bench <fixtures dir> --paced [--runs N] [--pause S] [--all]
+           pladder-cli bench <fixtures dir> --paced [--runs N] [--pause S] [--all] [--live]
 
     """.utf8))
     exit(2)
@@ -249,6 +255,15 @@ func runBench(dir: String, runs: Int, pause: Double) async throws {
     }
 }
 
+/// What the live passes of one paced run cost. Lock-protected because the
+/// live task records into it while the run's own task paces the audio.
+final class LivePassLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _times: [Double] = []
+    var times: [Double] { lock.withLock { _times } }
+    func record(_ elapsed: Double) { lock.withLock { _times.append(elapsed) } }
+}
+
 /// Paced bench variant: pushes each fixture in one-second chunks paced at real
 /// time, like a live recording, then times `endUtterance` alone. Pacing takes
 /// as long as the audio, so keep the fixture set small.
@@ -257,7 +272,15 @@ func runBench(dir: String, runs: Int, pause: Double) async throws {
 /// raw engine texts are compared before any processor runs. For the
 /// incremental engine that line is the identity gate; for the sliding-window
 /// engine it is a record of how far its seams drift.
-func runPacedBench(dir: String, runs: Int, pause: Double, includeShort: Bool) async throws {
+///
+/// With `live`, the Live Transcript style is modelled too: a second task asks
+/// the engine for the text so far every 0.5 s while the fixture is paced and
+/// is cancelled just before the release, exactly as the coordinator's feed
+/// loop is. That answers the two questions the style raises — what a live pass
+/// costs, and whether a release that lands next to one is slower — and the
+/// identity gate becomes a gate on the live passes as well, since a pass that
+/// disturbed the session's windows would change the text.
+func runPacedBench(dir: String, runs: Int, pause: Double, includeShort: Bool, live: Bool) async throws {
     guard runs >= 2 else {
         FileHandle.standardError.write(Data("--runs must be at least 2 (the first run is discarded)\n".utf8))
         exit(2)
@@ -287,6 +310,9 @@ func runPacedBench(dir: String, runs: Int, pause: Double, includeShort: Bool) as
     print("runs:    \(runs) per fixture, first discarded, median of `endUtterance` reported")
     print(String(format: "pause:   %.0f s idle before every run", pause))
     print("compare: the same engine, whole buffer, once per fixture, raw text")
+    if live {
+        print("live:    a live pass every 0.5 s while the fixture is paced, as the Live Transcript overlay makes")
+    }
     print("")
 
     let loadTime = try await loadEngine(engine)
@@ -300,6 +326,8 @@ func runPacedBench(dir: String, runs: Int, pause: Double, includeShort: Bool) as
         var spread: Double
         var wer: Double
         var identical: Bool
+        var livePasses: Int
+        var livePass: Double
     }
     var rows: [Row] = []
     let clock = ContinuousClock()
@@ -307,10 +335,23 @@ func runPacedBench(dir: String, runs: Int, pause: Double, includeShort: Bool) as
     for fixture in fixtures {
         var times: [Double] = []
         var errors: [Double] = []
+        var livePassTimes: [Double] = []
+        var livePassCounts: [Int] = []
         var lastText = ""
         for run in 1...runs {
             if pause > 0 { try await Task.sleep(for: .seconds(pause)) }
             try await engine.beginUtterance()
+            // The overlay's loop: a pass over the audio so far, every half
+            // second, for as long as the "key" is held.
+            let passes = LivePassLog()
+            let liveTask: Task<Void, Never>? = live ? Task {
+                while !Task.isCancelled {
+                    let started = clock.now
+                    _ = await engine.livePass()
+                    passes.record(seconds(clock.now - started))
+                    try? await Task.sleep(for: .milliseconds(500))
+                }
+            } : nil
             // One-second chunks paced at real time, as the coordinator's
             // feed task would deliver them.
             var offset = 0
@@ -321,6 +362,11 @@ func runPacedBench(dir: String, runs: Int, pause: Double, includeShort: Bool) as
                 offset += oneSecond
             }
             let tail = Array(fixture.samples[offset...])
+            // Cancelled and not awaited, exactly as the release does it: a
+            // pass already inside CoreML cannot be aborted, so the timed call
+            // below waits for it, and that wait is part of what the style
+            // costs.
+            liveTask?.cancel()
             let started = clock.now
             let transcript = try await engine.endUtterance(tail)
             let elapsed = seconds(clock.now - started)
@@ -331,10 +377,16 @@ func runPacedBench(dir: String, runs: Int, pause: Double, includeShort: Bool) as
             let thermal = thermalTag()
             throttled = throttled || !thermal.isEmpty
             let note = (run == 1 ? " (warm-up, discarded)" : "") + thermal
-            print(String(format: "%@ run %d: %.3f s, WER %.1f%%%@", fixture.name, run, elapsed, wer * 100, note))
+            let runPasses = passes.times
+            let liveNote = live
+                ? String(format: ", %d live passes (median %.3f s)", runPasses.count, median(runPasses))
+                : ""
+            print(String(format: "%@ run %d: %.3f s, WER %.1f%%%@%@", fixture.name, run, elapsed, wer * 100, liveNote, note))
             if run > 1 {
                 times.append(elapsed)
                 errors.append(wer)
+                livePassTimes.append(contentsOf: runPasses)
+                livePassCounts.append(runPasses.count)
             }
         }
 
@@ -363,17 +415,21 @@ func runPacedBench(dir: String, runs: Int, pause: Double, includeShort: Bool) as
         let spread = (times.max()! - times.min()!) / engineTime
         rows.append(Row(
             name: fixture.name, duration: fixture.duration, engine: engineTime,
-            spread: spread, wer: median(errors), identical: difference == nil))
+            spread: spread, wer: median(errors), identical: difference == nil,
+            livePasses: Int(median(livePassCounts.map(Double.init)).rounded()),
+            livePass: median(livePassTimes)))
     }
 
     print("")
-    print("| Fixture | Audio | endUtterance (median) | Spread | Realtime | WER | Identical whole-buffer |")
-    print("|---|---:|---:|---:|---:|---:|---|")
+    let liveHeader = live ? " Live passes | Live pass (median) |" : ""
+    print("| Fixture | Audio | endUtterance (median) | Spread | Realtime | WER | Identical whole-buffer |\(liveHeader)")
+    print("|---|---:|---:|---:|---:|---:|---|\(live ? "---:|---:|" : "")")
     for row in rows {
+        let liveCells = live ? String(format: " %d | %.3f s |", row.livePasses, row.livePass) : ""
         print(String(
-            format: "| %@ | %.1f s | %.3f s | %.0f %% | %.0fx | %.1f %% | %@ |",
+            format: "| %@ | %.1f s | %.3f s | %.0f %% | %.0fx | %.1f %% | %@ |%@",
             row.name, row.duration, row.engine, row.spread * 100, row.duration / row.engine,
-            row.wer * 100, row.identical ? "yes" : "no"))
+            row.wer * 100, row.identical ? "yes" : "no", liveCells))
     }
     print("")
     print(String(format: "load:    %.2f (one-minute average at end)", loadAverage()))
@@ -394,6 +450,7 @@ case "bench":
     var pause = 10.0
     var paced = false
     var includeShort = false
+    var live = false
     var dir: String?
     while let arg = arguments.first {
         arguments.removeFirst()
@@ -409,6 +466,8 @@ case "bench":
             paced = true
         } else if arg == "--all" {
             includeShort = true
+        } else if arg == "--live" {
+            live = true
         } else if dir == nil {
             dir = arg
         } else {
@@ -417,9 +476,10 @@ case "bench":
     }
     guard let dir else { usage() }
     if paced {
-        try await runPacedBench(dir: dir, runs: runs, pause: pause, includeShort: includeShort)
+        try await runPacedBench(dir: dir, runs: runs, pause: pause, includeShort: includeShort, live: live)
     } else {
-        if includeShort { usage() }
+        // Both flags only mean something while audio is being paced in.
+        if includeShort || live { usage() }
         try await runBench(dir: dir, runs: runs, pause: pause)
     }
 case let path?:

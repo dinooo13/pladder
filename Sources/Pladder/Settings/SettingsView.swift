@@ -46,10 +46,6 @@ private extension OverlayStyle {
         case .liveTranscript: "Live"
         }
     }
-
-    /// The live transcript pill is shown as a disabled card until #8 lands,
-    /// so the row already reads the way it finally will.
-    var isSelectable: Bool { self != .liveTranscript }
 }
 
 private struct GeneralSettingsView: View {
@@ -126,7 +122,6 @@ private struct GeneralSettingsView: View {
                             OptionCard(
                                 title: style.displayName,
                                 isSelected: model.settings.overlayStyle == style,
-                                isEnabled: style.isSelectable,
                                 action: { model.settings.overlayStyle = style }
                             ) {
                                 OverlayStyleThumbnail(style: style, glass: model.settings.overlayGlass)

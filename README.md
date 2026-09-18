@@ -104,12 +104,13 @@ A small pill at the bottom of the screen tells you what is happening: a red dot 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/styles-dark.png">
-    <img src="docs/images/styles-light.png" width="900" alt="The three overlay styles: Compact pill with level meter, Minimal disc, and Menu Bar glyph only">
+    <img src="docs/images/styles-light.png" width="900" alt="The four overlay styles: Compact pill with level meter, Minimal disc, Live transcript with the words so far, and Menu Bar glyph only">
   </picture>
 </p>
 
 - **Compact.** The full pill with the level meter. You always know it is listening.
 - **Minimal.** A small disc with a pulse. Enough to see it is on, not enough to look at.
+- **Live.** The words as they are recognised, while you are still speaking. The wider pill costs a little more of the chip than the others; the text it shows is only a preview, and what gets pasted is always the full recording.
 - **Menu Bar.** Nothing on the desktop at all. The wave in the menu bar is the only sign.
 
 Each comes in Liquid Glass or a flat fill, in light, dark or whatever the system is doing. Pick a different push-to-talk key or send key by pressing it. Teach it your words in the dictionary, and share the rules with your team as a JSON file.

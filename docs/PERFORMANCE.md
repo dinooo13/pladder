@@ -172,6 +172,24 @@ The interval is the dial: longer means more dictations start cold, shorter
 means more land on a pass in flight. Two seconds is a starting point, not a
 measured optimum.
 
+**The Live Transcript style.** It shows the words as they are recognised by
+running the warm pass over the audio so far instead of over silence: same
+call, same padded window, same cost, with a transcript to show for it. The
+cadence is the change. A pass of roughly 150 ms every 500 ms keeps the Neural
+Engine busy about 30 % of the time against about 7 % at the two-second warm
+cadence, so a release is four times as likely to land inside a pass and wait
+for it — the same bounded one-pass wait the warm loop already risks, taken
+more often. The engine is never cold in this style, which pulls the other way.
+Nothing else changes: the live pass transcribes a copy of the audio and never
+touches the session, so the windows the release merges are the same ones, and
+`pladder-cli bench --paced --live` gates exactly that. The partial text is
+display only; it is never processed and never inserted.
+
+Above 15 s the live pass transcribes only the tail that fits the model's
+window, cut on a 5 s grid, so it stays one pass however long the recording
+runs and the text on screen does not shift under the reader four times a
+second.
+
 **The floor itself.** A one-word dictation pays a full 15 s padded encoder
 pass. That is the physics of this model, and no amount of engineering around
 it changes that. FluidAudio ships Parakeet Unified streaming variants with a
