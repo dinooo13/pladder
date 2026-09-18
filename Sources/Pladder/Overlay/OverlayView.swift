@@ -229,10 +229,15 @@ struct OverlayPill: View {
             HStack(spacing: 10) {
                 RecordingDot()
                 LevelBars(level: level, count: 8, maxHeight: 24, opacity: 1, seeded: isPreview)
-                LiveTranscriptText(text: partial ?? "", fixedHeight: !hugsContent)
+                LiveTranscriptText(
+                    text: partial ?? "",
+                    hugs: hugsContent,
+                    width: hugsContent ? nil : Self.liveTextWidth
+                )
             }
-            // A capsule that grew and shrank with the text would jitter on
-            // every pass, so the live row is a fixed box on screen.
+            // A capsule whose width changed with the text would jitter on
+            // every pass, so the row is a fixed width; its height follows the
+            // number of lines, one to three.
             .frame(width: hugsContent ? nil : Self.liveRowWidth, alignment: .leading)
         default:
             compactContent
@@ -243,6 +248,14 @@ struct OverlayPill: View {
     /// the capsule comes to 440 pt, inside the 480 pt panel with room for its
     /// shadow.
     static let liveRowWidth: CGFloat = 404
+
+    /// What the dot, the eight bars and the two 10 pt gaps take of that row.
+    /// The bars are 3 pt wide with 3 pt between them.
+    private static let liveRowLead: CGFloat = 8 + 10 + (8 * 3 + 7 * 3) + 10
+
+    /// What is left of the row for the words. The text measures itself against
+    /// this to decide how much of the tail fits in three lines.
+    static var liveTextWidth: CGFloat { liveRowWidth - liveRowLead }
 
     /// Diameter of the Minimal disc. Five bars at 3 pt with 3 pt gaps are
     /// 27 pt wide and 20 pt tall, which sits inside the disc with room to
@@ -292,64 +305,76 @@ struct OverlayPill: View {
 
 /// The words so far, with the part that has not settled yet in secondary.
 ///
-/// Every live pass returns the whole window again, so successive texts share a
-/// long common prefix. Splitting on that prefix means the settled words are
-/// drawn identically from pass to pass and only the tail fades, which is what
-/// keeps a four-times-a-second update readable instead of flickering.
+/// Every live pass re-decodes the audio and returns a whole new string, so the
+/// layout can change anywhere in it. Nothing here animates: a cross-fade
+/// between two layouts draws both at once, which is unreadable at two passes a
+/// second. Each pass simply replaces the text. The only thing carried between
+/// passes is the common prefix with the previous string, which is the part the
+/// engine has stopped changing; what came after it is drawn in secondary, so
+/// the eye can see where the settled words end.
 struct LiveTranscriptText: View {
     let text: String
-    /// The overlay pins the text to three lines so the capsule cannot jump
-    /// around; the settings replica hugs its one line.
-    var fixedHeight: Bool = true
+    /// A replica in a settings card has no row to fill, so it hugs its sample
+    /// text on one line rather than wrapping inside the card.
+    var hugs: Bool = false
+    /// How wide the words may run before they wrap, so the view can work out
+    /// how much of the tail fits. Nil when it hugs.
+    var width: CGFloat?
 
-    /// 13 pt rounded, three lines, with the line spacing SwiftUI gives it.
-    private static let lineHeight: CGFloat = 16
+    /// Three lines of 13 pt is as much as the pill can show without turning
+    /// into a window.
+    static let maximumLines = 3
 
-    @State private var stable: String
-    @State private var tail: String
+    /// The font the words are drawn in, and the one they are measured in.
+    static let font = Font.system(size: 13, weight: .medium, design: .rounded)
 
-    init(text: String, fixedHeight: Bool = true) {
-        self.text = text
-        self.fixedHeight = fixedHeight
-        // The first text arrives before any change can be observed (the
-        // settings replica never gets a second one), so it starts settled.
-        _stable = State(initialValue: text)
-        _tail = State(initialValue: "")
+    /// The text of the previous pass, for the settled/unsettled split. It is
+    /// only a colour, so lagging one pass behind costs nothing.
+    @State private var previous = ""
+
+    /// The part of the text that is shown: the whole of it while it fits in
+    /// three lines, and its tail once it does not. SwiftUI's own head
+    /// truncation is no use here — with a line limit it keeps the first lines
+    /// and ellipsises the last one, which shows the oldest words and the
+    /// newest ones with the middle missing — so the cut is made here, at a
+    /// word boundary, against the font's real metrics.
+    private var shown: String {
+        guard let width, !hugs else { return text }
+        return LiveTranscriptMetrics.tail(of: text, fittingLines: Self.maximumLines, width: width)
     }
 
-    /// The settled words in the primary colour, the unsettled tail in
-    /// secondary. One `AttributedString` rather than two concatenated `Text`s,
-    /// which macOS 26 deprecates.
+    /// One `AttributedString` rather than two concatenated `Text`s, which
+    /// macOS 26 deprecates.
     private var attributed: AttributedString {
+        let shown = shown
+        // The previous pass may have been trimmed to a different tail, so
+        // compare like with like from the end.
+        var stable = shown.commonPrefix(with: previous.suffix(shown.count))
+        // A prefix that stops inside a word would paint half of it grey, so
+        // back up to the end of the last whole word.
+        if stable.count < shown.count, let lastSpace = stable.lastIndex(where: \.isWhitespace) {
+            stable = String(stable[..<lastSpace])
+        }
         var settled = AttributedString(stable)
         settled.foregroundColor = .primary
-        var unsettled = AttributedString(tail)
+        var unsettled = AttributedString(shown.dropFirst(stable.count))
         unsettled.foregroundColor = .secondary
         return settled + unsettled
     }
 
     var body: some View {
         Text(attributed)
-            .font(.system(size: 13, weight: .medium, design: .rounded))
-            .contentTransition(.opacity)
-            // Wrap rather than truncate, and let the text be as tall as it
-            // wants inside a frame that shows its last three lines: the newest
-            // words are the ones worth seeing, and no ScrollView is needed to
-            // keep them in view.
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(
-                maxWidth: .infinity,
-                maxHeight: fixedHeight ? Self.lineHeight * 3 : nil,
-                alignment: .bottomLeading
-            )
-            .clipped()
-            .onChange(of: text) { _, new in
-                let settled = new.commonPrefix(with: stable + tail)
-                withAnimation(.easeOut(duration: 0.18)) {
-                    stable = settled
-                    tail = String(new.dropFirst(settled.count))
-                }
-            }
+            .font(Self.font)
+            .multilineTextAlignment(.leading)
+            // A backstop only: `shown` has already been cut to fit.
+            .lineLimit(hugs ? 1 : Self.maximumLines)
+            // The row is a fixed width and the text takes what the dot and the
+            // meter leave of it, wrapping there. Its height is whatever that
+            // wrapping needs, one line to three, and the capsule grows with
+            // it; a fixed box would leave a single line stranded at an edge.
+            .fixedSize(horizontal: hugs, vertical: true)
+            .frame(maxWidth: hugs ? nil : .infinity, alignment: .leading)
+            .onChange(of: text) { old, _ in previous = old }
     }
 }
 
