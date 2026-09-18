@@ -125,6 +125,10 @@ private struct Pill: View {
 
     var body: some View {
         OverlayPill(state: state, style: style, glass: true, isPreview: true, partial: partial)
+            // A tile is narrower than the live row, and the proposed size
+            // would squeeze the glass but not the row inside it; the pill
+            // takes its own size and is scaled to fit instead.
+            .fixedSize()
             .compositingGroup()
             .shadow(color: .black.opacity(0.16), radius: 8, y: 3)
             .scaleEffect(scale)
