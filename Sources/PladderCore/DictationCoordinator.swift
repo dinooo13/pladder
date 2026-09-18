@@ -48,11 +48,13 @@ public final class DictationCoordinator {
     public var maximumDuration: Duration = .seconds(120)
     /// How long an error stays on screen before returning to idle.
     public var errorDisplayDuration: Duration = .seconds(2)
+    /// How long the "press ⌘V" hint stays on screen before returning to idle.
+    public var copiedDisplayDuration: Duration = .seconds(1.5)
 
     private let loader: EngineLoader
     private let capture: any AudioCapture
     private let output: any TextOutput
-    private let hotkeyMonitor: any HotkeyMonitor
+    private var hotkeyMonitor: any HotkeyMonitor
     private let makePipeline: @Sendable (Settings) -> ProcessorPipeline
     /// Rebuilt when settings change so that no processor is constructed on the
     /// release-to-paste path; `DictionaryReplacer` compiles a regex per entry.
@@ -61,7 +63,9 @@ public final class DictationCoordinator {
 
     private var hotkeyTask: Task<Void, Never>?
     private var levelTask: Task<Void, Never>?
-    private var errorResetTask: Task<Void, Never>?
+    /// Returns `.error` or `.copied` to idle after its display duration.
+    /// Only one of the two is ever on screen, so they share a task.
+    private var transientResetTask: Task<Void, Never>?
     private var maxDurationTask: Task<Void, Never>?
 
     /// Wall-clock time of each stage between the hotkey release and the paste.
@@ -120,7 +124,7 @@ public final class DictationCoordinator {
         hotkeyMonitor.stop()
         loader.stop()
         levelTask?.cancel()
-        errorResetTask?.cancel()
+        transientResetTask?.cancel()
         maxDurationTask?.cancel()
         if state.isRecording {
             Task { await cancelRecording() }
@@ -130,6 +134,20 @@ public final class DictationCoordinator {
     /// Re-run engine load, for example after a failed download.
     public func reloadEngine() {
         loader.load()
+    }
+
+    /// Swaps the hotkey source, for example when Accessibility is granted or
+    /// revoked and the app moves between the event tap and Carbon. The old
+    /// monitor's release would never arrive on the new stream, so a recording
+    /// in progress is dropped, exactly as for a chord change.
+    public func replaceHotkeyMonitor(_ monitor: any HotkeyMonitor) {
+        hotkeyTask?.cancel()
+        hotkeyMonitor.stop()
+        hotkeyMonitor = monitor
+        if state.isRecording {
+            Task { await cancelRecording() }
+        }
+        if !isHotkeySuspended { startHotkey() }
     }
 
     private func setEngineStatus(_ status: EngineStatus) {
@@ -306,7 +324,13 @@ public final class DictationCoordinator {
 
     /// Public so tests and a menu item can drive the state machine directly.
     public func hotkeyPressed() async {
-        guard case .idle = state else { return }
+        // `.copied` is the hint from the previous dictation, not a busy state:
+        // a press replaces it rather than being dropped.
+        switch state {
+        case .idle: break
+        case .copied: transientResetTask?.cancel()
+        default: return
+        }
         guard engineStatus.isReady else { return }
         // The engine that was ready at press transcribes this cycle, even if
         // the settings switch engines mid-recording.
@@ -429,13 +453,13 @@ public final class DictationCoordinator {
             let needsSpace = settings.appendTrailingSpace && processed.last?.isWhitespace != true
             let final = needsSpace ? processed + " " : processed
             started = ContinuousClock.now
-            try await output.insert(final, submit: submit)
+            let result = try await output.insert(final, submit: submit)
             timing.insert = ContinuousClock.now - started
             var inserted = transcript
             inserted.text = processed
             lastTranscript = inserted
             onEvent(.inserted(inserted, timing))
-            becomeIdle()
+            if result == .copied { showCopied() } else { becomeIdle() }
         } catch {
             fail(error.localizedDescription)
         }
@@ -468,12 +492,25 @@ public final class DictationCoordinator {
         drainPendingUnloads()
     }
 
+    /// The text is on the clipboard but nothing pasted it, so say so for a
+    /// moment before going idle. Not a busy state: a press cancels the hint
+    /// and starts the next dictation.
+    private func showCopied() {
+        state = .copied
+        transientResetTask?.cancel()
+        transientResetTask = Task { [weak self, copiedDisplayDuration] in
+            try? await Task.sleep(for: copiedDisplayDuration)
+            guard let self, !Task.isCancelled, case .copied = self.state else { return }
+            self.becomeIdle()
+        }
+    }
+
     private func fail(_ message: String) {
         lastError = message
         state = .error(message: message)
         onEvent(.failed(message))
-        errorResetTask?.cancel()
-        errorResetTask = Task { [weak self, errorDisplayDuration] in
+        transientResetTask?.cancel()
+        transientResetTask = Task { [weak self, errorDisplayDuration] in
             try? await Task.sleep(for: errorDisplayDuration)
             guard let self, !Task.isCancelled, case .error = self.state else { return }
             self.becomeIdle()

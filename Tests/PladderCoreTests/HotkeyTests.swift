@@ -242,3 +242,31 @@ private let keyA: UInt16 = 0x00
         #expect(settings.submitKey.keyCodes.isEmpty)
     }
 }
+
+@Suite struct SystemWideRegistrationTests {
+    private let rightShift: UInt16 = 0x3C
+    private let fn: UInt16 = 0x3F
+    private let f5: UInt16 = 0x60
+    private let keyS: UInt16 = 0x01
+
+    @Test func chordWithOneRegularKeyCanBeRegistered() {
+        #expect(Hotkey(leftControl, space).canBeRegisteredWithoutAccessibility)
+        #expect(Hotkey(space).canBeRegisteredWithoutAccessibility)
+        #expect(Hotkey(leftControl, rightShift, keyA).canBeRegisteredWithoutAccessibility)
+    }
+
+    @Test func modifierOnlyChordCannot() {
+        #expect(!Hotkey.rightCommand.canBeRegisteredWithoutAccessibility)
+        #expect(!Hotkey(rightCommand, rightOption).canBeRegisteredWithoutAccessibility)
+    }
+
+    @Test func fnChordCannot() {
+        // Carbon has no modifier bit for Fn, so the chord could only be
+        // registered as a bare F5 and would fire without Fn held.
+        #expect(!Hotkey(fn, f5).canBeRegisteredWithoutAccessibility)
+    }
+
+    @Test func twoRegularKeysCannot() {
+        #expect(!Hotkey(leftControl, keyA, keyS).canBeRegisteredWithoutAccessibility)
+    }
+}

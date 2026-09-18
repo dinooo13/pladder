@@ -55,6 +55,15 @@ public struct Hotkey: Codable, Sendable, Hashable {
     public var modifierKeyCodes: Set<UInt16> { keyCodes.filter(Self.isModifierKeyCode) }
     public var regularKeyCodes: Set<UInt16> { keyCodes.filter { !Self.isModifierKeyCode($0) } }
     public var isModifierOnly: Bool { !keyCodes.isEmpty && regularKeyCodes.isEmpty }
+
+    /// True when the chord can be registered as a system-wide hotkey without
+    /// Accessibility (Carbon `RegisterEventHotKey`): exactly one regular key,
+    /// any modifiers, no Fn. Sides are collapsed by that API, so Left and
+    /// Right Shift are the same chord to it.
+    public var canBeRegisteredWithoutAccessibility: Bool {
+        regularKeyCodes.count == 1 && !keyCodes.contains(0x3F)
+    }
+
     /// A chord with no keys never fires. Used to turn the submit key off.
     public var isEmpty: Bool { keyCodes.isEmpty }
 

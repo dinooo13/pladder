@@ -37,7 +37,9 @@ private enum OverlayPhase: Equatable {
         switch state {
         case .recording: self = .recording
         case .transcribing: self = .transcribing
-        case .inserting: self = .done
+        // The hint is the end of a dictation like the tick is, so the pill
+        // does not morph between them.
+        case .inserting, .copied: self = .done
         case .error(let message): self = .error(message)
         case .idle, .unavailable: self = .empty
         }
@@ -104,10 +106,11 @@ struct OverlayPill: View {
         }
     }
 
-    /// Minimal is a disc; everything else, including an error shown under
-    /// Minimal, is the capsule. Glass morphs between the two.
+    /// Minimal is a disc; everything else, including an error or the "press
+    /// ⌘V" hint shown under Minimal, is the capsule. Glass morphs between the
+    /// two.
     private var shape: AnyShape {
-        isError || style != .minimal ? AnyShape(Capsule()) : AnyShape(Circle())
+        needsRow ? AnyShape(Capsule()) : AnyShape(Circle())
     }
 
     private var isError: Bool {
@@ -115,13 +118,20 @@ struct OverlayPill: View {
         return false
     }
 
+    private var isCopied: Bool { state == .copied }
+
+    /// Both an error and the clipboard hint carry text, which needs the
+    /// Compact row's width, so they render as the row in every style.
+    private var needsRow: Bool { isError || isCopied || style != .minimal }
+
     @ViewBuilder
     private var content: some View {
         // An error presents in every style (the controller makes sure of it),
         // and the message needs the Compact row's width, so errors always
-        // render as the Compact row. `.menuBar` only ever reaches the view for
-        // errors; `.liveTranscript` renders as Compact until #8 lands.
-        if isError || style != .minimal {
+        // render as the Compact row; the "press ⌘V" hint is text too and
+        // follows the same rule. `.menuBar` only ever reaches the view for
+        // those two; `.liveTranscript` renders as Compact until #8 lands.
+        if needsRow {
             compactContent
                 .frame(minHeight: 32)
                 .padding(.horizontal, 18)
@@ -156,6 +166,16 @@ struct OverlayPill: View {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(.green)
                 Text("Done")
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(.primary)
+            }
+        case .copied:
+            // Nothing pasted the text, so the user has to. Same row as Done,
+            // with the instruction in place of the tick's word.
+            HStack(spacing: 8) {
+                Image(systemName: "doc.on.clipboard")
+                    .foregroundStyle(.secondary)
+                Text("Copied — press ⌘V")
                     .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(.primary)
             }
@@ -212,7 +232,9 @@ struct OverlayPill: View {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 14))
                 .foregroundStyle(.green)
-        case .error, .idle, .unavailable:
+        // An error and the clipboard hint are rendered as the row above, so
+        // they never reach this.
+        case .copied, .error, .idle, .unavailable:
             Color.clear
         }
     }

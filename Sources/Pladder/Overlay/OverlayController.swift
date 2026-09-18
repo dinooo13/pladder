@@ -83,6 +83,14 @@ final class OverlayController {
             cancelHide()
             present()
             scheduleHide(after: .seconds(2))
+        case .copied:
+            // Same rule as an error: the text is on the clipboard and nothing
+            // pasted it, so the user has to be told in every style. No hide is
+            // scheduled here — the coordinator holds `.copied` for its display
+            // duration and the `.idle` branch below fades the pill out.
+            model.state = state
+            cancelHide()
+            present()
         case .idle, .unavailable:
             // Deliberately *not* updating the model here: `.inserting` now lasts
             // only a few milliseconds (the pasteboard restore no longer blocks

@@ -34,6 +34,15 @@ final class AppModel {
     private var permissionTask: Task<Void, Never>?
     private var didRequestAccessibility = false
 
+    /// Both hotkey sources, kept for the app's life so switching between them
+    /// costs nothing. The tap swallows the chord's regular key and matches
+    /// left and right modifiers exactly, but needs Accessibility; Carbon needs
+    /// no permission at all and is what a standard account gets.
+    private let tapHotkey = GlobalHotkeyMonitor()
+    private let carbonHotkey = CarbonHotkeyMonitor()
+    /// Which of the two the coordinator is currently driven by.
+    private var hotkeyUsesTap: Bool
+
     /// When the hotkey was released, for the release-to-paste measurement.
     private var releaseInstant: ContinuousClock.Instant?
     /// Release-to-paste time per dictation, the number the user feels. Read
@@ -130,12 +139,14 @@ final class AppModel {
         self.processors = processorFactories.map { $0(initial) }
 
         let events = self.events
+        let trusted = Permissions.isAccessibilityTrusted
+        hotkeyUsesTap = trusted
         coordinator = DictationCoordinator(
             settings: initial,
             registry: registry,
             capture: AVAudioEngineCapture(),
             output: PasteboardOutput(),
-            hotkeyMonitor: GlobalHotkeyMonitor(),
+            hotkeyMonitor: trusted ? tapHotkey : carbonHotkey,
             makePipeline: { s in ProcessorPipeline(processorFactories.map { $0(s) }) },
             onEvent: { [events] event in events.send(event) }
         )
@@ -222,31 +233,38 @@ final class AppModel {
     func refreshPermissions() {
         accessibilityTrusted = Permissions.isAccessibilityTrusted
         microphoneStatus = Permissions.microphoneStatus
+        // Granting Accessibility upgrades the hotkey to the tap; revoking it
+        // drops back to Carbon. Either way a recording in progress is dropped
+        // by the coordinator, since the old monitor's release can no longer
+        // arrive.
+        if accessibilityTrusted != hotkeyUsesTap {
+            hotkeyUsesTap = accessibilityTrusted
+            coordinator.replaceHotkeyMonitor(accessibilityTrusted ? tapHotkey : carbonHotkey)
+        }
     }
 
     var needsAccessibility: Bool { !accessibilityTrusted }
+    /// Without Accessibility the chord has to contain a regular key, so the
+    /// recorder refuses modifier-only chords and settings says why.
+    var hotkeyNeedsRegularKey: Bool { !accessibilityTrusted }
     var needsMicrophone: Bool { microphoneStatus != .authorized }
     var needsAnyPermission: Bool { needsAccessibility || needsMicrophone }
 
-    /// Polls permission status every 2s until both Accessibility and
-    /// Microphone are granted, then stops. Neither API offers a change
-    /// notification, so this is how the menu and settings window notice a
-    /// permission flipped in System Settings. Re-armed by
-    /// `grantAccessibility()` and `grantMicrophone()` so a later revoke is
-    /// picked up again.
+    /// Polls permission status every 2 s for the app's life. Neither API
+    /// offers a change notification, so this is how the menu and the settings
+    /// window notice a permission flipped in System Settings — and, since
+    /// `refreshPermissions()` swaps the hotkey source, how the app moves
+    /// between the event tap and Carbon in both directions. It used to stop
+    /// once both permissions were granted; a later revoke has to be picked up
+    /// too, and two cheap status reads every two seconds cost nothing.
     private func startPermissionMirroring() {
         refreshPermissions()
-        guard needsAnyPermission else {
-            permissionTask?.cancel()
-            return
-        }
         permissionTask?.cancel()
         permissionTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(2))
                 guard let self else { return }
                 self.refreshPermissions()
-                if !self.needsAnyPermission { return }
             }
         }
     }
@@ -300,7 +318,15 @@ final class AppModel {
         case .transcribing: return "Transcribing…"
         case .inserting: return "Inserting…"
         case .error(let message): return "Error: \(message)"
-        case .idle: return "Ready — hold \(settings.hotkey.displayName)"
+        case .copied: return "Copied — press ⌘V"
+        case .idle:
+            // Without Accessibility only a chord with a regular key can be
+            // registered, so a stored Right Command is listening for nothing
+            // and "hold Right Command" would be a lie.
+            if !accessibilityTrusted, !settings.hotkey.canBeRegisteredWithoutAccessibility {
+                return "Choose a key combination in Settings (Accessibility is off)"
+            }
+            return "Ready — hold \(settings.hotkey.displayName)"
         case .unavailable:
             switch coordinator.engineStatus {
             case .downloading(let progress):

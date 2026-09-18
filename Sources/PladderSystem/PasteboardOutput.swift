@@ -86,10 +86,22 @@ public actor PasteboardOutput: TextOutput {
         prepared = (Snapshot.capture(), NSPasteboard.general.changeCount)
     }
 
-    public func insert(_ text: String, submit: Bool) async throws {
-        // Posting to the HID event tap is what needs Accessibility. Check first
-        // so the user gets a real message instead of a silently dropped paste.
-        guard AXIsProcessTrusted() else { throw OutputError.accessibilityDenied }
+    @discardableResult
+    public func insert(_ text: String, submit: Bool) async throws -> InsertResult {
+        // Posting to the HID event tap is what needs Accessibility. Without it
+        // the text is left on the clipboard and the caller tells the user to
+        // press ⌘V; a standard account cannot grant Accessibility on its own.
+        guard AXIsProcessTrusted() else {
+            // A restore still pending from an earlier trusted paste would put
+            // the old clipboard back over the transcript, so drop it. No
+            // restore of our own either: the transcript *is* the result. And
+            // no Return, which needs the same grant.
+            pending?.task?.cancel()
+            pending = nil
+            prepared = nil
+            _ = Snapshot.write(text)
+            return .copied
+        }
 
         // If a restore is still outstanding, take it over: cancel its timer and
         // carry its snapshot forward. Snapshotting now would capture the previous
@@ -139,8 +151,9 @@ public actor PasteboardOutput: TextOutput {
 
         // A concurrent `insert` may have superseded us across the sleep above; it
         // owns the snapshot now and will schedule its own restore.
-        guard pending?.changeCount == ourChangeCount else { return }
+        guard pending?.changeCount == ourChangeCount else { return .pasted }
         pending?.task = restoreTask(for: ourChangeCount)
+        return .pasted
     }
 
     /// Waits out `restoreDelay` off the critical path, then hands back to the
@@ -235,28 +248,14 @@ public actor PasteboardOutput: TextOutput {
 }
 
 public enum OutputError: LocalizedError {
-    /// The app is not in System Settings > Privacy & Security > Accessibility,
-    /// so synthetic key events are dropped.
-    case accessibilityDenied
     /// `CGEvent` refused to create the key event, which normally means the event
     /// source could not be created.
     case eventCreationFailed
 
     public var errorDescription: String? {
         switch self {
-        case .accessibilityDenied:
-            return "Accessibility permission required to paste"
         case .eventCreationFailed:
             return "Could not create the paste keystroke. Try again, or restart Pladder."
-        }
-    }
-
-    public var recoverySuggestion: String? {
-        switch self {
-        case .accessibilityDenied:
-            return "Enable Pladder in System Settings > Privacy & Security > Accessibility."
-        case .eventCreationFailed:
-            return nil
         }
     }
 }

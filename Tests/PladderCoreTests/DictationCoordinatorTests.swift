@@ -42,13 +42,18 @@ final class FakeOutput: TextOutput, @unchecked Sendable {
     var submitted: [Bool] { lock.withLock { _submitted } }
     var prepareCount: Int { lock.withLock { _prepareCount } }
     var shouldFail = false
+    /// What `insert` reports back: `.copied` stands in for an untrusted
+    /// `PasteboardOutput`, which leaves the text on the clipboard.
+    var result: InsertResult = .pasted
 
-    func insert(_ text: String, submit: Bool) async throws {
+    @discardableResult
+    func insert(_ text: String, submit: Bool) async throws -> InsertResult {
         if shouldFail { throw NSError(domain: "fake", code: 1, userInfo: [NSLocalizedDescriptionKey: "paste failed"]) }
         lock.withLock {
             _inserted.append(text)
             _submitted.append(submit)
         }
+        return result
     }
 
     func prepare() async {
@@ -58,7 +63,13 @@ final class FakeOutput: TextOutput, @unchecked Sendable {
 
 final class FakeHotkey: HotkeyMonitor, @unchecked Sendable {
     private var continuation: AsyncStream<HotkeyEvent>.Continuation?
+    /// How often `start` was called, and with what, so a monitor swap can be
+    /// checked from the outside.
+    private(set) var startCount = 0
+    private(set) var lastHotkey: Hotkey?
     func start(hotkey: Hotkey, submitKey: Hotkey) -> AsyncStream<HotkeyEvent> {
+        startCount += 1
+        lastHotkey = hotkey
         let (stream, cont) = AsyncStream<HotkeyEvent>.makeStream()
         continuation = cont
         return stream
@@ -183,6 +194,24 @@ func waitUntil(_ timeout: Duration = .seconds(2), _ condition: @MainActor () -> 
     return condition()
 }
 
+/// Records the coordinator's events by name, for assertions about order.
+final class EventLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _names: [String] = []
+    var names: [String] { lock.withLock { _names } }
+
+    func append(_ event: DictationCoordinator.Event) {
+        let name: String
+        switch event {
+        case .recordingStarted: name = "recordingStarted"
+        case .recordingStopped: name = "recordingStopped"
+        case .inserted: name = "inserted"
+        case .failed: name = "failed"
+        }
+        lock.withLock { _names.append(name) }
+    }
+}
+
 // MARK: - Tests
 
 @MainActor
@@ -255,6 +284,108 @@ func waitUntil(_ timeout: Duration = .seconds(2), _ condition: @MainActor () -> 
         #expect(await waitUntil { c.state == .recording(level: 0.7) })
         c.hotkeyReleased()
         await c.inFlight?.value
+    }
+
+    @Test func copiedResultShowsTheHintThenIdles() async {
+        let output = FakeOutput()
+        output.result = .copied
+        let (c, _, _) = makeCoordinator(output: output)
+        c.copiedDisplayDuration = .milliseconds(50)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed()
+        c.hotkeyReleased()
+        await c.inFlight?.value
+        #expect(c.state == .copied)
+        #expect(output.inserted.count == 1)
+        #expect(c.lastTranscript?.text == "hello world")
+        #expect(await waitUntil { c.state == .idle })
+    }
+
+    @Test func copiedResultStillEmitsInserted() async {
+        let output = FakeOutput()
+        output.result = .copied
+        let events = EventLog()
+        let registry = EngineRegistry([
+            .init(id: EchoEngine.engineID, displayName: "Echo", detail: "") {
+                EchoEngine(text: "hello world", delay: .milliseconds(5))
+            }
+        ])
+        let c = DictationCoordinator(
+            settings: Settings(engineID: EchoEngine.engineID),
+            registry: registry,
+            capture: FakeCapture(),
+            output: output,
+            hotkeyMonitor: FakeHotkey(),
+            makePipeline: { _ in ProcessorPipeline([]) },
+            onEvent: { [events] in events.append($0) }
+        )
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed()
+        c.hotkeyReleased()
+        await c.inFlight?.value
+        #expect(events.names.last == "inserted")
+        #expect(!events.names.contains("failed"))
+    }
+
+    @Test func pressDuringCopiedHintStartsRecording() async {
+        let output = FakeOutput()
+        output.result = .copied
+        let (c, _, _) = makeCoordinator(output: output)
+        // Long enough that the hint would still be up without the press.
+        c.copiedDisplayDuration = .seconds(5)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed()
+        c.hotkeyReleased()
+        await c.inFlight?.value
+        #expect(c.state == .copied)
+        await c.hotkeyPressed()
+        #expect(c.state.isRecording)
+        // The cancelled hint timer must not drop us back to idle.
+        try? await Task.sleep(for: .milliseconds(100))
+        #expect(c.state.isRecording)
+        await c.cancelRecording()
+    }
+
+    @Test func replacingTheHotkeyMonitorWhileRecordingStopsTheMicrophone() async {
+        let a = FakeHotkey()
+        let b = FakeHotkey()
+        let (c, output, capture) = makeCoordinator(hotkeyMonitor: a)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        a.press()
+        #expect(await waitUntil { c.state.isRecording })
+        c.replaceHotkeyMonitor(b)
+        #expect(await waitUntil { c.state == .idle })
+        #expect(await capture.stopCount == 1)
+        #expect(output.inserted.isEmpty)
+        #expect(b.startCount == 1)
+        #expect(b.lastHotkey == c.settings.hotkey)
+        // The old monitor is detached; only the new one drives the machine.
+        a.press()
+        try? await Task.sleep(for: .milliseconds(50))
+        #expect(c.state == .idle)
+        b.press()
+        #expect(await waitUntil { c.state.isRecording })
+        await c.cancelRecording()
+    }
+
+    @Test func replacingTheHotkeyMonitorWhileSuspendedStartsItOnResume() async {
+        let a = FakeHotkey()
+        let b = FakeHotkey()
+        let (c, _, _) = makeCoordinator(hotkeyMonitor: a)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        c.isHotkeySuspended = true
+        c.replaceHotkeyMonitor(b)
+        #expect(b.startCount == 0)
+        c.isHotkeySuspended = false
+        #expect(b.startCount == 1)
+        b.press()
+        #expect(await waitUntil { c.state.isRecording })
+        await c.cancelRecording()
     }
 
     @Test func outputFailureSurfacesErrorThenRecovers() async {
