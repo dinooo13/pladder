@@ -87,7 +87,7 @@ struct OverlayPill: View {
     var partial: String?
     /// The live row is a fixed box on screen so the capsule cannot jitter as
     /// the text grows. A settings card has no room for that box, so its
-    /// replica hugs its sample text instead.
+    /// replica hugs its sample text, wrapped onto two short lines.
     var hugsContent: Bool = false
 
     @Namespace private var glassNamespace
@@ -232,7 +232,7 @@ struct OverlayPill: View {
                 LiveTranscriptText(
                     text: partial ?? "",
                     hugs: hugsContent,
-                    width: hugsContent ? nil : Self.liveTextWidth
+                    width: hugsContent ? Self.previewTextWidth : Self.liveTextWidth
                 )
             }
             // A capsule whose width changed with the text would jitter on
@@ -256,6 +256,10 @@ struct OverlayPill: View {
     /// What is left of the row for the words. The text measures itself against
     /// this to decide how much of the tail fits in three lines.
     static var liveTextWidth: CGFloat { liveRowWidth - liveRowLead }
+
+    /// The words in a settings card: wide enough for two short lines, so the
+    /// card reads as text beside the meter rather than a long thin pill.
+    static let previewTextWidth: CGFloat = 80
 
     /// Diameter of the Minimal disc. Five bars at 3 pt with 3 pt gaps are
     /// 27 pt wide and 20 pt tall, which sits inside the disc with room to
@@ -315,10 +319,10 @@ struct OverlayPill: View {
 struct LiveTranscriptText: View {
     let text: String
     /// A replica in a settings card has no row to fill, so it hugs its sample
-    /// text on one line rather than wrapping inside the card.
+    /// text, wrapped at `width` onto at most two lines and never trimmed.
     var hugs: Bool = false
     /// How wide the words may run before they wrap, so the view can work out
-    /// how much of the tail fits. Nil when it hugs.
+    /// how much of the tail fits.
     var width: CGFloat?
 
     /// Three lines of 13 pt is as much as the pill can show without turning
@@ -367,12 +371,13 @@ struct LiveTranscriptText: View {
             .font(Self.font)
             .multilineTextAlignment(.leading)
             // A backstop only: `shown` has already been cut to fit.
-            .lineLimit(hugs ? 1 : Self.maximumLines)
+            .lineLimit(hugs ? 2 : Self.maximumLines)
             // The row is a fixed width and the text takes what the dot and the
             // meter leave of it, wrapping there. Its height is whatever that
             // wrapping needs, one line to three, and the capsule grows with
             // it; a fixed box would leave a single line stranded at an edge.
-            .fixedSize(horizontal: hugs, vertical: true)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(width: hugs ? width : nil, alignment: .leading)
             .frame(maxWidth: hugs ? nil : .infinity, alignment: .leading)
             .onChange(of: text) { old, _ in previous = old }
     }
