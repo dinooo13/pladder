@@ -82,7 +82,18 @@ func loadEngine(_ engine: any TranscriptionEngine) async throws -> Duration {
         }
     }
     defer { statusTask.cancel() }
-    try await engine.load()
+    do {
+        try await engine.load()
+    } catch {
+        // The engine's own wording for the failure — the line the menu shows —
+        // rather than a top-level trap printing the raw error, so a download
+        // that never finished can be diagnosed from the terminal.
+        if case .failed(let message) = await engine.status {
+            FileHandle.standardError.write(Data("model failed: \(message)\n".utf8))
+            exit(1)
+        }
+        throw error
+    }
     return clock.now - started
 }
 
