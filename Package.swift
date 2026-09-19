@@ -60,5 +60,6 @@ let package = Package(
         .testTarget(name: "PladderCoreTests", dependencies: ["PladderCore"]),
         .testTarget(name: "PladderAudioTests", dependencies: ["PladderAudio"]),
         .testTarget(name: "PladderBenchTests", dependencies: ["PladderBench"]),
+        .testTarget(name: "PladderSystemTests", dependencies: ["PladderSystem"]),
     ]
 )
