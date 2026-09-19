@@ -84,6 +84,20 @@ final class FakeHotkey: HotkeyMonitor, @unchecked Sendable {
     func cancel() { continuation?.yield(.cancelled) }
 }
 
+/// Counts the two calls the coordinator makes. The real controller's timing
+/// is tested on its own; what matters here is that both ends are called, from
+/// every path that ends a recording.
+final class FakeOutputMuter: OutputMuter, @unchecked Sendable {
+    private let lock = NSLock()
+    private var _startedCount = 0
+    private var _endedCount = 0
+    var startedCount: Int { lock.withLock { _startedCount } }
+    var endedCount: Int { lock.withLock { _endedCount } }
+
+    func recordingStarted() async { lock.withLock { _startedCount += 1 } }
+    func recordingEnded() async { lock.withLock { _endedCount += 1 } }
+}
+
 /// Fails `load()` a set number of times, then succeeds.
 actor FlakyEngine: TranscriptionEngine {
     nonisolated let id = EngineID("flaky")
@@ -208,7 +222,8 @@ private func makeCoordinator(
     settings: Settings? = nil,
     output: FakeOutput = FakeOutput(),
     capture: FakeCapture = FakeCapture(),
-    hotkeyMonitor: FakeHotkey? = nil
+    hotkeyMonitor: FakeHotkey? = nil,
+    outputMuter: (any OutputMuter)? = nil
 ) -> (DictationCoordinator, FakeOutput, FakeCapture) {
     let registry = EngineRegistry([
         .init(id: EchoEngine.engineID, displayName: "Echo", detail: "") {
@@ -221,6 +236,7 @@ private func makeCoordinator(
         registry: registry,
         capture: capture,
         output: output,
+        outputMuter: outputMuter,
         hotkeyMonitor: hotkeyMonitor ?? FakeHotkey(),
         makePipeline: { s in
             ProcessorPipeline([DictionaryReplacer(entries: s.dictionary), WhitespaceNormalizer()])
@@ -1018,6 +1034,64 @@ final class EventLog: @unchecked Sendable {
         #expect(c.state == .idle)
         #expect(output.inserted.isEmpty)
         #expect(engine.endCount == 0)
+    }
+
+    // MARK: Output mute
+
+    @Test func mutesAndRestoresTheOutputDeviceWhenTheSettingIsOn() async {
+        var settings = Settings(engineID: EchoEngine.engineID)
+        settings.muteOutputWhileDictating = true
+        let muter = FakeOutputMuter()
+        let (c, _, _) = makeCoordinator(settings: settings, outputMuter: muter)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed()
+        #expect(await waitUntil { muter.startedCount == 1 })
+        c.hotkeyReleased()
+        await c.inFlight?.value
+        #expect(await waitUntil { muter.endedCount == 1 })
+        #expect(muter.startedCount == 1)
+    }
+
+    /// The setting gates the mute, never the restore: turning it off while the
+    /// key is held must not strand a muted device.
+    @Test func withTheSettingOffNothingIsMutedButTheRestoreStillRuns() async {
+        let muter = FakeOutputMuter()
+        let (c, _, _) = makeCoordinator(outputMuter: muter)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed()
+        c.hotkeyReleased()
+        await c.inFlight?.value
+        #expect(await waitUntil { muter.endedCount == 1 })
+        #expect(muter.startedCount == 0)
+    }
+
+    @Test func cancelRecordingRestoresTheOutputDevice() async {
+        var settings = Settings(engineID: EchoEngine.engineID)
+        settings.muteOutputWhileDictating = true
+        let muter = FakeOutputMuter()
+        let (c, _, _) = makeCoordinator(settings: settings, outputMuter: muter)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed()
+        await c.cancelRecording()
+        #expect(await waitUntil { muter.endedCount == 1 })
+    }
+
+    @Test func theCancelledHotkeyEventRestoresTheOutputDevice() async {
+        var settings = Settings(engineID: EchoEngine.engineID)
+        settings.muteOutputWhileDictating = true
+        let hotkey = FakeHotkey()
+        let muter = FakeOutputMuter()
+        let (c, _, _) = makeCoordinator(
+            settings: settings, hotkeyMonitor: hotkey, outputMuter: muter)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        hotkey.press()
+        #expect(await waitUntil { c.state.isRecording })
+        hotkey.cancel()
+        #expect(await waitUntil { muter.endedCount == 1 })
     }
 }
 
