@@ -176,17 +176,22 @@ struct OverlayStyleThumbnail: View {
             // whole of this style.
             menuBar
         case .liveTranscript:
-            // The live row hugs its text in a preview, so a sample partial is
-            // all it takes to show what the style looks like.
+            // The live row hugs a two-line sample in a preview: at the
+            // Compact card's scale the words are small but read as words,
+            // which is what tells this style from Compact.
             OverlayPill(
                 state: .recording(level: Self.previewLevel),
                 style: .liveTranscript,
                 glass: glass,
                 isPreview: true,
-                partial: "and that's all",
+                partial: "see it as you speak",
                 hugsContent: true
             )
-            .scaleEffect(0.45)
+            // The card is narrower than the pill; proposed at the card's
+            // width the glass shrinks but the row does not, and the dot ends
+            // up outside the capsule. The pill takes its own size instead.
+            .fixedSize()
+            .scaleEffect(0.5)
         }
     }
 
