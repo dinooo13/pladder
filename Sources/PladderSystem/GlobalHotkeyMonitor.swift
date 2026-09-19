@@ -174,6 +174,9 @@ public final class GlobalHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
 
         let keyCode = UInt16(truncatingIfNeeded: event.getIntegerValueField(.keyboardEventKeycode))
         let flags = event.flags.rawValue
+        // One read per event, on the tap thread: the tracker times the
+        // interruption window from it.
+        let now = ContinuousClock.now
 
         let (outcome, continuation) = lock.withLock {
             () -> (HotkeyChordTracker.Outcome, AsyncStream<HotkeyEvent>.Continuation?) in
@@ -183,12 +186,13 @@ public final class GlobalHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
             case .keyDown:
                 let isRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
                 outcome = state.tracker!.keyDown(
-                    keyCode, isRepeat: isRepeat, modifiers: state.modifiers.held(flags: flags))
+                    keyCode, isRepeat: isRepeat, modifiers: state.modifiers.held(flags: flags), at: now)
             case .keyUp:
-                outcome = state.tracker!.keyUp(keyCode, modifiers: state.modifiers.held(flags: flags))
+                outcome = state.tracker!.keyUp(
+                    keyCode, modifiers: state.modifiers.held(flags: flags), at: now)
             case .flagsChanged:
                 let modifiers = state.modifiers.update(changedKey: keyCode, flags: flags)
-                outcome = state.tracker!.flagsChanged(modifiers: modifiers)
+                outcome = state.tracker!.flagsChanged(modifiers: modifiers, at: now)
             default:
                 return (.init(), nil)
             }

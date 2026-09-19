@@ -81,6 +81,7 @@ final class FakeHotkey: HotkeyMonitor, @unchecked Sendable {
     func stop() { continuation?.finish() }
     func press() { continuation?.yield(.pressed) }
     func release(submit: Bool = false) { continuation?.yield(.released(submit: submit)) }
+    func cancel() { continuation?.yield(.cancelled) }
 }
 
 /// Fails `load()` a set number of times, then succeeds.
@@ -446,6 +447,39 @@ final class EventLog: @unchecked Sendable {
         try? await Task.sleep(for: .milliseconds(100))
         #expect(c.state.isRecording)
         await c.cancelRecording()
+    }
+
+    @Test func cancelledEventDropsTheRecordingSilently() async {
+        let hotkey = FakeHotkey()
+        let events = EventLog()
+        let output = FakeOutput()
+        let capture = FakeCapture()
+        let registry = EngineRegistry([
+            .init(id: EchoEngine.engineID, displayName: "Echo", detail: "") {
+                EchoEngine(text: "hello world", delay: .milliseconds(5))
+            }
+        ])
+        let c = DictationCoordinator(
+            settings: Settings(engineID: EchoEngine.engineID),
+            registry: registry,
+            capture: capture,
+            output: output,
+            hotkeyMonitor: hotkey,
+            makePipeline: { _ in ProcessorPipeline([]) },
+            onEvent: { [events] in events.append($0) }
+        )
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        hotkey.press()
+        #expect(await waitUntil { c.state.isRecording })
+        hotkey.cancel()
+        #expect(await waitUntil { c.state == .idle })
+        #expect(await capture.stopCount == 1)
+        #expect(output.inserted.isEmpty)
+        // No `recordingStopped`: nothing plays the stop sound and nothing
+        // starts the release-to-paste measurement for a dictation that was
+        // never one.
+        #expect(events.names == ["recordingStarted"])
     }
 
     @Test func replacingTheHotkeyMonitorWhileRecordingStopsTheMicrophone() async {

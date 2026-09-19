@@ -9,6 +9,7 @@ private let rightCommand: UInt16 = 0x36
 private let leftShift: UInt16 = 0x38
 private let space: UInt16 = 0x31
 private let keyA: UInt16 = 0x00
+private let keyC: UInt16 = 0x08
 
 @Suite struct HotkeyChordTrackerTests {
     @Test func loneModifierPressesAndReleases() {
@@ -38,13 +39,15 @@ private let keyA: UInt16 = 0x00
     @Test func anotherKeyWhileHeldEndsThePress() {
         var t = HotkeyChordTracker(hotkey: .rightOption)
         #expect(t.flagsChanged(modifiers: [rightOption]) == .init(event: .pressed))
-        // Right Option + C is someone's shortcut, not dictation. Nothing is swallowed.
-        #expect(t.keyDown(keyA, modifiers: [rightOption]) == .init(event: .released(submit: false)))
+        // Right Option + C is someone's shortcut, not dictation. Nothing is
+        // swallowed, and since these instants are microseconds apart the press
+        // counts as interrupted rather than released (see `InterruptionTests`).
+        #expect(t.keyDown(keyA, modifiers: [rightOption]) == .init(event: .cancelled))
         #expect(t.keyUp(keyA, modifiers: [rightOption]) == .init())
         #expect(t.flagsChanged(modifiers: []) == .init())
         // Same for an extra modifier.
         #expect(t.flagsChanged(modifiers: [rightOption]) == .init(event: .pressed))
-        #expect(t.flagsChanged(modifiers: [rightOption, leftShift]) == .init(event: .released(submit: false)))
+        #expect(t.flagsChanged(modifiers: [rightOption, leftShift]) == .init(event: .cancelled))
         #expect(t.flagsChanged(modifiers: [rightOption]) == .init())
         #expect(t.flagsChanged(modifiers: []) == .init())
     }
@@ -171,14 +174,15 @@ private let keyA: UInt16 = 0x00
     @Test func foreignModifierEndsThePressWithoutSubmit() {
         var t = HotkeyChordTracker(hotkey: .rightCommand, submitKey: .rightOption)
         _ = t.flagsChanged(modifiers: [rightCommand])
-        #expect(t.flagsChanged(modifiers: [rightCommand, leftShift]) == .init(event: .released(submit: false)))
+        #expect(t.flagsChanged(modifiers: [rightCommand, leftShift]) == .init(event: .cancelled))
     }
 
     @Test func emptySubmitKeyBehavesAsBefore() {
         var t = HotkeyChordTracker(hotkey: .rightCommand)
         #expect(t.flagsChanged(modifiers: [rightCommand]) == .init(event: .pressed))
-        // Return is an ordinary key: it disengages the chord, nothing swallowed.
-        #expect(t.keyDown(returnKey, modifiers: [rightCommand]) == .init(event: .released(submit: false)))
+        // Return is an ordinary key: it disengages the chord, nothing swallowed,
+        // and this soon after the press that is an interruption.
+        #expect(t.keyDown(returnKey, modifiers: [rightCommand]) == .init(event: .cancelled))
         #expect(t.flagsChanged(modifiers: []) == .init())
     }
 
@@ -366,5 +370,113 @@ private let keyA: UInt16 = 0x00
         // macOS sets a private bit on the function-key shortcuts; it must not
         // become a phantom modifier.
         #expect(Hotkey(keyCode: f5, carbonModifierMask: 0x21000) == Hotkey(leftControl, f5))
+    }
+}
+
+/// The interruption window: another key going down just after the chord means
+/// the user typed a shortcut, not a dictation. Every instant is passed in, so
+/// nothing here sleeps.
+@Suite struct InterruptionTests {
+    private let t0 = ContinuousClock.now
+
+    @Test func letterWithinTheWindowCancels() {
+        var t = HotkeyChordTracker(hotkey: .rightCommand)
+        #expect(t.flagsChanged(modifiers: [rightCommand], at: t0) == .init(event: .pressed))
+        // Cmd+C. The C still reaches the app: swallowing it would break copy.
+        #expect(
+            t.keyDown(keyC, modifiers: [rightCommand], at: t0 + .milliseconds(80))
+                == .init(event: .cancelled))
+        #expect(t.flagsChanged(modifiers: [], at: t0 + .milliseconds(200)) == .init())
+    }
+
+    @Test func letterAfterTheWindowReleases() {
+        var t = HotkeyChordTracker(hotkey: .rightCommand)
+        #expect(t.flagsChanged(modifiers: [rightCommand], at: t0) == .init(event: .pressed))
+        // Held for a second and a half first: that was a dictation, and the
+        // stray key ends it the way it always did.
+        #expect(
+            t.keyDown(keyC, modifiers: [rightCommand], at: t0 + .milliseconds(1500))
+                == .init(event: .released(submit: false)))
+    }
+
+    @Test func heldPastTheWindowThenReleasedTranscribes() {
+        var t = HotkeyChordTracker(hotkey: .rightCommand)
+        #expect(t.flagsChanged(modifiers: [rightCommand], at: t0) == .init(event: .pressed))
+        #expect(t.flagsChanged(modifiers: [], at: t0 + .seconds(3)) == .init(event: .released(submit: false)))
+    }
+
+    @Test func releaseInsideTheWindowIsStillARelease() {
+        var t = HotkeyChordTracker(hotkey: .rightCommand)
+        #expect(t.flagsChanged(modifiers: [rightCommand], at: t0) == .init(event: .pressed))
+        // A tap of the chord alone is a (very short) dictation, not an
+        // interruption: only another key going down cancels.
+        #expect(
+            t.flagsChanged(modifiers: [], at: t0 + .milliseconds(80))
+                == .init(event: .released(submit: false)))
+    }
+
+    @Test func foreignModifierWithinTheWindowCancels() {
+        var t = HotkeyChordTracker(hotkey: .rightCommand)
+        #expect(t.flagsChanged(modifiers: [rightCommand], at: t0) == .init(event: .pressed))
+        // Cmd+Shift+4 on its way to the screenshot tool.
+        #expect(
+            t.flagsChanged(modifiers: [rightCommand, leftShift], at: t0 + .milliseconds(100))
+                == .init(event: .cancelled))
+    }
+
+    @Test func submitKeyIsNotAnInterruption() {
+        var t = HotkeyChordTracker(hotkey: .rightCommand, submitKey: .rightOption)
+        #expect(t.flagsChanged(modifiers: [rightCommand], at: t0) == .init(event: .pressed))
+        #expect(t.flagsChanged(modifiers: [rightCommand, rightOption], at: t0 + .milliseconds(100)) == .init())
+        #expect(
+            t.flagsChanged(modifiers: [], at: t0 + .seconds(2))
+                == .init(event: .released(submit: true)))
+    }
+
+    @Test func interruptedRegularKeyChordStillSwallowsItsKeyUp() {
+        var t = HotkeyChordTracker(hotkey: Hotkey(leftControl, space))
+        #expect(t.flagsChanged(modifiers: [leftControl], at: t0) == .init())
+        #expect(t.keyDown(space, modifiers: [leftControl], at: t0) == .init(event: .pressed, swallow: true))
+        #expect(
+            t.keyDown(keyA, modifiers: [leftControl], at: t0 + .milliseconds(50))
+                == .init(event: .cancelled))
+        // The Space we swallowed on the way down must not reach the app on the
+        // way up either, cancelled press or not.
+        #expect(t.keyUp(space, modifiers: [leftControl], at: t0 + .milliseconds(120)) == .init(swallow: true))
+    }
+
+    @Test func cancelClearsTheSubmitLatch() {
+        var t = HotkeyChordTracker(hotkey: .rightCommand, submitKey: .rightOption)
+        #expect(t.flagsChanged(modifiers: [rightCommand], at: t0) == .init(event: .pressed))
+        #expect(t.flagsChanged(modifiers: [rightCommand, rightOption], at: t0 + .milliseconds(50)) == .init())
+        #expect(
+            t.keyDown(keyC, modifiers: [rightCommand, rightOption], at: t0 + .milliseconds(100))
+                == .init(event: .cancelled))
+        #expect(t.isSubmitArmed == false)
+        // The next press starts clean: no Return follows it.
+        #expect(t.flagsChanged(modifiers: [], at: t0 + .milliseconds(200)) == .init())
+        #expect(t.flagsChanged(modifiers: [rightCommand], at: t0 + .milliseconds(300)) == .init(event: .pressed))
+        #expect(
+            t.flagsChanged(modifiers: [], at: t0 + .seconds(3))
+                == .init(event: .released(submit: false)))
+    }
+
+    @Test func aSecondPressRestartsTheWindow() {
+        var t = HotkeyChordTracker(hotkey: .rightCommand)
+        #expect(t.flagsChanged(modifiers: [rightCommand], at: t0) == .init(event: .pressed))
+        #expect(t.flagsChanged(modifiers: [], at: t0 + .seconds(5)) == .init(event: .released(submit: false)))
+        // The window is measured from this press, not the first one.
+        #expect(t.flagsChanged(modifiers: [rightCommand], at: t0 + .seconds(6)) == .init(event: .pressed))
+        #expect(
+            t.keyDown(keyC, modifiers: [rightCommand], at: t0 + .seconds(6) + .milliseconds(80))
+                == .init(event: .cancelled))
+    }
+
+    @Test func aShorterWindowIsRespected() {
+        var t = HotkeyChordTracker(hotkey: .rightCommand, interruptionWindow: .milliseconds(200))
+        #expect(t.flagsChanged(modifiers: [rightCommand], at: t0) == .init(event: .pressed))
+        #expect(
+            t.keyDown(keyC, modifiers: [rightCommand], at: t0 + .milliseconds(300))
+                == .init(event: .released(submit: false)))
     }
 }

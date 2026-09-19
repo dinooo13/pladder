@@ -106,6 +106,9 @@ final class HotkeyRecorder {
     private var commit: ((Hotkey) -> Void)?
     private var requiresRegularKey = false
     private var systemShortcuts: Set<Hotkey> = []
+    /// Shown for the whole session while Secure Event Input is on, and put
+    /// back whenever a chord notice is cleared.
+    private var secureInputNotice: String?
 
     func begin(
         requiresRegularKey: Bool = false,
@@ -116,6 +119,16 @@ final class HotkeyRecorder {
         self.commit = commit
         self.requiresRegularKey = requiresRegularKey
         self.systemShortcuts = systemShortcuts
+        // A warning, not a refusal: the recorder reads the settings window's
+        // own key events, which secure input does not gate, so recording
+        // normally works. What it does mean is that the chord about to be
+        // stored will not fire until Secure Keyboard Entry is off, unless
+        // Carbon can register it.
+        secureInputNotice = SecureInput.isEnabled
+            ? "Secure Keyboard Entry is on. A key combination recorded now may not "
+                + "reach Pladder, and one without a regular key will not fire until it is off."
+            : nil
+        notice = secureInputNotice
         isRecording = true
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp, .flagsChanged]) { event in
             // Local monitors run on the main thread, but `NSEvent` is not
@@ -210,7 +223,7 @@ final class HotkeyRecorder {
             // the macOS shortcut fires alongside it.
             notice = chord.systemShortcutConflict(in: systemShortcuts).map {
                 "\($0.sideAgnosticDisplayName) is a macOS keyboard shortcut and will fire as well."
-            }
+            } ?? secureInputNotice
         }
     }
 
@@ -222,6 +235,7 @@ final class HotkeyRecorder {
         commit = nil
         requiresRegularKey = false
         systemShortcuts = []
+        secureInputNotice = nil
         refusedModifiers = nil
         notice = nil
         pending = nil

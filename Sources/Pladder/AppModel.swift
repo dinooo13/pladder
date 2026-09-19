@@ -28,6 +28,14 @@ final class AppModel {
     private(set) var accessibilityTrusted: Bool = Permissions.isAccessibilityTrusted
     private(set) var microphoneStatus: AVAuthorizationStatus = Permissions.microphoneStatus
 
+    /// Secure Event Input, polled with the permissions. While it is on an
+    /// event tap sees no key-downs, so a chord with a regular key would fire
+    /// for nothing; `refreshPermissions()` hands such a chord to Carbon until
+    /// it clears. Only a *sustained* reading counts, so the password field the
+    /// user tabs through does not swap the monitor twice in four seconds.
+    private var secureInput = SustainedCondition()
+    private(set) var secureInputSustained = false
+
     /// The keyboard shortcuts macOS itself handles. Read on explicit triggers
     /// only — launch, a permission flip, a hotkey edit, the settings window
     /// opening — because `CopySymbolicHotKeys` is main-thread work linear in
@@ -265,14 +273,24 @@ final class AppModel {
     func refreshPermissions() {
         accessibilityTrusted = Permissions.isAccessibilityTrusted
         microphoneStatus = Permissions.microphoneStatus
+        let sustained = secureInput.observe(SecureInput.isEnabled)
+        if sustained != secureInputSustained { secureInputSustained = sustained }
         // Granting Accessibility upgrades the hotkey to the tap; revoking it
         // drops back to Carbon. Either way a recording in progress is dropped
         // by the coordinator, since the old monitor's release can no longer
         // arrive.
-        let flipped = accessibilityTrusted != hotkeyUsesTap
+        //
+        // Secure input is the second reason to leave the tap: it stops taps
+        // seeing key-downs, so a chord with a regular key is dead there.
+        // Carbon can take over only for a chord it can register, and a
+        // modifier-only chord is unaffected by secure input anyway, so both
+        // stay on the tap and nothing swaps.
+        let wantsTap = accessibilityTrusted
+            && !(sustained && settings.hotkey.canBeRegisteredWithoutAccessibility)
+        let flipped = wantsTap != hotkeyUsesTap
         if flipped {
-            hotkeyUsesTap = accessibilityTrusted
-            coordinator.replaceHotkeyMonitor(accessibilityTrusted ? tapHotkey : carbonHotkey)
+            hotkeyUsesTap = wantsTap
+            coordinator.replaceHotkeyMonitor(wantsTap ? tapHotkey : carbonHotkey)
         }
         // After the swap: the new monitor is started with the old stand-in and
         // then, if it changed, once more with the new one. The other order
@@ -411,9 +429,13 @@ final class AppModel {
     /// The chord to hold, named the way the monitor that matches it sees the
     /// keys: the tap tells Left from Right, Carbon's mask cannot.
     var effectiveHotkeyName: String {
-        guard !accessibilityTrusted else { return settings.hotkey.displayName }
+        guard !hotkeyUsesTap else { return settings.hotkey.displayName }
         return (fallbackHotkey ?? settings.hotkey).sideAgnosticDisplayName
     }
+
+    /// True while a working Accessibility grant is being ignored because
+    /// Secure Event Input has the tap deaf and Carbon is standing in.
+    var usesCarbonForSecureInput: Bool { accessibilityTrusted && !hotkeyUsesTap }
 
     /// What to say when nothing is happening. Without Accessibility the stored
     /// chord may be listening for nothing, in which case a stand-in is named
@@ -426,7 +448,10 @@ final class AppModel {
             // Every candidate is taken by a macOS shortcut on this Mac.
             return "Choose a key combination in Settings (Accessibility is off)"
         }
-        return "Ready — hold \(effectiveHotkeyName)"
+        let line = "Ready — hold \(effectiveHotkeyName)"
+        // Say why the send key and the swallowing stopped: both are the tap's,
+        // and the tap is deaf until Secure Keyboard Entry goes off again.
+        return usesCarbonForSecureInput ? line + " (Secure Keyboard Entry is on)" : line
     }
 
     var canRetryEngine: Bool {

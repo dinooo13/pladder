@@ -12,6 +12,13 @@ import Foundation
 /// - It *disengages* when any chord key goes up, or when any other key goes
 ///   down (the user has started a different shortcut, so stop listening). It
 ///   only re-engages once one of its keys is pressed again.
+/// - A disengage caused by another key going down within `interruptionWindow`
+///   of the chord engaging is an *interruption*: the user was typing Cmd+C or
+///   Cmd+Tab, not dictating, and the outcome is `.cancelled` rather than
+///   `.released`. The same key pressed after the window is an ordinary
+///   release, so a long hold that ends on a stray key still transcribes.
+///   Interruptions need a clock, so every event takes the instant it
+///   happened at; a key *up* never interrupts.
 /// - A regular key whose key-down completed the chord is *swallowed*, and so are
 ///   its auto-repeats and its key-up, so the frontmost app never sees the Space
 ///   in Control+Space. Modifier events are never swallowed.
@@ -45,6 +52,10 @@ public struct HotkeyChordTracker: Sendable, Equatable {
     /// The chord that, pressed while the hotkey chord is engaged, arms the
     /// release with `submit: true`. An empty chord means the feature is off.
     public let submitKey: Hotkey
+    /// How soon after the chord engages another key still counts as an
+    /// interruption. Long enough to cover a shortcut typed at speed, short
+    /// enough that a deliberate hold is never mistaken for one.
+    public let interruptionWindow: Duration
     public private(set) var isEngaged = false
     /// True once the submit chord has gone down during the current engagement.
     /// Reported on `.released`, then cleared.
@@ -56,15 +67,30 @@ public struct HotkeyChordTracker: Sendable, Equatable {
     /// swallowed too, even after the chord has disengaged, so an app never sees
     /// a key-up without its key-down.
     private var swallowedKeys: Set<UInt16> = []
+    /// When the current engagement began, for the interruption window.
+    private var engagedAt: ContinuousClock.Instant?
+    /// Set when the disengage now in progress was an interruption. Read and
+    /// cleared by `transition(from:)`.
+    private var wasInterrupted = false
 
-    public init(hotkey: Hotkey, submitKey: Hotkey = Hotkey(keyCodes: [])) {
+    public init(
+        hotkey: Hotkey,
+        submitKey: Hotkey = Hotkey(keyCodes: []),
+        interruptionWindow: Duration = .seconds(1)
+    ) {
         self.hotkey = hotkey
         self.submitKey = submitKey
+        self.interruptionWindow = interruptionWindow
     }
 
-    public mutating func keyDown(_ key: UInt16, isRepeat: Bool = false, modifiers: Set<UInt16>) -> Outcome {
+    public mutating func keyDown(
+        _ key: UInt16,
+        isRepeat: Bool = false,
+        modifiers: Set<UInt16>,
+        at instant: ContinuousClock.Instant = .now
+    ) -> Outcome {
         let wasEngaged = isEngaged
-        applyModifiers(modifiers)
+        applyModifiers(modifiers, at: instant)
         if isRepeat {
             return Outcome(event: transition(from: wasEngaged), swallow: swallowedKeys.contains(key))
         }
@@ -79,29 +105,32 @@ public struct HotkeyChordTracker: Sendable, Equatable {
                 swallow = true
                 armIfSubmitChordHeld()
             } else if !hotkey.keyCodes.contains(key) {
-                isEngaged = false
+                disengage(interruptedAt: instant)
             }
         } else if hotkey.keyCodes.contains(key), chordIsHeld {
-            isEngaged = true
-            isSubmitArmed = false
+            engage(at: instant)
             swallowedKeys.insert(key)
             swallow = true
         }
         return Outcome(event: transition(from: wasEngaged), swallow: swallow)
     }
 
-    public mutating func keyUp(_ key: UInt16, modifiers: Set<UInt16>) -> Outcome {
+    public mutating func keyUp(
+        _ key: UInt16, modifiers: Set<UInt16>, at instant: ContinuousClock.Instant = .now
+    ) -> Outcome {
         let wasEngaged = isEngaged
-        applyModifiers(modifiers)
+        applyModifiers(modifiers, at: instant)
         heldKeys.remove(key)
         let swallow = swallowedKeys.remove(key) != nil
         if isEngaged, hotkey.keyCodes.contains(key) { isEngaged = false }
         return Outcome(event: transition(from: wasEngaged), swallow: swallow)
     }
 
-    public mutating func flagsChanged(modifiers: Set<UInt16>) -> Outcome {
+    public mutating func flagsChanged(
+        modifiers: Set<UInt16>, at instant: ContinuousClock.Instant = .now
+    ) -> Outcome {
         let wasEngaged = isEngaged
-        applyModifiers(modifiers)
+        applyModifiers(modifiers, at: instant)
         return Outcome(event: transition(from: wasEngaged))
     }
 
@@ -110,25 +139,42 @@ public struct HotkeyChordTracker: Sendable, Equatable {
     /// lost, so the release never reports submit.
     public mutating func reset() -> HotkeyEvent? {
         let wasEngaged = isEngaged
-        self = Self(hotkey: hotkey, submitKey: submitKey)
+        self = Self(hotkey: hotkey, submitKey: submitKey, interruptionWindow: interruptionWindow)
         return wasEngaged ? .released(submit: false) : nil
     }
 
-    private mutating func applyModifiers(_ modifiers: Set<UInt16>) {
+    private mutating func applyModifiers(_ modifiers: Set<UInt16>, at instant: ContinuousClock.Instant) {
         let released = heldModifiers.subtracting(modifiers)
         let pressed = modifiers.subtracting(heldModifiers)
         heldModifiers = modifiers
         if isEngaged {
             let allowed = hotkey.keyCodes.union(submitKey.modifierKeyCodes)
-            if !released.isDisjoint(with: hotkey.keyCodes) || !pressed.isSubset(of: allowed) {
+            if !released.isDisjoint(with: hotkey.keyCodes) {
+                // A chord key was let go: an ordinary release, whenever it came.
                 isEngaged = false
+            } else if !pressed.isSubset(of: allowed) {
+                // A foreign modifier went down: Shift for Cmd+Shift+4, say.
+                disengage(interruptedAt: instant)
             } else if !pressed.isEmpty {
                 armIfSubmitChordHeld()
             }
         } else if !pressed.isDisjoint(with: hotkey.keyCodes), chordIsHeld {
-            isEngaged = true
-            isSubmitArmed = false
+            engage(at: instant)
         }
+    }
+
+    private mutating func engage(at instant: ContinuousClock.Instant) {
+        isEngaged = true
+        isSubmitArmed = false
+        wasInterrupted = false
+        engagedAt = instant
+    }
+
+    /// Disengages because another key went down. Inside the window that is an
+    /// interruption and the press is cancelled rather than released.
+    private mutating func disengage(interruptedAt instant: ContinuousClock.Instant) {
+        isEngaged = false
+        if let engagedAt, instant - engagedAt <= interruptionWindow { wasInterrupted = true }
     }
 
     private var chordIsHeld: Bool {
@@ -151,6 +197,11 @@ public struct HotkeyChordTracker: Sendable, Equatable {
         } else {
             let submit = isSubmitArmed
             isSubmitArmed = false
+            engagedAt = nil
+            if wasInterrupted {
+                wasInterrupted = false
+                return .cancelled
+            }
             return .released(submit: submit)
         }
     }
