@@ -66,6 +66,11 @@ final class AppModel {
     /// Release-to-paste time per dictation, the number the user feels. Read
     /// it with: log show --last 1h --predicate 'subsystem == "de.dinooo13.pladder"'
     private static let timing = Logger(subsystem: "de.dinooo13.pladder", category: "timing")
+    /// A processor that throws is skipped by `ProcessorPipeline` rather than
+    /// losing the dictation; this is where that gets logged. `Logger` is
+    /// `Sendable`, so this is safe to reach from the `@Sendable` failure
+    /// closure below without hopping back to the main actor.
+    private nonisolated static let processorLog = Logger(subsystem: "de.dinooo13.pladder", category: "processors")
 
     /// Settings live in the coordinator (it reacts to hotkey/engine changes);
     /// this forwards and persists. Applying the appearance covers every
@@ -155,7 +160,7 @@ final class AppModel {
         // a processor that needs settings builds itself from them; nothing here
         // knows which processor that is.
         let processorFactories: [@Sendable (Settings) -> any TextProcessor] = [
-            { _ in FillerRemover() },
+            { _ in FillerRemover(languageHint: { TranscriptLanguage.hint(for: $0) }) },
             { DictionaryReplacer(entries: $0.dictionary) },
             { _ in WhitespaceNormalizer() },
         ]
@@ -170,7 +175,11 @@ final class AppModel {
             capture: AVAudioEngineCapture(),
             output: PasteboardOutput(),
             hotkeyMonitor: trusted ? tapHotkey : carbonHotkey,
-            makePipeline: { s in ProcessorPipeline(processorFactories.map { $0(s) }) },
+            makePipeline: { s in
+                ProcessorPipeline(processorFactories.map { $0(s) }, onFailure: { id, error in
+                    Self.processorLog.error("processor \(id, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
+                })
+            },
             onEvent: { [events] event in events.send(event) }
         )
 

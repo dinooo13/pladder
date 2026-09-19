@@ -47,4 +47,28 @@ import Testing
         let r = replacer([("", "x"), ("  ", "y")])
         #expect(r.apply(to: "nothing changes") == "nothing changes")
     }
+
+    // MARK: Unicode word boundaries
+
+    @Test func umlautEdgeIsAWordBoundary() {
+        let r = replacer([("ärger", "Ärger")])
+        #expect(r.apply(to: "das ist ärger") == "das ist Ärger")
+    }
+
+    @Test func umlautAtTheEndOfFromIsAWordBoundary() {
+        let r = replacer([("müde", "erschöpft")])
+        #expect(r.apply(to: "ich bin müde heute") == "ich bin erschöpft heute")
+    }
+
+    @Test func accentedEntryMatchesNextToPunctuation() {
+        let r = replacer([("cafe", "café")])
+        #expect(r.apply(to: "the cafe, is nice") == "the café, is nice")
+        let capitalized = replacer([("café", "Café")])
+        #expect(capitalized.apply(to: "(café)") == "(Café)")
+    }
+
+    @Test func cjkEntryMatchesWithoutSpaces() {
+        let r = replacer([("東京", "Tokyo")])
+        #expect(r.apply(to: "私は東京に行く") == "私はTokyoに行く")
+    }
 }

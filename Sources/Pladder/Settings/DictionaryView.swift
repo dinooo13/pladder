@@ -21,6 +21,12 @@ struct DictionaryView: View {
 
     private var entries: [DictionaryEntry] { model.settings.dictionary }
 
+    /// Recomputed from the current entries whenever the table redraws, so
+    /// typing a new rule that closes a cycle is reflected without any extra
+    /// wiring. Cheap: the dictionary is small and this is not on the
+    /// release-to-paste path.
+    private var cyclicIDs: Set<DictionaryEntry.ID> { DictionaryEntry.cyclicIDs(in: entries) }
+
     var body: some View {
         Form {
             Section {
@@ -29,7 +35,12 @@ struct DictionaryView: View {
             } header: {
                 Text("Rules")
             } footer: {
-                FootnoteText("Whole words only. Longer phrases win. Case is carried over at the start of a sentence unless Match case is on.")
+                VStack(alignment: .leading, spacing: 4) {
+                    FootnoteText("Whole words only. Longer phrases win. Case is carried over at the start of a sentence unless Match case is on.")
+                    if !cyclicIDs.isEmpty {
+                        FootnoteText("⚠️ \u{201c}a\u{201d} → \u{201c}b\u{201d} and \u{201c}b\u{201d} → \u{201c}a\u{201d} undo each other; these rules are ignored.")
+                    }
+                }
             }
 
             Section("Try a sentence") {
@@ -52,12 +63,19 @@ struct DictionaryView: View {
     private var table: some View {
         Table($model.settings.dictionary, selection: $selection) {
             TableColumn("Heard as") { row in
-                DictionaryField(
-                    text: row.from,
-                    prompt: "spoken form",
-                    cell: DictionaryCell(id: row.wrappedValue.id, column: .from),
-                    focus: $focusedCell
-                )
+                HStack(spacing: 4) {
+                    if cyclicIDs.contains(row.wrappedValue.id) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                            .help("This rule undoes another one, so it is ignored.")
+                    }
+                    DictionaryField(
+                        text: row.from,
+                        prompt: "spoken form",
+                        cell: DictionaryCell(id: row.wrappedValue.id, column: .from),
+                        focus: $focusedCell
+                    )
+                }
             }
             .width(min: 120, ideal: 170)
 

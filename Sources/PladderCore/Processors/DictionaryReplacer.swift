@@ -11,6 +11,9 @@ import Foundation
 /// - If the matched text started with a capital letter and the replacement is
 ///   all lowercase, the replacement's first letter is capitalised. Replacements
 ///   containing their own capitals (brand names) are left exactly as written.
+/// - Entries on a replacement cycle (see `DictionaryEntry.cyclicIDs`) are
+///   dropped, since running each rule once in order makes a cycle silently
+///   revert an earlier rule rather than loop.
 public struct DictionaryReplacer: TextProcessor {
     public static let processorID = "dictionary"
 
@@ -27,24 +30,13 @@ public struct DictionaryReplacer: TextProcessor {
     }
 
     public init(entries: [DictionaryEntry]) {
+        let cyclic = DictionaryEntry.cyclicIDs(in: entries)
         rules = entries
+            .filter { !cyclic.contains($0.id) }
             .filter { !$0.from.trimmingCharacters(in: .whitespaces).isEmpty }
             .sorted { $0.from.count > $1.from.count }
             .compactMap { entry in
-                let from = entry.from.trimmingCharacters(in: .whitespaces)
-                // Collapse runs of whitespace in the pattern so "claude  code"
-                // and "claude code" both match.
-                let words = from.split(whereSeparator: { $0.isWhitespace })
-                    .map { NSRegularExpression.escapedPattern(for: String($0)) }
-                let body = words.joined(separator: "\\s+")
-                // \b needs a word character on the boundary. If `from` starts or
-                // ends with punctuation, fall back to a lookaround on whitespace.
-                let leading = from.first!.isLetter || from.first!.isNumber ? "\\b" : "(?<!\\S)"
-                let trailing = from.last!.isLetter || from.last!.isNumber ? "\\b" : "(?!\\S)"
-                let pattern = leading + body + trailing
-                var options: NSRegularExpression.Options = []
-                if !entry.matchCase { options.insert(.caseInsensitive) }
-                guard let regex = try? NSRegularExpression(pattern: pattern, options: options) else {
+                guard let regex = WholeWordPattern.regex(for: entry.from, caseInsensitive: !entry.matchCase) else {
                     return nil
                 }
                 return Rule(regex: regex, replacement: entry.to, matchCase: entry.matchCase)
