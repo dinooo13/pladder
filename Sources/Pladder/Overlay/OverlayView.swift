@@ -259,7 +259,7 @@ struct OverlayPill: View {
 
     /// The words in a settings card: wide enough for two short lines, so the
     /// card reads as text beside the meter rather than a long thin pill.
-    static let previewTextWidth: CGFloat = 80
+    static let previewTextWidth: CGFloat = 62
 
     /// Diameter of the Minimal disc. Five bars at 3 pt with 3 pt gaps are
     /// 27 pt wide and 20 pt tall, which sits inside the disc with room to

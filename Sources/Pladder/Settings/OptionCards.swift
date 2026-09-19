@@ -176,8 +176,9 @@ struct OverlayStyleThumbnail: View {
             // whole of this style.
             menuBar
         case .liveTranscript:
-            // The live row hugs a two-line sample in a preview: at the
-            // Compact card's scale the words are small but read as words,
+            // The live row hugs a two-line sample in a preview. The card's
+            // design box is 88 pt wide, so the pill, 171 pt at full size, is
+            // scaled to about 72 pt: the words are small but read as words,
             // which is what tells this style from Compact.
             OverlayPill(
                 state: .recording(level: Self.previewLevel),
@@ -191,7 +192,7 @@ struct OverlayStyleThumbnail: View {
             // width the glass shrinks but the row does not, and the dot ends
             // up outside the capsule. The pill takes its own size instead.
             .fixedSize()
-            .scaleEffect(0.5)
+            .scaleEffect(0.42)
         }
     }
 
