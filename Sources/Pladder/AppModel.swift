@@ -79,6 +79,10 @@ final class AppModel {
     /// `Sendable`, so this is safe to reach from the `@Sendable` failure
     /// closure below without hopping back to the main actor.
     private nonisolated static let processorLog = Logger(subsystem: "de.dinooo13.pladder", category: "processors")
+    /// Every mute and unmute of the output device. A mute that gets stuck —
+    /// the app quitting mid-recording, a device vanishing — is silent and
+    /// baffling otherwise, so both ends of it are logged `.public`.
+    private nonisolated static let muteLog = Logger(subsystem: "de.dinooo13.pladder", category: "mute")
 
     /// Settings live in the coordinator (it reacts to hotkey/engine changes);
     /// this forwards and persists. Applying the appearance covers every
@@ -185,6 +189,9 @@ final class AppModel {
             registry: registry,
             capture: AVAudioEngineCapture(),
             output: PasteboardOutput(),
+            outputMuter: OutputMuteController(
+                control: CoreAudioOutputMute(),
+                log: { Self.muteLog.info("\($0, privacy: .public)") }),
             hotkeyMonitor: trusted ? tapHotkey : carbonHotkey,
             makePipeline: { s in
                 ProcessorPipeline(processorFactories.map { $0(s) }, onFailure: { id, error in

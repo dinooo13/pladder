@@ -30,6 +30,10 @@ public struct Settings: Codable, Sendable, Equatable {
     public var launchAtLogin: Bool
     /// Play a short sound on record start/stop.
     public var playSounds: Bool
+    /// Mute the default output device while the key is held, so music or a
+    /// call does not end up in the microphone. Off by default: some people
+    /// want the audio to keep playing.
+    public var muteOutputWhileDictating: Bool
     public var appearance: Appearance
     public var overlayStyle: OverlayStyle
     /// Liquid Glass behind the overlay pill; off gives a flat
@@ -45,6 +49,7 @@ public struct Settings: Codable, Sendable, Equatable {
         appendTrailingSpace: Bool = true,
         launchAtLogin: Bool = false,
         playSounds: Bool = true,
+        muteOutputWhileDictating: Bool = false,
         appearance: Appearance = .system,
         overlayStyle: OverlayStyle = .compact,
         overlayGlass: Bool = true
@@ -57,6 +62,7 @@ public struct Settings: Codable, Sendable, Equatable {
         self.appendTrailingSpace = appendTrailingSpace
         self.launchAtLogin = launchAtLogin
         self.playSounds = playSounds
+        self.muteOutputWhileDictating = muteOutputWhileDictating
         self.appearance = appearance
         self.overlayStyle = overlayStyle
         self.overlayGlass = overlayGlass
@@ -66,7 +72,7 @@ public struct Settings: Codable, Sendable, Equatable {
     // never makes an existing settings file unreadable.
     private enum CodingKeys: String, CodingKey {
         case engineID, hotkey, submitKey, disabledProcessors, dictionary, appendTrailingSpace, launchAtLogin, playSounds, appearance
-        case overlayStyle, overlayGlass
+        case overlayStyle, overlayGlass, muteOutputWhileDictating
     }
 
     public init(from decoder: Decoder) throws {
@@ -86,6 +92,7 @@ public struct Settings: Codable, Sendable, Equatable {
         appearance = try c.decodeIfPresent(Appearance.self, forKey: .appearance) ?? .system
         overlayStyle = try c.decodeIfPresent(OverlayStyle.self, forKey: .overlayStyle) ?? .compact
         overlayGlass = try c.decodeIfPresent(Bool.self, forKey: .overlayGlass) ?? true
+        muteOutputWhileDictating = try c.decodeIfPresent(Bool.self, forKey: .muteOutputWhileDictating) ?? false
     }
 
     public func isProcessorEnabled(_ id: String) -> Bool {
