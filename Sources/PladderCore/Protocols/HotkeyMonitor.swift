@@ -15,6 +15,12 @@ public enum HotkeyEvent: Sendable, Equatable {
     /// `submit` is true when the submit key was pressed at some point while the
     /// chord was held, in which case the text is followed by Return.
     case released(submit: Bool)
+    /// The press was interrupted: another key went down within
+    /// `HotkeyChordTracker.interruptionWindow` of the chord engaging, so the
+    /// user was typing a shortcut (Cmd+C, Cmd+Tab) rather than dictating. The
+    /// recording is dropped without transcribing. Only the event tap can
+    /// produce this; Carbon never sees the interrupting key.
+    case cancelled
 }
 
 /// The push-to-talk chord: one or more physical keys that must be held together.

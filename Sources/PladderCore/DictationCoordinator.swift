@@ -368,6 +368,10 @@ public final class DictationCoordinator {
                 switch event {
                 case .pressed: await self.hotkeyPressed()
                 case .released(let submit): self.hotkeyReleased(submit: submit)
+                // Another key went down right after the chord: the user typed
+                // Cmd+C, not a dictation. Drop the audio without transcribing,
+                // without a stop sound and without a timing line.
+                case .cancelled: await self.cancelRecording()
                 }
             }
         }
