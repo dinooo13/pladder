@@ -82,6 +82,9 @@ public final class DictationCoordinator {
     private let loader: EngineLoader
     private let capture: any AudioCapture
     private let output: any TextOutput
+    /// Silences the speakers while the mic is open, when the setting is on.
+    /// Nil in tests and wherever the app does not want the behaviour at all.
+    private let outputMuter: (any OutputMuter)?
     private var hotkeyMonitor: any HotkeyMonitor
     private let makePipeline: @Sendable (Settings) -> ProcessorPipeline
     /// Rebuilt when settings change so that no processor is constructed on the
@@ -123,6 +126,7 @@ public final class DictationCoordinator {
         registry: EngineRegistry,
         capture: any AudioCapture,
         output: any TextOutput,
+        outputMuter: (any OutputMuter)? = nil,
         hotkeyMonitor: any HotkeyMonitor,
         makePipeline: @escaping @Sendable (Settings) -> ProcessorPipeline,
         onEvent: @escaping @Sendable (Event) -> Void = { _ in }
@@ -130,6 +134,7 @@ public final class DictationCoordinator {
         self.settings = settings
         self.capture = capture
         self.output = output
+        self.outputMuter = outputMuter
         self.hotkeyMonitor = hotkeyMonitor
         self.makePipeline = makePipeline
         self.pipeline = makePipeline(settings)
@@ -406,6 +411,12 @@ public final class DictationCoordinator {
                 return
             }
             onEvent(.recordingStarted)
+            // Read at press, so flipping the setting mid-recording cannot
+            // arm a mute half way through. The muter waits out its own delay
+            // before touching anything, so this is off the key-down path too.
+            if settings.muteOutputWhileDictating, let outputMuter {
+                Task { await outputMuter.recordingStarted() }
+            }
             // Work that keeps the release-to-paste path short: the clipboard
             // snapshot and, for batch engines, a Neural Engine warm-up (the
             // feed below does that for streaming engines). Both run while the
@@ -460,6 +471,14 @@ public final class DictationCoordinator {
         // it runs before `recordingStopped`, so it is not even inside the
         // measured window.
         partialTranscript = nil
+        // Before `recordingStopped`, so restoring the speakers is outside the
+        // release-to-paste window the app measures, and detached so the paste
+        // never waits on a CoreAudio call. Unconditional, not gated on the
+        // setting: turning it off mid-recording must still put the device
+        // back. With nothing muted this is two integer reads on an actor.
+        if let outputMuter {
+            Task.detached(priority: .utility) { await outputMuter.recordingEnded() }
+        }
         onEvent(.recordingStopped)
         let engine = cycleEngine ?? loader.engine
         let fedSamples = fedSampleCount
@@ -548,6 +567,11 @@ public final class DictationCoordinator {
         maxDurationTask?.cancel()
         stopWarmupLoop()
         partialTranscript = nil
+        // Same restore as at release, for the paths that never transcribe:
+        // an interrupted chord, a hotkey change, `stop()`.
+        if let outputMuter {
+            Task.detached(priority: .utility) { await outputMuter.recordingEnded() }
+        }
         becomeIdle()
         abandonStreaming()
         cycleEngine = nil
