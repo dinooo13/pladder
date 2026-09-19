@@ -139,6 +139,31 @@ import Testing
         #expect(c.apply(to: "chat g p t, grüße") == "ChatGPT, grüße")
     }
 
+    // MARK: Possessives
+
+    @Test func aPossessiveSuffixIsNotSwallowed() {
+        let c = corrector(["Claude", "ChatGPT"])
+        #expect(c.apply(to: "ask Claude's opinion") == "ask Claude's opinion")
+        #expect(c.apply(to: "ChatGPT's answer") == "ChatGPT's answer")
+    }
+
+    @Test func aMisheardWordKeepsItsPossessive() {
+        let c = corrector(["Claude"])
+        #expect(c.apply(to: "clawed's opinion") == "Claude's opinion")
+    }
+
+    @Test func aCurlyApostropheIsAPossessiveToo() {
+        let c = corrector(["Claude"])
+        #expect(c.apply(to: "ask Claude\u{2019}s opinion") == "ask Claude\u{2019}s opinion")
+        #expect(c.apply(to: "clawed\u{2019}s opinion") == "Claude\u{2019}s opinion")
+    }
+
+    @Test func aTermThatIsItselfAPossessiveIsNotDoubled() {
+        let c = corrector(["McDonald's"])
+        #expect(c.apply(to: "McDonald's") == "McDonald's")
+        #expect(c.apply(to: "mcdonald's fries") == "McDonald's fries")
+    }
+
     // MARK: Soundex
 
     @Test func soundexRescuesAHomophoneTheDistanceAloneWouldReject() {

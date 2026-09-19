@@ -21,7 +21,9 @@ import Foundation
 ///   distance threshold starts admitting whole phrases.
 /// - Leading punctuation is split off the first token and trailing punctuation
 ///   off the last, and an n-gram never steps over punctuation in between, so
-///   "chat, g p t" is three separate candidates rather than one.
+///   "chat, g p t" is three separate candidates rather than one. A possessive
+///   "'s" counts as trailing punctuation, so "Claude's" matches on "Claude" and
+///   keeps its suffix; a term that is itself a possessive takes the suffix back.
 /// - Score is the Levenshtein distance over the longer key length, times 0.3
 ///   when the Soundex codes agree, accepted below 0.18. The best score at a
 ///   position wins; ties go to the longer n-gram.
@@ -146,13 +148,19 @@ public struct CustomWordCorrector: TextProcessor {
 
             let first = tokens[index]
             let last = tokens[index + best.size - 1]
-            let matched = text[first.core.lowerBound..<last.core.upperBound]
+            // A term that is itself a possessive ("McDonald's") takes the
+            // suffix back, so the match does not come out as "McDonald's's".
+            var end = last.core.upperBound
+            if let possessiveEnd = last.possessiveEnd, Self.endsInPossessive(best.term.text) {
+                end = possessiveEnd
+            }
+            let matched = text[first.core.lowerBound..<end]
             let replacement = Self.adjustCase(term: best.term, matched: matched)
 
             if !replacement.elementsEqual(matched) {
                 out += text[copied..<first.core.lowerBound]
                 out += replacement
-                copied = last.core.upperBound
+                copied = end
                 changed = true
             }
             index += best.size
@@ -340,6 +348,10 @@ public struct CustomWordCorrector: TextProcessor {
         let key: [UInt8]?
         let hasLeadingPunctuation: Bool
         let hasTrailingPunctuation: Bool
+        /// Where a possessive "'s" trimmed off the core ends, so a term that
+        /// already carries its own possessive can swallow it back instead of
+        /// doubling it. nil when the token has no possessive.
+        let possessiveEnd: String.Index?
     }
 
     private static func tokenise(_ text: String) -> [Token] {
@@ -372,7 +384,8 @@ public struct CustomWordCorrector: TextProcessor {
                 core: range.lowerBound..<range.lowerBound,
                 key: [],
                 hasLeadingPunctuation: true,
-                hasTrailingPunctuation: true
+                hasTrailingPunctuation: true,
+                possessiveEnd: nil
             )
         }
 
@@ -381,6 +394,23 @@ public struct CustomWordCorrector: TextProcessor {
             let previous = text.index(before: upper)
             if isWordCharacter(text[previous]) { break }
             upper = previous
+        }
+
+        // A possessive "'s" is not part of the word. Left in, the core of
+        // "Claude's" keys as "claudes", which is one edit from "claude", and
+        // the replacement would be spliced over the apostrophe and the s —
+        // "ask Claude's opinion" coming out as "ask Claude opinion". Treating
+        // it as trailing punctuation preserves it and stops an n-gram running
+        // past it. Possessives only: other contractions ("don't", "we'll") keep
+        // their tail, which is part of what was said.
+        var possessiveEnd: String.Index?
+        let sIndex = text.index(before: upper)
+        if sIndex > lower, text[sIndex] == "s" || text[sIndex] == "S" {
+            let apostrophe = text.index(before: sIndex)
+            if apostrophe > lower, text[apostrophe] == "'" || text[apostrophe] == "\u{2019}" {
+                possessiveEnd = upper
+                upper = apostrophe
+            }
         }
 
         var key: [UInt8]? = []
@@ -396,12 +426,20 @@ public struct CustomWordCorrector: TextProcessor {
             core: lower..<upper,
             key: key,
             hasLeadingPunctuation: lower != range.lowerBound,
-            hasTrailingPunctuation: upper != range.upperBound
+            hasTrailingPunctuation: upper != range.upperBound,
+            possessiveEnd: possessiveEnd
         )
     }
 
     private static func isWordCharacter(_ character: Character) -> Bool {
         character.isLetter || character.isNumber
+    }
+
+    /// True for a term that already ends in a possessive, straight or curly.
+    private static func endsInPossessive(_ text: String) -> Bool {
+        guard let last = text.last, last == "s" || last == "S" else { return false }
+        let previous = text.dropLast().last
+        return previous == "'" || previous == "\u{2019}"
     }
 
     /// False when the span would step over punctuation: only the first token
