@@ -13,6 +13,7 @@ final class OverlayController {
 
     private var hideTask: Task<Void, Never>?
     private var spinnerTask: Task<Void, Never>?
+    private var presentTask: Task<Void, Never>?
     private var running = false
     private var visible = false
 
@@ -20,6 +21,13 @@ final class OverlayController {
     /// A normal dictation is pasted well inside this, and progress shown for
     /// work shorter than the indicator's own animation says nothing.
     private static let spinnerDelay: Duration = .milliseconds(300)
+
+    /// How long a press has to last before the pill appears. Cmd+C, Cmd+V and
+    /// Cmd+Tab all begin with the same modifier as the default chord and are
+    /// over well inside this, so the press the tracker is about to cancel
+    /// never shows anything. A real dictation lasts far longer and pays for
+    /// this only in seeing the pill a sixth of a second later.
+    private static let presentDelay: Duration = .milliseconds(150)
 
     init(coordinator: DictationCoordinator) {
         self.coordinator = coordinator
@@ -34,6 +42,7 @@ final class OverlayController {
 
     func stop() {
         running = false
+        cancelPresent()
         cancelSpinner()
         hideTask?.cancel()
         panel.orderOut(nil)
@@ -74,6 +83,8 @@ final class OverlayController {
     }
 
     private func apply(_ state: DictationState) {
+        // Anything but a recording supersedes a pill that has not appeared yet.
+        if !state.isRecording { cancelPresent() }
         switch state {
         case .recording:
             cancelSpinner()
@@ -87,7 +98,7 @@ final class OverlayController {
             model.state = state
             model.partialTranscript = coordinator.partialTranscript
             cancelHide()
-            present()
+            schedulePresent()
         case .transcribing:
             // The pill fades out from the recording row it was showing at the
             // release, and the model is deliberately left alone so that is
@@ -149,6 +160,27 @@ final class OverlayController {
         guard !visible else { return }
         visible = true
         panel.show()
+    }
+
+    /// Presents after `presentDelay`, unless the pill is already up (a press
+    /// inside the previous take's fade-out, where waiting would blink it) or
+    /// a wait is already running (a partial re-applying `.recording` must not
+    /// push the appearance back again).
+    private func schedulePresent() {
+        guard !visible, presentTask == nil else { return }
+        presentTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.presentDelay)
+            guard !Task.isCancelled, let self, self.running else { return }
+            self.presentTask = nil
+            guard self.coordinator.state.isRecording, self.model.style != .menuBar else { return }
+            self.cancelHide()
+            self.present()
+        }
+    }
+
+    private func cancelPresent() {
+        presentTask?.cancel()
+        presentTask = nil
     }
 
     private func cancelHide() {
