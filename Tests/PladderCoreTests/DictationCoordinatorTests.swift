@@ -487,6 +487,80 @@ final class EventLog: @unchecked Sendable {
         await c.cancelRecording()
     }
 
+    // MARK: Stand-in chord
+
+    /// Control+Shift+Space, the first chord the app stands in with when
+    /// Accessibility is missing and the stored one cannot be registered.
+    private static let standIn = Hotkey(0x3B, 0x38, 0x31)
+
+    @Test func hotkeyOverrideIsWhatTheMonitorStarts() async {
+        let fake = FakeHotkey()
+        let (c, _, _) = makeCoordinator(hotkeyMonitor: fake)
+        // Set before `start()`, the way the app does it: one registration.
+        c.hotkeyOverride = Self.standIn
+        #expect(fake.startCount == 0)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        #expect(fake.startCount == 1)
+        #expect(fake.lastHotkey == Self.standIn)
+        #expect(c.settings.hotkey == .rightCommand)
+    }
+
+    @Test func changingTheOverrideWhileRecordingStopsTheMicrophone() async {
+        let fake = FakeHotkey()
+        let (c, output, capture) = makeCoordinator(hotkeyMonitor: fake)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        fake.press()
+        #expect(await waitUntil { c.state.isRecording })
+        c.hotkeyOverride = Self.standIn
+        #expect(await waitUntil { c.state == .idle })
+        #expect(await capture.stopCount == 1)
+        #expect(output.inserted.isEmpty)
+        #expect(fake.startCount == 2)
+        #expect(fake.lastHotkey == Self.standIn)
+    }
+
+    @Test func clearingTheOverrideReturnsToTheStoredChord() async {
+        let fake = FakeHotkey()
+        let (c, _, _) = makeCoordinator(hotkeyMonitor: fake)
+        c.hotkeyOverride = Self.standIn
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        // What granting Accessibility does.
+        c.hotkeyOverride = nil
+        #expect(fake.startCount == 2)
+        #expect(fake.lastHotkey == c.settings.hotkey)
+        fake.press()
+        #expect(await waitUntil { c.state.isRecording })
+        await c.cancelRecording()
+    }
+
+    @Test func unchangedOverrideDoesNotRestartTheMonitor() async {
+        let fake = FakeHotkey()
+        let (c, _, _) = makeCoordinator(hotkeyMonitor: fake)
+        c.hotkeyOverride = Self.standIn
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        // The app recomputes the stand-in on every permission flip; the same
+        // answer must not tear the registration down and build it again.
+        c.hotkeyOverride = Self.standIn
+        #expect(fake.startCount == 1)
+    }
+
+    @Test func overrideWhileSuspendedStartsOnResume() async {
+        let fake = FakeHotkey()
+        let (c, _, _) = makeCoordinator(hotkeyMonitor: fake)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        c.isHotkeySuspended = true
+        c.hotkeyOverride = Self.standIn
+        #expect(fake.startCount == 1)
+        c.isHotkeySuspended = false
+        #expect(fake.startCount == 2)
+        #expect(fake.lastHotkey == Self.standIn)
+    }
+
     @Test func outputFailureSurfacesErrorThenRecovers() async {
         let output = FakeOutput()
         output.shouldFail = true

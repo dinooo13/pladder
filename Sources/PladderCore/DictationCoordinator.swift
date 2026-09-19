@@ -44,6 +44,29 @@ public final class DictationCoordinator {
         }
     }
 
+    /// The chord the monitor listens for in place of `settings.hotkey`.
+    ///
+    /// Set by the app while Accessibility is missing and the stored chord
+    /// cannot be registered without it — a modifier-only default such as Right
+    /// Command, or one macOS already owns. The stored chord is left untouched
+    /// and comes back the moment this is cleared, which is what happens when
+    /// Accessibility is granted. Nil means "listen for the stored chord".
+    public var hotkeyOverride: Hotkey? {
+        didSet {
+            guard hotkeyOverride != oldValue else { return }
+            // The old chord's release can no longer arrive, exactly as for a
+            // stored-chord change or a monitor swap.
+            if state.isRecording {
+                Task { await cancelRecording() }
+            }
+            // Before `start()` there is nothing to restart, and `start()`
+            // reads the override itself, so setting it at launch costs one
+            // registration rather than two.
+            guard hotkeyTask != nil, !isHotkeySuspended else { return }
+            startHotkey()
+        }
+    }
+
     /// Minimum recording length worth transcribing. Taps shorter than this are
     /// treated as accidental.
     public var minimumDuration: TimeInterval = 0.3
@@ -337,7 +360,8 @@ public final class DictationCoordinator {
     private func startHotkey() {
         hotkeyTask?.cancel()
         hotkeyMonitor.stop()
-        let stream = hotkeyMonitor.start(hotkey: settings.hotkey, submitKey: settings.submitKey)
+        let stream = hotkeyMonitor.start(
+            hotkey: hotkeyOverride ?? settings.hotkey, submitKey: settings.submitKey)
         hotkeyTask = Task { [weak self] in
             for await event in stream {
                 guard let self else { return }

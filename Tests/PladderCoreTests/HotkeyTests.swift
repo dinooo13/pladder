@@ -270,3 +270,101 @@ private let keyA: UInt16 = 0x00
         #expect(!Hotkey(leftControl, keyA, keyS).canBeRegisteredWithoutAccessibility)
     }
 }
+
+/// The stand-in chord used while Accessibility is missing, and the rule that
+/// decides which chords macOS has already taken.
+@Suite struct FallbackHotkeyTests {
+    private let rightControl: UInt16 = 0x3E
+    private let rightShift: UInt16 = 0x3C
+    private let leftCommand: UInt16 = 0x37
+    private let keyD: UInt16 = 0x02
+    private let f5: UInt16 = 0x60
+
+    private var controlShiftSpace: Hotkey { Hotkey(leftControl, leftShift, space) }
+    private var optionShiftSpace: Hotkey { Hotkey(leftOption, leftShift, space) }
+    private var controlShiftD: Hotkey { Hotkey(leftControl, leftShift, keyD) }
+
+    @Test func firstCandidateWhenNothingIsTaken() {
+        #expect(Hotkey.fallback(avoiding: []) == controlShiftSpace)
+    }
+
+    @Test func controlSpaceSystemShortcutRulesOutControlShiftSpace() {
+        // What was actually observed on a Mac with two input sources:
+        // Control+Space is enabled, and Control+Shift+Space never reaches the
+        // front app either.
+        #expect(Hotkey.fallback(avoiding: [Hotkey(leftControl, space)]) == optionShiftSpace)
+    }
+
+    @Test func rightSideShortcutStillCollides() {
+        // Carbon's mask has no side, so a shortcut spelled with the right-hand
+        // key is the same shortcut.
+        #expect(Hotkey.fallback(avoiding: [Hotkey(rightControl, space)]) == optionShiftSpace)
+    }
+
+    @Test func sameModifiersDifferentKeyDoNotCollide() {
+        #expect(Hotkey.fallback(avoiding: [Hotkey(leftControl, leftShift, keyA)]) == controlShiftSpace)
+    }
+
+    @Test func spotlightAndInputSourcesLeaveControlShiftD() {
+        // Command+Space, Option+Command+Space, Control+Space and
+        // Control+Option+Space are the ones enabled on the developer's Mac;
+        // add an Option+Space and only the third candidate is left.
+        let taken: Set<Hotkey> = [
+            Hotkey(leftCommand, space), Hotkey(leftCommand, leftOption, space),
+            Hotkey(leftControl, space), Hotkey(leftControl, leftOption, space),
+            Hotkey(leftOption, space),
+        ]
+        #expect(Hotkey.fallback(avoiding: taken) == controlShiftD)
+    }
+
+    @Test func everyCandidateTakenGivesNil() {
+        #expect(Hotkey.fallback(avoiding: Set(Hotkey.fallbackCandidates)) == nil)
+    }
+
+    @Test func candidatesAreRegistrableAndNeverSwallowTyping() {
+        for candidate in Hotkey.fallbackCandidates {
+            #expect(candidate.canBeRegisteredWithoutAccessibility)
+            // Two modifiers at least: a chord Pladder swallows system wide
+            // must not be something anyone types.
+            #expect(candidate.modifierKeyCodes.count >= 2)
+        }
+    }
+
+    @Test func conflictNamesTheOwningShortcut() {
+        #expect(
+            controlShiftSpace.systemShortcutConflict(in: [Hotkey(leftControl, space)])
+                == Hotkey(leftControl, space))
+        // Not the other way round: that shortcut needs a modifier the chord
+        // does not have, so holding the chord never triggers it.
+        #expect(
+            Hotkey(leftControl, space)
+                .systemShortcutConflict(in: [Hotkey(leftControl, leftOption, space)]) == nil)
+    }
+
+    @Test func modifierOnlyChordNeverConflicts() {
+        // Symbolic hot keys always carry a regular key, so a lone Right
+        // Command cannot collide with one.
+        #expect(Hotkey.rightCommand.systemShortcutConflict(in: [Hotkey(leftControl, space)]) == nil)
+    }
+
+    @Test func carbonMaskRoundTrips() {
+        // 0x1000 controlKey | 0x0200 shiftKey
+        #expect(Hotkey(keyCode: space, carbonModifierMask: 0x1200) == controlShiftSpace)
+        #expect(controlShiftSpace.carbonModifierMask == 0x1200)
+        // The right-hand keys produce the same mask, which is the whole point.
+        #expect(Hotkey(rightControl, rightShift, space).carbonModifierMask == 0x1200)
+        #expect(Hotkey(keyCode: space, carbonModifierMask: 0x0100) == Hotkey(leftCommand, space))
+        #expect(Hotkey(keyCode: space, carbonModifierMask: 0x0800) == Hotkey(leftOption, space))
+    }
+
+    @Test func noKeyShortcutsAreNotChords() {
+        // 0xFFFF is how the symbolic hot key list spells "no key assigned".
+        #expect(Hotkey(keyCode: 0xFFFF, carbonModifierMask: 0x1200) == nil)
+    }
+
+    @Test func unknownMaskBitsAreIgnored() {
+        // macOS sets a private bit on the function-key shortcuts; it must not
+        // become a phantom modifier.
+        #expect(Hotkey(keyCode: f5, carbonModifierMask: 0x21000) == Hotkey(leftControl, f5))
+    }
+}

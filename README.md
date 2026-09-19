@@ -118,7 +118,7 @@ cd pladder
 ./scripts/bundle.sh --install --run
 ```
 
-Grant Microphone and Accessibility when asked, wait for the model to download once, then hold **Right Command** in any text field and speak. The full walkthrough, signing, troubleshooting and the command-line tool are in [INSTALL.md](INSTALL.md).
+Grant Microphone and Accessibility when asked, wait for the model to download once, then hold **Right Command** in any text field and speak. Without Accessibility the menu says which key stands in for it. The full walkthrough, signing, troubleshooting and the command-line tool are in [INSTALL.md](INSTALL.md).
 
 ## FAQ
 

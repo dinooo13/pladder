@@ -6,19 +6,28 @@ public extension Hotkey {
     /// "Right Option", "Left Control + Space", "Fn + F5". Character keys are
     /// named after what they type in the current keyboard layout.
     var displayName: String { KeyNames.name(for: self) }
+
+    /// The same name without the sides: "Control + Shift + Space".
+    ///
+    /// For anything Carbon matches — the stand-in chord, the stored chord
+    /// while Accessibility is missing, a macOS shortcut — where the modifier
+    /// mask genuinely cannot tell Left from Right, so naming a side would
+    /// promise a precision the matching does not have.
+    var sideAgnosticDisplayName: String { KeyNames.name(for: self, collapsingSides: true) }
 }
 
 /// Human-readable names for virtual key codes.
 public enum KeyNames {
-    public static func name(for hotkey: Hotkey) -> String {
+    public static func name(for hotkey: Hotkey, collapsingSides: Bool = false) -> String {
         guard !hotkey.keyCodes.isEmpty else { return "None" }
         return hotkey.keyCodes
             .sorted { (rank($0), $0) < (rank($1), $1) }
-            .map(name(forKeyCode:))
+            .map { name(forKeyCode: $0, collapsingSides: collapsingSides) }
             .joined(separator: " + ")
     }
 
-    public static func name(forKeyCode code: UInt16) -> String {
+    public static func name(forKeyCode code: UInt16, collapsingSides: Bool = false) -> String {
+        if collapsingSides, let sideless = sidelessNames[code] { return sideless }
         if let fixed = fixedNames[code] { return fixed }
         if let character = layoutCharacter(for: code) { return character }
         return "Key \(code)"
@@ -36,6 +45,19 @@ public enum KeyNames {
         default: 5
         }
     }
+
+    /// Modifier names with the side dropped, for chords matched by Carbon.
+    /// `rank` is unchanged, so "Control + Shift + Space" still comes out in
+    /// the order macOS prints modifiers.
+    private static let sidelessNames: [UInt16: String] = {
+        let entries: [(Int, String)] = [
+            (kVK_Command, "Command"), (kVK_RightCommand, "Command"),
+            (kVK_Shift, "Shift"), (kVK_RightShift, "Shift"),
+            (kVK_Option, "Option"), (kVK_RightOption, "Option"),
+            (kVK_Control, "Control"), (kVK_RightControl, "Control"),
+        ]
+        return Dictionary(uniqueKeysWithValues: entries.map { (UInt16($0.0), $0.1) })
+    }()
 
     /// Keys whose name does not depend on the layout.
     private static let fixedNames: [UInt16: String] = {
