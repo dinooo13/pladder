@@ -158,6 +158,7 @@ private struct GeneralSettingsView: View {
 
             Section("Sounds & Startup") {
                 Toggle("Play start and stop sounds", isOn: $model.settings.playSounds)
+                Toggle("Mute audio while dictating", isOn: $model.settings.muteOutputWhileDictating)
                 VStack(alignment: .leading, spacing: 2) {
                     Toggle("Launch at login", isOn: launchAtLogin)
                     if let error = model.launchAtLoginError {

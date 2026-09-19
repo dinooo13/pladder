@@ -45,6 +45,7 @@ swift run -c release pladder-cli bench bench/fixtures --paced     # feed at real
 | Send key | Press Right Option (configurable) while the hotkey is held and Return is posted 50 ms after Cmd+V | Sends a chat message or runs a command without a second trip to the keyboard; the Return is posted from a detached task so it stays off the release-to-paste path |
 | Output | Clipboard + simulated Cmd+V; the old clipboard is restored off the critical path | Universal, fast |
 | Post-processing | Filler remover, dictionary replacer, fuzzy custom-word corrector, whitespace normaliser, in that order | No latency, no network. The Apple Intelligence cleanup step was removed because it sat on the critical path without anyone measuring what it cost |
+| Mute while dictating | Off by default; `kAudioDevicePropertyMute` on the default output device 200 ms into a recording, restored off the release path | Music or a call otherwise goes into the microphone. The delay means a tap-and-release never toggles anything; a device the user had already muted is left alone, and the device that was muted is the one unmuted even if the default changed meanwhile |
 | Recording cap | 120 s | Keeps the microphone from staying on when a key-up is lost |
 | Benchmark | A script run by hand, not a test | A benchmark that fails on noise gets ignored |
 
