@@ -37,6 +37,7 @@ struct DictionaryView: View {
             } footer: {
                 VStack(alignment: .leading, spacing: 4) {
                     FootnoteText("Whole words only. Longer phrases win. Case is carried over at the start of a sentence unless Match case is on.")
+                    FootnoteText("Leave Heard as empty to list a word that should be repaired when it comes out nearly right.")
                     if !cyclicIDs.isEmpty {
                         FootnoteText("⚠️ \u{201c}a\u{201d} → \u{201c}b\u{201d} and \u{201c}b\u{201d} → \u{201c}a\u{201d} undo each other; these rules are ignored.")
                     }
@@ -147,10 +148,11 @@ struct DictionaryView: View {
         }
     }
 
-    /// Runs the same replacer the pipeline uses, so the preview cannot drift
-    /// from the real behaviour.
+    /// Runs the same two processors the pipeline runs, in the same order, so
+    /// the preview cannot drift from the real behaviour.
     private var testResult: String {
-        DictionaryReplacer(entries: entries).apply(to: sample)
+        let replaced = DictionaryReplacer(entries: entries).apply(to: sample)
+        return CustomWordCorrector(entries: entries).apply(to: replaced)
     }
 
     // MARK: Editing
@@ -176,6 +178,7 @@ struct DictionaryView: View {
             DictionaryEntry(from: "claude code", to: "Claude Code"),
             DictionaryEntry(from: "clode", to: "Claude"),
             DictionaryEntry(from: "speak up", to: "Pladder"),
+            DictionaryEntry(from: "", to: "ChatGPT"),
         ])
     }
 
@@ -210,27 +213,42 @@ struct DictionaryView: View {
         }
     }
 
-    /// Adds entries, overwriting any existing rule with the same `from`
-    /// (case-insensitively) instead of creating a duplicate.
+    /// Adds entries, overwriting an existing row with the same key instead of
+    /// creating a duplicate.
+    ///
+    /// A regular rule is keyed by its `from`. A custom word — an empty `from`,
+    /// which is how `CustomWordCorrector` reads its terms — has no `from` to key
+    /// on, so it is keyed by its `to` instead. Without that second key every
+    /// custom word would either be dropped on import or duplicated on every
+    /// re-import. A row with neither is nothing at all and is skipped.
     private func merge(_ incoming: [DictionaryEntry]) {
         var result = model.settings.dictionary
-        var indexByFrom = [String: Int]()
+        var indexByKey = [String: Int]()
         for (index, entry) in result.enumerated() {
-            indexByFrom[entry.from.lowercased()] = index
+            if let key = Self.mergeKey(for: entry) { indexByKey[key] = index }
         }
         for var entry in incoming {
-            let key = entry.from.lowercased()
-            guard !key.trimmingCharacters(in: .whitespaces).isEmpty else { continue }
-            if let index = indexByFrom[key] {
+            guard let key = Self.mergeKey(for: entry) else { continue }
+            if let index = indexByKey[key] {
                 // Keep the existing identity so selection and focus survive.
                 entry.id = result[index].id
                 result[index] = entry
             } else {
-                indexByFrom[key] = result.count
+                indexByKey[key] = result.count
                 result.append(entry)
             }
         }
         model.settings.dictionary = result
+    }
+
+    /// `from:` for a replacement rule, `to:` for a custom word, nil for a row
+    /// with neither.
+    private static func mergeKey(for entry: DictionaryEntry) -> String? {
+        let from = entry.from.trimmingCharacters(in: .whitespaces)
+        if !from.isEmpty { return "from:" + from.lowercased() }
+        let to = entry.to.trimmingCharacters(in: .whitespaces)
+        if !to.isEmpty { return "to:" + to.lowercased() }
+        return nil
     }
 }
 
