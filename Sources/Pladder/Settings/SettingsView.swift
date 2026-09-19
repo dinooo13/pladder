@@ -72,7 +72,8 @@ private struct GeneralSettingsView: View {
                         onRecordingChanged: { model.coordinator.isHotkeySuspended = $0 },
                         // The send key is off without Accessibility anyway, so
                         // only the push-to-talk key is constrained.
-                        requiresRegularKey: model.hotkeyNeedsRegularKey
+                        requiresRegularKey: model.hotkeyNeedsRegularKey,
+                        systemShortcuts: model.systemShortcuts
                     )
                 }
                 if let warning = hotkeyWarning {
@@ -171,7 +172,7 @@ private struct GeneralSettingsView: View {
             Section("Permissions") {
                 PermissionRow(
                     title: "Accessibility",
-                    detail: "Needed for a modifier-only key and for pasting. Without it the key needs a regular key and the text is copied for you to paste with ⌘V; a standard account needs an administrator to switch it on.",
+                    detail: "Needed for a modifier-only key such as Right Command and for pasting. Without it another key stands in (the menu says which) and the text is copied for you to paste with ⌘V; a standard account needs an administrator to switch it on.",
                     granted: model.accessibilityTrusted,
                     action: model.grantAccessibility
                 )
@@ -184,17 +185,33 @@ private struct GeneralSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear { model.refreshPermissions() }
+        // The shortcuts macOS owns are re-read here rather than on the
+        // permission poll: this window is where they are shown, and the user
+        // may have just changed them in System Settings.
+        .onAppear {
+            model.refreshPermissions()
+            model.refreshSystemShortcuts()
+        }
     }
 
-    /// First: a chord that cannot be registered at all without Accessibility,
-    /// which leaves the user with a key that does nothing. Then the standing
-    /// warning that a chord without a modifier is swallowed system wide, so a
-    /// plain letter or Space would become untypeable while Pladder runs.
+    /// In order: the stored chord cannot be detected but something stands in
+    /// for it; it cannot be detected and nothing is left to stand in; macOS
+    /// owns it, so it may never arrive; and the standing warning that a chord
+    /// without a modifier is swallowed system wide, so a plain letter or Space
+    /// would become untypeable while Pladder runs.
     private var hotkeyWarning: String? {
         let hotkey = model.settings.hotkey
+        if let fallback = model.fallbackHotkey {
+            return "Without Accessibility, \(hotkey.displayName) cannot be detected, so "
+                + "\(fallback.sideAgnosticDisplayName) stands in for it until Accessibility is "
+                + "granted. Record a combination with a regular key to choose your own."
+        }
         if model.hotkeyNeedsRegularKey, !hotkey.canBeRegisteredWithoutAccessibility {
-            return "Without Accessibility, \(hotkey.displayName) cannot be detected. Choose a combination with a regular key, such as Control+Shift+Space."
+            return "Without Accessibility, \(hotkey.displayName) cannot be detected. Choose a combination with a regular key, such as Control+Shift+D."
+        }
+        if let owner = model.systemShortcutConflict(for: hotkey) {
+            return "\(owner.sideAgnosticDisplayName) is a macOS keyboard shortcut, so "
+                + "\(hotkey.displayName) may never reach Pladder. Change one of them."
         }
         guard hotkey.modifierKeyCodes.isEmpty, !hotkey.keyCodes.isEmpty else { return nil }
         return "Without a modifier, \(hotkey.displayName) can no longer be typed in other apps while Pladder is running."

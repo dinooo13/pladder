@@ -24,6 +24,11 @@ import os
 ///   keyboard, and posting the Return it asks for needs Accessibility anyway.
 ///   `submitKey` is therefore ignored and every release says `submit: false`.
 ///
+/// This stays a dumb registrar: an unregistrable chord is refused here, and it
+/// is `AppModel` that hands the coordinator a stand-in chord instead, since the
+/// menu and the settings window have to name what is actually being listened
+/// for. See `SystemShortcuts` and `Hotkey.fallback(avoiding:)`.
+///
 /// Carbon delivers its events on the main run loop, and registration is main
 /// thread work, so everything hops there. Mutable state lives behind `lock`
 /// because the protocol is `Sendable` and callers are not all on the main
@@ -98,7 +103,7 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
             return stream
         }
 
-        let modifiers = Self.carbonModifiers(for: hotkey.modifierKeyCodes)
+        let modifiers = hotkey.carbonModifierMask
         onMain { [weak self] in
             self?.register(keyCode: UInt32(keyCode), modifiers: modifiers, generation: generation)
         }
@@ -241,23 +246,6 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
     }
 
     // MARK: Helpers
-
-    /// Carbon's side-agnostic modifier mask for the modifier key codes in a
-    /// chord. Fn has no bit, which is why `canBeRegisteredWithoutAccessibility`
-    /// refuses a chord containing it.
-    private static func carbonModifiers(for keyCodes: Set<UInt16>) -> UInt32 {
-        var mask: UInt32 = 0
-        for code in keyCodes {
-            switch code {
-            case 0x3B, 0x3E: mask |= UInt32(controlKey)
-            case 0x3A, 0x3D: mask |= UInt32(optionKey)
-            case 0x38, 0x3C: mask |= UInt32(shiftKey)
-            case 0x37, 0x36: mask |= UInt32(cmdKey)
-            default: break
-            }
-        }
-        return mask
-    }
 
     private func onMain(_ block: @escaping @Sendable () -> Void) {
         Self.onMainThread(block)
