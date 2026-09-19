@@ -39,8 +39,8 @@
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/flow-dark.png">
-    <img src="docs/images/flow-light.png" width="900" alt="The Pladder pill in its three states: recording with a live level meter, transcribing, done">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/styles-dark.png">
+    <img src="docs/images/styles-light.png" width="900" alt="The Pladder pill while dictating, in its four styles: Compact with a level meter, Minimal disc, Live transcript, Menu Bar glyph">
   </picture>
 </p>
 
@@ -99,14 +99,7 @@ Privacy here is not a policy, it is how the thing is built.
 
 ## Choose your style
 
-A small pill at the bottom of the screen tells you what is happening: a red dot and a live level meter while you speak, a spinner while it thinks, a tick when the text is in. It never takes focus from the app you are typing into. Show as much or as little of it as you like.
-
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/styles-dark.png">
-    <img src="docs/images/styles-light.png" width="900" alt="The four overlay styles: Compact pill with level meter, Minimal disc, Live transcript with the words so far, and Menu Bar glyph only">
-  </picture>
-</p>
+A small pill at the bottom of the screen shows a red dot and a live level meter while you speak, and is gone the moment you let go; the pasted text is the confirmation. Only when transcription takes longer than usual — the first dictation after launch, say — does a spinner say so. It never takes focus from the app you are typing into. Show as much or as little of it as you like.
 
 - **Compact.** The full pill with the level meter. You always know it is listening.
 - **Minimal.** A small disc with a pulse. Enough to see it is on, not enough to look at.

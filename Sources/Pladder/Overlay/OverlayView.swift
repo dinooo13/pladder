@@ -33,16 +33,17 @@ private enum OverlayPhase: Equatable {
     case empty
     case recording
     case transcribing
-    case done
+    case copied
     case error(String)
 
     init(_ state: DictationState) {
         switch state {
         case .recording: self = .recording
         case .transcribing: self = .transcribing
-        // The hint is the end of a dictation like the tick is, so the pill
-        // does not morph between them.
-        case .inserting, .copied: self = .done
+        case .copied: self = .copied
+        // The controller never mirrors `.inserting` onto the model, so this
+        // is only reached by a preview, and it draws nothing.
+        case .inserting: self = .empty
         case .error(let message): self = .error(message)
         case .idle, .unavailable: self = .empty
         }
@@ -50,8 +51,8 @@ private enum OverlayPhase: Equatable {
 }
 
 /// Liquid Glass pill: a capsule that samples the desktop behind the
-/// transparent panel and morphs between the recording, transcribing, done and
-/// error states.
+/// transparent panel and morphs between the recording, transcribing, copied
+/// and error states.
 struct OverlayView: View {
     let model: OverlayModel
 
@@ -160,7 +161,7 @@ struct OverlayPill: View {
                 .frame(minWidth: 140)
         } else {
             // A fixed square so the disc never changes size between the
-            // dot, the wave, the spinner and the tick.
+            // dot, the wave and the spinner.
             minimalContent
                 .frame(width: Self.minimalDiameter, height: Self.minimalDiameter)
         }
@@ -182,17 +183,10 @@ struct OverlayPill: View {
                     .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(.primary)
             }
-        case .inserting:
-            HStack(spacing: 8) {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-                Text("Done")
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(.primary)
-            }
         case .copied:
-            // Nothing pasted the text, so the user has to. Same row as Done,
-            // with the instruction in place of the tick's word.
+            // Nothing pasted the text, so the user has to. The one thing the
+            // pill still says after a release: the paste that is normally the
+            // confirmation never happened.
             HStack(spacing: 8) {
                 Image(systemName: "doc.on.clipboard")
                     .foregroundStyle(.secondary)
@@ -213,15 +207,16 @@ struct OverlayPill: View {
                     // the capsule grow past its edges.
                     .frame(maxWidth: 232)
             }
-        case .idle, .unavailable:
+        // `.inserting` is never mirrored onto the model, so it draws nothing.
+        case .inserting, .idle, .unavailable:
             Color.clear.frame(width: 100)
         }
     }
 
     /// The words as they are recognised, beside a narrower meter. Only the
-    /// recording row differs from Compact: transcribing, done and the error
-    /// say the same thing in every style, and letting them keep the live row's
-    /// width would leave a mostly empty capsule on screen.
+    /// recording row differs from Compact: the spinner, the clipboard hint and
+    /// the error say the same thing in every style, and letting them keep the
+    /// live row's width would leave a mostly empty capsule on screen.
     @ViewBuilder
     private var liveContent: some View {
         switch state {
@@ -266,9 +261,10 @@ struct OverlayPill: View {
     /// spare at the chord where the bars reach.
     static let minimalDiameter: CGFloat = 44
 
-    /// Just enough to say "recording", "working", "done": no text, and a
-    /// disc rather than a pill. The dot marks the start of a take, then a
-    /// narrow wave takes over so the disc still shows the microphone is live.
+    /// Just enough to say "recording", and "still working" when a
+    /// transcription runs long: no text, and a disc rather than a pill. The
+    /// dot marks the start of a take, then a narrow wave takes over so the
+    /// disc still shows the microphone is live.
     @ViewBuilder
     private var minimalContent: some View {
         switch state {
@@ -292,13 +288,9 @@ struct OverlayPill: View {
         case .transcribing:
             ProgressView()
                 .controlSize(.small)
-        case .inserting:
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 14))
-                .foregroundStyle(.green)
         // An error and the clipboard hint are rendered as the row above, so
-        // they never reach this.
-        case .copied, .error, .idle, .unavailable:
+        // they never reach this; `.inserting` is never mirrored onto the model.
+        case .inserting, .copied, .error, .idle, .unavailable:
             Color.clear
         }
     }
