@@ -21,8 +21,6 @@ enum Screenshots {
 
         for scheme in [ColorScheme.light, .dark] {
             let suffix = scheme == .dark ? "dark" : "light"
-            await capture(FlowFigure(), size: CGSize(width: 960, height: 260), scheme: scheme,
-                          to: directory.appending(path: "flow-\(suffix).png"))
             // Four tiles of 290 pt with 24 pt between them and 16 pt of
             // padding either side.
             await capture(StylesFigure(), size: CGSize(width: 1264, height: 250), scheme: scheme,
@@ -132,21 +130,6 @@ private struct Pill: View {
             .compositingGroup()
             .shadow(color: .black.opacity(0.16), radius: 8, y: 3)
             .scaleEffect(scale)
-    }
-}
-
-/// Hold, release, pasted: the three states of one dictation, left to right.
-private struct FlowFigure: View {
-    var body: some View {
-        Wallpaper()
-            .overlay {
-                HStack(spacing: 72) {
-                    Pill(state: .recording(level: 0.6), scale: 1.3)
-                    Pill(state: .transcribing, scale: 1.3)
-                    Pill(state: .inserting, scale: 1.3)
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 20))
     }
 }
 

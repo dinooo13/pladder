@@ -23,6 +23,11 @@ final class OverlayPanel: NSPanel {
         }
     }
 
+    /// How long the pill takes to fade out. The controller waits it out
+    /// before it resets the model, so the last content stays on screen for
+    /// the whole fade.
+    static let fadeOutDuration: TimeInterval = 0.25
+
     private let model: OverlayModel
 
     /// Bumped on every show/hide so a fade-out that is superseded by a new
@@ -87,7 +92,7 @@ final class OverlayPanel: NSPanel {
         generation &+= 1
         let token = generation
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.25
+            context.duration = Self.fadeOutDuration
             context.timingFunction = CAMediaTimingFunction(name: .easeIn)
             animator().alphaValue = 0
         } completionHandler: { [weak self] in
