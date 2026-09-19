@@ -58,6 +58,7 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
     private func performLoad() async throws {
         status = .downloading(progress: nil)
         do {
+            await resumePartialDownload()
             // The progress handler is invoked off-actor; hop back to update status.
             let models = try await AsrModels.downloadAndLoad(version: version) { [weak self] progress in
                 guard let self else { return }
@@ -73,6 +74,88 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
         } catch {
             status = .failed(message: Self.describe(error))
             throw error
+        }
+    }
+
+    /// Finishes a half-written model cache before the loader decides it is
+    /// complete.
+    ///
+    /// FluidAudio resumes an interrupted file: it streams into
+    /// `<file>.partial` with an ETag validator beside it and a new process
+    /// continues it with a `Range` request, and it refuses any body whose
+    /// size differs from the one Hugging Face listed, so a truncated file is
+    /// never moved into place. What it does not do is notice a partial once
+    /// the cache *looks* whole: `AsrModels.download` skips the fetch when
+    /// every model directory and the vocabulary exist
+    /// (`AsrModels.modelsExist`), which a kill during the last few small
+    /// files can leave true while one bundle still holds only a
+    /// `weights/weight.bin.partial`. The load then fails on that bundle and
+    /// FluidAudio's recovery deletes the whole ~460 MB repo and fetches it
+    /// again.
+    ///
+    /// `ModelHub.download` is the layer below that decision: it skips files
+    /// already in place and resumes the partial, so running it first turns
+    /// the purge into the few megabytes that were actually missing. When
+    /// there is no partial — every launch after the first — this is one
+    /// `FileManager` walk of a ten-entry tree. It runs at launch, nowhere
+    /// near the release-to-paste path.
+    private func resumePartialDownload() async {
+        let cacheDirectory = AsrModels.defaultCacheDirectory(for: version)
+        guard Self.hasPartialDownload(under: cacheDirectory) else { return }
+        do {
+            try await ModelHub.download(
+                Self.repository(for: version),
+                to: cacheDirectory.deletingLastPathComponent(),
+                variant: Self.encoderVariant(for: version),
+                progressHandler: { [weak self] progress in
+                    guard let self else { return }
+                    Task { await self.report(progress) }
+                }
+            )
+        } catch {
+            // Fail open. Whatever stopped the resume stops the download below
+            // as well, and that one reports the failure to the menu; a
+            // pre-pass that throws on its own would only replace a resumable
+            // state with an error message.
+        }
+    }
+
+    /// Whether any file under the cache is still being downloaded.
+    /// `FileDownloader` writes `<file>.partial` and moves it into place only
+    /// after the size check, so a `.partial` anywhere means an interrupted
+    /// run, whatever the directory listing suggests.
+    private static func hasPartialDownload(under directory: URL) -> Bool {
+        guard
+            let walk = FileManager.default.enumerator(
+                at: directory,
+                includingPropertiesForKeys: nil,
+                options: [.skipsHiddenFiles]
+            )
+        else { return false }
+        for case let url as URL in walk where url.pathExtension == "partial" {
+            return true
+        }
+        return false
+    }
+
+    /// The same mapping `AsrModelVersion.repo` makes inside FluidAudio, which
+    /// is not public; `Repo` and its cases are.
+    private static func repository(for version: AsrModelVersion) -> Repo {
+        switch version {
+        case .v2: return .parakeetV2
+        case .v3: return .parakeetV3
+        case .tdtCtc110m: return .parakeetTdtCtc110m
+        case .tdtJa: return .parakeetJa
+        }
+    }
+
+    /// `AsrModels.download` passes the encoder precision as the repo variant
+    /// for v3 only, and its default precision is `.int8`; the pre-pass has to
+    /// ask for the same files or it would fetch a second encoder.
+    private static func encoderVariant(for version: AsrModelVersion) -> String? {
+        switch version {
+        case .v3: return ParakeetEncoderPrecision.int8.rawValue
+        case .v2, .tdtCtc110m, .tdtJa: return nil
         }
     }
 
@@ -239,9 +322,81 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
         return Double(parts.seconds) + Double(parts.attoseconds) / 1e18
     }
 
+    /// What the menu says under `Model failed:` when the load throws.
+    ///
+    /// The distinction worth a user's attention is whether the network or the
+    /// files are at fault: a download that stopped continues from where it
+    /// stopped when they choose Retry, missing or damaged files are fetched
+    /// again, and only what is left is an engine problem. The raw
+    /// `errorDescription` said none of that — a lost connection during the
+    /// first-launch download read as an engine bug, which is what the issue
+    /// was opened about.
     private static func describe(_ error: Error) -> String {
-        let text = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+        let text: String
+        switch error {
+        case let error as DownloadError:
+            text = describe(error)
+        case let error as AsrModelsError:
+            text = describe(error)
+        case let error as URLError:
+            text = downloadFailure(reason(for: error))
+        default:
+            let detail = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+            text = "Model could not be loaded: \(detail)"
+        }
         return text.count > 160 ? String(text.prefix(160)) + "…" : text
+    }
+
+    private static func describe(_ error: DownloadError) -> String {
+        switch error {
+        case .invalidResponse, .htmlErrorResponse:
+            return downloadFailure("Hugging Face returned an error")
+        case .rateLimited:
+            return downloadFailure("Hugging Face rate limit")
+        case .stalled:
+            return downloadFailure("the transfer stalled")
+        case .downloadFailed(_, let underlying):
+            return downloadFailure((underlying as? URLError).map(reason(for:)) ?? "network error")
+        case .invalidArtifact:
+            return downloadFailure("a file arrived damaged")
+        case .modelNotFound, .modelMissing, .networkDisabled:
+            return Self.incompleteFiles
+        }
+    }
+
+    private static func describe(_ error: AsrModelsError) -> String {
+        switch error {
+        case .downloadFailed(let reason):
+            return downloadFailure(reason)
+        case .modelNotFound:
+            return Self.incompleteFiles
+        case .loadingFailed(let reason), .modelCompilationFailed(let reason):
+            return "Model could not be loaded: \(reason)"
+        }
+    }
+
+    /// Retry calls `load()` again, which resumes the `.partial` rather than
+    /// starting the ~460 MB over; saying so is the point of the message.
+    private static func downloadFailure(_ reason: String) -> String {
+        "Download failed: \(reason) (Retry resumes it)"
+    }
+
+    private static let incompleteFiles = "Model files incomplete (Retry re-downloads them)"
+
+    private static func reason(for error: URLError) -> String {
+        switch error.code {
+        case .notConnectedToInternet, .networkConnectionLost, .cannotFindHost,
+            .cannotConnectToHost, .dnsLookupFailed, .internationalRoamingOff:
+            return "no connection"
+        case .timedOut:
+            return "timed out"
+        case .secureConnectionFailed, .serverCertificateUntrusted:
+            return "TLS error"
+        case .cancelled:
+            return "cancelled"
+        default:
+            return "network error"
+        }
     }
 
     public enum EngineError: LocalizedError {
