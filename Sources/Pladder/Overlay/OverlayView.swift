@@ -17,10 +17,74 @@ final class OverlayModel {
     var style: OverlayStyle = .compact
     /// Liquid Glass behind the pill, or a flat window-background fill.
     var glass: Bool = true
+    /// How fast the pill flies in and out.
+    var speed: OverlayAnimationSpeed = .quick
+    /// Where the pill is in the fly-in/fly-out presentation. The panel does
+    /// the sliding below the screen edge; this phase keeps the pill as the
+    /// Minimal disc whenever it is not settled, so it flies as the disc and
+    /// morphs to its style's shape once it has arrived.
+    var presentation: OverlayPresentation = .hidden
     /// What the engine has heard so far, for the Live Transcript style. Nil in
     /// every other style, and nil again the moment the key is released.
     var partialTranscript: String?
     init() {}
+}
+
+enum OverlayPresentation: Equatable {
+    /// Off screen, parked as the disc so the next flight starts from it.
+    case hidden
+    /// Rising from the bottom edge as the disc; content forced to Minimal.
+    case flyingIn
+    /// At rest, in the style's own shape.
+    case settled
+    /// Collapsing to the disc, about to dive; content forced to Minimal.
+    case flyingOut
+}
+
+/// The timing the animation setting maps to. Panel and view read the same
+/// values so the slide and the morph stay in sync; the mapping lives here
+/// because PladderCore never imports SwiftUI.
+extension OverlayAnimationSpeed {
+    /// How long the panel takes to slide up from (or back down behind) the
+    /// bottom edge of the screen.
+    var flightDuration: TimeInterval {
+        switch self {
+        case .instant: 0.06
+        case .quick: 0.20
+        case .expressive: 0.35
+        }
+    }
+
+    /// How long the disc↔row morph takes, in both directions. Arrival is
+    /// slide-up then expand; departure is collapse then slide-down. The
+    /// controller waits exactly this long between the collapse and the dive,
+    /// so the two directions are mirror images, and the content crossfade
+    /// runs over the same span so what is inside the pill never outruns the
+    /// pill.
+    var morphDuration: TimeInterval {
+        switch self {
+        case .instant: 0.10
+        case .quick: 0.26
+        case .expressive: 0.5
+        }
+    }
+
+    /// The spring the disc↔row geometry uses. A spring's duration is
+    /// perceptual, so the bounce is kept small enough that the settle stays
+    /// inside `morphDuration`.
+    var morphAnimation: Animation {
+        switch self {
+        case .instant: .smooth(duration: morphDuration)
+        case .quick: .spring(duration: morphDuration, bounce: 0.12)
+        case .expressive: .spring(duration: morphDuration, bounce: 0.22)
+        }
+    }
+
+    /// How the content arriving with a morph fades in: over the same span as
+    /// the geometry, but no bounce, since a spring on opacity would dip past
+    /// zero and flash the content back. What is leaving goes quickly instead
+    /// (`OverlayPill.contentHandover`), so the eye never sees two dots.
+    var contentFade: Animation { .easeInOut(duration: morphDuration) }
 }
 
 /// What the pill looks like, with the live audio level projected out.
@@ -63,7 +127,9 @@ struct OverlayView: View {
             state: model.state,
             style: model.style,
             glass: model.glass,
-            partial: model.partialTranscript
+            partial: model.partialTranscript,
+            presentation: model.presentation,
+            animationSpeed: model.speed
         )
             // Glass carries its own edge highlight; this is only enough shadow
             // to lift the pill off a light desktop. The flat background gets
@@ -71,6 +137,7 @@ struct OverlayView: View {
             .compositingGroup()
             .shadow(color: .black.opacity(0.16), radius: 8, y: 3)
             .animation(.smooth(duration: 0.25), value: phase)
+            .animation(model.speed.morphAnimation, value: model.presentation)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .modifier(ForcedScheme(appearance: model.appearance))
     }
@@ -90,6 +157,16 @@ struct OverlayPill: View {
     /// the text grows. A settings card has no room for that box, so its
     /// replica hugs its sample text, wrapped onto two short lines.
     var hugsContent: Bool = false
+    /// While the pill flies in or out (or waits off screen) it is always the
+    /// Minimal disc: the bigger styles expand from it after arriving and
+    /// collapse back into it before diving. Settings replicas never fly, so
+    /// they are always settled.
+    var presentation: OverlayPresentation = .settled
+    /// The speed whose spring drives the disc↔row geometry on both sides of
+    /// the flight, so contracting to the disc takes exactly as long as
+    /// expanding out of it. Settings replicas never fly, so they keep the
+    /// default.
+    var animationSpeed: OverlayAnimationSpeed = .quick
 
     @Namespace private var glassNamespace
     /// Minimal shows a pulsing dot for the first 0.7 s, then the bars.
@@ -98,10 +175,24 @@ struct OverlayPill: View {
 
     private var phase: OverlayPhase { OverlayPhase(state) }
 
+    private var flying: Bool { presentation != .settled }
+
     var body: some View {
         GlassEffectContainer(spacing: 14) {
             content
-                .modifier(PillBackground(glass: glass, shape: shape, namespace: glassNamespace))
+                // The size driver: in flight the pill is proposed the disc's
+                // width, at rest its own — animated with the speed's morph
+                // spring on *both* sides of the flight, so contracting to the
+                // disc and expanding out of it are the same rate. The glass
+                // bubble outside this point follows the proposal.
+                .frame(width: flying ? Self.minimalDiameter : nil)
+                // What arrives inside fades in over the same span (the branch
+                // transitions below), so the row is still faint while the
+                // capsule is small; this clip keeps it inside the capsule
+                // rather than poking out of the disc.
+                .clipShape(Capsule())
+                .animation(animationSpeed.morphAnimation, value: flying)
+                .modifier(PillBackground(glass: glass, namespace: glassNamespace))
         }
         .task(id: phase) {
             guard !isPreview else { return }
@@ -121,13 +212,6 @@ struct OverlayPill: View {
         }
     }
 
-    /// Minimal is a disc; everything else, including an error or the "press
-    /// ⌘V" hint shown under Minimal, is the capsule. Glass morphs between the
-    /// two.
-    private var shape: AnyShape {
-        needsRow ? AnyShape(Capsule()) : AnyShape(Circle())
-    }
-
     private var isError: Bool {
         if case .error = state { return true }
         return false
@@ -139,31 +223,54 @@ struct OverlayPill: View {
     /// Compact row's width, so they render as the row in every style.
     private var needsRow: Bool { isError || isCopied || style != .minimal }
 
+    /// The transition on every content branch: what is arriving fades in
+    /// over the morph, so it comes up with the capsule around it; what is
+    /// leaving goes at once, so its dot is gone before the arriving dot is
+    /// visible and nothing is seen sliding towards the centre of a shrinking
+    /// capsule.
+    private var contentHandover: AnyTransition {
+        .asymmetric(
+            insertion: .opacity.animation(animationSpeed.contentFade),
+            removal: .opacity.animation(.easeOut(duration: 0.08))
+        )
+    }
+
     @ViewBuilder
     private var content: some View {
+        // In flight the pill is the Minimal disc whatever the style: the disc
+        // rises with the dot inside it, and the style's own shape comes out
+        // of it on arrival. Minimal shares that branch whether flying or
+        // not, so its bars and dot keep their identity — and their state —
+        // across the arrival.
+        if flying || !needsRow {
+            // A fixed square so the disc never changes size between the
+            // dot, the wave and the spinner. On release a row style's
+            // content goes at once and the Minimal wave comes up in the
+            // shrinking capsule, so every style leaves the way Minimal does.
+            minimalContent
+                .frame(width: Self.minimalDiameter, height: Self.minimalDiameter)
+                .transition(contentHandover)
+        }
         // An error presents in every style (the controller makes sure of it),
         // and the message needs the Compact row's width, so errors always
         // render as the Compact row; the "press ⌘V" hint is text too and
         // follows the same rule. `.menuBar` only ever reaches the view for
         // those two. Live has its own recording row and falls back to the
         // Compact rows for everything else.
-        if style == .liveTranscript && !isError {
+        else if style == .liveTranscript && !isError {
             liveContent
                 .frame(minHeight: 32)
                 .padding(.horizontal, 18)
                 .padding(.vertical, 12)
                 .frame(minWidth: 140)
-        } else if needsRow {
+                .transition(contentHandover)
+        } else {
             compactContent
                 .frame(minHeight: 32)
                 .padding(.horizontal, 18)
                 .padding(.vertical, 12)
                 .frame(minWidth: 140)
-        } else {
-            // A fixed square so the disc never changes size between the
-            // dot, the wave and the spinner.
-            minimalContent
-                .frame(width: Self.minimalDiameter, height: Self.minimalDiameter)
+                .transition(contentHandover)
         }
     }
 
@@ -271,8 +378,11 @@ struct OverlayPill: View {
         case .recording(let level):
             ZStack {
                 if showsDot {
+                    // The pulse is Minimal's own start-of-take cue. A row
+                    // style flying in keeps the dot at the row's size, so
+                    // the dot it hands over to on arrival is the same dot.
                     RecordingDot()
-                        .scaleEffect(pulsing ? 1.3 : 1.0)
+                        .scaleEffect(pulsing && !needsRow ? 1.3 : 1.0)
                         .onAppear {
                             guard !isPreview else { return }
                             withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
@@ -295,8 +405,15 @@ struct OverlayPill: View {
         }
     }
 
-    /// A replica has no timer, so it goes straight to the bars.
-    private var showsDot: Bool { isPreview ? false : showDot }
+    /// A replica has no timer, so it goes straight to the bars. A row style
+    /// collapsing after a short take would otherwise put the dot back in the
+    /// middle of the capsule its own dot just left; the wave is what the
+    /// disc shows on the way out.
+    private var showsDot: Bool {
+        if isPreview { return false }
+        if presentation == .flyingOut && needsRow { return false }
+        return showDot
+    }
 }
 
 /// The words so far, with the part that has not settled yet in secondary.
@@ -392,11 +509,17 @@ struct RecordingDot: View {
 /// still. The shadow is added by whoever hosts the pill.
 struct PillBackground: ViewModifier {
     let glass: Bool
-    /// Capsule for the rows, circle for the Minimal disc.
-    var shape: AnyShape = AnyShape(Capsule())
     /// Only the live overlay morphs between states, so the glass identity is
     /// optional; the settings replicas pass nothing.
     var namespace: Namespace.ID?
+
+    /// One shape for the rows and the Minimal disc: a capsule in a square is
+    /// a circle, so the disc↔row morph is purely the animated size. A
+    /// separate `Circle` would snap — `Circle()` in a row-sized frame draws a
+    /// disc in the middle of the row at once, and `AnyShape` cannot
+    /// interpolate between two shape types, so the collapse would be over
+    /// before it started.
+    private var shape: Capsule { Capsule() }
 
     @ViewBuilder
     func body(content: Content) -> some View {

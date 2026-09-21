@@ -1123,6 +1123,7 @@ final class EventLog: @unchecked Sendable {
         #expect(decoded.appearance == .system)
         #expect(decoded.overlayStyle == .compact)
         #expect(decoded.overlayGlass == true)
+        #expect(decoded.overlayAnimationSpeed == .quick)
     }
 
     @Test func appearancePersists() throws {
@@ -1152,6 +1153,22 @@ final class EventLog: @unchecked Sendable {
         try store.save(changed)
         #expect(store.load() == changed)
         #expect(store.load().overlayStyle == .liveTranscript)
+        try? FileManager.default.removeItem(at: dir)
+    }
+
+    @Test func overlayAnimationSpeedPersists() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let url = dir.appendingPathComponent("settings.json")
+        let defaults = Settings(engineID: EchoEngine.engineID)
+        let store = SettingsStore(url: url, defaults: defaults)
+        var changed = defaults
+        changed.overlayAnimationSpeed = .expressive
+        try store.save(changed)
+        #expect(store.load() == changed)
+
+        changed.overlayAnimationSpeed = .instant
+        try store.save(changed)
+        #expect(store.load().overlayAnimationSpeed == .instant)
         try? FileManager.default.removeItem(at: dir)
     }
 

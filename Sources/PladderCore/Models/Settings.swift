@@ -13,6 +13,13 @@ public enum OverlayStyle: String, Codable, Sendable, CaseIterable, Equatable {
     case menuBar, minimal, compact, liveTranscript
 }
 
+/// How fast the pill flies in from the bottom edge and dives back down. Pure
+/// data; the durations it maps to live with the overlay, so PladderCore stays
+/// free of AppKit and SwiftUI.
+public enum OverlayAnimationSpeed: String, Codable, Sendable, CaseIterable, Equatable {
+    case instant, quick, expressive
+}
+
 /// Everything the user can change. Persisted as JSON by `SettingsStore`.
 public struct Settings: Codable, Sendable, Equatable {
     public var engineID: EngineID
@@ -39,6 +46,8 @@ public struct Settings: Codable, Sendable, Equatable {
     /// Liquid Glass behind the overlay pill; off gives a flat
     /// window-background fill.
     public var overlayGlass: Bool
+    /// Speed of the fly-in/fly-out presentation animation.
+    public var overlayAnimationSpeed: OverlayAnimationSpeed
 
     public init(
         engineID: EngineID,
@@ -52,7 +61,8 @@ public struct Settings: Codable, Sendable, Equatable {
         muteOutputWhileDictating: Bool = false,
         appearance: Appearance = .system,
         overlayStyle: OverlayStyle = .compact,
-        overlayGlass: Bool = true
+        overlayGlass: Bool = true,
+        overlayAnimationSpeed: OverlayAnimationSpeed = .quick
     ) {
         self.engineID = engineID
         self.hotkey = hotkey
@@ -66,13 +76,14 @@ public struct Settings: Codable, Sendable, Equatable {
         self.appearance = appearance
         self.overlayStyle = overlayStyle
         self.overlayGlass = overlayGlass
+        self.overlayAnimationSpeed = overlayAnimationSpeed
     }
 
     // Decoding tolerates missing keys so adding a field in a later version
     // never makes an existing settings file unreadable.
     private enum CodingKeys: String, CodingKey {
         case engineID, hotkey, submitKey, disabledProcessors, dictionary, appendTrailingSpace, launchAtLogin, playSounds, appearance
-        case overlayStyle, overlayGlass, muteOutputWhileDictating
+        case overlayStyle, overlayGlass, overlayAnimationSpeed, muteOutputWhileDictating
     }
 
     public init(from decoder: Decoder) throws {
@@ -92,6 +103,7 @@ public struct Settings: Codable, Sendable, Equatable {
         appearance = try c.decodeIfPresent(Appearance.self, forKey: .appearance) ?? .system
         overlayStyle = try c.decodeIfPresent(OverlayStyle.self, forKey: .overlayStyle) ?? .compact
         overlayGlass = try c.decodeIfPresent(Bool.self, forKey: .overlayGlass) ?? true
+        overlayAnimationSpeed = try c.decodeIfPresent(OverlayAnimationSpeed.self, forKey: .overlayAnimationSpeed) ?? .quick
         muteOutputWhileDictating = try c.decodeIfPresent(Bool.self, forKey: .muteOutputWhileDictating) ?? false
     }
 

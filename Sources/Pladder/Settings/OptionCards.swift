@@ -228,3 +228,28 @@ struct BackgroundThumbnail: View {
         }
     }
 }
+
+/// A speed for the fly-in/fly-out. An animation cannot be captured in a
+/// still picture, so each card says it with a speed instead: lightning for
+/// almost instant, a hare for quick, a tortoise for the long expressive one.
+struct AnimationSpeedThumbnail: View {
+    let speed: OverlayAnimationSpeed
+
+    var body: some View {
+        DesktopThumbnail {
+            Image(systemName: icon)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 26, height: 26)
+                .foregroundStyle(.white)
+        }
+    }
+
+    private var icon: String {
+        switch speed {
+        case .instant: "bolt.fill"
+        case .quick: "hare.fill"
+        case .expressive: "tortoise.fill"
+        }
+    }
+}
