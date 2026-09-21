@@ -13,8 +13,8 @@ import os
 /// list is the check that works.
 ///
 /// Which shortcuts are enabled is per Mac: install a second keyboard layout and
-/// Control+Space becomes the input-source switch, which is why the stand-in
-/// chord is chosen against this and not hard-coded.
+/// Control+Space becomes the input-source switch, which is why the recorded
+/// chord is checked against this rather than against a fixed list.
 public enum SystemShortcuts {
     private static let log = Logger(subsystem: "de.dinooo13.pladder", category: "hotkey")
 

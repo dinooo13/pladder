@@ -43,14 +43,14 @@ final class AppModel {
     /// someone visits System Settings. Never on a key press.
     private(set) var systemShortcuts: Set<Hotkey> = []
 
-    /// The chord that stands in for the stored one while Accessibility is
-    /// missing, or nil when the stored chord is what the monitor listens for.
-    ///
-    /// The stored chord is never rewritten: Right Command stays the default
-    /// and comes back the moment an administrator ticks the box.
-    private(set) var fallbackHotkey: Hotkey?
+    /// The default chord, standing in for a stored chord Carbon cannot
+    /// register while Accessibility is missing. The stored chord is never
+    /// rewritten and returns with the grant.
+    var standInHotkey: Hotkey? {
+        accessibilityTrusted ? nil : settings.hotkey.standInWithoutAccessibility
+    }
 
-    /// So the first `refreshPermissions()` computes the stand-in even though
+    /// So the first `refreshPermissions()` sets the stand-in even though
     /// nothing flipped; `hotkeyUsesTap` already matches the grant at that point.
     private var didComputeEffectiveHotkey = false
 
@@ -308,36 +308,27 @@ final class AppModel {
         }
         // After the swap: the new monitor is started with the old stand-in and
         // then, if it changed, once more with the new one. The other order
-        // would make the Carbon monitor log a failure for Right Command on the
-        // way to being replaced by the tap.
+        // would make the Carbon monitor log a failure for a modifier-only
+        // chord on the way to being replaced by the tap.
         if flipped || !didComputeEffectiveHotkey {
             didComputeEffectiveHotkey = true
+            updateEffectiveHotkey()
             refreshSystemShortcuts()
         }
     }
 
-    /// Re-reads the shortcuts macOS owns and recomputes the stand-in chord.
-    /// Called when the settings window opens, the moment the answer is about
-    /// to be shown to the user and the recorder about to be handed it.
+    /// Re-reads the shortcuts macOS owns, which feed the warnings shown in the
+    /// settings window. Called when that window opens, the moment the answer
+    /// is about to be shown to the user and the recorder about to be handed it.
     func refreshSystemShortcuts() {
         let shortcuts = SystemShortcuts.enabled()
         if shortcuts != systemShortcuts { systemShortcuts = shortcuts }
-        updateEffectiveHotkey()
     }
 
-    /// The stand-in chord is a function of the stored chord, the Accessibility
-    /// grant and the shortcuts macOS owns. With the grant there is none: the
-    /// tap matches anything. Without it, a chord Carbon cannot register — or
-    /// one the window server eats first — listens for nothing, so the first
-    /// free candidate takes its place until the grant arrives.
+    /// With the grant the tap matches anything; without it a chord Carbon
+    /// cannot register listens for nothing, so the default takes its place.
     private func updateEffectiveHotkey() {
-        let stored = settings.hotkey
-        let standsIn = !accessibilityTrusted
-            && (!stored.canBeRegisteredWithoutAccessibility
-                || stored.systemShortcutConflict(in: systemShortcuts) != nil)
-        let fallback = standsIn ? Hotkey.fallback(avoiding: systemShortcuts) : nil
-        if fallback != fallbackHotkey { fallbackHotkey = fallback }
-        coordinator.hotkeyOverride = fallback
+        coordinator.hotkeyOverride = standInHotkey
     }
 
     /// The enabled macOS shortcut that swallows `hotkey`, if any. Shown as a
@@ -444,7 +435,7 @@ final class AppModel {
     /// keys: the tap tells Left from Right, Carbon's mask cannot.
     var effectiveHotkeyName: String {
         guard !hotkeyUsesTap else { return settings.hotkey.displayName }
-        return (fallbackHotkey ?? settings.hotkey).sideAgnosticDisplayName
+        return settings.hotkey.sideAgnosticDisplayName
     }
 
     /// True while a working Accessibility grant is being ignored because
@@ -452,15 +443,11 @@ final class AppModel {
     var usesCarbonForSecureInput: Bool { accessibilityTrusted && !hotkeyUsesTap }
 
     /// What to say when nothing is happening. Without Accessibility the stored
-    /// chord may be listening for nothing, in which case a stand-in is named
+    /// chord may be listening for nothing, in which case the stand-in is named
     /// instead; "hold Right Command" would be a lie.
     private var readyLine: String {
-        if let fallback = fallbackHotkey {
-            return "Ready — hold \(fallback.sideAgnosticDisplayName) (Accessibility is off)"
-        }
-        if !accessibilityTrusted, !settings.hotkey.canBeRegisteredWithoutAccessibility {
-            // Every candidate is taken by a macOS shortcut on this Mac.
-            return "Choose a key combination in Settings (Accessibility is off)"
+        if let standIn = standInHotkey {
+            return "Ready — hold \(standIn.sideAgnosticDisplayName) (Accessibility is off)"
         }
         let line = "Ready — hold \(effectiveHotkeyName)"
         // Say why the send key and the swallowing stopped: both are the tap's,

@@ -179,27 +179,11 @@ public struct Hotkey: Codable, Sendable, Hashable {
     /// elsewhere in System Settings > Keyboard.
     public static let function = Hotkey(0x3F)
 
-    /// Chords that can stand in for one Carbon cannot register, best first.
-    ///
-    /// Each has exactly one regular key and no Fn, so Carbon takes it, and at
-    /// least two modifiers, so swallowing it system wide cannot make anything
-    /// untypeable — which is why Shift+Space and Option+Space are not here.
-    /// Which one is actually free depends on the Mac: Control+Shift+Space is
-    /// eaten wherever input-source switching is on, so the list is filtered
-    /// against the enabled macOS shortcuts rather than fixed.
-    public static let fallbackCandidates: [Hotkey] = [
-        Hotkey(0x3B, 0x38, 0x31), // Control + Shift + Space
-        Hotkey(0x3A, 0x38, 0x31), // Option + Shift + Space
-        Hotkey(0x3B, 0x38, 0x02), // Control + Shift + D
-    ]
-
-    /// The first candidate no enabled macOS shortcut owns, or nil when they
-    /// are all taken — in which case the user has to pick a chord themselves.
-    public static func fallback(
-        avoiding shortcuts: Set<Hotkey>,
-        preferring candidates: [Hotkey] = fallbackCandidates
-    ) -> Hotkey? {
-        candidates.first { $0.systemShortcutConflict(in: shortcuts) == nil }
+    /// The chord that stands in for this one without Accessibility, or nil
+    /// when Carbon can register this one itself. Only a chord without exactly
+    /// one regular key, or with Fn, needs it; the default always registers.
+    public var standInWithoutAccessibility: Hotkey? {
+        canBeRegisteredWithoutAccessibility ? nil : .optionSpace
     }
 
     // MARK: Codable

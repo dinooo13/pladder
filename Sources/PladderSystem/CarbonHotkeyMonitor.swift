@@ -16,7 +16,7 @@ import os
 ///
 /// What it cannot do, and why this is only the fallback:
 /// - the chord needs exactly one regular key: a modifier-only chord such as
-///   the Right Command default cannot be registered (`Hotkey`'s
+///   Right Command cannot be registered (`Hotkey`'s
 ///   `canBeRegisteredWithoutAccessibility` is the predicate),
 /// - the modifier mask is side-agnostic, so Left and Right Shift are the same
 ///   chord here, and there is no bit for Fn,
@@ -25,9 +25,9 @@ import os
 ///   `submitKey` is therefore ignored and every release says `submit: false`.
 ///
 /// This stays a dumb registrar: an unregistrable chord is refused here, and it
-/// is `AppModel` that hands the coordinator a stand-in chord instead, since the
-/// menu and the settings window have to name what is actually being listened
-/// for. See `SystemShortcuts` and `Hotkey.fallback(avoiding:)`.
+/// is `AppModel` that hands the coordinator the default chord instead, since
+/// the menu and the settings window have to name what is actually being
+/// listened for. See `Hotkey.standInWithoutAccessibility`.
 ///
 /// Carbon delivers its events on the main run loop, and registration is main
 /// thread work, so everything hops there. Mutable state lives behind `lock`

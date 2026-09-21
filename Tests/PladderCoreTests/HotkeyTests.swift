@@ -342,63 +342,58 @@ private let keyC: UInt16 = 0x08
     }
 }
 
-/// The stand-in chord used while Accessibility is missing, and the rule that
-/// decides which chords macOS has already taken.
-@Suite struct FallbackHotkeyTests {
+/// The one chord that stands in while Accessibility is missing, and the rule
+/// that decides which chords macOS has already taken.
+@Suite struct StandInRuleTests {
     private let rightControl: UInt16 = 0x3E
     private let rightShift: UInt16 = 0x3C
     private let leftCommand: UInt16 = 0x37
     private let keyD: UInt16 = 0x02
+    private let fn: UInt16 = 0x3F
     private let f5: UInt16 = 0x60
 
     private var controlShiftSpace: Hotkey { Hotkey(leftControl, leftShift, space) }
-    private var optionShiftSpace: Hotkey { Hotkey(leftOption, leftShift, space) }
-    private var controlShiftD: Hotkey { Hotkey(leftControl, leftShift, keyD) }
 
-    @Test func firstCandidateWhenNothingIsTaken() {
-        #expect(Hotkey.fallback(avoiding: []) == controlShiftSpace)
+    @Test func defaultIsOptionSpaceAndRegistrable() {
+        #expect(Hotkey.optionSpace == Hotkey(leftOption, space))
+        // The whole point: Carbon takes it, so it needs nothing to stand in.
+        #expect(Hotkey.optionSpace.canBeRegisteredWithoutAccessibility)
+        #expect(Hotkey.optionSpace.standInWithoutAccessibility == nil)
     }
 
-    @Test func controlSpaceSystemShortcutRulesOutControlShiftSpace() {
-        // What was actually observed on a Mac with two input sources:
-        // Control+Space is enabled, and Control+Shift+Space never reaches the
-        // front app either.
-        #expect(Hotkey.fallback(avoiding: [Hotkey(leftControl, space)]) == optionShiftSpace)
-    }
-
-    @Test func rightSideShortcutStillCollides() {
-        // Carbon's mask has no side, so a shortcut spelled with the right-hand
-        // key is the same shortcut.
-        #expect(Hotkey.fallback(avoiding: [Hotkey(rightControl, space)]) == optionShiftSpace)
-    }
-
-    @Test func sameModifiersDifferentKeyDoNotCollide() {
-        #expect(Hotkey.fallback(avoiding: [Hotkey(leftControl, leftShift, keyA)]) == controlShiftSpace)
-    }
-
-    @Test func spotlightAndInputSourcesLeaveControlShiftD() {
+    @Test func defaultIsFreeWithTwoInputSources() {
         // Command+Space, Option+Command+Space, Control+Space and
-        // Control+Option+Space are the ones enabled on the developer's Mac;
-        // add an Option+Space and only the third candidate is left.
+        // Control+Option+Space are the ones enabled on the developer's Mac,
+        // where a second input source turns the last two on. None owns
+        // Option+Space.
         let taken: Set<Hotkey> = [
             Hotkey(leftCommand, space), Hotkey(leftCommand, leftOption, space),
             Hotkey(leftControl, space), Hotkey(leftControl, leftOption, space),
-            Hotkey(leftOption, space),
         ]
-        #expect(Hotkey.fallback(avoiding: taken) == controlShiftD)
+        #expect(Hotkey.optionSpace.systemShortcutConflict(in: taken) == nil)
     }
 
-    @Test func everyCandidateTakenGivesNil() {
-        #expect(Hotkey.fallback(avoiding: Set(Hotkey.fallbackCandidates)) == nil)
+    @Test func modifierOnlyChordStandsInWithTheDefault() {
+        #expect(Hotkey.rightCommand.standInWithoutAccessibility == .optionSpace)
+        #expect(Hotkey(rightCommand, rightOption).standInWithoutAccessibility == .optionSpace)
+        // Fn has no Carbon bit, so a chord with it cannot be registered either.
+        #expect(Hotkey(fn, f5).standInWithoutAccessibility == .optionSpace)
     }
 
-    @Test func candidatesAreRegistrableAndNeverSwallowTyping() {
-        for candidate in Hotkey.fallbackCandidates {
-            #expect(candidate.canBeRegisteredWithoutAccessibility)
-            // Two modifiers at least: a chord Pladder swallows system wide
-            // must not be something anyone types.
-            #expect(candidate.modifierKeyCodes.count >= 2)
-        }
+    @Test func registrableChordNeedsNoStandIn() {
+        #expect(Hotkey(leftControl, space).standInWithoutAccessibility == nil)
+        #expect(Hotkey(rightOption, space).standInWithoutAccessibility == nil)
+    }
+
+    @Test func canonicalFoldsSidesOnlyWithARegularKey() {
+        #expect(Hotkey(rightOption, space).canonical == Hotkey(leftOption, space))
+        #expect(
+            Hotkey(rightControl, rightShift, space).canonical
+                == Hotkey(leftControl, leftShift, space))
+        // A modifier-only chord is matched by side, so it keeps it.
+        #expect(Hotkey.rightCommand.canonical == .rightCommand)
+        #expect(
+            Hotkey(rightCommand, rightOption).canonical == Hotkey(rightCommand, rightOption))
     }
 
     @Test func conflictNamesTheOwningShortcut() {
