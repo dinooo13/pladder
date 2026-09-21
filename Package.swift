@@ -3,6 +3,9 @@ import PackageDescription
 
 let package = Package(
     name: "Pladder",
+    // The UI follows the macOS system language; English is the source
+    // language, and the String Catalogs below need this to compile.
+    defaultLocalization: "en",
     platforms: [.macOS(.v26)],
     products: [
         .executable(name: "Pladder", targets: ["Pladder"]),
@@ -26,7 +29,13 @@ let package = Package(
 
         // Hotkey, pasteboard output, permissions, optional Foundation Models
         // processor. AppKit lives here.
-        .target(name: "PladderSystem", dependencies: ["PladderCore"]),
+        .target(
+            name: "PladderSystem",
+            dependencies: ["PladderCore"],
+            // Key names, in their own table so the merged de.lproj can hold
+            // this and the app's catalog side by side.
+            resources: [.process("Resources/KeyNames.xcstrings")]
+        ),
 
         // Concrete transcription engines.
         .target(
@@ -43,7 +52,14 @@ let package = Package(
             dependencies: ["PladderCore", "PladderAudio", "PladderSystem", "PladderEngines"],
             // Info.plist is copied into the .app by scripts/bundle.sh; SwiftPM
             // refuses to treat it as a resource, so keep it out of the bundle.
-            exclude: ["Resources/Info.plist"]
+            exclude: ["Resources/Info.plist"],
+            // Compiled to de.lproj/<Table>.strings inside the target's
+            // resource bundle; bundle.sh merges those lproj folders into the
+            // app's own Resources, so lookups go through Bundle.main.
+            resources: [
+                .process("Resources/Localizable.xcstrings"),
+                .process("Resources/InfoPlist.xcstrings"),
+            ]
         ),
 
         // Benchmark helpers (word error rate). Only the CLI links this; the

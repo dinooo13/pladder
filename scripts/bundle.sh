@@ -53,6 +53,16 @@ shopt -s nullglob
 for bundle in "$BIN_DIR"/*.bundle; do
 	cp -R "$bundle" "$CONTENTS/Resources/"
 done
+
+# The String Catalogs compile into de.lproj/<Table>.strings inside those
+# bundles. A nested bundle alone is ignored: macOS picks the app's language
+# from the main bundle, which with a bare Info.plist has only English, so the
+# German strings would never be reached. Merging the lproj folders into the
+# app's own Resources both declares the languages and puts the tables where
+# Bundle.main looks, which is why no code names a bundle.
+for lproj in "$BIN_DIR"/*.bundle/Contents/Resources/*.lproj; do
+	ditto "$lproj" "$CONTENTS/Resources/$(basename "$lproj")"
+done
 shopt -u nullglob
 
 # Sign with a real certificate when one is available. An ad-hoc signature
