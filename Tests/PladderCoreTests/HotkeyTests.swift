@@ -235,7 +235,13 @@ private let keyC: UInt16 = 0x08
     @Test func settingsWithEmptyChordFallBackToDefault() throws {
         let json = #"{"engineID":"echo","hotkey":{"keyCodes":[]}}"#
         let settings = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
-        #expect(settings.hotkey == .rightCommand)
+        #expect(settings.hotkey == .optionSpace)
+    }
+
+    @Test func settingsWithoutHotkeyUsesOptionSpace() throws {
+        let json = #"{"engineID":"echo"}"#
+        let settings = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
+        #expect(settings.hotkey == Hotkey(leftOption, space))
     }
 
     @Test func settingsWithEmptySubmitKeyStaysEmpty() throws {

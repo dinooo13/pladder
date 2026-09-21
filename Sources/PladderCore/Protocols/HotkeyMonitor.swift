@@ -152,8 +152,12 @@ public struct Hotkey: Codable, Sendable, Hashable {
 
     // MARK: Well-known chords
 
-    /// Right Command (kVK_RightCommand = 0x36). The default: rarely part of a
-    /// shortcut, and it types nothing on its own.
+    /// Option + Space (kVK_Option, kVK_Space). The default: no macOS shortcut
+    /// owns it with one or several input sources, and Carbon registers it, so
+    /// it works with and without Accessibility.
+    public static let optionSpace = Hotkey(0x3A, 0x31)
+    /// Right Command (kVK_RightCommand = 0x36). The default before
+    /// Option+Space; still the usual modifier-only choice.
     public static let rightCommand = Hotkey(0x36)
     /// Right Option (kVK_RightOption = 0x3D).
     public static let rightOption = Hotkey(0x3D)
