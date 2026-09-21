@@ -3,16 +3,17 @@ import Foundation
 import PladderCore
 
 public extension Hotkey {
-    /// "Right Option", "Left Control + Space", "Fn + F5". Character keys are
+    /// "Right Option", "Option + Space", "Fn + F5". Sides are named only for a
+    /// modifier-only chord, the only kind matched by side. Character keys are
     /// named after what they type in the current keyboard layout.
-    var displayName: String { KeyNames.name(for: self) }
+    var displayName: String { KeyNames.name(for: self, collapsingSides: !isModifierOnly) }
 
     /// The same name without the sides: "Control + Shift + Space".
     ///
-    /// For anything Carbon matches — the stand-in chord, the stored chord
-    /// while Accessibility is missing, a macOS shortcut — where the modifier
-    /// mask genuinely cannot tell Left from Right, so naming a side would
-    /// promise a precision the matching does not have.
+    /// For anything Carbon matches — the stored chord while Accessibility is
+    /// missing, a macOS shortcut — where the modifier mask genuinely cannot
+    /// tell Left from Right, so naming a side would promise a precision the
+    /// matching does not have.
     var sideAgnosticDisplayName: String { KeyNames.name(for: self, collapsingSides: true) }
 }
 

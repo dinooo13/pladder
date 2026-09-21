@@ -6,6 +6,7 @@ private let rightOption: UInt16 = 0x3D
 private let leftOption: UInt16 = 0x3A
 private let leftControl: UInt16 = 0x3B
 private let rightCommand: UInt16 = 0x36
+private let leftCommand: UInt16 = 0x37
 private let leftShift: UInt16 = 0x38
 private let space: UInt16 = 0x31
 private let keyA: UInt16 = 0x00
@@ -201,6 +202,66 @@ private let keyC: UInt16 = 0x08
         // so pressing Right Option last never engages the chord.
         #expect(t.flagsChanged(modifiers: [rightCommand, rightOption]) == .init())
         #expect(t.flagsChanged(modifiers: []) == .init())
+    }
+
+    // MARK: The side rule
+
+    @Test func rightOptionSpaceFiresTheOptionSpaceChord() {
+        var t = HotkeyChordTracker(hotkey: .optionSpace)
+        #expect(t.flagsChanged(modifiers: [rightOption]) == .init())
+        #expect(t.keyDown(space, modifiers: [rightOption]) == .init(event: .pressed, swallow: true))
+        #expect(t.flagsChanged(modifiers: []) == .init(event: .released(submit: false)))
+        #expect(t.keyUp(space, modifiers: []) == .init(swallow: true))
+    }
+
+    @Test func shiftOptionSpaceIsNotTheChord() {
+        // Sides are folded, the set is still compared exactly: an extra
+        // modifier is a different chord.
+        var t = HotkeyChordTracker(hotkey: .optionSpace)
+        #expect(t.keyDown(space, modifiers: [leftShift, leftOption]) == .init())
+        #expect(t.keyUp(space, modifiers: [leftShift, leftOption]) == .init())
+    }
+
+    @Test func loneRightCommandDoesNotFireOnLeftCommand() {
+        // A modifier-only chord keeps its side; that is what makes it usable.
+        var t = HotkeyChordTracker(hotkey: .rightCommand)
+        #expect(t.flagsChanged(modifiers: [leftCommand]) == .init())
+        #expect(t.flagsChanged(modifiers: []) == .init())
+    }
+
+    @Test func spaceBeforeRightOptionEngagesButIsNotSwallowed() {
+        var t = HotkeyChordTracker(hotkey: .optionSpace)
+        #expect(t.keyDown(space, modifiers: []) == .init())
+        #expect(t.flagsChanged(modifiers: [rightOption]) == .init(event: .pressed))
+        #expect(
+            t.keyUp(space, modifiers: [rightOption])
+                == .init(event: .released(submit: false), swallow: false))
+    }
+
+    @Test func aRedundantOptionLetGoDoesNotEndThePress() {
+        // Both Options down, one released: the chord is still held, so the
+        // release is asked of what is down rather than of what went up.
+        var t = HotkeyChordTracker(hotkey: .optionSpace)
+        #expect(t.keyDown(space, modifiers: [rightOption]) == .init(event: .pressed, swallow: true))
+        #expect(t.flagsChanged(modifiers: [rightOption, leftOption]) == .init())
+        #expect(t.flagsChanged(modifiers: [rightOption]) == .init())
+        #expect(t.flagsChanged(modifiers: []) == .init(event: .released(submit: false)))
+    }
+
+    @Test func sendKeyStillArmsWhileOptionSpaceIsHeld() {
+        var t = HotkeyChordTracker(hotkey: .optionSpace, submitKey: .rightOption)
+        #expect(t.keyDown(space, modifiers: [leftOption]) == .init(event: .pressed, swallow: true))
+        #expect(t.flagsChanged(modifiers: [leftOption, rightOption]) == .init())
+        #expect(t.flagsChanged(modifiers: []) == .init(event: .released(submit: true)))
+    }
+
+    @Test func sendKeyArmsOnEitherOptionWhileOptionSpaceIsHeld() {
+        // Accepted quirk: Right Option is already down as part of the chord,
+        // so pressing the other Option arms the send key.
+        var t = HotkeyChordTracker(hotkey: .optionSpace, submitKey: .rightOption)
+        #expect(t.keyDown(space, modifiers: [rightOption]) == .init(event: .pressed, swallow: true))
+        #expect(t.flagsChanged(modifiers: [rightOption, leftOption]) == .init())
+        #expect(t.flagsChanged(modifiers: []) == .init(event: .released(submit: true)))
     }
 }
 

@@ -29,8 +29,9 @@ public enum HotkeyEvent: Sendable, Equatable {
 /// members of the chord under their own key codes, so Right Option (0x3D) and
 /// Left Option (0x3A) are different keys, and a chord can be a lone modifier,
 /// several modifiers, or modifiers plus a regular key. Matching is exact on the
-/// modifiers (see `HotkeyChordTracker`), which is what keeps Shift+Right Option
-/// from being mistaken for Right Option.
+/// sides for a modifier-only chord, which is what lets a lone Right Command be
+/// a hotkey; a chord with a regular key ignores which side a modifier is on
+/// (see `HotkeyChordTracker`).
 public struct Hotkey: Codable, Sendable, Hashable {
     public var keyCodes: Set<UInt16>
 
@@ -73,13 +74,26 @@ public struct Hotkey: Codable, Sendable, Hashable {
     /// A chord with no keys never fires. Used to turn the submit key off.
     public var isEmpty: Bool { keyCodes.isEmpty }
 
+    /// The form a chord is stored in. A chord with a regular key ignores the
+    /// modifiers' sides, so it keeps the left-hand codes; a modifier-only
+    /// chord is matched by side and is kept as pressed.
+    public var canonical: Hotkey {
+        isModifierOnly ? self : Hotkey(keyCodes: regularKeyCodes.union(collapsedModifierKeyCodes))
+    }
+
     // MARK: Carbon's side-agnostic view of a chord
 
     /// The modifiers with each right-hand key folded onto its left-hand code,
     /// which is all Carbon's modifier mask can express. Fn has no side and no
     /// bit, so it is left alone and simply never matches anything Carbon owns.
     public var collapsedModifierKeyCodes: Set<UInt16> {
-        Set(modifierKeyCodes.map { code in
+        Self.collapsingSides(modifierKeyCodes)
+    }
+
+    /// The same folding for a loose set of key codes, which is how the tracker
+    /// compares held modifiers against a chord with a regular key.
+    public static func collapsingSides(_ codes: Set<UInt16>) -> Set<UInt16> {
+        Set(codes.map { code in
             switch code {
             case 0x36: 0x37 // Right Command -> Command
             case 0x3C: 0x38 // Right Shift -> Shift
