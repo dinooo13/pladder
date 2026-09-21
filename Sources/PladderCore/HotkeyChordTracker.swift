@@ -8,7 +8,9 @@ import Foundation
 /// - The chord *engages* when one of its keys goes down and, at that moment,
 ///   exactly the chord's modifier keys and at least the chord's regular keys are
 ///   held. "Exactly" is what keeps ordinary shortcuts working: Shift+Right
-///   Option is not Right Option.
+///   Option is not Right Option. Exactly for a modifier-only chord, that is; a
+///   chord with a regular key ignores which side a modifier is on, so Right
+///   Option+Space is Option+Space.
 /// - It *disengages* when any chord key goes up, or when any other key goes
 ///   down (the user has started a different shortcut, so stop listening). It
 ///   only re-engages once one of its keys is pressed again.
@@ -144,21 +146,24 @@ public struct HotkeyChordTracker: Sendable, Equatable {
     }
 
     private mutating func applyModifiers(_ modifiers: Set<UInt16>, at instant: ContinuousClock.Instant) {
-        let released = heldModifiers.subtracting(modifiers)
         let pressed = modifiers.subtracting(heldModifiers)
         heldModifiers = modifiers
+        let chordModifiers = matching(hotkey.modifierKeyCodes)
         if isEngaged {
-            let allowed = hotkey.keyCodes.union(submitKey.modifierKeyCodes)
-            if !released.isDisjoint(with: hotkey.keyCodes) {
-                // A chord key was let go: an ordinary release, whenever it came.
+            let allowed = chordModifiers.union(matching(submitKey.modifierKeyCodes))
+            if !chordModifiers.isSubset(of: matching(heldModifiers)) {
+                // A chord modifier is no longer held: an ordinary release,
+                // whenever it came. Asked of what is still down rather than of
+                // what went up, so letting go of a redundant Left Option while
+                // Right Option holds Option+Space keeps the chord engaged.
                 isEngaged = false
-            } else if !pressed.isSubset(of: allowed) {
+            } else if !matching(pressed).isSubset(of: allowed) {
                 // A foreign modifier went down: Shift for Cmd+Shift+4, say.
                 disengage(interruptedAt: instant)
             } else if !pressed.isEmpty {
                 armIfSubmitChordHeld()
             }
-        } else if !pressed.isDisjoint(with: hotkey.keyCodes), chordIsHeld {
+        } else if !matching(pressed).isDisjoint(with: chordModifiers), chordIsHeld {
             engage(at: instant)
         }
     }
@@ -177,8 +182,15 @@ public struct HotkeyChordTracker: Sendable, Equatable {
         if let engagedAt, instant - engagedAt <= interruptionWindow { wasInterrupted = true }
     }
 
+    /// Held modifiers as the chord compares them: sides folded for a chord
+    /// with a regular key, exact for a modifier-only chord.
+    private func matching(_ modifiers: Set<UInt16>) -> Set<UInt16> {
+        hotkey.isModifierOnly ? modifiers : Hotkey.collapsingSides(modifiers)
+    }
+
     private var chordIsHeld: Bool {
-        heldModifiers == hotkey.modifierKeyCodes && hotkey.regularKeyCodes.isSubset(of: heldKeys)
+        matching(heldModifiers) == matching(hotkey.modifierKeyCodes)
+            && hotkey.regularKeyCodes.isSubset(of: heldKeys)
     }
 
     /// The whole submit chord is held once every one of its keys is down.

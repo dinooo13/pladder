@@ -8,9 +8,11 @@ import SwiftUI
 /// A button that shows the current push-to-talk chord and, when clicked,
 /// records a new one from whatever the user presses next.
 ///
-/// Any key or combination is allowed, lone modifiers included, and left and
-/// right modifiers are distinct. The chord is committed once every key has
-/// been let go, so a chord of several keys can be built up in any order.
+/// Any key or combination is allowed, lone modifiers included. Left and right
+/// modifiers are distinct in a modifier-only chord; with a regular key the
+/// side is ignored and the left-hand key is stored. The chord is committed
+/// once every key has been let go, so a chord of several keys can be built up
+/// in any order.
 /// Escape on its own cancels.
 struct HotkeyRecorderField: View {
     @Binding var hotkey: Hotkey
@@ -211,7 +213,7 @@ final class HotkeyRecorder {
                 }
                 let commit = self.commit
                 end()
-                commit?(pending)
+                commit?(pending.canonical)
             }
         } else if !held.isSubset(of: pending?.keyCodes ?? []) {
             // A key went down that is not part of the chord so far: the chord
