@@ -291,16 +291,3 @@ public actor PasteboardOutput: TextOutput {
         }
     }
 }
-
-public enum OutputError: LocalizedError {
-    /// `CGEvent` refused to create the key event, which normally means the event
-    /// source could not be created.
-    case eventCreationFailed
-
-    public var errorDescription: String? {
-        switch self {
-        case .eventCreationFailed:
-            return "Could not create the paste keystroke. Try again, or restart Pladder."
-        }
-    }
-}

@@ -10,6 +10,14 @@ public enum InsertResult: Sendable, Equatable {
     case copied
 }
 
+/// What an output can fail at for a reason the app knows how to phrase. No
+/// `LocalizedError`: the wording lives in the app, next to the catalog.
+public enum OutputError: Error, Equatable, Sendable {
+    /// `CGEvent` refused to create the key event, which normally means the
+    /// event source could not be created.
+    case eventCreationFailed
+}
+
 /// Delivers final text into whatever application currently has focus.
 public protocol TextOutput: Sendable {
     /// Inserts `text` at the cursor. With `submit`, Return is pressed once the

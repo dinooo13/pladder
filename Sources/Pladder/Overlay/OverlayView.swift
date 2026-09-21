@@ -98,7 +98,7 @@ private enum OverlayPhase: Equatable {
     case recording
     case transcribing
     case copied
-    case error(String)
+    case error(DictationFailure)
 
     init(_ state: DictationState) {
         switch state {
@@ -108,7 +108,7 @@ private enum OverlayPhase: Equatable {
         // The controller never mirrors `.inserting` onto the model, so this
         // is only reached by a preview, and it draws nothing.
         case .inserting: self = .empty
-        case .error(let message): self = .error(message)
+        case .error(let failure): self = .error(failure)
         case .idle, .unavailable: self = .empty
         }
     }
@@ -301,11 +301,11 @@ struct OverlayPill: View {
                     .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(.primary)
             }
-        case .error(let message):
+        case .error(let failure):
             HStack(spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
-                Text(message)
+                Text(failure.text)
                     .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(.primary)
                     .lineLimit(1)

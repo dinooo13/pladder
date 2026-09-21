@@ -40,7 +40,7 @@ public final class EngineLoader {
                 if case .failed = status {
                     self.setStatus(status)
                 } else {
-                    self.setStatus(.failed(message: error.localizedDescription))
+                    self.setStatus(.failed(.loadFailed(detail: error.localizedDescription)))
                 }
                 self.pollTask?.cancel()
                 return

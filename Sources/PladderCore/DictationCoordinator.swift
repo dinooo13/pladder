@@ -8,10 +8,10 @@ import Observation
 @MainActor
 @Observable
 public final class DictationCoordinator {
-    public private(set) var state: DictationState = .unavailable(reason: "Starting")
+    public private(set) var state: DictationState = .unavailable(.starting)
     public private(set) var engineStatus: EngineStatus = .unloaded
     public private(set) var lastTranscript: Transcript?
-    public private(set) var lastError: String?
+    public private(set) var lastError: DictationFailure?
 
     /// What the engine makes of the recording so far, for the Live Transcript
     /// overlay. Display only: it is never processed and never inserted, and it
@@ -119,7 +119,7 @@ public final class DictationCoordinator {
         case recordingStarted
         case recordingStopped
         case inserted(Transcript, CycleTiming)
-        case failed(String)
+        case failed(DictationFailure)
     }
 
     public init(
@@ -189,10 +189,10 @@ public final class DictationCoordinator {
         switch status {
         case .ready:
             if case .unavailable = state { state = .idle }
-        case .failed(let message):
-            if !state.isBusy { state = .unavailable(reason: message) }
+        case .failed(let failure):
+            if !state.isBusy { state = .unavailable(.engineFailed(failure)) }
         case .downloading, .loading, .unloaded:
-            if !state.isBusy { state = .unavailable(reason: "Loading model") }
+            if !state.isBusy { state = .unavailable(.loadingModel) }
         }
     }
 
@@ -450,7 +450,7 @@ public final class DictationCoordinator {
                 self.hotkeyReleased(submit: false)
             }
         } catch {
-            fail("Microphone: \(error.localizedDescription)")
+            fail(.microphone(detail: error.localizedDescription))
         }
     }
 
@@ -547,7 +547,7 @@ public final class DictationCoordinator {
             onEvent(.inserted(inserted, timing))
             if result == .copied { showCopied() } else { becomeIdle() }
         } catch {
-            fail(error.localizedDescription)
+            fail(DictationFailure(error))
         }
     }
 
@@ -556,8 +556,8 @@ public final class DictationCoordinator {
     private func becomeIdle() {
         switch engineStatus {
         case .ready: state = .idle
-        case .failed(let message): state = .unavailable(reason: message)
-        case .unloaded, .downloading, .loading: state = .unavailable(reason: "Loading model")
+        case .failed(let failure): state = .unavailable(.engineFailed(failure))
+        case .unloaded, .downloading, .loading: state = .unavailable(.loadingModel)
         }
     }
 
@@ -597,10 +597,10 @@ public final class DictationCoordinator {
         }
     }
 
-    private func fail(_ message: String) {
-        lastError = message
-        state = .error(message: message)
-        onEvent(.failed(message))
+    private func fail(_ failure: DictationFailure) {
+        lastError = failure
+        state = .error(failure)
+        onEvent(.failed(failure))
         transientResetTask?.cancel()
         transientResetTask = Task { [weak self, errorDisplayDuration] in
             try? await Task.sleep(for: errorDisplayDuration)
