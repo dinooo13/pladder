@@ -1,129 +1,1236 @@
 {
   "sourceLanguage": "en",
   "strings": {
-    "%@ is a macOS keyboard shortcut and will fire as well.": {},
-    "%@ is a macOS keyboard shortcut, so %@ may never reach Pladder. Change one of them.": {},
-    "%@ is part of the push-to-talk key, so it can never be pressed separately.": {},
-    "Add a rule": {},
-    "Add examples": {},
-    "Animation": {},
-    "Appearance": {},
-    "Append a space after each dictation": {},
-    "Applies your replacement rules. Edit them in the Dictionary tab.": {},
-    "Auto": {},
-    "Background": {},
-    "Chill": {},
-    "Choose a key combination in Settings (Accessibility is off)": {},
-    "Click, then press the key or combination to use.": {},
-    "Click, then press the key or combination to use. Without Accessibility the key must include a regular key, for example Control+Shift+D.": {},
-    "Compact": {},
-    "Copied — press ⌘V": {},
-    "Could not create the paste keystroke. Try again, or restart Pladder.": {},
-    "Could not read that file. It should be a JSON array of { from, to, matchCase }.": {},
-    "Could not write that file: %@": {},
-    "Custom words": {},
-    "Dark": {},
-    "Denied. Enable it in System Settings.": {},
-    "Dictionary": {},
-    "Download failed: %@ (Retry resumes it)": {},
-    "Each dictation runs through these in order before it is inserted.": {},
-    "Engine": {},
-    "Error: %@": {},
-    "Export…": {},
-    "Flat": {},
-    "General": {},
-    "Glass": {},
-    "Grant Accessibility…": {},
-    "Grant Microphone…": {},
-    "Granted.": {},
-    "Heard as": {},
-    "Hold to record, release to insert. Press the send key while recording and Return is pressed after the text. Click a field and press any key combination to assign it.": {},
-    "Hugging Face rate limit": {},
-    "Hugging Face returned an error": {},
-    "Import": {},
-    "Import…": {},
-    "Inserting…": {},
-    "Key": {},
-    "Last: %@": {},
-    "Launch at login": {},
-    "Leave Heard as empty to list a word that should be repaired when it comes out nearly right.": {},
-    "Light": {},
-    "Live": {},
-    "Loading model": {},
-    "Ludicrous": {},
-    "Match case": {},
-    "Menu": {},
-    "Microphone: %@": {},
-    "Minimal": {},
-    "Model could not be loaded: %@": {},
-    "Model failed: %@": {},
-    "Model files incomplete (Retry re-downloads them)": {},
-    "Model: downloading %lld%%": {},
-    "Model: downloading…": {},
-    "Model: loading…": {},
-    "Model: not loaded": {},
-    "Mute audio while dictating": {},
-    "NVIDIA Parakeet via FluidAudio, runs on the Neural Engine. ~700 MB download on first use.": {},
-    "Needed for a modifier-only key such as Right Command and for pasting. Without it another key stands in (the menu says which) and the text is copied for you to paste with ⌘V; a standard account needs an administrator to switch it on.": {},
-    "Not requested yet.": {},
-    "OK": {},
-    "Only %@ arrived…": {},
-    "Only %@ reached Pladder. If you pressed a regular key too, macOS or another app owns that shortcut; try a different key, for example Control+Shift+D.": {},
-    "Open Settings…": {},
-    "Output": {},
-    "Overlay": {},
-    "Permissions": {},
-    "Play start and stop sounds": {},
-    "Press keys…": {},
-    "Press the key or combination to use. Escape cancels.": {},
-    "Press the key or combination to use. Escape cancels. Without Accessibility the key must include a regular key, for example Control+Shift+D.": {},
-    "Processing": {},
-    "Processors": {},
-    "Push to Talk": {},
-    "Quick": {},
-    "Quit Pladder": {},
-    "Ready — hold %@": {},
-    "Ready — hold %@ (Accessibility is off)": {},
-    "Ready — hold %@ (Secure Keyboard Entry is on)": {},
-    "Recording…": {},
-    "Remove fillers": {},
-    "Remove the selected rules": {},
-    "Repairs near misses of the words you list in the Dictionary tab with an empty Heard as.": {},
-    "Replace with": {},
-    "Retry Model Download": {},
-    "Rules": {},
-    "Secure Keyboard Entry is on. A key combination recorded now may not reach Pladder, and one without a regular key will not fire until it is off.": {},
-    "Send key": {},
-    "Separates consecutive dictations so pasted runs stay readable.": {},
-    "Settings…": {},
-    "Shown while you dictate, flying up from the bottom edge as a circle and expanding into place. Menu relies on the wave in the menu bar alone; errors still appear.": {},
-    "Sounds & Startup": {},
-    "Speech model is not loaded yet.": {},
-    "Starting": {},
-    "Strips hesitation sounds like “uh” and “um” from English, German and Spanish transcripts.": {},
-    "Style": {},
-    "TLS error": {},
-    "The send key needs Accessibility.": {},
-    "This rule undoes another one, so it is ignored.": {},
-    "Tidy whitespace": {},
-    "Transcribing…": {},
-    "Trims the transcript and collapses runs of spaces.": {},
-    "Try a sentence": {},
-    "Type a sentence to see how the rules change it": {},
-    "Whole words only. Longer phrases win. Case is carried over at the start of a sentence unless Match case is on.": {},
-    "Without Accessibility, %@ cannot be detected, so %@ stands in for it until Accessibility is granted. Record a combination with a regular key to choose your own.": {},
-    "Without Accessibility, %@ cannot be detected. Choose a combination with a regular key, such as Control+Shift+D.": {},
-    "Without a modifier, %@ can no longer be typed in other apps while Pladder is running.": {},
-    "a file arrived damaged": {},
-    "cancelled": {},
-    "network error": {},
-    "no connection": {},
-    "replacement": {},
-    "see it as you speak": {},
-    "spoken form": {},
-    "the transfer stalled": {},
-    "timed out": {},
-    "⚠️ “a” → “b” and “b” → “a” undo each other; these rules are ignored.": {}
+    "%@ is a macOS keyboard shortcut and will fire as well.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ ist ein macOS-Tastaturkurzbefehl und wird ebenfalls ausgelöst."
+          }
+        }
+      }
+    },
+    "%@ is a macOS keyboard shortcut, so %@ may never reach Pladder. Change one of them.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ ist ein macOS-Tastaturkurzbefehl, daher erreicht %2$@ Pladder möglicherweise nie. Ändere eines von beiden."
+          }
+        }
+      }
+    },
+    "%@ is part of the push-to-talk key, so it can never be pressed separately.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ ist Teil der Push-to-Talk-Taste und kann daher nie einzeln gedrückt werden."
+          }
+        }
+      }
+    },
+    "Add a rule": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Regel hinzufügen"
+          }
+        }
+      }
+    },
+    "Add examples": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beispiele hinzufügen"
+          }
+        }
+      }
+    },
+    "Animation": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Animation"
+          }
+        }
+      }
+    },
+    "Appearance": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erscheinungsbild"
+          }
+        }
+      }
+    },
+    "Append a space after each dictation": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nach jedem Diktat ein Leerzeichen anfügen"
+          }
+        }
+      }
+    },
+    "Applies your replacement rules. Edit them in the Dictionary tab.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wendet deine Ersetzungsregeln an. Bearbeite sie im Tab „Wörterbuch“."
+          }
+        }
+      }
+    },
+    "Auto": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatisch"
+          }
+        }
+      }
+    },
+    "Background": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hintergrund"
+          }
+        }
+      }
+    },
+    "Chill": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gemächlich"
+          }
+        }
+      }
+    },
+    "Choose a key combination in Settings (Accessibility is off)": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tastenkombination in den Einstellungen wählen (Bedienungshilfen sind aus)"
+          }
+        }
+      }
+    },
+    "Click, then press the key or combination to use.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klicken und dann die gewünschte Taste oder Tastenkombination drücken."
+          }
+        }
+      }
+    },
+    "Click, then press the key or combination to use. Without Accessibility the key must include a regular key, for example Control+Shift+D.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klicken und dann die gewünschte Taste oder Tastenkombination drücken. Ohne Bedienungshilfen muss die Kombination eine normale Taste enthalten, zum Beispiel Steuerungstaste + Umschalttaste + D."
+          }
+        }
+      }
+    },
+    "Compact": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kompakt"
+          }
+        }
+      }
+    },
+    "Copied — press ⌘V": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kopiert — ⌘V drücken"
+          }
+        }
+      }
+    },
+    "Could not create the paste keystroke. Try again, or restart Pladder.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Tastendruck zum Einfügen konnte nicht erzeugt werden. Versuche es erneut oder starte Pladder neu."
+          }
+        }
+      }
+    },
+    "Could not read that file. It should be a JSON array of { from, to, matchCase }.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diese Datei konnte nicht gelesen werden. Sie sollte ein JSON-Array aus { from, to, matchCase } sein."
+          }
+        }
+      }
+    },
+    "Could not write that file: %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diese Datei konnte nicht geschrieben werden: %@"
+          }
+        }
+      }
+    },
+    "Custom words": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eigene Wörter"
+          }
+        }
+      }
+    },
+    "Dark": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dunkel"
+          }
+        }
+      }
+    },
+    "Denied. Enable it in System Settings.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abgelehnt. In den Systemeinstellungen aktivieren."
+          }
+        }
+      }
+    },
+    "Dictionary": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wörterbuch"
+          }
+        }
+      }
+    },
+    "Download failed: %@ (Retry resumes it)": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download fehlgeschlagen: %@ (Wiederholen setzt ihn fort)"
+          }
+        }
+      }
+    },
+    "Each dictation runs through these in order before it is inserted.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jedes Diktat durchläuft diese der Reihe nach, bevor es eingefügt wird."
+          }
+        }
+      }
+    },
+    "Engine": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Engine"
+          }
+        }
+      }
+    },
+    "Error: %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fehler: %@"
+          }
+        }
+      }
+    },
+    "Export…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exportieren…"
+          }
+        }
+      }
+    },
+    "Flat": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flach"
+          }
+        }
+      }
+    },
+    "General": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allgemein"
+          }
+        }
+      }
+    },
+    "Glass": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Glas"
+          }
+        }
+      }
+    },
+    "Grant Accessibility…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bedienungshilfen erlauben…"
+          }
+        }
+      }
+    },
+    "Grant Microphone…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mikrofon erlauben…"
+          }
+        }
+      }
+    },
+    "Granted.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erlaubt."
+          }
+        }
+      }
+    },
+    "Heard as": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gehört als"
+          }
+        }
+      }
+    },
+    "Hold to record, release to insert. Press the send key while recording and Return is pressed after the text. Click a field and press any key combination to assign it.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zum Aufnehmen gedrückt halten, zum Einfügen loslassen. Wird während der Aufnahme die Sendetaste gedrückt, folgt nach dem Text ein Zeilenschalter. Zum Zuweisen ein Feld anklicken und eine beliebige Tastenkombination drücken."
+          }
+        }
+      }
+    },
+    "Hugging Face rate limit": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anfragelimit von Hugging Face"
+          }
+        }
+      }
+    },
+    "Hugging Face returned an error": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hugging Face hat einen Fehler zurückgegeben"
+          }
+        }
+      }
+    },
+    "Import": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importieren"
+          }
+        }
+      }
+    },
+    "Import…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importieren…"
+          }
+        }
+      }
+    },
+    "Inserting…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einfügen…"
+          }
+        }
+      }
+    },
+    "Key": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Taste"
+          }
+        }
+      }
+    },
+    "Last: %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zuletzt: %@"
+          }
+        }
+      }
+    },
+    "Launch at login": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bei der Anmeldung öffnen"
+          }
+        }
+      }
+    },
+    "Leave Heard as empty to list a word that should be repaired when it comes out nearly right.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "„Gehört als“ leer lassen, um ein Wort aufzuführen, das korrigiert werden soll, wenn es fast richtig erkannt wird."
+          }
+        }
+      }
+    },
+    "Light": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hell"
+          }
+        }
+      }
+    },
+    "Live": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live"
+          }
+        }
+      }
+    },
+    "Loading model": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modell wird geladen"
+          }
+        }
+      }
+    },
+    "Ludicrous": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wahnsinnig"
+          }
+        }
+      }
+    },
+    "Match case": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Groß-/Kleinschreibung beachten"
+          }
+        }
+      }
+    },
+    "Menu": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menü"
+          }
+        }
+      }
+    },
+    "Microphone: %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mikrofon: %@"
+          }
+        }
+      }
+    },
+    "Minimal": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Minimal"
+          }
+        }
+      }
+    },
+    "Model could not be loaded: %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modell konnte nicht geladen werden: %@"
+          }
+        }
+      }
+    },
+    "Model failed: %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modellfehler: %@"
+          }
+        }
+      }
+    },
+    "Model files incomplete (Retry re-downloads them)": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modelldateien unvollständig (Wiederholen lädt sie neu)"
+          }
+        }
+      }
+    },
+    "Model: downloading %lld%%": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modell: Download %lld %%"
+          }
+        }
+      }
+    },
+    "Model: downloading…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modell: Download…"
+          }
+        }
+      }
+    },
+    "Model: loading…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modell: wird geladen…"
+          }
+        }
+      }
+    },
+    "Model: not loaded": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modell: nicht geladen"
+          }
+        }
+      }
+    },
+    "Mute audio while dictating": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ton während des Diktierens stummschalten"
+          }
+        }
+      }
+    },
+    "NVIDIA Parakeet via FluidAudio, runs on the Neural Engine. ~700 MB download on first use.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NVIDIA Parakeet über FluidAudio, läuft auf der Neural Engine. Beim ersten Verwenden ca. 700 MB Download."
+          }
+        }
+      }
+    },
+    "Needed for a modifier-only key such as Right Command and for pasting. Without it another key stands in (the menu says which) and the text is copied for you to paste with ⌘V; a standard account needs an administrator to switch it on.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erforderlich für eine reine Sondertaste wie die rechte Befehlstaste und für das Einfügen. Ohne sie springt eine andere Taste ein (das Menü nennt sie) und der Text wird nur kopiert, sodass du ihn mit ⌘V einfügen kannst; in einem Standardaccount kann das nur ein Administrator aktivieren."
+          }
+        }
+      }
+    },
+    "Not requested yet.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Noch nicht angefragt."
+          }
+        }
+      }
+    },
+    "OK": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        }
+      }
+    },
+    "Only %@ arrived…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nur %@ angekommen…"
+          }
+        }
+      }
+    },
+    "Only %@ reached Pladder. If you pressed a regular key too, macOS or another app owns that shortcut; try a different key, for example Control+Shift+D.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nur %@ hat Pladder erreicht. Falls du zusätzlich eine normale Taste gedrückt hast, gehört dieser Kurzbefehl macOS oder einer anderen App; probiere eine andere Taste, zum Beispiel Steuerungstaste + Umschalttaste + D."
+          }
+        }
+      }
+    },
+    "Open Settings…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einstellungen öffnen…"
+          }
+        }
+      }
+    },
+    "Output": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ausgabe"
+          }
+        }
+      }
+    },
+    "Overlay": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Overlay"
+          }
+        }
+      }
+    },
+    "Permissions": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Berechtigungen"
+          }
+        }
+      }
+    },
+    "Play start and stop sounds": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start- und Stopptöne abspielen"
+          }
+        }
+      }
+    },
+    "Press keys…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tasten drücken…"
+          }
+        }
+      }
+    },
+    "Press the key or combination to use. Escape cancels.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die gewünschte Taste oder Tastenkombination drücken. Esc bricht ab."
+          }
+        }
+      }
+    },
+    "Press the key or combination to use. Escape cancels. Without Accessibility the key must include a regular key, for example Control+Shift+D.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die gewünschte Taste oder Tastenkombination drücken. Esc bricht ab. Ohne Bedienungshilfen muss die Kombination eine normale Taste enthalten, zum Beispiel Steuerungstaste + Umschalttaste + D."
+          }
+        }
+      }
+    },
+    "Processing": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verarbeitung"
+          }
+        }
+      }
+    },
+    "Processors": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verarbeitungsschritte"
+          }
+        }
+      }
+    },
+    "Push to Talk": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Push-to-Talk"
+          }
+        }
+      }
+    },
+    "Quick": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flott"
+          }
+        }
+      }
+    },
+    "Quit Pladder": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pladder beenden"
+          }
+        }
+      }
+    },
+    "Ready — hold %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bereit — %@ gedrückt halten"
+          }
+        }
+      }
+    },
+    "Ready — hold %@ (Accessibility is off)": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bereit — %@ gedrückt halten (Bedienungshilfen sind aus)"
+          }
+        }
+      }
+    },
+    "Ready — hold %@ (Secure Keyboard Entry is on)": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bereit — %@ gedrückt halten (Sichere Tastatureingabe ist an)"
+          }
+        }
+      }
+    },
+    "Recording…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aufnahme…"
+          }
+        }
+      }
+    },
+    "Remove fillers": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Füllwörter entfernen"
+          }
+        }
+      }
+    },
+    "Remove the selected rules": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ausgewählte Regeln entfernen"
+          }
+        }
+      }
+    },
+    "Repairs near misses of the words you list in the Dictionary tab with an empty Heard as.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Repariert knapp danebenliegende Erkennungen der Wörter, die du im Tab „Wörterbuch“ mit leerem „Gehört als“ aufführst."
+          }
+        }
+      }
+    },
+    "Replace with": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ersetzen durch"
+          }
+        }
+      }
+    },
+    "Retry Model Download": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modell-Download wiederholen"
+          }
+        }
+      }
+    },
+    "Rules": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Regeln"
+          }
+        }
+      }
+    },
+    "Secure Keyboard Entry is on. A key combination recorded now may not reach Pladder, and one without a regular key will not fire until it is off.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sichere Tastatureingabe ist an. Eine jetzt aufgezeichnete Tastenkombination erreicht Pladder möglicherweise nicht, und eine ohne normale Taste löst erst aus, wenn sie wieder aus ist."
+          }
+        }
+      }
+    },
+    "Send key": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sendetaste"
+          }
+        }
+      }
+    },
+    "Separates consecutive dictations so pasted runs stay readable.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trennt aufeinanderfolgende Diktate, damit eingefügte Passagen lesbar bleiben."
+          }
+        }
+      }
+    },
+    "Settings…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einstellungen…"
+          }
+        }
+      }
+    },
+    "Shown while you dictate, flying up from the bottom edge as a circle and expanding into place. Menu relies on the wave in the menu bar alone; errors still appear.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wird beim Diktieren angezeigt: fliegt als Kreis von der unteren Bildschirmkante herauf und entfaltet sich an seinem Platz. „Menü“ verlässt sich allein auf die Welle in der Menüleiste; Fehler erscheinen weiterhin."
+          }
+        }
+      }
+    },
+    "Sounds & Startup": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Töne & Start"
+          }
+        }
+      }
+    },
+    "Speech model is not loaded yet.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Sprachmodell ist noch nicht geladen."
+          }
+        }
+      }
+    },
+    "Starting": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Startet"
+          }
+        }
+      }
+    },
+    "Strips hesitation sounds like “uh” and “um” from English, German and Spanish transcripts.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entfernt Verzögerungslaute wie „äh“ und „ähm“ aus englischen, deutschen und spanischen Transkripten."
+          }
+        }
+      }
+    },
+    "Style": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stil"
+          }
+        }
+      }
+    },
+    "TLS error": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "TLS-Fehler"
+          }
+        }
+      }
+    },
+    "The send key needs Accessibility.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Sendetaste benötigt die Bedienungshilfen."
+          }
+        }
+      }
+    },
+    "This rule undoes another one, so it is ignored.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diese Regel hebt eine andere auf und wird deshalb ignoriert."
+          }
+        }
+      }
+    },
+    "Tidy whitespace": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leerzeichen bereinigen"
+          }
+        }
+      }
+    },
+    "Transcribing…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transkription…"
+          }
+        }
+      }
+    },
+    "Trims the transcript and collapses runs of spaces.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kürzt das Transkript an den Rändern und fasst Folgen von Leerzeichen zusammen."
+          }
+        }
+      }
+    },
+    "Try a sentence": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Satz ausprobieren"
+          }
+        }
+      }
+    },
+    "Type a sentence to see how the rules change it": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einen Satz eingeben, um zu sehen, wie die Regeln ihn verändern"
+          }
+        }
+      }
+    },
+    "Whole words only. Longer phrases win. Case is carried over at the start of a sentence unless Match case is on.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nur ganze Wörter. Längere Wendungen haben Vorrang. Am Satzanfang wird die Groß-/Kleinschreibung übernommen, sofern „Groß-/Kleinschreibung beachten“ nicht aktiv ist."
+          }
+        }
+      }
+    },
+    "Without Accessibility, %@ cannot be detected, so %@ stands in for it until Accessibility is granted. Record a combination with a regular key to choose your own.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ohne Bedienungshilfen kann %1$@ nicht erkannt werden, daher springt %2$@ ein, bis die Bedienungshilfen erlaubt sind. Zeichne eine Kombination mit einer normalen Taste auf, um eine eigene zu wählen."
+          }
+        }
+      }
+    },
+    "Without Accessibility, %@ cannot be detected. Choose a combination with a regular key, such as Control+Shift+D.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ohne Bedienungshilfen kann %@ nicht erkannt werden. Wähle eine Kombination mit einer normalen Taste, zum Beispiel Steuerungstaste + Umschalttaste + D."
+          }
+        }
+      }
+    },
+    "Without a modifier, %@ can no longer be typed in other apps while Pladder is running.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ohne Sondertaste lässt sich %@ in anderen Apps nicht mehr tippen, solange Pladder läuft."
+          }
+        }
+      }
+    },
+    "a file arrived damaged": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "eine Datei kam beschädigt an"
+          }
+        }
+      }
+    },
+    "cancelled": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "abgebrochen"
+          }
+        }
+      }
+    },
+    "network error": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Netzwerkfehler"
+          }
+        }
+      }
+    },
+    "no connection": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "keine Verbindung"
+          }
+        }
+      }
+    },
+    "replacement": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ersetzung"
+          }
+        }
+      }
+    },
+    "see it as you speak": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sieh beim Sprechen zu"
+          }
+        }
+      }
+    },
+    "spoken form": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "gesprochene Form"
+          }
+        }
+      }
+    },
+    "the transfer stalled": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "die Übertragung stockte"
+          }
+        }
+      }
+    },
+    "timed out": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zeitüberschreitung"
+          }
+        }
+      }
+    },
+    "⚠️ “a” → “b” and “b” → “a” undo each other; these rules are ignored.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⚠️ „a“ → „b“ und „b“ → „a“ heben sich gegenseitig auf; diese Regeln werden ignoriert."
+          }
+        }
+      }
+    }
   },
   "version": "1.0"
 }
