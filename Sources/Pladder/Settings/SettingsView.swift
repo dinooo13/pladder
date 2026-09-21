@@ -30,9 +30,9 @@ struct SettingsView: View {
 private extension Appearance {
     var displayName: String {
         switch self {
-        case .system: "Auto"
-        case .light: "Light"
-        case .dark: "Dark"
+        case .system: String(localized: "Auto")
+        case .light: String(localized: "Light")
+        case .dark: String(localized: "Dark")
         }
     }
 }
@@ -40,10 +40,10 @@ private extension Appearance {
 private extension OverlayStyle {
     var displayName: String {
         switch self {
-        case .menuBar: "Menu"
-        case .minimal: "Minimal"
-        case .compact: "Compact"
-        case .liveTranscript: "Live"
+        case .menuBar: String(localized: "Menu")
+        case .minimal: String(localized: "Minimal")
+        case .compact: String(localized: "Compact")
+        case .liveTranscript: String(localized: "Live")
         }
     }
 }
@@ -51,9 +51,9 @@ private extension OverlayStyle {
 private extension OverlayAnimationSpeed {
     var displayName: String {
         switch self {
-        case .instant: "Ludicrous"
-        case .quick: "Quick"
-        case .expressive: "Chill"
+        case .instant: String(localized: "Ludicrous")
+        case .quick: String(localized: "Quick")
+        case .expressive: String(localized: "Chill")
         }
     }
 }
@@ -66,13 +66,14 @@ private struct GeneralSettingsView: View {
             Section {
                 Picker("Engine", selection: $model.settings.engineID) {
                     ForEach(model.registry.available) { entry in
-                        Text(entry.displayName).tag(entry.id)
+                        Text(LocalizedStringKey(entry.displayName)).tag(entry.id)
                     }
                 }
             } header: {
                 Text("Engine")
             } footer: {
-                FootnoteText(model.registry.entry(for: model.settings.engineID)?.detail ?? "")
+                // The registry's own text, localized where it is built.
+                FootnoteText(verbatim: model.registry.entry(for: model.settings.engineID)?.detail ?? "")
             }
 
             Section {
@@ -143,7 +144,7 @@ private struct GeneralSettingsView: View {
                 LabeledContent("Background") {
                     HStack(spacing: 8) {
                         OptionCard(
-                            title: "Glass",
+                            title: String(localized: "Glass"),
                             isSelected: model.settings.overlayGlass,
                             isEnabled: model.settings.overlayStyle != .menuBar,
                             action: { model.settings.overlayGlass = true }
@@ -151,7 +152,7 @@ private struct GeneralSettingsView: View {
                             BackgroundThumbnail(glass: true)
                         }
                         OptionCard(
-                            title: "Flat",
+                            title: String(localized: "Flat"),
                             isSelected: !model.settings.overlayGlass,
                             isEnabled: model.settings.overlayStyle != .menuBar,
                             action: { model.settings.overlayGlass = false }
@@ -199,7 +200,7 @@ private struct GeneralSettingsView: View {
             Section("Permissions") {
                 PermissionRow(
                     title: "Accessibility",
-                    detail: "Needed for a modifier-only key such as Right Command, for the send key and for pasting. Without it Option+Space still works and the text is copied for you to paste with ⌘V; a standard account needs an administrator to switch it on.",
+                    detail: String(localized: "Needed for a modifier-only key such as Right Command, for the send key and for pasting. Without it Option+Space still works and the text is copied for you to paste with ⌘V; a standard account needs an administrator to switch it on."),
                     granted: model.accessibilityTrusted,
                     action: model.grantAccessibility
                 )
@@ -233,22 +234,19 @@ private struct GeneralSettingsView: View {
             if let owner = model.systemShortcutConflict(for: standIn) {
                 return conflictWarning(owner: owner, chord: standIn)
             }
-            return "Without Accessibility, \(hotkey.displayName) cannot be detected, so "
-                + "\(standIn.sideAgnosticDisplayName) stands in for it until Accessibility is "
-                + "granted. Record a combination with a regular key to choose your own."
+            return String(localized: "Without Accessibility, \(hotkey.displayName) cannot be detected, so \(standIn.sideAgnosticDisplayName) stands in for it until Accessibility is granted. Record a combination with a regular key to choose your own.")
         }
         if let owner = model.systemShortcutConflict(for: hotkey) {
             return conflictWarning(owner: owner, chord: hotkey)
         }
         guard hotkey.modifierKeyCodes.isEmpty, !hotkey.keyCodes.isEmpty else { return nil }
-        return "Without a modifier, \(hotkey.displayName) can no longer be typed in other apps while Pladder is running."
+        return String(localized: "Without a modifier, \(hotkey.displayName) can no longer be typed in other apps while Pladder is running.")
     }
 
     /// An enabled macOS shortcut is dispatched by the window server before
     /// either monitor sees the keys, so the chord may simply never arrive.
     private func conflictWarning(owner: Hotkey, chord: Hotkey) -> String {
-        "\(owner.sideAgnosticDisplayName) is a macOS keyboard shortcut, so "
-            + "\(chord.displayName) may never reach Pladder. Record another combination."
+        String(localized: "\(owner.sideAgnosticDisplayName) is a macOS keyboard shortcut, so \(chord.displayName) may never reach Pladder. Record another combination.")
     }
 
     /// The send key presses Return through the same synthetic event as the
@@ -258,10 +256,10 @@ private struct GeneralSettingsView: View {
         let submitKey = model.settings.submitKey
         guard !submitKey.keyCodes.isEmpty else { return nil }
         if !model.accessibilityTrusted {
-            return "The send key needs Accessibility."
+            return String(localized: "The send key needs Accessibility.")
         }
         guard submitKey.keyCodes.isSubset(of: model.settings.hotkey.keyCodes) else { return nil }
-        return "\(submitKey.displayName) is part of the push-to-talk key, so it can never be pressed separately."
+        return String(localized: "\(submitKey.displayName) is part of the push-to-talk key, so it can never be pressed separately.")
     }
 
     private var launchAtLogin: Binding<Bool> {
@@ -273,9 +271,9 @@ private struct GeneralSettingsView: View {
 
     private var micDetail: String {
         switch model.microphoneStatus {
-        case .authorized: "Granted."
-        case .denied, .restricted: "Denied. Enable it in System Settings."
-        default: "Not requested yet."
+        case .authorized: String(localized: "Granted.")
+        case .denied, .restricted: String(localized: "Denied. Enable it in System Settings.")
+        default: String(localized: "Not requested yet.")
         }
     }
 }
@@ -289,8 +287,10 @@ private struct ProcessingSettingsView: View {
                 ForEach(model.processors, id: \.id) { processor in
                     Toggle(isOn: binding(for: processor.id)) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(processor.displayName)
-                            Text(processor.detail)
+                            // Core cannot import the catalog, so its
+                            // processors are looked up by their English text.
+                            Text(LocalizedStringKey(processor.displayName))
+                            Text(LocalizedStringKey(processor.detail))
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -324,7 +324,9 @@ private struct ProcessingSettingsView: View {
 }
 
 private struct PermissionRow: View {
-    let title: String
+    let title: LocalizedStringKey
+    /// Already in the user's language: the callers build it with
+    /// `String(localized:)` because it depends on the permission's state.
     let detail: String
     let granted: Bool
     let action: @MainActor () -> Void
@@ -354,12 +356,16 @@ private struct PermissionRow: View {
 /// Section footer styling, the native macOS pattern: secondary colour, callout
 /// size, wrapping instead of truncating.
 struct FootnoteText: View {
-    private let text: String
+    private let text: Text
 
-    init(_ text: String) { self.text = text }
+    /// A literal, which the String Catalog translates.
+    init(_ key: LocalizedStringKey) { text = Text(key) }
+    /// Text that is already in the user's language, or has no translation to
+    /// give it: an engine's detail line, an error from the system.
+    init(verbatim text: String) { self.text = Text(text) }
 
     var body: some View {
-        Text(text)
+        text
             .font(.callout)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
