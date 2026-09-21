@@ -25,7 +25,8 @@ import Foundation
 ///   its auto-repeats and its key-up, so the frontmost app never sees the Space
 ///   in Control+Space. Modifier events are never swallowed.
 /// - The *submit key* is a second chord that may be pressed at any point while
-///   the hotkey chord is engaged. Doing so *arms* the release: the resulting
+///   the hotkey chord is engaged, and is always matched by side, however the
+///   hotkey chord is matched. Doing so *arms* the release: the resulting
 ///   `.released(submit: true)` asks for Return after the pasted text. The
 ///   submit keys themselves are swallowed (and their repeats and key-up with
 ///   them) so an app never sees a stray Return inside the dictation, and they
@@ -150,14 +151,17 @@ public struct HotkeyChordTracker: Sendable, Equatable {
         heldModifiers = modifiers
         let chordModifiers = matching(hotkey.modifierKeyCodes)
         if isEngaged {
-            let allowed = chordModifiers.union(matching(submitKey.modifierKeyCodes))
+            // The submit key is matched by side, so it is taken out before the
+            // rest is folded: the other side of it is a foreign modifier like
+            // any other.
+            let foreign = pressed.subtracting(submitKey.modifierKeyCodes)
             if !chordModifiers.isSubset(of: matching(heldModifiers)) {
                 // A chord modifier is no longer held: an ordinary release,
                 // whenever it came. Asked of what is still down rather than of
                 // what went up, so letting go of a redundant Left Option while
                 // Right Option holds Option+Space keeps the chord engaged.
                 isEngaged = false
-            } else if !matching(pressed).isSubset(of: allowed) {
+            } else if !matching(foreign).isSubset(of: chordModifiers) {
                 // A foreign modifier went down: Shift for Cmd+Shift+4, say.
                 disengage(interruptedAt: instant)
             } else if !pressed.isEmpty {
