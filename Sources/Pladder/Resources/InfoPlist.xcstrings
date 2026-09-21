@@ -1,7 +1,23 @@
 {
-  "sourceLanguage" : "en",
-  "strings" : {
-
+  "sourceLanguage": "en",
+  "strings": {
+    "NSMicrophoneUsageDescription": {
+      "comment": "The prompt macOS shows the first time Pladder asks for the microphone. The en value repeats the one in Info.plist; keep the two in step.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pladder nimmt deine Stimme auf, solange du die Push-to-Talk-Taste gedrückt hältst, und transkribiert sie auf diesem Mac."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pladder records your voice while you hold the push-to-talk key and transcribes it on this Mac."
+          }
+        }
+      }
+    }
   },
-  "version" : "1.0"
+  "version": "1.0"
 }
