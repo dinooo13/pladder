@@ -20,7 +20,7 @@ public extension Hotkey {
 /// Human-readable names for virtual key codes.
 public enum KeyNames {
     public static func name(for hotkey: Hotkey, collapsingSides: Bool = false) -> String {
-        guard !hotkey.keyCodes.isEmpty else { return "None" }
+        guard !hotkey.keyCodes.isEmpty else { return localized("None") }
         return hotkey.keyCodes
             .sorted { (rank($0), $0) < (rank($1), $1) }
             .map { name(forKeyCode: $0, collapsingSides: collapsingSides) }
@@ -28,10 +28,25 @@ public enum KeyNames {
     }
 
     public static func name(forKeyCode code: UInt16, collapsingSides: Bool = false) -> String {
-        if collapsingSides, let sideless = sidelessNames[code] { return sideless }
-        if let fixed = fixedNames[code] { return fixed }
+        if collapsingSides, let sideless = sidelessNames[code] { return localized(sideless) }
+        if let fixed = fixedNames[code] { return localized(fixed) }
+        // What the key types in the current layout, which is already the
+        // user's own language by definition.
         if let character = layoutCharacter(for: code) { return character }
-        return "Key \(code)"
+        return String(localized: "Key \(Int(code))", table: "KeyNames")
+    }
+
+    /// The dictionaries below stay English, because the English name is the
+    /// catalog key. A key with no German entry — F1 to F20, Eisu, Kana — is
+    /// returned as it stands, which is the right answer for all of them.
+    ///
+    /// Outside `Pladder.app` there is no catalog at all and this returns the
+    /// key too, so `swift run` and the tests need no bundle.
+    ///
+    /// Called by the settings recorder and the menu; never by the
+    /// coordinator, so no lookup is on the release-to-paste path.
+    private static func localized(_ key: String) -> String {
+        String(localized: String.LocalizationValue(key), table: "KeyNames")
     }
 
     /// Modifiers first, in the order macOS prints them (Control, Option,
