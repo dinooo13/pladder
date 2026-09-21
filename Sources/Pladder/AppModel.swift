@@ -412,7 +412,7 @@ final class AppModel {
         case .recording: return "Recording…"
         case .transcribing: return "Transcribing…"
         case .inserting: return "Inserting…"
-        case .error(let message): return "Error: \(message)"
+        case .error(let failure): return "Error: \(failure.text)"
         case .copied: return "Copied — press ⌘V"
         case .idle:
             return readyLine
@@ -425,7 +425,7 @@ final class AppModel {
                 return "Model: downloading…"
             case .loading: return "Model: loading…"
             case .unloaded: return "Model: not loaded"
-            case .failed(let message): return "Model failed: \(message)"
+            case .failed(let failure): return "Model failed: \(failure.text)"
             case .ready: return readyLine
             }
         }

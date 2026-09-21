@@ -23,13 +23,13 @@ import Testing
     @Test func loadFailureReportsTheEngineMessage() async {
         let loader = makeLoader(failures: 1)
         loader.load()
-        #expect(await waitUntil { loader.status == .failed(message: "boom") })
+        #expect(await waitUntil { loader.status == .failed(.loadFailed(detail: "boom")) })
     }
 
     @Test func reloadAfterFailureRecovers() async {
         let loader = makeLoader(failures: 1)
         loader.load()
-        #expect(await waitUntil { loader.status == .failed(message: "boom") })
+        #expect(await waitUntil { loader.status == .failed(.loadFailed(detail: "boom")) })
         loader.load()
         #expect(await waitUntil { loader.status == .ready })
     }

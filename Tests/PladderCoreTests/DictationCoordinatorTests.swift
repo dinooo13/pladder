@@ -109,7 +109,7 @@ actor FlakyEngine: TranscriptionEngine {
     func load() async throws {
         if failuresRemaining > 0 {
             failuresRemaining -= 1
-            status = .failed(message: "boom")
+            status = .failed(.loadFailed(detail: "boom"))
             throw LoadFailed()
         }
         status = .ready
@@ -334,7 +334,7 @@ final class EventLog: @unchecked Sendable {
 @Suite struct DictationCoordinatorTests {
     @Test func startsUnavailableThenIdleWhenEngineReady() async {
         let (c, _, _) = makeCoordinator()
-        #expect(c.state == .unavailable(reason: "Starting"))
+        #expect(c.state == .unavailable(.starting))
         c.start()
         #expect(await waitUntil { c.state == .idle })
         #expect(c.engineStatus == .ready)
@@ -343,7 +343,7 @@ final class EventLog: @unchecked Sendable {
     @Test func ignoresPressWhileEngineNotReady() async {
         let (c, _, capture) = makeCoordinator()
         await c.hotkeyPressed()
-        #expect(c.state == .unavailable(reason: "Starting"))
+        #expect(c.state == .unavailable(.starting))
         #expect(await capture.startCount == 0)
     }
 
@@ -621,8 +621,8 @@ final class EventLog: @unchecked Sendable {
         await c.hotkeyPressed()
         c.hotkeyReleased()
         await c.inFlight?.value
-        #expect(c.state == .error(message: "paste failed"))
-        #expect(c.lastError == "paste failed")
+        #expect(c.state == .error(.other(detail: "paste failed")))
+        #expect(c.lastError == .other(detail: "paste failed"))
         #expect(await waitUntil { c.state == .idle })
     }
 
@@ -710,7 +710,7 @@ final class EventLog: @unchecked Sendable {
         // the one the settings switched to mid-recording.
         #expect(output.inserted == ["one"])
         // The cycle ends in a terminal state; "two" may still be loading.
-        #expect(c.state == .unavailable(reason: "Loading model") || c.state == .idle)
+        #expect(c.state == .unavailable(.loadingModel) || c.state == .idle)
         #expect(await waitUntil { c.engineStatus == .ready })
         #expect(await waitUntil { c.state == .idle })
     }
@@ -837,8 +837,8 @@ final class EventLog: @unchecked Sendable {
             capture: FakeCapture(), output: FakeOutput(),
             hotkeyMonitor: FakeHotkey(), makePipeline: { _ in ProcessorPipeline([]) })
         c.start()
-        #expect(await waitUntil { c.state == .unavailable(reason: "boom") })
-        #expect(c.engineStatus == .failed(message: "boom"))
+        #expect(await waitUntil { c.state == .unavailable(.engineFailed(.loadFailed(detail: "boom"))) })
+        #expect(c.engineStatus == .failed(.loadFailed(detail: "boom")))
     }
 
     @Test func reloadAfterLoadFailureRecovers() async {
@@ -850,7 +850,7 @@ final class EventLog: @unchecked Sendable {
             capture: FakeCapture(), output: FakeOutput(),
             hotkeyMonitor: FakeHotkey(), makePipeline: { _ in ProcessorPipeline([]) })
         c.start()
-        #expect(await waitUntil { c.state == DictationState.unavailable(reason: "boom") })
+        #expect(await waitUntil { c.state == DictationState.unavailable(.engineFailed(.loadFailed(detail: "boom"))) })
         c.reloadEngine()
         #expect(await waitUntil { c.state == DictationState.idle })
     }

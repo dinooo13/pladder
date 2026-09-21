@@ -72,7 +72,7 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
             self.manager = manager
             status = .ready
         } catch {
-            status = .failed(message: Self.describe(error))
+            status = .failed(Self.describe(error))
             throw error
         }
     }
@@ -172,7 +172,7 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
     // MARK: StreamingTranscriptionEngine
 
     public func beginUtterance() async throws {
-        guard let manager, status.isReady else { throw EngineError.notLoaded }
+        guard let manager, status.isReady else { throw TranscriptionError.notLoaded }
         await session?.cancel()
         fedSampleCount = 0
         liveAudio.removeAll(keepingCapacity: true)
@@ -193,8 +193,8 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
     /// The timed part is `finish()` alone: the final window plus the merge,
     /// which is all that is left on the release-to-paste path.
     public func endUtterance(_ tail: [Float]) async throws -> Transcript {
-        guard status.isReady else { throw EngineError.notLoaded }
-        guard let session else { throw EngineError.notLoaded }
+        guard status.isReady else { throw TranscriptionError.notLoaded }
+        guard let session else { throw TranscriptionError.notLoaded }
         if !tail.isEmpty {
             fedSampleCount += tail.count
             try await session.append(tail)
@@ -272,7 +272,7 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
     /// single method. This is the batch path, not the incremental one; the
     /// incremental path needs audio delivered over time to show anything.
     public func transcribe(_ samples: [Float]) async throws -> Transcript {
-        guard let manager, status.isReady else { throw EngineError.notLoaded }
+        guard let manager, status.isReady else { throw TranscriptionError.notLoaded }
         let result = try await Self.transcribeWholeBuffer(samples, using: manager)
         return Transcript(
             text: result.text,
@@ -331,80 +331,69 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
     /// `errorDescription` said none of that — a lost connection during the
     /// first-launch download read as an engine bug, which is what the issue
     /// was opened about.
-    private static func describe(_ error: Error) -> String {
-        let text: String
+    ///
+    /// A value, not a sentence: the app owns the wording and the catalog.
+    private static func describe(_ error: Error) -> EngineFailure {
         switch error {
         case let error as DownloadError:
-            text = describe(error)
+            return describe(error)
         case let error as AsrModelsError:
-            text = describe(error)
+            return describe(error)
         case let error as URLError:
-            text = downloadFailure(reason(for: error))
+            return .download(reason(for: error))
         default:
             let detail = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
-            text = "Model could not be loaded: \(detail)"
+            return .loadFailed(detail: cut(detail))
         }
-        return text.count > 160 ? String(text.prefix(160)) + "…" : text
     }
 
-    private static func describe(_ error: DownloadError) -> String {
+    private static func describe(_ error: DownloadError) -> EngineFailure {
         switch error {
         case .invalidResponse, .htmlErrorResponse:
-            return downloadFailure("Hugging Face returned an error")
+            return .download(.serverError)
         case .rateLimited:
-            return downloadFailure("Hugging Face rate limit")
+            return .download(.rateLimited)
         case .stalled:
-            return downloadFailure("the transfer stalled")
+            return .download(.stalled)
         case .downloadFailed(_, let underlying):
-            return downloadFailure((underlying as? URLError).map(reason(for:)) ?? "network error")
+            return .download((underlying as? URLError).map(reason(for:)) ?? .network)
         case .invalidArtifact:
-            return downloadFailure("a file arrived damaged")
+            return .download(.damagedFile)
         case .modelNotFound, .modelMissing, .networkDisabled:
-            return Self.incompleteFiles
+            return .incompleteFiles
         }
     }
 
-    private static func describe(_ error: AsrModelsError) -> String {
+    private static func describe(_ error: AsrModelsError) -> EngineFailure {
         switch error {
         case .downloadFailed(let reason):
-            return downloadFailure(reason)
+            return .download(.other(detail: cut(reason)))
         case .modelNotFound:
-            return Self.incompleteFiles
+            return .incompleteFiles
         case .loadingFailed(let reason), .modelCompilationFailed(let reason):
-            return "Model could not be loaded: \(reason)"
+            return .loadFailed(detail: cut(reason))
         }
     }
 
-    /// Retry calls `load()` again, which resumes the `.partial` rather than
-    /// starting the ~460 MB over; saying so is the point of the message.
-    private static func downloadFailure(_ reason: String) -> String {
-        "Download failed: \(reason) (Retry resumes it)"
-    }
-
-    private static let incompleteFiles = "Model files incomplete (Retry re-downloads them)"
-
-    private static func reason(for error: URLError) -> String {
+    private static func reason(for error: URLError) -> DownloadFailure {
         switch error.code {
         case .notConnectedToInternet, .networkConnectionLost, .cannotFindHost,
             .cannotConnectToHost, .dnsLookupFailed, .internationalRoamingOff:
-            return "no connection"
+            return .noConnection
         case .timedOut:
-            return "timed out"
+            return .timedOut
         case .secureConnectionFailed, .serverCertificateUntrusted:
-            return "TLS error"
+            return .tls
         case .cancelled:
-            return "cancelled"
+            return .cancelled
         default:
-            return "network error"
+            return .network
         }
     }
 
-    public enum EngineError: LocalizedError {
-        case notLoaded
-        public var errorDescription: String? {
-            switch self {
-            case .notLoaded: return "Speech model is not loaded yet."
-            }
-        }
+    /// The engine's own free text is shown verbatim after a translated
+    /// prefix, so it is kept to a line.
+    private static func cut(_ detail: String) -> String {
+        detail.count > 160 ? String(detail.prefix(160)) + "…" : detail
     }
 }

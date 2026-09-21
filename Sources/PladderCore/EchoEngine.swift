@@ -26,7 +26,7 @@ public actor EchoEngine: TranscriptionEngine {
     }
 
     public func transcribe(_ samples: [Float]) async throws -> Transcript {
-        guard status == .ready else { throw NotLoaded() }
+        guard status == .ready else { throw TranscriptionError.notLoaded }
         let started = Date()
         try await Task.sleep(for: delay)
         return Transcript(
@@ -35,10 +35,6 @@ public actor EchoEngine: TranscriptionEngine {
             processingTime: Date().timeIntervalSince(started),
             engineID: id
         )
-    }
-
-    public struct NotLoaded: LocalizedError {
-        public var errorDescription: String? { "Speech model is not loaded yet." }
     }
 
     public func unload() {

@@ -39,7 +39,47 @@ public enum EngineStatus: Equatable, Sendable {
     case downloading(progress: Double?)
     case loading
     case ready
-    case failed(message: String)
+    case failed(EngineFailure)
 
     public var isReady: Bool { self == .ready }
+}
+
+/// Why an engine could not be loaded, as a value rather than a sentence: Core
+/// imports Foundation only and produces no user-facing text, so the app turns
+/// this into the line the menu shows, in the system language.
+///
+/// The distinction worth a user's attention is whether the network or the
+/// files are at fault: a download that stopped continues from where it
+/// stopped when they choose Retry, missing or damaged files are fetched
+/// again, and only what is left is an engine problem.
+public enum EngineFailure: Equatable, Sendable {
+    /// The model did not finish downloading. Calling `load()` again resumes
+    /// the `.partial` rather than starting over.
+    case download(DownloadFailure)
+    /// The cache is missing files. Calling `load()` again re-downloads them.
+    case incompleteFiles
+    /// The engine's own wording for anything else. Kept short; it is shown
+    /// verbatim, untranslated, after a translated prefix.
+    case loadFailed(detail: String)
+}
+
+/// What stopped the download.
+public enum DownloadFailure: Equatable, Sendable {
+    case serverError
+    case rateLimited
+    case stalled
+    case damagedFile
+    case noConnection
+    case timedOut
+    case tls
+    case cancelled
+    case network
+    /// The downloader's own wording, shown verbatim and untranslated.
+    case other(detail: String)
+}
+
+/// The errors an engine throws for reasons the app knows how to phrase.
+public enum TranscriptionError: Error, Equatable, Sendable {
+    /// Asked to transcribe before `load()` finished.
+    case notLoaded
 }
