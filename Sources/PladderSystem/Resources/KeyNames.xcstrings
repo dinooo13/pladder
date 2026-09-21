@@ -1,59 +1,536 @@
 {
   "sourceLanguage": "en",
   "strings": {
-    "Caps Lock": {},
-    "Command": {},
-    "Control": {},
-    "Delete": {},
-    "Down Arrow": {},
-    "End": {},
-    "Escape": {},
-    "Fn / Globe": {},
-    "Forward Delete": {},
-    "Help": {},
-    "Home": {},
-    "Key %lld": {},
-    "Keypad *": {},
-    "Keypad +": {},
-    "Keypad -": {},
-    "Keypad .": {},
-    "Keypad /": {},
-    "Keypad 0": {},
-    "Keypad 1": {},
-    "Keypad 2": {},
-    "Keypad 3": {},
-    "Keypad 4": {},
-    "Keypad 5": {},
-    "Keypad 6": {},
-    "Keypad 7": {},
-    "Keypad 8": {},
-    "Keypad 9": {},
-    "Keypad =": {},
-    "Keypad Clear": {},
-    "Keypad Enter": {},
-    "Left Arrow": {},
-    "Left Command": {},
-    "Left Control": {},
-    "Left Option": {},
-    "Left Shift": {},
-    "Menu": {},
-    "Mute": {},
-    "None": {},
-    "Option": {},
-    "Page Down": {},
-    "Page Up": {},
-    "Return": {},
-    "Right Arrow": {},
-    "Right Command": {},
-    "Right Control": {},
-    "Right Option": {},
-    "Right Shift": {},
-    "Shift": {},
-    "Space": {},
-    "Tab": {},
-    "Up Arrow": {},
-    "Volume Down": {},
-    "Volume Up": {}
+    "Caps Lock": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feststelltaste"
+          }
+        }
+      }
+    },
+    "Command": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Befehlstaste"
+          }
+        }
+      }
+    },
+    "Control": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Steuerungstaste"
+          }
+        }
+      }
+    },
+    "Delete": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rückschritttaste"
+          }
+        }
+      }
+    },
+    "Down Arrow": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pfeil unten"
+          }
+        }
+      }
+    },
+    "End": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ende"
+          }
+        }
+      }
+    },
+    "Escape": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esc"
+          }
+        }
+      }
+    },
+    "Fn / Globe": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fn / Globus"
+          }
+        }
+      }
+    },
+    "Forward Delete": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entfernen"
+          }
+        }
+      }
+    },
+    "Help": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hilfe"
+          }
+        }
+      }
+    },
+    "Home": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anfang"
+          }
+        }
+      }
+    },
+    "Key %lld": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Taste %lld"
+          }
+        }
+      }
+    },
+    "Keypad *": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ziffernblock *"
+          }
+        }
+      }
+    },
+    "Keypad +": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ziffernblock +"
+          }
+        }
+      }
+    },
+    "Keypad -": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ziffernblock -"
+          }
+        }
+      }
+    },
+    "Keypad .": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ziffernblock ."
+          }
+        }
+      }
+    },
+    "Keypad /": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ziffernblock /"
+          }
+        }
+      }
+    },
+    "Keypad 0": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ziffernblock 0"
+          }
+        }
+      }
+    },
+    "Keypad 1": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ziffernblock 1"
+          }
+        }
+      }
+    },
+    "Keypad 2": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ziffernblock 2"
+          }
+        }
+      }
+    },
+    "Keypad 3": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ziffernblock 3"
+          }
+        }
+      }
+    },
+    "Keypad 4": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ziffernblock 4"
+          }
+        }
+      }
+    },
+    "Keypad 5": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ziffernblock 5"
+          }
+        }
+      }
+    },
+    "Keypad 6": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ziffernblock 6"
+          }
+        }
+      }
+    },
+    "Keypad 7": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ziffernblock 7"
+          }
+        }
+      }
+    },
+    "Keypad 8": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ziffernblock 8"
+          }
+        }
+      }
+    },
+    "Keypad 9": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ziffernblock 9"
+          }
+        }
+      }
+    },
+    "Keypad =": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ziffernblock ="
+          }
+        }
+      }
+    },
+    "Keypad Clear": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ziffernblock löschen"
+          }
+        }
+      }
+    },
+    "Keypad Enter": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ziffernblock-Eingabe"
+          }
+        }
+      }
+    },
+    "Left Arrow": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pfeil links"
+          }
+        }
+      }
+    },
+    "Left Command": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Linke Befehlstaste"
+          }
+        }
+      }
+    },
+    "Left Control": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Linke Steuerungstaste"
+          }
+        }
+      }
+    },
+    "Left Option": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Linke Wahltaste"
+          }
+        }
+      }
+    },
+    "Left Shift": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Linke Umschalttaste"
+          }
+        }
+      }
+    },
+    "Menu": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menü"
+          }
+        }
+      }
+    },
+    "Mute": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stumm"
+          }
+        }
+      }
+    },
+    "None": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine"
+          }
+        }
+      }
+    },
+    "Option": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wahltaste"
+          }
+        }
+      }
+    },
+    "Page Down": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bild ab"
+          }
+        }
+      }
+    },
+    "Page Up": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bild auf"
+          }
+        }
+      }
+    },
+    "Return": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zeilenschalter"
+          }
+        }
+      }
+    },
+    "Right Arrow": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pfeil rechts"
+          }
+        }
+      }
+    },
+    "Right Command": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rechte Befehlstaste"
+          }
+        }
+      }
+    },
+    "Right Control": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rechte Steuerungstaste"
+          }
+        }
+      }
+    },
+    "Right Option": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rechte Wahltaste"
+          }
+        }
+      }
+    },
+    "Right Shift": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rechte Umschalttaste"
+          }
+        }
+      }
+    },
+    "Shift": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Umschalttaste"
+          }
+        }
+      }
+    },
+    "Space": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leertaste"
+          }
+        }
+      }
+    },
+    "Tab": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tabulatortaste"
+          }
+        }
+      }
+    },
+    "Up Arrow": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pfeil oben"
+          }
+        }
+      }
+    },
+    "Volume Down": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leiser"
+          }
+        }
+      }
+    },
+    "Volume Up": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lauter"
+          }
+        }
+      }
+    }
   },
   "version": "1.0"
 }
