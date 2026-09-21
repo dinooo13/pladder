@@ -23,10 +23,17 @@ final class OverlayPanel: NSPanel {
         }
     }
 
-    /// How long the pill takes to fade out. The controller waits it out
-    /// before it resets the model, so the last content stays on screen for
-    /// the whole fade.
+    /// How long the pill takes to fade out when it does not fly. Flightless
+    /// hides — the clipboard hint, an error — use the plain fade; the
+    /// controller waits it out before it resets the model, so the last
+    /// content stays on screen for the whole fade.
     static let fadeOutDuration: TimeInterval = 0.25
+
+    /// How far below its resting frame the panel starts (and dives back to),
+    /// so the pill enters and leaves through the screen's bottom edge. The
+    /// pill never sits higher than the panel's top, which is 64 pt above the
+    /// screen bottom, and it draws its own shadow.
+    private static func flightDistance(for height: CGFloat) -> CGFloat { height + 80 }
 
     private let model: OverlayModel
 
@@ -70,55 +77,93 @@ final class OverlayPanel: NSPanel {
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 
-    func show() {
+    func show(flight: Bool, onArrival: (@MainActor @Sendable () -> Void)? = nil) {
         generation &+= 1
+        let token = generation
         // A borderless panel that is never key or main does not reliably
         // inherit an appearance changed through `NSApp.appearance` after it
         // was created, so re-sync on every show. The settings window restyles
         // itself; the panel only exists between its appearances.
         appearance = NSApp.appearance
-        reposition()
+        let final = targetFrame()
+        alphaValue = 1
         // `orderFrontRegardless` avoids requiring Pladder to be active, which
         // an accessory app never is.
-        orderFrontRegardless()
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.15
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            animator().alphaValue = 1
+        if flight {
+            // Start fully below the bottom edge — the window is clipped
+            // there, so nothing flashes — and slide up to rest. The pill is
+            // always opaque; the disc-to-style morph is SwiftUI's job once
+            // the slide lands.
+            setFrame(final.offsetBy(dx: 0, dy: -Self.flightDistance(for: final.height)), display: false)
+            orderFrontRegardless()
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = model.speed.flightDuration
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                animator().setFrame(final, display: true)
+            }, completionHandler: { [weak self] in
+                MainActor.assumeIsolated {
+                    guard let self, self.generation == token else { return }
+                    onArrival?()
+                }
+            })
+        } else {
+            setFrame(final, display: false)
+            orderFrontRegardless()
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.15
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                animator().alphaValue = 1
+            }
         }
     }
 
-    func hide() {
+    func hide(flight: Bool) {
         generation &+= 1
         let token = generation
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = Self.fadeOutDuration
-            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
-            animator().alphaValue = 0
-        } completionHandler: { [weak self] in
-            // AppKit runs this on the main thread, but types it as @Sendable.
-            MainActor.assumeIsolated {
-                guard let self, self.generation == token else { return }
-                self.orderOut(nil)
+        if flight {
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = model.speed.flightDuration
+                context.timingFunction = CAMediaTimingFunction(name: .easeIn)
+                animator().setFrame(
+                    frame.offsetBy(dx: 0, dy: -Self.flightDistance(for: frame.height)),
+                    display: true)
+            }, completionHandler: { [weak self] in
+                MainActor.assumeIsolated {
+                    guard let self, self.generation == token else { return }
+                    self.orderOut(nil)
+                }
+            })
+        } else {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = Self.fadeOutDuration
+                context.timingFunction = CAMediaTimingFunction(name: .easeIn)
+                animator().alphaValue = 0
+            } completionHandler: { [weak self] in
+                // AppKit runs this on the main thread, but types it as @Sendable.
+                MainActor.assumeIsolated {
+                    guard let self, self.generation == token else { return }
+                    self.orderOut(nil)
+                }
             }
         }
     }
 
     /// Bottom-centre of whichever screen the pointer is on, so the pill shows up
     /// where the user is looking on a multi-display setup.
-    private func reposition() {
+    private func targetFrame() -> NSRect {
         let mouse = NSEvent.mouseLocation
         let screen = NSScreen.screens.first { $0.frame.contains(mouse) }
             ?? NSScreen.main
             ?? NSScreen.screens.first
-        guard let frame = screen?.frame else { return }
+        guard let frame = screen?.frame else { return self.frame }
         // The style can change between showings; the hosting view's
         // autoresizing mask follows `setFrame`.
         let size = Self.size(for: model.style)
-        let origin = NSPoint(
+        return NSRect(
             x: frame.midX - size.width / 2,
-            y: frame.minY + 64
+            y: frame.minY + 64,
+            width: size.width,
+            height: size.height
         )
-        setFrame(NSRect(origin: origin, size: size), display: false)
     }
 }

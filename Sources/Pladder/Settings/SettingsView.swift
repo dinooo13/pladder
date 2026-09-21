@@ -40,10 +40,20 @@ private extension Appearance {
 private extension OverlayStyle {
     var displayName: String {
         switch self {
-        case .menuBar: "Menu Bar"
+        case .menuBar: "Menu"
         case .minimal: "Minimal"
         case .compact: "Compact"
         case .liveTranscript: "Live"
+        }
+    }
+}
+
+private extension OverlayAnimationSpeed {
+    var displayName: String {
+        switch self {
+        case .instant: "Ludicrous"
+        case .quick: "Quick"
+        case .expressive: "Chill"
         }
     }
 }
@@ -150,10 +160,26 @@ private struct GeneralSettingsView: View {
                         }
                     }
                 }
+                LabeledContent("Animation") {
+                    HStack(spacing: 8) {
+                        ForEach(OverlayAnimationSpeed.allCases, id: \.self) { speed in
+                            OptionCard(
+                                title: speed.displayName,
+                                isSelected: model.settings.overlayAnimationSpeed == speed,
+                                // Menu never flies a pill in, so like the
+                                // background the speed has nothing to act on.
+                                isEnabled: model.settings.overlayStyle != .menuBar,
+                                action: { model.settings.overlayAnimationSpeed = speed }
+                            ) {
+                                AnimationSpeedThumbnail(speed: speed)
+                            }
+                        }
+                    }
+                }
             } header: {
                 Text("Overlay")
             } footer: {
-                FootnoteText("Shown while you dictate. Menu Bar only relies on the wave in the menu bar; errors still appear.")
+                FootnoteText("Shown while you dictate, flying up from the bottom edge as a circle and expanding into place. Menu relies on the wave in the menu bar alone; errors still appear.")
             }
 
             Section("Sounds & Startup") {

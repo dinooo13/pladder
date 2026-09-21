@@ -104,6 +104,9 @@ final class AppModel {
             if newValue.overlayStyle != old.overlayStyle || newValue.overlayGlass != old.overlayGlass {
                 overlay.applyStyle(newValue.overlayStyle, glass: newValue.overlayGlass)
             }
+            if newValue.overlayAnimationSpeed != old.overlayAnimationSpeed {
+                overlay.applySpeed(newValue.overlayAnimationSpeed)
+            }
             if newValue.hotkey != old.hotkey {
                 // A chord with a regular key no longer needs a stand-in, and a
                 // modifier-only one does.
@@ -228,6 +231,7 @@ final class AppModel {
     func start() {
         applyAppearance(settings.appearance)
         overlay.applyStyle(settings.overlayStyle, glass: settings.overlayGlass)
+        overlay.applySpeed(settings.overlayAnimationSpeed)
         refreshPermissions()
         if !accessibilityTrusted && !didRequestAccessibility {
             didRequestAccessibility = true

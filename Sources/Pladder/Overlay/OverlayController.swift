@@ -64,6 +64,12 @@ final class OverlayController {
         model.glass = glass
     }
 
+    /// Pushes the animation speed onto the model; both the panel's slide and
+    /// the pill's morph read it.
+    func applySpeed(_ speed: OverlayAnimationSpeed) {
+        model.speed = speed
+    }
+
     /// `withObservationTracking` fires once per change, so we re-arm it every
     /// time. The callback runs *before* the new value is stored, hence the hop
     /// onto a task to read it.
@@ -92,7 +98,7 @@ final class OverlayController {
             // presented. If the style was switched mid-dictation the pill may
             // already be up; fade it out the same way idle does.
             guard model.style != .menuBar else {
-                if visible { scheduleHide(after: .zero) }
+                if visible { scheduleHide(after: .zero, flight: false) }
                 return
             }
             model.state = state
@@ -100,18 +106,18 @@ final class OverlayController {
             cancelHide()
             schedulePresent()
         case .transcribing:
-            // The pill fades out from the recording row it was showing at the
-            // release, and the model is deliberately left alone so that is
-            // what fades. The text normally lands before a "Transcribing…"
-            // morph could even finish, and the paste is the confirmation.
+            // The pill dives back down from the recording row it was showing
+            // at the release, and the model is deliberately left alone so
+            // that is what flies away. The text normally lands well inside
+            // the flight, and the paste is the confirmation.
             guard model.style != .menuBar else {
-                if visible { scheduleHide(after: .zero) }
+                if visible { scheduleHide(after: .zero, flight: false) }
                 return
             }
             // A new partial can re-run this while the spinner is already
             // armed or on screen; only the first `.transcribing` acts.
             guard spinnerTask == nil else { return }
-            if visible { scheduleHide(after: .zero) }
+            if visible { scheduleHide(after: .zero, flight: true) }
             // Only a transcription that outlasts the delay — a cold engine, a
             // long merge, a release inside a warm pass — brings the pill back.
             spinnerTask = Task { [weak self] in
@@ -121,7 +127,7 @@ final class OverlayController {
                 self.model.partialTranscript = nil
                 self.model.state = .transcribing
                 self.cancelHide()
-                self.present()
+                self.present(flight: true)
             }
         case .inserting:
             // Milliseconds long, and `.idle` or `.copied` follows at once, so
@@ -130,36 +136,53 @@ final class OverlayController {
             cancelSpinner()
         case .error:
             // Errors show in every style, Menu Bar included: a failed paste
-            // must never be silent.
+            // must never be silent. They fade in place rather than fly: an
+            // alarm should be there at once, not arrive a moment later.
             cancelSpinner()
             model.state = state
             cancelHide()
-            present()
-            scheduleHide(after: .seconds(2))
+            present(flight: false)
+            scheduleHide(after: .seconds(2), flight: false)
         case .copied:
             // Same rule as an error: the text is on the clipboard and nothing
             // pasted it, so the user has to be told in every style. No hide is
             // scheduled here — the coordinator holds `.copied` for its display
-            // duration and the `.idle` branch below fades the pill out.
+            // duration and the `.idle` branch below hides the pill after it.
             cancelSpinner()
             model.state = state
             cancelHide()
-            present()
+            present(flight: false)
         case .idle, .unavailable:
             // Deliberately *not* updating the model here: the pill keeps
             // whatever it was showing — the recording row, the spinner, the
-            // clipboard hint — and fades out with it. `scheduleHide` resets
-            // the model once the panel is out.
+            // clipboard hint — and leaves the screen with it. `scheduleHide`
+            // resets the model once the panel is out.
             cancelSpinner()
             guard visible else { return }
-            scheduleHide(after: .zero)
+            scheduleHide(after: .zero, flight: false)
         }
     }
 
-    private func present() {
+    /// A flight presentation is the flying disc: the pill rises from the
+    /// screen's bottom edge as the Minimal circle and expands into its
+    /// style's shape on arrival. Errors and the clipboard hint skip the
+    /// flight — they must be immediate — and fade in where the pill rests;
+    /// the pill is parked as the disc while hidden, so they open out of it
+    /// during the fade.
+    private func present(flight: Bool) {
         guard !visible else { return }
         visible = true
-        panel.show()
+        if flight {
+            model.presentation = .flyingIn
+            panel.show(flight: true) {
+                // The view animates on every presentation change, so this
+                // expands the disc into the style's shape.
+                self.model.presentation = .settled
+            }
+        } else {
+            model.presentation = .settled
+            panel.show(flight: false)
+        }
     }
 
     /// Presents after `presentDelay`, unless the pill is already up (a press
@@ -174,7 +197,7 @@ final class OverlayController {
             self.presentTask = nil
             guard self.coordinator.state.isRecording, self.model.style != .menuBar else { return }
             self.cancelHide()
-            self.present()
+            self.present(flight: true)
         }
     }
 
@@ -193,20 +216,34 @@ final class OverlayController {
         spinnerTask = nil
     }
 
-    private func scheduleHide(after delay: Duration) {
+    /// `flight` matches the presentation: a recording pill dives back down
+    /// through the screen's bottom edge, anything else fades in place.
+    private func scheduleHide(after delay: Duration, flight: Bool) {
         hideTask?.cancel()
         hideTask = Task { [weak self] in
             try? await Task.sleep(for: delay)
             guard !Task.isCancelled, let self, self.visible else { return }
             self.visible = false
-            self.panel.hide()
+            if flight {
+                // First the capsule gathers into the disc, then the panel
+                // slides down behind the screen edge: the mirror of the
+                // arrival, which slides up and then expands.
+                self.model.presentation = .flyingOut
+                try? await Task.sleep(for: .seconds(self.model.speed.morphDuration))
+                guard !Task.isCancelled, !self.visible else { return }
+                self.panel.hide(flight: true)
+                try? await Task.sleep(for: .seconds(self.model.speed.flightDuration))
+            } else {
+                self.panel.hide(flight: false)
+                try? await Task.sleep(for: .seconds(OverlayPanel.fadeOutDuration))
+            }
             // Once the panel is out, put the model back to idle. `OverlayPill`
             // restarts the Minimal dot and its pulse when the phase *leaves*
             // `.recording`, so a model left at the last recording level would
-            // open the next take on bare bars. A press inside the fade cancels
-            // this task, so that one take skips the dot intro.
-            try? await Task.sleep(for: .seconds(OverlayPanel.fadeOutDuration))
+            // open the next take on bare bars. A press inside the flight
+            // cancels this task, so that one take skips the dot intro.
             guard !Task.isCancelled, !self.visible else { return }
+            self.model.presentation = .hidden
             self.model.state = .idle
             self.model.partialTranscript = nil
         }
