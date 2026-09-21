@@ -51,7 +51,7 @@ public struct Settings: Codable, Sendable, Equatable {
 
     public init(
         engineID: EngineID,
-        hotkey: Hotkey = .rightCommand,
+        hotkey: Hotkey = .optionSpace,
         submitKey: Hotkey = .rightOption,
         disabledProcessors: Set<String> = [],
         dictionary: [DictionaryEntry] = [],
@@ -91,7 +91,7 @@ public struct Settings: Codable, Sendable, Equatable {
         engineID = try c.decode(EngineID.self, forKey: .engineID)
         // An empty chord can never fire, so treat it like a missing key.
         let decodedHotkey = try c.decodeIfPresent(Hotkey.self, forKey: .hotkey)
-        hotkey = decodedHotkey.flatMap { $0.keyCodes.isEmpty ? nil : $0 } ?? .rightCommand
+        hotkey = decodedHotkey.flatMap { $0.keyCodes.isEmpty ? nil : $0 } ?? .optionSpace
         // Unlike the hotkey, an empty submit key is meaningful: it is how the
         // feature is switched off.
         submitKey = try c.decodeIfPresent(Hotkey.self, forKey: .submitKey) ?? .rightOption

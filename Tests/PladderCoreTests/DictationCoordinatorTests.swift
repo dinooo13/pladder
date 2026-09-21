@@ -539,8 +539,8 @@ final class EventLog: @unchecked Sendable {
 
     // MARK: Stand-in chord
 
-    /// Control+Shift+Space, the first chord the app stands in with when
-    /// Accessibility is missing and the stored one cannot be registered.
+    /// A chord the app stands in with when Accessibility is missing and the
+    /// stored one cannot be registered.
     private static let standIn = Hotkey(0x3B, 0x38, 0x31)
 
     @Test func hotkeyOverrideIsWhatTheMonitorStarts() async {
@@ -553,7 +553,7 @@ final class EventLog: @unchecked Sendable {
         #expect(await waitUntil { c.state == .idle })
         #expect(fake.startCount == 1)
         #expect(fake.lastHotkey == Self.standIn)
-        #expect(c.settings.hotkey == .rightCommand)
+        #expect(c.settings.hotkey == .optionSpace)
     }
 
     @Test func changingTheOverrideWhileRecordingStopsTheMicrophone() async {
@@ -1117,7 +1117,7 @@ final class EventLog: @unchecked Sendable {
         let decoded = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
         #expect(decoded.engineID == EchoEngine.engineID)
         #expect(decoded.dictionary.count == 1)
-        #expect(decoded.hotkey == .rightCommand)
+        #expect(decoded.hotkey == .optionSpace)
         #expect(decoded.submitKey == .rightOption)
         #expect(decoded.appendTrailingSpace == true)
         #expect(decoded.appearance == .system)
