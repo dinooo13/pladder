@@ -47,10 +47,11 @@ public final class DictationCoordinator {
     /// The chord the monitor listens for in place of `settings.hotkey`.
     ///
     /// Set by the app while Accessibility is missing and the stored chord
-    /// cannot be registered without it — a modifier-only default such as Right
-    /// Command, or one macOS already owns. The stored chord is left untouched
-    /// and comes back the moment this is cleared, which is what happens when
-    /// Accessibility is granted. Nil means "listen for the stored chord".
+    /// cannot be registered without it — a modifier-only chord such as Right
+    /// Command, which the default Option+Space then stands in for. The stored
+    /// chord is left untouched and comes back the moment this is cleared,
+    /// which is what happens when Accessibility is granted. Nil means "listen
+    /// for the stored chord".
     public var hotkeyOverride: Hotkey? {
         didSet {
             guard hotkeyOverride != oldValue else { return }
