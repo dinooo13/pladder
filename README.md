@@ -30,7 +30,7 @@
 </p>
 
 <!--
-  Hero GIF goes here: six to eight seconds of holding Right Command, saying a
+  Hero GIF goes here: six to eight seconds of holding Option+Space, saying a
   prompt into Claude Code, letting go, the text landing, the agent starting.
   Record with QuickTime or `screencapture -v`, convert with ffmpeg + gifski.
   Replace the picture below with:
@@ -56,7 +56,7 @@
 
 You type long prompts all day. Speech is three to four times faster than typing, and the thing that has always made dictation annoying is waiting for it. Pladder is built around one number: the time between letting go of the key and the text appearing. On the slowest supported Mac, a ten-second sentence is pasted in under 300 milliseconds. That is the entire path — capture, transcription, output — measured end to end.
 
-- **One key, everywhere.** Hold Right Command, or any key or chord you record. Speak. Release. The words land at the cursor in any app that takes text. No window to open, no button to click, no mode to leave.
+- **One key, everywhere.** Hold Option+Space, or any key or chord you record. Speak. Release. The words land at the cursor in any app that takes text. No window to open, no button to click, no mode to leave.
 - **Two keys, and it is sent.** Tap Right Option while you speak and the dictation goes out with Return the moment you let go. A prompt to an agent, a chat message, a shell command, without touching the keyboard again.
 - **Nothing leaves your Mac.** The speech model runs on the Neural Engine. There is no account, no server, no telemetry, and the app makes no network requests after the one-time model download.
 - **It knows your words.** A dictionary turns what the model hears into what you meant. "clode code" becomes "Claude Code", "get hub" becomes "GitHub", every time, at zero cost in latency. List a word on its own and near misses of it are repaired too, so "Chat G P T" comes out as "ChatGPT" without you predicting every way the model might mangle it.
@@ -118,7 +118,7 @@ cd pladder
 ./scripts/bundle.sh --install --run
 ```
 
-Grant Microphone and Accessibility when asked, wait for the model to download once, then hold **Right Command** in any text field and speak. Without Accessibility the menu says which key stands in for it. The full walkthrough, signing, troubleshooting and the command-line tool are in [INSTALL.md](INSTALL.md).
+Grant Microphone and Accessibility when asked, wait for the model to download once, then hold **Option+Space** in any text field and speak. It is the same key with or without Accessibility. The full walkthrough, signing, troubleshooting and the command-line tool are in [INSTALL.md](INSTALL.md).
 
 ## FAQ
 
@@ -141,7 +141,10 @@ The 25 European languages Parakeet TDT v3 supports, including English, German, F
 Any Apple Silicon Mac on macOS 26 or later. Benchmarks are taken on an M1, so every newer chip is faster.
 
 **Can I change the key?**
-Yes. Any key or combination, recorded by pressing it in Settings. Right Command is the default because nothing else uses it.
+Yes. Any key or combination, recorded by pressing it in Settings, and either Option works for the default. Option+Space is the default because no macOS shortcut owns it and it works without Accessibility.
+
+**Option+Space is my Alfred or Raycast hotkey, or I type non-breaking spaces with it.**
+Option+Space is Alfred's default hotkey and a common Raycast choice, and it types a non-breaking space in most layouts. Both are lost while Pladder runs. Record another combination in Settings if you need them.
 
 **Can it press Return for me?**
 Yes. Press the send key, Right Option by default, at any point while you hold the push-to-talk key, and Return is pressed after the text is pasted. That sends a chat message or runs a terminal command without touching the keyboard again. The send key can be changed in Settings, like the push-to-talk key.
