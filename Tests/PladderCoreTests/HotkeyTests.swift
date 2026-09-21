@@ -255,6 +255,19 @@ private let keyC: UInt16 = 0x08
         #expect(t.flagsChanged(modifiers: []) == .init(event: .released(submit: true)))
     }
 
+    @Test func theOtherSideOfTheSendKeyStillInterrupts() {
+        // The send key is matched by side even when the chord is not, so Left
+        // Option is a foreign modifier here and the press is cancelled.
+        let t0 = ContinuousClock.now
+        var t = HotkeyChordTracker(hotkey: Hotkey(leftControl, space), submitKey: .rightOption)
+        #expect(
+            t.keyDown(space, modifiers: [leftControl], at: t0)
+                == .init(event: .pressed, swallow: true))
+        #expect(
+            t.flagsChanged(modifiers: [leftControl, leftOption], at: t0 + .milliseconds(100))
+                == .init(event: .cancelled))
+    }
+
     @Test func sendKeyArmsOnEitherOptionWhileOptionSpaceIsHeld() {
         // Accepted quirk: Right Option is already down as part of the chord,
         // so pressing the other Option arms the send key.

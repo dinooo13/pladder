@@ -539,8 +539,8 @@ final class EventLog: @unchecked Sendable {
 
     // MARK: Stand-in chord
 
-    /// A chord the app stands in with when Accessibility is missing and the
-    /// stored one cannot be registered.
+    /// An override chord; the coordinator does not care which, it just starts
+    /// the monitor with whatever the app hands it.
     private static let standIn = Hotkey(0x3B, 0x38, 0x31)
 
     @Test func hotkeyOverrideIsWhatTheMonitorStarts() async {
