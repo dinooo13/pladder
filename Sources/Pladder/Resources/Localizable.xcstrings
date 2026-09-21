@@ -31,6 +31,16 @@
         }
       }
     },
+    "Accessibility": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bedienungshilfen"
+          }
+        }
+      }
+    },
     "Add a rule": {
       "localizations": {
         "de": {
@@ -521,6 +531,16 @@
         }
       }
     },
+    "Microphone": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mikrofon"
+          }
+        }
+      }
+    },
     "Microphone: %@": {
       "localizations": {
         "de": {
@@ -986,7 +1006,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Startet"
+            "value": "Wird gestartet"
           }
         }
       }
