@@ -66,18 +66,24 @@ struct HotkeyRecorderField: View {
         // "Needs a regular key…": the user may well have pressed one and had
         // macOS eat it before Pladder saw it.
         if let refused = recorder.refusedModifiers {
-            return "Only \(refused.sideAgnosticDisplayName) arrived…"
+            return String(localized: "Only \(refused.sideAgnosticDisplayName) arrived…")
         }
-        return recorder.pending?.displayName ?? "Press keys…"
+        return recorder.pending?.displayName ?? String(localized: "Press keys…")
     }
 
+    /// Four whole sentences rather than fragments glued together: a
+    /// translation cannot be assembled from clauses.
     private var help: String {
-        let base = recorder.isRecording
-            ? "Press the key or combination to use. Escape cancels."
-            : "Click, then press the key or combination to use."
-        guard requiresRegularKey else { return base }
-        return base + " Without Accessibility the key must include a regular key, "
-            + "for example Control+Shift+D."
+        switch (recorder.isRecording, requiresRegularKey) {
+        case (true, false):
+            String(localized: "Press the key or combination to use. Escape cancels.")
+        case (true, true):
+            String(localized: "Press the key or combination to use. Escape cancels. Without Accessibility the key must include a regular key, for example Control+Shift+D.")
+        case (false, false):
+            String(localized: "Click, then press the key or combination to use.")
+        case (false, true):
+            String(localized: "Click, then press the key or combination to use. Without Accessibility the key must include a regular key, for example Control+Shift+D.")
+        }
     }
 }
 
@@ -127,8 +133,7 @@ final class HotkeyRecorder {
         // stored will not fire until Secure Keyboard Entry is off, unless
         // Carbon can register it.
         secureInputNotice = SecureInput.isEnabled
-            ? "Secure Keyboard Entry is on. A key combination recorded now may not "
-                + "reach Pladder, and one without a regular key will not fire until it is off."
+            ? String(localized: "Secure Keyboard Entry is on. A key combination recorded now may not reach Pladder, and one without a regular key will not fire until it is off.")
             : nil
         notice = secureInputNotice
         isRecording = true
@@ -206,9 +211,7 @@ final class HotkeyRecorder {
                     // implying Pladder mis-read the keys.
                     self.pending = nil
                     refusedModifiers = pending
-                    notice = "Only \(pending.sideAgnosticDisplayName) reached Pladder. "
-                        + "If you pressed a regular key too, macOS or another app owns that "
-                        + "shortcut; try a different key, for example Control+Shift+D."
+                    notice = String(localized: "Only \(pending.sideAgnosticDisplayName) reached Pladder. If you pressed a regular key too, macOS or another app owns that shortcut; try a different key, for example Control+Shift+D.")
                     return
                 }
                 let commit = self.commit
@@ -224,7 +227,7 @@ final class HotkeyRecorder {
             // Warning only, in both modes: the tap does see such a chord, but
             // the macOS shortcut fires alongside it.
             notice = chord.systemShortcutConflict(in: systemShortcuts).map {
-                "\($0.sideAgnosticDisplayName) is a macOS keyboard shortcut and will fire as well."
+                String(localized: "\($0.sideAgnosticDisplayName) is a macOS keyboard shortcut and will fire as well.")
             } ?? secureInputNotice
         }
     }

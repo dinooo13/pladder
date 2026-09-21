@@ -185,7 +185,7 @@ struct OverlayStyleThumbnail: View {
                 style: .liveTranscript,
                 glass: glass,
                 isPreview: true,
-                partial: "see it as you speak",
+                partial: String(localized: "see it as you speak"),
                 hugsContent: true
             )
             // The card is narrower than the pill; proposed at the card's

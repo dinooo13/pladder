@@ -134,7 +134,7 @@ final class AppModel {
             EngineRegistry.Entry(
                 id: FluidAudioIncrementalEngine.engineID,
                 displayName: "Parakeet TDT v3",
-                detail: "NVIDIA Parakeet via FluidAudio, runs on the Neural Engine. ~700 MB download on first use.",
+                detail: String(localized: "NVIDIA Parakeet via FluidAudio, runs on the Neural Engine. ~700 MB download on first use."),
                 make: { FluidAudioIncrementalEngine() }
             )
         )
@@ -409,23 +409,23 @@ final class AppModel {
     /// One line describing what the app is doing right now.
     var statusLine: String {
         switch coordinator.state {
-        case .recording: return "Recording…"
-        case .transcribing: return "Transcribing…"
-        case .inserting: return "Inserting…"
-        case .error(let failure): return "Error: \(failure.text)"
-        case .copied: return "Copied — press ⌘V"
+        case .recording: return String(localized: "Recording…")
+        case .transcribing: return String(localized: "Transcribing…")
+        case .inserting: return String(localized: "Inserting…")
+        case .error(let failure): return String(localized: "Error: \(failure.text)")
+        case .copied: return String(localized: "Copied — press ⌘V")
         case .idle:
             return readyLine
         case .unavailable:
             switch coordinator.engineStatus {
             case .downloading(let progress):
                 if let progress {
-                    return "Model: downloading \(Int((progress * 100).rounded()))%"
+                    return String(localized: "Model: downloading \(Int((progress * 100).rounded()))%")
                 }
-                return "Model: downloading…"
-            case .loading: return "Model: loading…"
-            case .unloaded: return "Model: not loaded"
-            case .failed(let failure): return "Model failed: \(failure.text)"
+                return String(localized: "Model: downloading…")
+            case .loading: return String(localized: "Model: loading…")
+            case .unloaded: return String(localized: "Model: not loaded")
+            case .failed(let failure): return String(localized: "Model failed: \(failure.text)")
             case .ready: return readyLine
             }
         }
@@ -447,12 +447,15 @@ final class AppModel {
     /// instead; "hold Right Command" would be a lie.
     private var readyLine: String {
         if let standIn = standInHotkey {
-            return "Ready — hold \(standIn.sideAgnosticDisplayName) (Accessibility is off)"
+            return String(localized: "Ready — hold \(standIn.sideAgnosticDisplayName) (Accessibility is off)")
         }
-        let line = "Ready — hold \(effectiveHotkeyName)"
         // Say why the send key and the swallowing stopped: both are the tap's,
-        // and the tap is deaf until Secure Keyboard Entry goes off again.
-        return usesCarbonForSecureInput ? line + " (Secure Keyboard Entry is on)" : line
+        // and the tap is deaf until Secure Keyboard Entry goes off again. A
+        // whole sentence either way: a suffix glued on cannot be translated.
+        if usesCarbonForSecureInput {
+            return String(localized: "Ready — hold \(effectiveHotkeyName) (Secure Keyboard Entry is on)")
+        }
+        return String(localized: "Ready — hold \(effectiveHotkeyName)")
     }
 
     var canRetryEngine: Bool {

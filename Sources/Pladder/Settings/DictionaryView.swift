@@ -188,14 +188,14 @@ struct DictionaryView: View {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.json]
         panel.allowsMultipleSelection = false
-        panel.prompt = "Import"
+        panel.prompt = String(localized: "Import")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             let data = try Data(contentsOf: url)
             let imported = try JSONDecoder().decode([ImportedEntry].self, from: data)
             merge(imported.map(\.entry))
         } catch {
-            errorMessage = "Could not read that file. It should be a JSON array of { from, to, matchCase }."
+            errorMessage = String(localized: "Could not read that file. It should be a JSON array of { from, to, matchCase }.")
         }
     }
 
@@ -209,7 +209,7 @@ struct DictionaryView: View {
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             try encoder.encode(entries).write(to: url, options: .atomic)
         } catch {
-            errorMessage = "Could not write that file: \(error.localizedDescription)"
+            errorMessage = String(localized: "Could not write that file: \(error.localizedDescription)")
         }
     }
 
@@ -269,7 +269,7 @@ private struct ImportedEntry: Decodable {
 /// typing does not persist settings on every keystroke.
 private struct DictionaryField: View {
     @Binding var text: String
-    let prompt: String
+    let prompt: LocalizedStringKey
     let cell: DictionaryCell
     var focus: FocusState<DictionaryCell?>.Binding
 
