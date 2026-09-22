@@ -5,6 +5,7 @@ import PladderAudio
 import PladderBench
 import PladderCore
 import PladderEngines
+import PladderRefine
 
 // Developer tool.
 //
@@ -27,6 +28,11 @@ import PladderEngines
 //                                         how many there were and what they cost. The
 //                                         `identical:` column then also proves the live
 //                                         passes leave the release's windows alone.
+//   pladder-cli polish <text file | ->    run the polish hotkey's prompt over a transcript
+//                                         with Apple's on-device model: once cold, once
+//                                         after prepare() and a two-second wait, the way
+//                                         a real press warms it. Prints both timings.
+//       [--instructions <file>]           try another system prompt before committing it.
 //
 // Fixtures are audio files with a sibling .txt holding the spoken script, as
 // produced by scripts/make-fixtures.sh.
@@ -36,6 +42,7 @@ func usage() -> Never {
     usage: pladder-cli <audio file>
            pladder-cli bench <fixtures dir> [--runs N] [--pause S]
            pladder-cli bench <fixtures dir> --paced [--runs N] [--pause S] [--all] [--live]
+           pladder-cli polish <text file | -> [--instructions <file>]
 
     """.utf8))
     exit(2)
@@ -451,6 +458,50 @@ func runPacedBench(dir: String, runs: Int, pause: Double, includeShort: Bool, li
     }
 }
 
+// MARK: - Polish
+
+/// Runs `TranscriptPolisher` over one transcript twice and prints what the
+/// polish key would paste. The first run is cold (no `prepare()`), the second
+/// warm, which is what a real press gets: the session is made and prewarmed
+/// at key-down, seconds before the release.
+func runPolish(_ path: String, instructionsPath: String?) async throws {
+    let text: String
+    if path == "-" {
+        text = String(decoding: FileHandle.standardInput.readDataToEndOfFile(), as: UTF8.self)
+    } else {
+        text = try String(contentsOf: URL(fileURLWithPath: path), encoding: .utf8)
+    }
+    let transcript = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    print("availability: \(TranscriptPolisher.availability)")
+    print("input (\(transcript.split(whereSeparator: \.isWhitespace).count) words):")
+    print(transcript)
+
+    func show(_ label: String, _ report: TranscriptPolisher.Report) {
+        print("")
+        let timing = String(format: "%.3f", seconds(report.elapsed))
+        if let polished = report.text {
+            print("\(label): \(timing) s, \(report.wordsIn) words in, \(report.wordsOut) out, \(report.mode.rawValue)")
+            print(polished)
+        } else {
+            let reason = report.failure ?? "unknown"
+            print("\(label): \(timing) s, no polish (\(reason)); the text would be pasted as dictated")
+        }
+    }
+
+    let polisher: TranscriptPolisher
+    if let instructionsPath {
+        let instructions = try String(contentsOf: URL(fileURLWithPath: instructionsPath), encoding: .utf8)
+        polisher = TranscriptPolisher(instructions: instructions)
+        print("instructions: \(instructionsPath)")
+    } else {
+        polisher = TranscriptPolisher()
+    }
+    show("cold", await polisher.polish(transcript))
+    await polisher.prepare()
+    try await Task.sleep(for: .seconds(2))
+    show("warm", await polisher.polish(transcript))
+}
+
 // MARK: - Entry
 
 var arguments = Array(CommandLine.arguments.dropFirst())
@@ -495,6 +546,24 @@ case "bench":
         if includeShort || live { usage() }
         try await runBench(dir: dir, runs: runs, pause: pause)
     }
+case "polish":
+    arguments.removeFirst()
+    var instructionsPath: String?
+    var textPath: String?
+    while let arg = arguments.first {
+        arguments.removeFirst()
+        if arg == "--instructions" {
+            guard let value = arguments.first else { usage() }
+            arguments.removeFirst()
+            instructionsPath = value
+        } else if textPath == nil {
+            textPath = arg
+        } else {
+            usage()
+        }
+    }
+    guard let textPath else { usage() }
+    try await runPolish(textPath, instructionsPath: instructionsPath)
 case let path?:
     try await transcribeFile(path)
 }

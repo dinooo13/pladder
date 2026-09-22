@@ -4,7 +4,8 @@ import Observation
 /// The push-to-talk state machine. Owns no I/O itself; everything is injected.
 ///
 /// Flow: hotkey pressed -> capture starts -> hotkey released -> capture stops ->
-/// engine transcribes -> pipeline processes -> output inserts -> idle.
+/// engine transcribes -> pipeline processes -> (polish hotkey: model refines ->)
+/// output inserts -> idle.
 @MainActor
 @Observable
 public final class DictationCoordinator {
@@ -17,6 +18,10 @@ public final class DictationCoordinator {
     /// overlay. Display only: it is never processed and never inserted, and it
     /// is cleared the moment the key is released. Nil in every other style.
     public private(set) var partialTranscript: String?
+
+    /// True from a polish-hotkey press until that cycle ends, so the overlay
+    /// can keep the pill up across the release.
+    public private(set) var willPolish = false
 
     /// The transcribe → process → insert work for the most recent release.
     /// Exposed so callers (and tests) can await completion of a cycle.
@@ -51,7 +56,9 @@ public final class DictationCoordinator {
     /// Command, which the default Option+Space then stands in for. The stored
     /// chord is left untouched and comes back the moment this is cleared,
     /// which is what happens when Accessibility is granted. Nil means "listen
-    /// for the stored chord".
+    /// for the stored chord". Applies to the dictate chord only; the polish
+    /// chord has no stand-in and is simply not registered when Carbon cannot
+    /// take it.
     public var hotkeyOverride: Hotkey? {
         didSet {
             guard hotkeyOverride != oldValue else { return }
@@ -71,6 +78,9 @@ public final class DictationCoordinator {
     /// Minimum recording length worth transcribing. Taps shorter than this are
     /// treated as accidental.
     public var minimumDuration: TimeInterval = 0.3
+    /// Transcripts shorter than this are pasted as they are: the model cannot
+    /// improve three words and would cost a second.
+    public var minimumPolishWords = 4
     /// Recordings are cut off after this long. A release event can be lost for
     /// real, for example while a secure password field has focus and global
     /// monitors receive nothing, and this keeps the microphone from staying on.
@@ -87,6 +97,9 @@ public final class DictationCoordinator {
     /// Silences the speakers while the mic is open, when the setting is on.
     /// Nil in tests and wherever the app does not want the behaviour at all.
     private let outputMuter: (any OutputMuter)?
+    /// The polish hotkey's second pass. Nil where there is none, which makes
+    /// the polish key a plain dictation.
+    private let refiner: (any TranscriptRefiner)?
     private var hotkeyMonitor: any HotkeyMonitor
     private let makePipeline: @Sendable (Settings) -> ProcessorPipeline
     /// Rebuilt when settings change so that no processor is constructed on the
@@ -107,12 +120,22 @@ public final class DictationCoordinator {
         public var engine: Duration
         public var processing: Duration
         public var insert: Duration
+        /// Nil on the normal path; on a polish cycle the model's time, zero
+        /// when the transcript was too short for it.
+        public var polish: Duration?
 
-        public init(captureStop: Duration, engine: Duration, processing: Duration, insert: Duration) {
+        public init(
+            captureStop: Duration,
+            engine: Duration,
+            processing: Duration,
+            insert: Duration,
+            polish: Duration? = nil
+        ) {
             self.captureStop = captureStop
             self.engine = engine
             self.processing = processing
             self.insert = insert
+            self.polish = polish
         }
     }
 
@@ -129,6 +152,7 @@ public final class DictationCoordinator {
         capture: any AudioCapture,
         output: any TextOutput,
         outputMuter: (any OutputMuter)? = nil,
+        refiner: (any TranscriptRefiner)? = nil,
         hotkeyMonitor: any HotkeyMonitor,
         makePipeline: @escaping @Sendable (Settings) -> ProcessorPipeline,
         onEvent: @escaping @Sendable (Event) -> Void = { _ in }
@@ -137,6 +161,7 @@ public final class DictationCoordinator {
         self.capture = capture
         self.output = output
         self.outputMuter = outputMuter
+        self.refiner = refiner
         self.hotkeyMonitor = hotkeyMonitor
         self.makePipeline = makePipeline
         self.pipeline = makePipeline(settings)
@@ -203,7 +228,8 @@ public final class DictationCoordinator {
         // entry. `AppModel.settings` ignores assignments that change nothing,
         // so this runs only on real changes.
         pipeline = makePipeline(settings)
-        if old.hotkey != settings.hotkey || old.submitKey != settings.submitKey {
+        if old.hotkey != settings.hotkey || old.submitKey != settings.submitKey
+            || old.polishHotkey != settings.polishHotkey {
             // The old key's release will never arrive on the new stream.
             // The submit key counts too: the restarted monitor would never
             // deliver the pending release for the old configuration.
@@ -233,6 +259,9 @@ public final class DictationCoordinator {
     /// The engine that was ready when the current recording started. Nil
     /// between cycles.
     private var cycleEngine: (any TranscriptionEngine)?
+    /// The chord that started the current recording. Only its release or
+    /// cancel ends the recording. Nil between cycles.
+    private var cycleRole: HotkeyRole?
 
     /// Half a second of silence. Transcribing it at key-down brings the
     /// Neural Engine up from idle while the user is still speaking; every
@@ -367,25 +396,37 @@ public final class DictationCoordinator {
     private func startHotkey() {
         hotkeyTask?.cancel()
         hotkeyMonitor.stop()
-        let stream = hotkeyMonitor.start(
-            hotkey: hotkeyOverride ?? settings.hotkey, submitKey: settings.submitKey)
+        var chords: [HotkeyRole: Hotkey] = [.dictate: hotkeyOverride ?? settings.hotkey]
+        // A polish chord that is the dictate chord would fire both trackers
+        // at once; the settings row says why it does nothing.
+        if !settings.polishHotkey.isEmpty, settings.polishHotkey != chords[.dictate] {
+            chords[.polish] = settings.polishHotkey
+        }
+        let stream = hotkeyMonitor.start(chords: chords, submitKey: settings.submitKey)
         hotkeyTask = Task { [weak self] in
-            for await event in stream {
+            for await tagged in stream {
                 guard let self else { return }
-                switch event {
-                case .pressed: await self.hotkeyPressed()
-                case .released(let submit): self.hotkeyReleased(submit: submit)
+                switch tagged.event {
+                case .pressed: await self.hotkeyPressed(role: tagged.role)
+                // Only the chord that started the recording may end it: with
+                // nested chords the other tracker reports the hand-over as
+                // its own release.
+                case .released(let submit):
+                    if tagged.role == self.cycleRole { self.hotkeyReleased(submit: submit) }
                 // Another key went down right after the chord: the user typed
                 // Cmd+C, not a dictation. Drop the audio without transcribing,
                 // without a stop sound and without a timing line.
-                case .cancelled: await self.cancelRecording()
+                case .cancelled:
+                    if tagged.role == self.cycleRole { await self.cancelRecording() }
                 }
             }
         }
     }
 
     /// Public so tests and a menu item can drive the state machine directly.
-    public func hotkeyPressed() async {
+    /// `role` is the chord that was pressed; it decides what the dictation
+    /// goes through at release.
+    public func hotkeyPressed(role: HotkeyRole = .dictate) async {
         // `.copied` is the hint from the previous dictation, not a busy state:
         // a press replaces it rather than being dropped.
         switch state {
@@ -397,6 +438,8 @@ public final class DictationCoordinator {
         // The engine that was ready at press transcribes this cycle, even if
         // the settings switch engines mid-recording.
         cycleEngine = loader.engine
+        cycleRole = role
+        willPolish = role == .polish
         partialTranscript = nil
         // Read once, at press: switching the style mid-recording must not
         // leave the loop half live, with nothing warming the engine.
@@ -408,6 +451,7 @@ public final class DictationCoordinator {
             let levels = try await capture.start()
             guard state.isRecording else {
                 // Cancelled or superseded while the mic was starting.
+                willPolish = false
                 _ = await capture.stop()
                 abandonStreaming()
                 return
@@ -424,6 +468,11 @@ public final class DictationCoordinator {
             // feed below does that for streaming engines). Both run while the
             // user is still speaking.
             Task { [weak self] in await self?.output.prepare() }
+            // The model's load is the one cost this feature can hide: about
+            // 700 ms cold, paid while the user is still speaking.
+            if willPolish, let refiner {
+                Task.detached(priority: .utility) { await refiner.prepare() }
+            }
             if let streaming = cycleEngine as? (any StreamingTranscriptionEngine) {
                 try? await streaming.beginUtterance()
                 startStreamingFeed(streaming, live: live)
@@ -451,6 +500,7 @@ public final class DictationCoordinator {
                 self.hotkeyReleased(submit: false)
             }
         } catch {
+            willPolish = false
             fail(.microphone(detail: error.localizedDescription))
         }
     }
@@ -486,6 +536,7 @@ public final class DictationCoordinator {
         let fedSamples = fedSampleCount
         fedSampleCount = 0
         cycleEngine = nil
+        cycleRole = nil
         inFlight = Task { [weak self] in
             guard let self else { return }
             let stopped = ContinuousClock.now
@@ -502,7 +553,10 @@ public final class DictationCoordinator {
         submit: Bool,
         captureStop: Duration
     ) async {
-        defer { drainPendingUnloads() }
+        defer {
+            drainPendingUnloads()
+            willPolish = false
+        }
         // Streaming engines were already fed `fedSamples` while recording;
         // only the tail came through `stop()`.
         let totalDuration = Double(fedSamples + audio.samples.count) / CapturedAudio.sampleRate
@@ -533,23 +587,39 @@ public final class DictationCoordinator {
                 becomeIdle()
                 return
             }
+            // The polish key's one branch; on the normal path it costs a Bool
+            // read. A refiner that cannot help returns nil and the text goes
+            // out as dictated.
+            var final = processed
+            if willPolish, let refiner, Self.wordCount(processed) >= minimumPolishWords {
+                state = .polishing
+                started = ContinuousClock.now
+                if let polished = await refiner.refine(processed) { final = polished }
+                timing.polish = ContinuousClock.now - started
+            } else if willPolish {
+                timing.polish = .zero
+            }
             state = .inserting
             // Don't double the junction: a transcript that already ends in
             // whitespace (e.g. "Tidy whitespace" disabled) carries its own
             // separator, so appending another makes a double space.
-            let needsSpace = settings.appendTrailingSpace && processed.last?.isWhitespace != true
-            let final = needsSpace ? processed + " " : processed
+            let needsSpace = settings.appendTrailingSpace && final.last?.isWhitespace != true
+            let toInsert = needsSpace ? final + " " : final
             started = ContinuousClock.now
-            let result = try await output.insert(final, submit: submit)
+            let result = try await output.insert(toInsert, submit: submit)
             timing.insert = ContinuousClock.now - started
             var inserted = transcript
-            inserted.text = processed
+            inserted.text = final
             lastTranscript = inserted
             onEvent(.inserted(inserted, timing))
             if result == .copied { showCopied() } else { becomeIdle() }
         } catch {
             fail(DictationFailure(error))
         }
+    }
+
+    private static func wordCount(_ text: String) -> Int {
+        text.split(whereSeparator: \.isWhitespace).count
     }
 
     /// Idle if the engine can take another dictation, otherwise unavailable
@@ -569,6 +639,7 @@ public final class DictationCoordinator {
         maxDurationTask?.cancel()
         stopWarmupLoop()
         partialTranscript = nil
+        willPolish = false
         // Same restore as at release, for the paths that never transcribe:
         // an interrupted chord, a hotkey change, `stop()`.
         if let outputMuter {
@@ -577,6 +648,7 @@ public final class DictationCoordinator {
         becomeIdle()
         abandonStreaming()
         cycleEngine = nil
+        cycleRole = nil
         let engine = loader.engine
         _ = await capture.stop()
         if let streaming = engine as? (any StreamingTranscriptionEngine) {

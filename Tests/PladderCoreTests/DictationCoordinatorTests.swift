@@ -66,22 +66,70 @@ final class FakeOutput: TextOutput, @unchecked Sendable {
 }
 
 final class FakeHotkey: HotkeyMonitor, @unchecked Sendable {
-    private var continuation: AsyncStream<HotkeyEvent>.Continuation?
+    private var continuation: AsyncStream<HotkeyMonitorEvent>.Continuation?
     /// How often `start` was called, and with what, so a monitor swap can be
     /// checked from the outside.
     private(set) var startCount = 0
-    private(set) var lastHotkey: Hotkey?
-    func start(hotkey: Hotkey, submitKey: Hotkey) -> AsyncStream<HotkeyEvent> {
+    private(set) var lastChords: [HotkeyRole: Hotkey] = [:]
+    var lastHotkey: Hotkey? { lastChords[.dictate] }
+    func start(chords: [HotkeyRole: Hotkey], submitKey: Hotkey) -> AsyncStream<HotkeyMonitorEvent> {
         startCount += 1
-        lastHotkey = hotkey
-        let (stream, cont) = AsyncStream<HotkeyEvent>.makeStream()
+        lastChords = chords
+        let (stream, cont) = AsyncStream<HotkeyMonitorEvent>.makeStream()
         continuation = cont
         return stream
     }
     func stop() { continuation?.finish() }
-    func press() { continuation?.yield(.pressed) }
-    func release(submit: Bool = false) { continuation?.yield(.released(submit: submit)) }
-    func cancel() { continuation?.yield(.cancelled) }
+    func press(_ role: HotkeyRole = .dictate) {
+        continuation?.yield(HotkeyMonitorEvent(role: role, event: .pressed))
+    }
+    func release(_ role: HotkeyRole = .dictate, submit: Bool = false) {
+        continuation?.yield(HotkeyMonitorEvent(role: role, event: .released(submit: submit)))
+    }
+    func cancel(_ role: HotkeyRole = .dictate) {
+        continuation?.yield(HotkeyMonitorEvent(role: role, event: .cancelled))
+    }
+}
+
+/// Stands in for the on-device model: records what it was asked, answers
+/// `result` after `delay`.
+final class FakeRefiner: TranscriptRefiner, @unchecked Sendable {
+    private let lock = NSLock()
+    private var _calls: [String] = []
+    private var _prepareCount = 0
+    private let result: String?
+    private let delay: Duration
+    var calls: [String] { lock.withLock { _calls } }
+    var prepareCount: Int { lock.withLock { _prepareCount } }
+
+    init(result: String? = "polished", delay: Duration = .zero) {
+        self.result = result
+        self.delay = delay
+    }
+
+    func prepare() async { lock.withLock { _prepareCount += 1 } }
+
+    func refine(_ text: String) async -> String? {
+        lock.withLock { _calls.append(text) }
+        if delay > .zero { try? await Task.sleep(for: delay) }
+        return result
+    }
+}
+
+/// Keeps every event the coordinator emits, for assertions about timing.
+final class RecordedEvents: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _events: [DictationCoordinator.Event] = []
+    var events: [DictationCoordinator.Event] { lock.withLock { _events } }
+    func append(_ e: DictationCoordinator.Event) { lock.withLock { _events.append(e) } }
+
+    /// The timing of the last `inserted` event, if there was one.
+    var lastTiming: DictationCoordinator.CycleTiming? {
+        for event in events.reversed() {
+            if case .inserted(_, let timing) = event { return timing }
+        }
+        return nil
+    }
 }
 
 /// Counts the two calls the coordinator makes. The real controller's timing
@@ -223,7 +271,9 @@ private func makeCoordinator(
     output: FakeOutput = FakeOutput(),
     capture: FakeCapture = FakeCapture(),
     hotkeyMonitor: FakeHotkey? = nil,
-    outputMuter: (any OutputMuter)? = nil
+    outputMuter: (any OutputMuter)? = nil,
+    refiner: (any TranscriptRefiner)? = nil,
+    events: RecordedEvents? = nil
 ) -> (DictationCoordinator, FakeOutput, FakeCapture) {
     let registry = EngineRegistry([
         .init(id: EchoEngine.engineID, displayName: "Echo", detail: "") {
@@ -237,10 +287,12 @@ private func makeCoordinator(
         capture: capture,
         output: output,
         outputMuter: outputMuter,
+        refiner: refiner,
         hotkeyMonitor: hotkeyMonitor ?? FakeHotkey(),
         makePipeline: { s in
             ProcessorPipeline([DictionaryReplacer(entries: s.dictionary), WhitespaceNormalizer()])
-        }
+        },
+        onEvent: { event in events?.append(event) }
     )
     return (coordinator, output, capture)
 }
@@ -825,6 +877,7 @@ final class EventLog: @unchecked Sendable {
             return
         }
         #expect(timing.engine >= .milliseconds(50))
+        #expect(timing.polish == nil)
         #expect(output.inserted == ["hello world"])
     }
 
@@ -1095,6 +1148,280 @@ final class EventLog: @unchecked Sendable {
     }
 }
 
+// MARK: - Polish hotkey
+
+@MainActor
+@Suite struct PolishHotkeyTests {
+    /// Long enough to clear `minimumPolishWords`.
+    private static let sentence = "send it on Friday please"
+    private static let polishChord = Hotkey(0x3B, 0x31)
+
+    private static func settings(polish: Hotkey = polishChord) -> Settings {
+        var s = Settings(engineID: EchoEngine.engineID)
+        s.polishHotkey = polish
+        return s
+    }
+
+    @Test func polishHotkeyRoutesThroughTheRefiner() async {
+        let refiner = FakeRefiner()
+        let events = RecordedEvents()
+        let hotkey = FakeHotkey()
+        let (c, output, _) = makeCoordinator(
+            engineText: Self.sentence, settings: Self.settings(),
+            hotkeyMonitor: hotkey, refiner: refiner, events: events)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        hotkey.press(.polish)
+        #expect(await waitUntil { c.state.isRecording })
+        hotkey.release(.polish)
+        #expect(await waitUntil { c.inFlight != nil })
+        await c.inFlight?.value
+        #expect(output.inserted == ["polished "])
+        #expect(refiner.calls == [Self.sentence])
+        #expect(c.lastTranscript?.text == "polished")
+        #expect(events.lastTiming?.polish != nil)
+    }
+
+    @Test func normalHotkeyNeverCallsTheRefiner() async {
+        let refiner = FakeRefiner()
+        let events = RecordedEvents()
+        let hotkey = FakeHotkey()
+        let (c, output, _) = makeCoordinator(
+            engineText: Self.sentence, settings: Self.settings(),
+            hotkeyMonitor: hotkey, refiner: refiner, events: events)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        hotkey.press()
+        #expect(await waitUntil { c.state.isRecording })
+        #expect(!c.willPolish)
+        hotkey.release()
+        #expect(await waitUntil { c.inFlight != nil })
+        await c.inFlight?.value
+        #expect(output.inserted == [Self.sentence + " "])
+        #expect(refiner.calls.isEmpty)
+        #expect(refiner.prepareCount == 0)
+        #expect(events.lastTiming != nil)
+        #expect(events.lastTiming?.polish == nil)
+    }
+
+    @Test func blankTranscriptSkipsTheRefiner() async {
+        let refiner = FakeRefiner()
+        let (c, output, _) = makeCoordinator(engineText: "", settings: Self.settings(), refiner: refiner)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed(role: .polish)
+        c.hotkeyReleased()
+        await c.inFlight?.value
+        #expect(output.inserted.isEmpty)
+        #expect(refiner.calls.isEmpty)
+        #expect(c.state == .idle)
+    }
+
+    @Test func shortTranscriptSkipsTheRefiner() async {
+        let refiner = FakeRefiner()
+        let events = RecordedEvents()
+        let (c, output, _) = makeCoordinator(
+            engineText: "one two three", settings: Self.settings(), refiner: refiner, events: events)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed(role: .polish)
+        c.hotkeyReleased()
+        await c.inFlight?.value
+        #expect(output.inserted == ["one two three "])
+        #expect(refiner.calls.isEmpty)
+        #expect(events.lastTiming?.polish == .zero)
+    }
+
+    @Test func fourWordsAreRefined() async {
+        let refiner = FakeRefiner()
+        let (c, output, _) = makeCoordinator(
+            engineText: "one two three four", settings: Self.settings(), refiner: refiner)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed(role: .polish)
+        c.hotkeyReleased()
+        await c.inFlight?.value
+        #expect(refiner.calls == ["one two three four"])
+        #expect(output.inserted == ["polished "])
+    }
+
+    @Test func refinerReturningNilPastesThePlainText() async {
+        // What an unavailable, refusing or timed-out model looks like here.
+        let refiner = FakeRefiner(result: nil)
+        let events = RecordedEvents()
+        let (c, output, _) = makeCoordinator(
+            engineText: Self.sentence, settings: Self.settings(), refiner: refiner, events: events)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed(role: .polish)
+        c.hotkeyReleased()
+        await c.inFlight?.value
+        #expect(refiner.calls == [Self.sentence])
+        #expect(output.inserted == [Self.sentence + " "])
+        #expect(c.lastTranscript?.text == Self.sentence)
+        guard case .inserted = events.events.last else {
+            Issue.record("expected an inserted event, got \(String(describing: events.events.last))")
+            return
+        }
+        #expect(c.state == .idle)
+    }
+
+    @Test func withoutARefinerThePolishKeyIsAPlainDictation() async {
+        let (c, output, _) = makeCoordinator(engineText: Self.sentence, settings: Self.settings())
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed(role: .polish)
+        c.hotkeyReleased()
+        await c.inFlight?.value
+        #expect(output.inserted == [Self.sentence + " "])
+    }
+
+    @Test func polishPressWarmsTheRefiner() async {
+        let refiner = FakeRefiner()
+        let (c, _, _) = makeCoordinator(engineText: Self.sentence, settings: Self.settings(), refiner: refiner)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed(role: .polish)
+        #expect(await waitUntil { refiner.prepareCount == 1 })
+        #expect(c.state.isRecording)
+        #expect(refiner.calls.isEmpty)
+    }
+
+    @Test func polishingStateIsPublishedWhileTheModelRuns() async {
+        let refiner = FakeRefiner(delay: .milliseconds(200))
+        let (c, output, _) = makeCoordinator(engineText: Self.sentence, settings: Self.settings(), refiner: refiner)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed(role: .polish)
+        #expect(c.willPolish)
+        c.hotkeyReleased()
+        #expect(await waitUntil { c.state == .polishing })
+        #expect(c.willPolish)
+        #expect(output.inserted.isEmpty)
+        await c.inFlight?.value
+        #expect(c.state == .idle)
+        #expect(!c.willPolish)
+        #expect(output.inserted == ["polished "])
+    }
+
+    @Test func polishChordIsHandedToTheMonitor() async {
+        let fake = FakeHotkey()
+        let (c, _, _) = makeCoordinator(settings: Self.settings(), hotkeyMonitor: fake)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        #expect(fake.lastChords == [.dictate: .optionSpace, .polish: Self.polishChord])
+    }
+
+    @Test func emptyPolishChordIsNotRegistered() async {
+        let fake = FakeHotkey()
+        let (c, _, _) = makeCoordinator(hotkeyMonitor: fake)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        #expect(Array(fake.lastChords.keys) == [.dictate])
+    }
+
+    @Test func polishChordEqualToTheDictateChordIsNotRegistered() async {
+        let fake = FakeHotkey()
+        let (c, _, _) = makeCoordinator(settings: Self.settings(polish: .optionSpace), hotkeyMonitor: fake)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        #expect(Array(fake.lastChords.keys) == [.dictate])
+    }
+
+    @Test func polishChordChangeRestartsTheMonitor() async {
+        let fake = FakeHotkey()
+        let (c, output, capture) = makeCoordinator(hotkeyMonitor: fake)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        #expect(fake.startCount == 1)
+        await c.hotkeyPressed()
+        #expect(c.state.isRecording)
+        c.settings.polishHotkey = Self.polishChord
+        #expect(fake.startCount == 2)
+        #expect(fake.lastChords[.polish] == Self.polishChord)
+        // Dropped like a hotkey change: the restarted monitor would never
+        // deliver the pending release.
+        #expect(await waitUntil { c.state == .idle })
+        #expect(await capture.stopCount == 1)
+        #expect(output.inserted.isEmpty)
+    }
+
+    @Test func theOverrideAppliesOnlyToTheDictateChord() async {
+        let fake = FakeHotkey()
+        let standIn = Hotkey(0x3B, 0x38, 0x31)
+        let (c, _, _) = makeCoordinator(settings: Self.settings(), hotkeyMonitor: fake)
+        c.hotkeyOverride = standIn
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        #expect(fake.lastChords[.dictate] == standIn)
+        #expect(fake.lastChords[.polish] == Self.polishChord)
+    }
+
+    @Test func aReleaseFromTheOtherChordIsIgnored() async {
+        let hotkey = FakeHotkey()
+        let refiner = FakeRefiner()
+        let (c, output, _) = makeCoordinator(
+            engineText: Self.sentence, settings: Self.settings(), hotkeyMonitor: hotkey, refiner: refiner)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        hotkey.press(.dictate)
+        #expect(await waitUntil { c.state.isRecording })
+        hotkey.release(.polish)
+        hotkey.cancel(.polish)
+        // Give the stream a moment to deliver both; neither may end the take.
+        try? await Task.sleep(for: .milliseconds(50))
+        #expect(c.state.isRecording)
+        hotkey.release(.dictate)
+        #expect(await waitUntil { c.inFlight != nil })
+        await c.inFlight?.value
+        #expect(output.inserted == [Self.sentence + " "])
+        #expect(refiner.calls.isEmpty)
+    }
+
+    @Test func cancelledPolishPressDropsTheRecording() async {
+        let hotkey = FakeHotkey()
+        let refiner = FakeRefiner()
+        let (c, output, capture) = makeCoordinator(
+            engineText: Self.sentence, settings: Self.settings(), hotkeyMonitor: hotkey, refiner: refiner)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        hotkey.press(.polish)
+        #expect(await waitUntil { c.state.isRecording })
+        hotkey.cancel(.polish)
+        #expect(await waitUntil { c.state == .idle })
+        #expect(await capture.stopCount == 1)
+        #expect(output.inserted.isEmpty)
+        #expect(refiner.calls.isEmpty)
+        #expect(!c.willPolish)
+    }
+
+    @Test func submitWorksOnThePolishPath() async {
+        let hotkey = FakeHotkey()
+        let (c, output, _) = makeCoordinator(
+            engineText: Self.sentence, settings: Self.settings(), hotkeyMonitor: hotkey, refiner: FakeRefiner())
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        hotkey.press(.polish)
+        #expect(await waitUntil { c.state.isRecording })
+        hotkey.release(.polish, submit: true)
+        #expect(await waitUntil { c.inFlight != nil })
+        await c.inFlight?.value
+        #expect(output.inserted == ["polished "])
+        #expect(output.submitted == [true])
+    }
+
+    @Test func cancelRecordingClearsWillPolish() async {
+        let (c, _, _) = makeCoordinator(settings: Self.settings(), refiner: FakeRefiner())
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed(role: .polish)
+        #expect(c.willPolish)
+        await c.cancelRecording()
+        #expect(!c.willPolish)
+        #expect(c.state == .idle)
+    }
+}
+
 @Suite struct SettingsStoreTests {
     @Test func roundTrip() throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -1106,6 +1433,7 @@ final class EventLog: @unchecked Sendable {
         var changed = defaults
         changed.hotkey = .rightOption
         changed.submitKey = Hotkey(0x24)
+        changed.polishHotkey = Hotkey(0x3B, 0x31)
         changed.dictionary = [DictionaryEntry(from: "a", to: "b")]
         try store.save(changed)
         #expect(store.load() == changed)
@@ -1119,6 +1447,7 @@ final class EventLog: @unchecked Sendable {
         #expect(decoded.dictionary.count == 1)
         #expect(decoded.hotkey == .optionSpace)
         #expect(decoded.submitKey == .rightOption)
+        #expect(decoded.polishHotkey.isEmpty)
         #expect(decoded.appendTrailingSpace == true)
         #expect(decoded.appearance == .system)
         #expect(decoded.overlayStyle == .compact)

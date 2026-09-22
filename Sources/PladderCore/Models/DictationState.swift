@@ -6,6 +6,9 @@ public enum DictationState: Equatable, Sendable {
     case unavailable(UnavailableReason)
     case recording(level: Float)
     case transcribing
+    /// The model is cleaning the transcript; only a dictation started with
+    /// the polish hotkey gets here.
+    case polishing
     case inserting
     /// Transcript is on the clipboard for the user to paste; shown briefly,
     /// then returns to idle. Reached when Pladder cannot paste it itself,
@@ -21,7 +24,7 @@ public enum DictationState: Equatable, Sendable {
 
     public var isBusy: Bool {
         switch self {
-        case .recording, .transcribing, .inserting: return true
+        case .recording, .transcribing, .polishing, .inserting: return true
         default: return false
         }
     }

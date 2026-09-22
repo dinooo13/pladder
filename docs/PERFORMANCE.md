@@ -82,7 +82,8 @@ returns, and the key event still has to cross the window server after that.
 The sleep guarded a race the ordering already prevents.
 
 An earlier version also ran an Apple Intelligence cleanup step on the path.
-It was removed. Nobody had measured what it cost.
+It was removed unmeasured. The model is back as an opt-in second hotkey whose
+cost is logged as its own line and never lands on this path.
 
 ## Why length used to cost time
 

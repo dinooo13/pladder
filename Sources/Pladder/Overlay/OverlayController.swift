@@ -114,6 +114,17 @@ final class OverlayController {
                 if visible { scheduleHide(after: .zero, flight: false) }
                 return
             }
+            // A polish cycle is seconds, not milliseconds: keep the pill up,
+            // say what is happening, and let `.polishing` and then `.idle`
+            // take over.
+            if coordinator.willPolish {
+                cancelSpinner()
+                model.partialTranscript = nil
+                model.state = .transcribing
+                cancelHide()
+                present(flight: true)
+                return
+            }
             // A new partial can re-run this while the spinner is already
             // armed or on screen; only the first `.transcribing` acts.
             guard spinnerTask == nil else { return }
@@ -129,6 +140,15 @@ final class OverlayController {
                 self.cancelHide()
                 self.present(flight: true)
             }
+        case .polishing:
+            guard model.style != .menuBar else {
+                if visible { scheduleHide(after: .zero, flight: false) }
+                return
+            }
+            cancelSpinner()
+            model.state = state
+            cancelHide()
+            present(flight: true)
         case .inserting:
             // Milliseconds long, and `.idle` or `.copied` follows at once, so
             // nothing is shown and nothing is hidden here: hiding would

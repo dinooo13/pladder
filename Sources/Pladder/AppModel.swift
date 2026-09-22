@@ -8,6 +8,7 @@ import os
 import PladderSystem
 import PladderAudio
 import PladderEngines
+import PladderRefine
 
 /// Composition root. Builds the engine registry, the settings store and the
 /// coordinator, owns the overlay, and exposes everything the UI needs.
@@ -42,6 +43,13 @@ final class AppModel {
     /// the number of shortcuts and the answer changes about as often as
     /// someone visits System Settings. Never on a key press.
     private(set) var systemShortcuts: Set<Hotkey> = []
+
+    /// Whether Apple Intelligence can polish right now, for the polish key's
+    /// row. Polled with the permissions: it can be switched on or off in
+    /// System Settings while the app runs, and the read is cheap. The
+    /// coordinator never asks; an unavailable model makes the polish key a
+    /// plain dictation on its own.
+    private(set) var polishAvailability: OnDeviceModelAvailability = TranscriptPolisher.availability
 
     /// The default chord, standing in for a stored chord Carbon cannot
     /// register while Accessibility is missing. The stored chord is never
@@ -195,6 +203,7 @@ final class AppModel {
             outputMuter: OutputMuteController(
                 control: CoreAudioOutputMute(),
                 log: { Self.muteLog.info("\($0, privacy: .public)") }),
+            refiner: TranscriptPolisher(),
             hotkeyMonitor: trusted ? tapHotkey : carbonHotkey,
             makePipeline: { s in
                 ProcessorPipeline(processorFactories.map { $0(s) }, onFailure: { id, error in
@@ -263,11 +272,15 @@ final class AppModel {
             guard let released = releaseInstant else { return }
             releaseInstant = nil
             let total = Self.seconds(instant - released)
+            // A polish cycle gets its own line, so the plain one stays the
+            // number the benchmark rule watches; one predicate finds both.
+            let polish = timing.polish.map { "polish \(fmt($0)), " } ?? ""
+            let label = timing.polish == nil ? "release-to-paste" : "polished release-to-paste"
             let stages = "stop \(fmt(timing.captureStop)), engine \(fmt(timing.engine)), " +
-                "process \(fmt(timing.processing)), paste \(fmt(timing.insert))"
+                "process \(fmt(timing.processing)), \(polish)paste \(fmt(timing.insert))"
             Self.timing.log(
                 """
-                release-to-paste \(total, format: .fixed(precision: 3), privacy: .public) s: \(stages, privacy: .public); \
+                \(label, privacy: .public) \(total, format: .fixed(precision: 3), privacy: .public) s: \(stages, privacy: .public); \
                 audio \(transcript.audioDuration, format: .fixed(precision: 1), privacy: .public) s, \
                 engine-time \(transcript.processingTime, format: .fixed(precision: 3), privacy: .public) s
                 """
@@ -287,6 +300,8 @@ final class AppModel {
     func refreshPermissions() {
         accessibilityTrusted = Permissions.isAccessibilityTrusted
         microphoneStatus = Permissions.microphoneStatus
+        let polish = TranscriptPolisher.availability
+        if polish != polishAvailability { polishAvailability = polish }
         let sustained = secureInput.observe(SecureInput.isEnabled)
         if sustained != secureInputSustained { secureInputSustained = sustained }
         // Granting Accessibility upgrades the hotkey to the tap; revoking it
@@ -411,6 +426,7 @@ final class AppModel {
         switch coordinator.state {
         case .recording: return String(localized: "Recording…")
         case .transcribing: return String(localized: "Transcribing…")
+        case .polishing: return String(localized: "Polishing…")
         case .inserting: return String(localized: "Inserting…")
         case .error(let failure): return String(localized: "Error: \(failure.text)")
         case .copied: return String(localized: "Copied — press ⌘V")

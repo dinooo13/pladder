@@ -105,10 +105,32 @@ private struct GeneralSettingsView: View {
                         .foregroundStyle(.orange)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                // The polish hotkey's one row. It stays when Apple
+                // Intelligence is off, so the chord can be recorded before it
+                // is turned on; the warning says what the key does meanwhile.
+                LabeledContent("Dictate and polish") {
+                    HotkeyRecorderField(
+                        hotkey: $model.settings.polishHotkey,
+                        onRecordingChanged: { model.coordinator.isHotkeySuspended = $0 },
+                        requiresRegularKey: model.hotkeyNeedsRegularKey,
+                        systemShortcuts: model.systemShortcuts
+                    )
+                }
+                if let warning = polishKeyWarning {
+                    Label(warning, systemImage: "exclamationmark.triangle")
+                        .font(.callout)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             } header: {
                 Text("Push to Talk")
             } footer: {
-                FootnoteText("Hold to record, release to insert. Press the send key while recording and Return is pressed after the text. Click a field and press any key combination to assign it.")
+                // Separate literals, so each translation stays whole and
+                // another key can add its own line.
+                VStack(alignment: .leading, spacing: 4) {
+                    FootnoteText("Hold to record, release to insert. Press the send key while recording and Return is pressed after the text. Click a field and press any key combination to assign it.")
+                    FootnoteText("Hold the Dictate and polish key instead and Apple Intelligence cleans up the transcript on this Mac before it is pasted: self-corrections, spoken punctuation and numbers, lists. That takes a second or two.")
+                }
             }
 
             Section {
@@ -260,6 +282,31 @@ private struct GeneralSettingsView: View {
         }
         guard submitKey.keyCodes.isSubset(of: model.settings.hotkey.keyCodes) else { return nil }
         return String(localized: "\(submitKey.displayName) is part of the push-to-talk key, so it can never be pressed separately.")
+    }
+
+    /// In order: nothing to say while the key is off; the push-to-talk
+    /// chord itself is never registered twice, so it would never polish;
+    /// Apple Intelligence cannot run, so the key pastes the text as dictated;
+    /// macOS owns the chord; Carbon cannot register it without
+    /// Accessibility, and there is no stand-in for this key; and the same
+    /// warning as the push-to-talk key for a chord without a modifier.
+    private var polishKeyWarning: String? {
+        let polish = model.settings.polishHotkey
+        guard !polish.isEmpty else { return nil }
+        if polish == (model.standInHotkey ?? model.settings.hotkey) {
+            return String(localized: "\(polish.displayName) is also the push-to-talk key, so it never polishes. Record a different combination.")
+        }
+        if let reason = model.polishAvailability.polishKeyText {
+            return reason
+        }
+        if let owner = model.systemShortcutConflict(for: polish) {
+            return conflictWarning(owner: owner, chord: polish)
+        }
+        if !model.accessibilityTrusted, !polish.canBeRegisteredWithoutAccessibility {
+            return String(localized: "Without Accessibility, \(polish.displayName) cannot be detected, so this key is off until Accessibility is granted.")
+        }
+        guard polish.modifierKeyCodes.isEmpty else { return nil }
+        return String(localized: "Without a modifier, \(polish.displayName) can no longer be typed in other apps while Pladder is running.")
     }
 
     private var launchAtLogin: Binding<Bool> {
