@@ -18,6 +18,18 @@ public enum OverlayStyle: String, Codable, Sendable, CaseIterable, Equatable {
 /// free of AppKit and SwiftUI.
 public enum OverlayAnimationSpeed: String, Codable, Sendable, CaseIterable, Equatable {
     case instant, quick, expressive
+
+    /// How long the "press ⌘V" hint rests before it leaves. A hold, not
+    /// motion, but it scales with the speed all the same: without
+    /// Accessibility the hint follows every dictation, and someone who chose
+    /// Instant wants the overlay out of the way, not a message to read.
+    public var copiedHoldDuration: Duration {
+        switch self {
+        case .instant: .milliseconds(700)
+        case .quick: .seconds(1)
+        case .expressive: .seconds(1.5)
+        }
+    }
 }
 
 /// Everything the user can change. Persisted as JSON by `SettingsStore`.

@@ -78,7 +78,8 @@ public final class DictationCoordinator {
     /// How long an error stays on screen before returning to idle.
     public var errorDisplayDuration: Duration = .seconds(2)
     /// How long the "press ⌘V" hint stays on screen before returning to idle.
-    public var copiedDisplayDuration: Duration = .seconds(1.5)
+    /// Nil follows the overlay animation speed; tests set it directly.
+    public var copiedDisplayDuration: Duration?
 
     private let loader: EngineLoader
     private let capture: any AudioCapture
@@ -590,8 +591,9 @@ public final class DictationCoordinator {
     private func showCopied() {
         state = .copied
         transientResetTask?.cancel()
-        transientResetTask = Task { [weak self, copiedDisplayDuration] in
-            try? await Task.sleep(for: copiedDisplayDuration)
+        let hold = copiedDisplayDuration ?? settings.overlayAnimationSpeed.copiedHoldDuration
+        transientResetTask = Task { [weak self] in
+            try? await Task.sleep(for: hold)
             guard let self, !Task.isCancelled, case .copied = self.state else { return }
             self.becomeIdle()
         }
