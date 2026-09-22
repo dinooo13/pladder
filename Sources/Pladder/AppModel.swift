@@ -431,7 +431,10 @@ final class AppModel {
     /// One line describing what the app is doing right now.
     var statusLine: String {
         switch coordinator.state {
-        case .recording: return String(localized: "Recording…")
+        case .recording:
+            // The Menu style has no pill, so this line is its latched cue.
+            guard coordinator.isLatched else { return String(localized: "Recording…") }
+            return String(localized: "Recording — press \(stopKeyName) to stop")
         case .transcribing: return String(localized: "Transcribing…")
         case .inserting: return String(localized: "Inserting…")
         case .error(let failure): return String(localized: "Error: \(failure.text)")
@@ -458,6 +461,17 @@ final class AppModel {
     var effectiveHotkeyName: String {
         guard !hotkeyUsesTap else { return settings.hotkey.displayName }
         return settings.hotkey.sideAgnosticDisplayName
+    }
+
+    /// What ends a latched recording. Any chord does; this names the one that
+    /// latched it: the toggle key when it is a chord of its own, otherwise
+    /// the key, or what stands in for it.
+    private var stopKeyName: String {
+        let toggle = settings.toggleHotkey
+        if !toggle.isEmpty, toggle.canonical != settings.hotkey.canonical {
+            return hotkeyUsesTap ? toggle.displayName : toggle.sideAgnosticDisplayName
+        }
+        return standInHotkey?.sideAgnosticDisplayName ?? effectiveHotkeyName
     }
 
     /// True while a working Accessibility grant is being ignored because
