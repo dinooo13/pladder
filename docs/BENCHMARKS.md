@@ -208,3 +208,9 @@ something new is contending with the main actor.
 The engine's own `processingTime` is logged beside the stages as
 `engine-time`; a large gap between `engine` and `engine-time` means the engine
 actor was busy with something else.
+
+A `keyboard bounce observed` line in the `hotkey` category means the keyboard
+reported a held key as released and pressed again, and every release since
+then has waited 50 ms before `recordingStopped`. That wait is felt but is not
+in the `release-to-paste` number. A latched recording's release-to-paste runs
+from the closing press.

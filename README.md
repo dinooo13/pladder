@@ -149,6 +149,9 @@ Option+Space is Alfred's default hotkey and a common Raycast choice, and it type
 **Can it press Return for me?**
 Yes. Press the send key, Right Option by default, at any point while you hold the push-to-talk key, and Return is pressed after the text is pasted. That sends a chat message or runs a terminal command without touching the keyboard again. The send key can be changed in Settings, like the push-to-talk key.
 
+**Can I toggle instead of holding?**
+Yes. Record a toggle key in Settings: one tap starts a recording, the next tap inserts it. Give it the same combination as the push-to-talk key and that key does both: tap to start and tap again to insert, or hold and release as before. Escape discards a recording either way.
+
 **What about long dictations?**
 Recordings stop at 120 seconds, so a lost key-up never leaves the microphone on. Audio longer than 15 seconds is transcribed in overlapping windows.
 
