@@ -199,7 +199,10 @@ public final class GlobalHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
             return (outcome, state.continuation)
         }
 
-        for event in outcome.events { continuation?.yield(event) }
+        for var event in outcome.events {
+            event.instant = now
+            continuation?.yield(event)
+        }
         return outcome.swallow
     }
 
@@ -214,7 +217,11 @@ public final class GlobalHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
             return (state.tap, events, state.continuation)
         }
         if let tap { CGEvent.tapEnable(tap: tap.port, enable: true) }
-        for event in events { continuation?.yield(event) }
+        let now = ContinuousClock.now
+        for var event in events {
+            event.instant = now
+            continuation?.yield(event)
+        }
     }
 
     // MARK: Helpers
