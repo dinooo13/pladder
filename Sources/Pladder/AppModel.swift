@@ -91,6 +91,9 @@ final class AppModel {
     /// the app quitting mid-recording, a device vanishing — is silent and
     /// baffling otherwise, so both ends of it are logged `.public`.
     private nonisolated static let muteLog = Logger(subsystem: "de.dinooo13.pladder", category: "mute")
+    /// Hotkey behaviour worth knowing about after the fact, such as a
+    /// keyboard that bounces.
+    private static let hotkeyLog = Logger(subsystem: "de.dinooo13.pladder", category: "hotkey")
 
     /// Settings live in the coordinator (it reacts to hotkey/engine changes);
     /// this forwards and persists. Applying the appearance covers every
@@ -162,7 +165,10 @@ final class AppModel {
             url: Self.settingsURL,
             defaults: Settings(engineID: FluidAudioIncrementalEngine.engineID)
         )
-        Self.migrateLegacySettings(to: Self.settingsURL)
+        // A test copy starts from the defaults, not from an old install.
+        if Self.settingsPathOverride == nil {
+            Self.migrateLegacySettings(to: Self.settingsURL)
+        }
         self.store = store
 
         // One read: the store moves an undecodable file aside on load, so a
@@ -217,8 +223,19 @@ final class AppModel {
         events.handler = { [weak self] event, at in self?.handle(event, at: at) }
     }
 
+    /// `PLADDER_SETTINGS_PATH` points a copy launched for testing at a file
+    /// of its own, so it neither reads nor writes the configuration of the
+    /// copy in daily use; every recorder commit is saved at once. Development
+    /// only: no UI, and a normal launch never has it set.
+    static var settingsPathOverride: String? {
+        guard let path = ProcessInfo.processInfo.environment["PLADDER_SETTINGS_PATH"],
+              !path.isEmpty else { return nil }
+        return path
+    }
+
     static var settingsURL: URL {
-        FileManager.default
+        if let path = settingsPathOverride { return URL(filePath: path) }
+        return FileManager.default
             .homeDirectoryForCurrentUser
             .appending(path: "Library/Application Support/Pladder/settings.json")
     }
@@ -287,6 +304,15 @@ final class AppModel {
             )
         case .failed:
             releaseInstant = nil
+        case .recordingDiscarded:
+            // Escape: no paste follows, so no timing line either, but the
+            // microphone did go off and the user should hear it.
+            releaseInstant = nil
+            if settings.playSounds { SoundPlayer.playStop() }
+        case .keyboardBounceObserved:
+            // That wait comes before `recordingStopped`, so the timing line
+            // cannot show it; this line is what explains a felt delay.
+            Self.hotkeyLog.notice("keyboard bounce observed: releases now settle for 50 ms before stopping")
         }
     }
 
@@ -313,7 +339,8 @@ final class AppModel {
         // seeing key-downs, so a chord with a regular key is dead there.
         // Carbon can take over only for a chord it can register, and a
         // modifier-only chord is unaffected by secure input anyway, so both
-        // stay on the tap and nothing swaps.
+        // stay on the tap and nothing swaps. The push-to-talk chord alone
+        // decides; the toggle chord follows whichever monitor is up.
         let wantsTap = accessibilityTrusted
             && !(sustained && settings.hotkey.canBeRegisteredWithoutAccessibility)
         let flipped = wantsTap != hotkeyUsesTap
@@ -424,7 +451,10 @@ final class AppModel {
     /// One line describing what the app is doing right now.
     var statusLine: String {
         switch coordinator.state {
-        case .recording: return String(localized: "Recording…")
+        case .recording:
+            // The Menu style has no pill, so this line is its latched cue.
+            guard coordinator.isLatched else { return String(localized: "Recording…") }
+            return String(localized: "Recording — press \(stopKeyName) to stop")
         case .transcribing: return String(localized: "Transcribing…")
         case .polishing: return String(localized: "Polishing…")
         case .inserting: return String(localized: "Inserting…")
@@ -452,6 +482,17 @@ final class AppModel {
     var effectiveHotkeyName: String {
         guard !hotkeyUsesTap else { return settings.hotkey.displayName }
         return settings.hotkey.sideAgnosticDisplayName
+    }
+
+    /// What ends a latched recording. Any chord does; this names the one that
+    /// latched it: the toggle key when it is a chord of its own, otherwise
+    /// the key, or what stands in for it.
+    private var stopKeyName: String {
+        let toggle = settings.toggleHotkey
+        if !toggle.isEmpty, toggle.canonical != settings.hotkey.canonical {
+            return hotkeyUsesTap ? toggle.displayName : toggle.sideAgnosticDisplayName
+        }
+        return standInHotkey?.sideAgnosticDisplayName ?? effectiveHotkeyName
     }
 
     /// True while a working Accessibility grant is being ignored because

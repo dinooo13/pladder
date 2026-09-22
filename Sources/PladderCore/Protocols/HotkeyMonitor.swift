@@ -1,9 +1,11 @@
 import Foundation
 
 /// Which chord fired. The coordinator starts a recording for either and
-/// decides at release what the dictation goes through.
+/// decides at release what the dictation goes through. `toggle` is only a
+/// chord of its own when it differs from the dictate chord; equal, it makes
+/// the dictate chord hybrid instead (see `HotkeyGestureTracker`).
 public enum HotkeyRole: String, Sendable, Hashable, CaseIterable, Comparable {
-    case dictate, polish
+    case dictate, polish, toggle
 
     public static func < (a: Self, b: Self) -> Bool { a.rawValue < b.rawValue }
 }
@@ -12,10 +14,17 @@ public enum HotkeyRole: String, Sendable, Hashable, CaseIterable, Comparable {
 public struct HotkeyMonitorEvent: Sendable, Equatable {
     public var role: HotkeyRole
     public var event: HotkeyEvent
+    /// When the key moved, stamped by the monitor as the keystroke arrives.
+    /// The coordinator times holds from this rather than from when it gets
+    /// round to the event: a press waits for the microphone to start, and a
+    /// release queued behind it must not look longer than it was. Nil from a
+    /// source that does not stamp, a test fake say; the reader uses now.
+    public var instant: ContinuousClock.Instant?
 
-    public init(role: HotkeyRole, event: HotkeyEvent) {
+    public init(role: HotkeyRole, event: HotkeyEvent, instant: ContinuousClock.Instant? = nil) {
         self.role = role
         self.event = event
+        self.instant = instant
     }
 }
 
@@ -29,6 +38,12 @@ public protocol HotkeyMonitor: Sendable {
     /// calling `stop()` ends monitoring.
     func start(chords: [HotkeyRole: Hotkey], submitKey: Hotkey) -> AsyncStream<HotkeyMonitorEvent>
     func stop()
+    /// While true a plain Escape is the cancel key: reported as `.escape` and
+    /// kept from other apps. The coordinator turns it on when a recording
+    /// starts and off when it ends, so Escape is never taken system wide
+    /// between recordings. Must return at once: it is called on the release
+    /// path. `start` and `stop` turn it off.
+    func setCancelKeyEnabled(_ enabled: Bool)
 }
 
 public enum HotkeyEvent: Sendable, Equatable {
@@ -42,6 +57,10 @@ public enum HotkeyEvent: Sendable, Equatable {
     /// recording is dropped without transcribing. Only the event tap can
     /// produce this; Carbon never sees the interrupting key.
     case cancelled
+    /// The cancel key went down while enabled (`setCancelKeyEnabled`): drop
+    /// the recording. Belongs to no chord, so no chord tracker produces it;
+    /// the monitors tag it `.dictate` and the coordinator ignores the role.
+    case escape
 }
 
 /// The push-to-talk chord: one or more physical keys that must be held together.

@@ -23,6 +23,12 @@ import os
 /// - the send key is not supported: it would need a second observer of the
 ///   keyboard, and posting the Return it asks for needs Accessibility anyway.
 ///   `submitKey` is therefore ignored and every release says `submit: false`.
+/// - the cancel key has to be a hot key of its own, and a hot key is taken
+///   from every app, so Escape is registered when a recording starts and
+///   unregistered when it ends; that is why the monitor has to be told when
+///   one is on (`setCancelKeyEnabled`). Its mask is empty, so only a bare
+///   Escape cancels here, where the tap also accepts Escape with the chord's
+///   own modifiers still held.
 ///
 /// Each chord is its own hot key; a chord that cannot be registered is
 /// skipped on its own, the others still work.
@@ -47,6 +53,11 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
         /// after a `stop()`; this makes each role's events strictly
         /// alternating.
         var pressed: Set<HotkeyRole> = []
+        /// Escape, registered only while a recording is on.
+        var cancelKey: CancelKey?
+        /// What the coordinator last asked for. Remembered so an enable that
+        /// lands before the session's registration is honoured by it.
+        var cancelKeyWanted = false
         /// Bumped by every `start`/`stop` so a registration that was scheduled
         /// onto the main thread and then superseded quietly undoes itself, and
         /// so events for an old hot key are ignored.
@@ -141,11 +152,29 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
             state.pressed = []
             return result
         }
+        let cancelKey: CancelKey? = lock.withLock {
+            defer { state.cancelKey = nil; state.cancelKeyWanted = false }
+            return state.cancelKey
+        }
         // `finish()` may run `onTermination` synchronously; the lock is
         // released and the registration is already detached, so that is a
         // no-op.
         continuation?.finish()
         Self.tearDown(registration)
+        Self.tearDown(cancelKey)
+    }
+
+    /// Never registers or unregisters inline: the coordinator calls this on
+    /// the release path, and a Carbon call there would wait on the window
+    /// server. The main queue does it straight after.
+    public func setCancelKeyEnabled(_ enabled: Bool) {
+        let generation: UInt32 = lock.withLock {
+            state.cancelKeyWanted = enabled
+            return state.generation
+        }
+        DispatchQueue.main.async { [weak self] in
+            self?.syncCancelKey(generation: generation)
+        }
     }
 
     // MARK: Registration
@@ -156,6 +185,11 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
     private struct Registration: @unchecked Sendable {
         var hotKeys: [EventHotKeyRef]
         var handler: EventHandlerRef?
+    }
+
+    /// Escape's hot key. Only ever created and destroyed on the main thread.
+    private struct CancelKey: @unchecked Sendable {
+        var hotKey: EventHotKeyRef
     }
 
     /// One chord to register: which role it is, the ID its events carry, and
@@ -172,6 +206,11 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
     private static func hotKeyID(generation: UInt32, role: HotkeyRole) -> UInt32 {
         let index = UInt32(HotkeyRole.allCases.firstIndex(of: role) ?? 0)
         return (generation &<< 3) | index
+    }
+
+    /// The cancel key takes the last of the eight slots, clear of the roles.
+    private static func cancelKeyID(generation: UInt32) -> UInt32 {
+        (generation &<< 3) | 7
     }
 
     /// Main thread only.
@@ -227,6 +266,48 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
             return false
         }
         if stale { Self.tearDown(registration) }
+        // A recording that started before the handler was in place.
+        syncCancelKey(generation: generation)
+    }
+
+    /// Main thread only. Brings Escape's registration in line with what the
+    /// coordinator last asked for. Needs the session's handler, which only
+    /// exists once a chord registered; without one no recording can start
+    /// from this monitor anyway.
+    private func syncCancelKey(generation: UInt32) {
+        let (wanted, current, hasHandler) = lock.withLock { () -> (Bool, CancelKey?, Bool) in
+            guard state.generation == generation else { return (false, nil, false) }
+            return (state.cancelKeyWanted, state.cancelKey, state.registration != nil)
+        }
+        if !wanted, let current {
+            let taken: Bool = lock.withLock {
+                guard state.generation == generation, state.cancelKey != nil else { return false }
+                state.cancelKey = nil
+                return true
+            }
+            if taken { UnregisterEventHotKey(current.hotKey) }
+            return
+        }
+        guard wanted, current == nil, hasHandler else { return }
+        var hotKey: EventHotKeyRef?
+        let id = EventHotKeyID(signature: Self.signature, id: Self.cancelKeyID(generation: generation))
+        let registered = RegisterEventHotKey(
+            UInt32(kVK_Escape), 0, id, GetApplicationEventTarget(), 0, &hotKey)
+        guard registered == noErr, let hotKey else {
+            if registered == OSStatus(eventHotKeyExistsErr) {
+                Self.log.error("Escape is registered by another app; it cannot cancel a recording")
+            } else {
+                Self.log.error("Could not register Escape (\(registered, privacy: .public))")
+            }
+            return
+        }
+        let stale: Bool = lock.withLock {
+            guard state.generation == generation, state.cancelKeyWanted, state.cancelKey == nil
+            else { return true }
+            state.cancelKey = CancelKey(hotKey: hotKey)
+            return false
+        }
+        if stale { UnregisterEventHotKey(hotKey) }
     }
 
     private func unregister(generation: UInt32) {
@@ -236,6 +317,11 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
             return state.registration
         }
         Self.tearDown(registration)
+    }
+
+    private static func tearDown(_ cancelKey: CancelKey?) {
+        guard let cancelKey else { return }
+        onMainThread { UnregisterEventHotKey(cancelKey.hotKey) }
     }
 
     private static func tearDown(_ registration: Registration?) {
@@ -266,20 +352,29 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
         }
 
         let kind = GetEventKind(event)
+        let now = ContinuousClock.now
         let (outcome, continuation) = lock.withLock {
             () -> (HotkeyMonitorEvent?, AsyncStream<HotkeyMonitorEvent>.Continuation?) in
+            // Escape while a recording is on. Only its press matters, and
+            // one that lands after it was let go is ignored.
+            if id.id == Self.cancelKeyID(generation: state.generation) {
+                guard Int(kind) == kEventHotKeyPressed, state.cancelKey != nil else { return (nil, nil) }
+                return (HotkeyMonitorEvent(role: .dictate, event: .escape, instant: now), state.continuation)
+            }
             // An event for a hot key we have already replaced.
             guard id.id >> 3 == state.generation & (UInt32.max >> 3),
                   let role = state.roles[id.id] else { return (nil, nil) }
             switch Int(kind) {
             case kEventHotKeyPressed:
                 guard state.pressed.insert(role).inserted else { return (nil, nil) }
-                return (HotkeyMonitorEvent(role: role, event: .pressed), state.continuation)
+                return (HotkeyMonitorEvent(role: role, event: .pressed, instant: now), state.continuation)
             case kEventHotKeyReleased:
                 guard state.pressed.remove(role) != nil else { return (nil, nil) }
                 // No send key here: posting the Return it asks for needs the
                 // grant this monitor exists to do without.
-                return (HotkeyMonitorEvent(role: role, event: .released(submit: false)), state.continuation)
+                return (
+                    HotkeyMonitorEvent(role: role, event: .released(submit: false), instant: now),
+                    state.continuation)
             default:
                 return (nil, nil)
             }

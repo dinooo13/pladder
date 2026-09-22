@@ -153,6 +153,9 @@ Yes. Press the send key, Right Option by default, at any point while you hold th
 **Can it clean up what I said?**
 Record a key for Dictate and polish in Settings and hold that instead. The dictation goes through Apple Intelligence on your Mac before it is pasted, which takes a second or two. It needs Apple Intelligence turned on in System Settings; without it that key pastes the text as dictated.
 
+**Can I toggle instead of holding?**
+Yes. Record a toggle key in Settings: one tap starts a recording, the next tap inserts it. Give it the same combination as the push-to-talk key and that key does both: tap to start and tap again to insert, or hold and release as before. Escape discards a recording either way.
+
 **What about long dictations?**
 Recordings stop at 120 seconds, so a lost key-up never leaves the microphone on. Audio longer than 15 seconds is transcribed in overlapping windows.
 

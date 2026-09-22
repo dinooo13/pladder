@@ -13,7 +13,7 @@ import SwiftUI
 /// side is ignored and the left-hand key is stored. The chord is committed
 /// once every key has been let go, so a chord of several keys can be built up
 /// in any order.
-/// Escape on its own cancels.
+/// Escape on its own cancels; Delete on its own clears, where that is allowed.
 struct HotkeyRecorderField: View {
     @Binding var hotkey: Hotkey
     /// Called with `true` while recording. The caller suspends the global
@@ -23,6 +23,9 @@ struct HotkeyRecorderField: View {
     /// Carbon, which needs exactly one regular key, so modifier-only chords
     /// are refused instead of being stored and silently never firing.
     var requiresRegularKey = false
+    /// Delete with nothing pending commits an empty chord, which turns the
+    /// key off. The push-to-talk key can never be empty.
+    var allowsEmpty = false
     /// The shortcuts macOS owns, so a chord that collides with one can be
     /// warned about while it is being pressed rather than after it is stored.
     var systemShortcuts: Set<Hotkey> = []
@@ -37,6 +40,7 @@ struct HotkeyRecorderField: View {
                 } else {
                     recorder.begin(
                         requiresRegularKey: requiresRegularKey,
+                        allowsEmpty: allowsEmpty,
                         systemShortcuts: systemShortcuts
                     ) { hotkey = $0 }
                 }
@@ -71,14 +75,18 @@ struct HotkeyRecorderField: View {
         return recorder.pending?.displayName ?? String(localized: "Press keys…")
     }
 
-    /// Four whole sentences rather than fragments glued together: a
-    /// translation cannot be assembled from clauses.
+    /// Whole sentences rather than fragments glued together: a translation
+    /// cannot be assembled from clauses.
     private var help: String {
         switch (recorder.isRecording, requiresRegularKey) {
         case (true, false):
-            String(localized: "Press the key or combination to use. Escape cancels.")
+            allowsEmpty
+                ? String(localized: "Press the key or combination to use. Escape cancels, Delete clears.")
+                : String(localized: "Press the key or combination to use. Escape cancels.")
         case (true, true):
-            String(localized: "Press the key or combination to use. Escape cancels. Without Accessibility the key must include a regular key, for example Control+Shift+D.")
+            allowsEmpty
+                ? String(localized: "Press the key or combination to use. Escape cancels, Delete clears. Without Accessibility the key must include a regular key, for example Control+Shift+D.")
+                : String(localized: "Press the key or combination to use. Escape cancels. Without Accessibility the key must include a regular key, for example Control+Shift+D.")
         case (false, false):
             String(localized: "Click, then press the key or combination to use.")
         case (false, true):
@@ -113,6 +121,7 @@ final class HotkeyRecorder {
     private var resignObserver: (any NSObjectProtocol)?
     private var commit: ((Hotkey) -> Void)?
     private var requiresRegularKey = false
+    private var allowsEmpty = false
     private var systemShortcuts: Set<Hotkey> = []
     /// Shown for the whole session while Secure Event Input is on, and put
     /// back whenever a chord notice is cleared.
@@ -120,12 +129,14 @@ final class HotkeyRecorder {
 
     func begin(
         requiresRegularKey: Bool = false,
+        allowsEmpty: Bool = false,
         systemShortcuts: Set<Hotkey> = [],
         commit: @escaping (Hotkey) -> Void
     ) {
         cancel()
         self.commit = commit
         self.requiresRegularKey = requiresRegularKey
+        self.allowsEmpty = allowsEmpty
         self.systemShortcuts = systemShortcuts
         // A warning, not a refusal: the recorder reads the settings window's
         // own key events, which secure input does not gate, so recording
@@ -180,6 +191,12 @@ final class HotkeyRecorder {
             heldModifiers = modifierState.held(flags: key.flags)
             if Int(key.keyCode) == kVK_Escape, heldModifiers.isEmpty, pending == nil {
                 end()
+                return true
+            }
+            if allowsEmpty, Int(key.keyCode) == kVK_Delete, heldModifiers.isEmpty, pending == nil {
+                let commit = self.commit
+                end()
+                commit?(Hotkey(keyCodes: []))
                 return true
             }
             heldKeys.insert(key.keyCode)
@@ -239,6 +256,7 @@ final class HotkeyRecorder {
         resignObserver = nil
         commit = nil
         requiresRegularKey = false
+        allowsEmpty = false
         systemShortcuts = []
         secureInputNotice = nil
         refusedModifiers = nil
