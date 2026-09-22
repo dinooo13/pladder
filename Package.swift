@@ -27,8 +27,7 @@ let package = Package(
         // Microphone capture and resampling.
         .target(name: "PladderAudio", dependencies: ["PladderCore"]),
 
-        // Hotkey, pasteboard output, permissions, optional Foundation Models
-        // processor. AppKit lives here.
+        // Hotkey, pasteboard output, permissions. AppKit lives here.
         .target(
             name: "PladderSystem",
             dependencies: ["PladderCore"],
@@ -46,10 +45,14 @@ let package = Package(
             ]
         ),
 
+        // Apple's on-device model behind the polish hotkey. The only target
+        // that imports FoundationModels.
+        .target(name: "PladderRefine", dependencies: ["PladderCore"]),
+
         // The menu bar app.
         .executableTarget(
             name: "Pladder",
-            dependencies: ["PladderCore", "PladderAudio", "PladderSystem", "PladderEngines"],
+            dependencies: ["PladderCore", "PladderAudio", "PladderSystem", "PladderEngines", "PladderRefine"],
             // Info.plist is copied into the .app by scripts/bundle.sh; SwiftPM
             // refuses to treat it as a resource, so keep it out of the bundle.
             exclude: ["Resources/Info.plist"],
@@ -70,12 +73,13 @@ let package = Package(
         // engines, or run the benchmark (see docs/BENCHMARKS.md).
         .executableTarget(
             name: "PladderCLI",
-            dependencies: ["PladderCore", "PladderEngines", "PladderAudio", "PladderBench"]
+            dependencies: ["PladderCore", "PladderEngines", "PladderAudio", "PladderBench", "PladderRefine"]
         ),
 
         .testTarget(name: "PladderCoreTests", dependencies: ["PladderCore"]),
         .testTarget(name: "PladderAudioTests", dependencies: ["PladderAudio"]),
         .testTarget(name: "PladderBenchTests", dependencies: ["PladderBench"]),
         .testTarget(name: "PladderSystemTests", dependencies: ["PladderSystem"]),
+        .testTarget(name: "PladderRefineTests", dependencies: ["PladderRefine"]),
     ]
 )
