@@ -233,6 +233,9 @@ public final class DictationCoordinator {
     /// The engine that was ready when the current recording started. Nil
     /// between cycles.
     private var cycleEngine: (any TranscriptionEngine)?
+    /// The chord that started the current recording. Only its release or
+    /// cancel ends the recording. Nil between cycles.
+    private var cycleRole: HotkeyRole?
 
     /// Half a second of silence. Transcribing it at key-down brings the
     /// Neural Engine up from idle while the user is still speaking; every
@@ -367,25 +370,32 @@ public final class DictationCoordinator {
     private func startHotkey() {
         hotkeyTask?.cancel()
         hotkeyMonitor.stop()
-        let stream = hotkeyMonitor.start(
-            hotkey: hotkeyOverride ?? settings.hotkey, submitKey: settings.submitKey)
+        let chords: [HotkeyRole: Hotkey] = [.dictate: hotkeyOverride ?? settings.hotkey]
+        let stream = hotkeyMonitor.start(chords: chords, submitKey: settings.submitKey)
         hotkeyTask = Task { [weak self] in
-            for await event in stream {
+            for await tagged in stream {
                 guard let self else { return }
-                switch event {
-                case .pressed: await self.hotkeyPressed()
-                case .released(let submit): self.hotkeyReleased(submit: submit)
+                switch tagged.event {
+                case .pressed: await self.hotkeyPressed(role: tagged.role)
+                // Only the chord that started the recording may end it: with
+                // nested chords the other tracker reports the hand-over as
+                // its own release.
+                case .released(let submit):
+                    if tagged.role == self.cycleRole { self.hotkeyReleased(submit: submit) }
                 // Another key went down right after the chord: the user typed
                 // Cmd+C, not a dictation. Drop the audio without transcribing,
                 // without a stop sound and without a timing line.
-                case .cancelled: await self.cancelRecording()
+                case .cancelled:
+                    if tagged.role == self.cycleRole { await self.cancelRecording() }
                 }
             }
         }
     }
 
     /// Public so tests and a menu item can drive the state machine directly.
-    public func hotkeyPressed() async {
+    /// `role` is the chord that was pressed; it decides what the dictation
+    /// goes through at release.
+    public func hotkeyPressed(role: HotkeyRole = .dictate) async {
         // `.copied` is the hint from the previous dictation, not a busy state:
         // a press replaces it rather than being dropped.
         switch state {
@@ -397,6 +407,7 @@ public final class DictationCoordinator {
         // The engine that was ready at press transcribes this cycle, even if
         // the settings switch engines mid-recording.
         cycleEngine = loader.engine
+        cycleRole = role
         partialTranscript = nil
         // Read once, at press: switching the style mid-recording must not
         // leave the loop half live, with nothing warming the engine.
@@ -486,6 +497,7 @@ public final class DictationCoordinator {
         let fedSamples = fedSampleCount
         fedSampleCount = 0
         cycleEngine = nil
+        cycleRole = nil
         inFlight = Task { [weak self] in
             guard let self else { return }
             let stopped = ContinuousClock.now
@@ -577,6 +589,7 @@ public final class DictationCoordinator {
         becomeIdle()
         abandonStreaming()
         cycleEngine = nil
+        cycleRole = nil
         let engine = loader.engine
         _ = await capture.stop()
         if let streaming = engine as? (any StreamingTranscriptionEngine) {

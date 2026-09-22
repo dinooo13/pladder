@@ -66,22 +66,29 @@ final class FakeOutput: TextOutput, @unchecked Sendable {
 }
 
 final class FakeHotkey: HotkeyMonitor, @unchecked Sendable {
-    private var continuation: AsyncStream<HotkeyEvent>.Continuation?
+    private var continuation: AsyncStream<HotkeyMonitorEvent>.Continuation?
     /// How often `start` was called, and with what, so a monitor swap can be
     /// checked from the outside.
     private(set) var startCount = 0
-    private(set) var lastHotkey: Hotkey?
-    func start(hotkey: Hotkey, submitKey: Hotkey) -> AsyncStream<HotkeyEvent> {
+    private(set) var lastChords: [HotkeyRole: Hotkey] = [:]
+    var lastHotkey: Hotkey? { lastChords[.dictate] }
+    func start(chords: [HotkeyRole: Hotkey], submitKey: Hotkey) -> AsyncStream<HotkeyMonitorEvent> {
         startCount += 1
-        lastHotkey = hotkey
-        let (stream, cont) = AsyncStream<HotkeyEvent>.makeStream()
+        lastChords = chords
+        let (stream, cont) = AsyncStream<HotkeyMonitorEvent>.makeStream()
         continuation = cont
         return stream
     }
     func stop() { continuation?.finish() }
-    func press() { continuation?.yield(.pressed) }
-    func release(submit: Bool = false) { continuation?.yield(.released(submit: submit)) }
-    func cancel() { continuation?.yield(.cancelled) }
+    func press(_ role: HotkeyRole = .dictate) {
+        continuation?.yield(HotkeyMonitorEvent(role: role, event: .pressed))
+    }
+    func release(_ role: HotkeyRole = .dictate, submit: Bool = false) {
+        continuation?.yield(HotkeyMonitorEvent(role: role, event: .released(submit: submit)))
+    }
+    func cancel(_ role: HotkeyRole = .dictate) {
+        continuation?.yield(HotkeyMonitorEvent(role: role, event: .cancelled))
+    }
 }
 
 /// Counts the two calls the coordinator makes. The real controller's timing
