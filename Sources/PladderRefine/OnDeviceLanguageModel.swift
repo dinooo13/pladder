@@ -29,7 +29,7 @@ public enum OnDeviceModelError: Error, Sendable, Equatable {
 ///   always runs in a detached task and the caller only awaits its value.
 /// - The system model serialises requests, so a call abandoned at the
 ///   timeout blocks the next one. It is parked and the next call drains it
-///   before it starts.
+///   before it starts, within that call's own budget.
 /// - Sessions carry a transcript: one session per exchange, then dropped,
 ///   so nothing leaks from one dictation into the next.
 /// - Greedy sampling: the same prompt gives the same answer, so a harness
@@ -112,13 +112,16 @@ public struct OnDeviceLanguageModel: Sendable {
     /// model call that ignores cancellation would still hold the paste. A
     /// one-shot `AsyncStream` lets the loser be abandoned. Both tasks are
     /// detached so neither inherits the caller's actor.
+    ///
+    /// The drain of an abandoned call runs inside the budget, not before it:
+    /// a call that never comes back would otherwise hold every later paste
+    /// with no limit at all.
     private func race<Value: Sendable>(
         _ work: @escaping @Sendable () async throws -> Value
     ) async throws -> Value {
-        await Self.drain()
-
         let (stream, continuation) = AsyncStream<Attempt<Value>>.makeStream()
         let call = Task.detached(priority: .userInitiated) {
+            await Self.drain()
             do {
                 continuation.yield(.value(try await work()))
             } catch {
