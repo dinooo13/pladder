@@ -43,6 +43,10 @@ public struct Settings: Codable, Sendable, Equatable {
     /// A dictation started with this chord runs through the on-device model
     /// before it is pasted. Empty, the default, means there is no such chord.
     public var polishHotkey: Hotkey
+    /// A chord that starts a recording on one press and ends it on the next.
+    /// The same chord as `hotkey` makes that key hybrid: a tap latches, a hold
+    /// stops at release. Empty, the default, turns it off.
+    public var toggleHotkey: Hotkey
     /// Processor IDs that are turned off. Absent means enabled.
     public var disabledProcessors: Set<String>
     public var dictionary: [DictionaryEntry]
@@ -69,6 +73,7 @@ public struct Settings: Codable, Sendable, Equatable {
         hotkey: Hotkey = .optionSpace,
         submitKey: Hotkey = .rightOption,
         polishHotkey: Hotkey = Hotkey(keyCodes: []),
+        toggleHotkey: Hotkey = Hotkey(keyCodes: []),
         disabledProcessors: Set<String> = [],
         dictionary: [DictionaryEntry] = [],
         appendTrailingSpace: Bool = true,
@@ -84,6 +89,7 @@ public struct Settings: Codable, Sendable, Equatable {
         self.hotkey = hotkey
         self.submitKey = submitKey
         self.polishHotkey = polishHotkey
+        self.toggleHotkey = toggleHotkey
         self.disabledProcessors = disabledProcessors
         self.dictionary = dictionary
         self.appendTrailingSpace = appendTrailingSpace
@@ -101,6 +107,7 @@ public struct Settings: Codable, Sendable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case engineID, hotkey, submitKey, polishHotkey, disabledProcessors, dictionary, appendTrailingSpace, launchAtLogin, playSounds, appearance
         case overlayStyle, overlayGlass, overlayAnimationSpeed, muteOutputWhileDictating
+        case toggleHotkey
     }
 
     public init(from decoder: Decoder) throws {
@@ -114,6 +121,8 @@ public struct Settings: Codable, Sendable, Equatable {
         submitKey = try c.decodeIfPresent(Hotkey.self, forKey: .submitKey) ?? .rightOption
         // Empty means off, like the submit key.
         polishHotkey = try c.decodeIfPresent(Hotkey.self, forKey: .polishHotkey) ?? Hotkey(keyCodes: [])
+        // Like the submit key, empty is meaningful: off.
+        toggleHotkey = try c.decodeIfPresent(Hotkey.self, forKey: .toggleHotkey) ?? Hotkey(keyCodes: [])
         disabledProcessors = try c.decodeIfPresent(Set<String>.self, forKey: .disabledProcessors) ?? []
         dictionary = try c.decodeIfPresent([DictionaryEntry].self, forKey: .dictionary) ?? []
         appendTrailingSpace = try c.decodeIfPresent(Bool.self, forKey: .appendTrailingSpace) ?? true

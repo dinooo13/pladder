@@ -31,6 +31,16 @@
         }
       }
     },
+    "%@ is also the toggle key, so it never polishes. Record a different combination.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ ist auch die Start/Stopp-Taste, deshalb wird damit nie überarbeitet. Nimm eine andere Kombination auf."
+          }
+        }
+      }
+    },
     "%@ is part of the push-to-talk key, so it can never be pressed separately.": {
       "localizations": {
         "de": {
@@ -841,6 +851,26 @@
         }
       }
     },
+    "Press the key or combination to use. Escape cancels, Delete clears.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Taste oder Kombination drücken. Esc bricht ab, die Löschtaste leert das Feld."
+          }
+        }
+      }
+    },
+    "Press the key or combination to use. Escape cancels, Delete clears. Without Accessibility the key must include a regular key, for example Control+Shift+D.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Taste oder Kombination drücken. Esc bricht ab, die Löschtaste leert das Feld. Ohne Bedienungshilfen braucht die Kombination eine normale Taste, zum Beispiel Ctrl + Umschalttaste + D."
+          }
+        }
+      }
+    },
     "Press the key or combination to use. Escape cancels.": {
       "localizations": {
         "de": {
@@ -1121,6 +1151,16 @@
         }
       }
     },
+    "Tap the toggle key to start recording and tap it again to insert. Set it to the same combination as the key and a short tap toggles while a hold still works as before. Delete clears a field.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tipp die Start/Stopp-Taste an, um die Aufnahme zu starten, und tipp sie noch mal an, um einzufügen. Gibst du ihr dieselbe Kombination wie der Taste, startet und stoppt ein kurzes Antippen, und Halten funktioniert wie bisher. Die Löschtaste leert ein Feld."
+          }
+        }
+      }
+    },
     "The Apple Intelligence model is still downloading, so this key pastes the text as dictated for now.": {
       "localizations": {
         "de": {
@@ -1167,6 +1207,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Leerzeichen bereinigen"
+          }
+        }
+      }
+    },
+    "Toggle key": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start/Stopp-Taste"
           }
         }
       }
@@ -1227,6 +1277,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ohne Bedienungshilfen wird %1$@ nicht erkannt, deshalb springt %2$@ ein, bis die Bedienungshilfen erlaubt sind. Nimm eine Kombination mit einer normalen Taste auf, wenn du eine eigene willst."
+          }
+        }
+      }
+    },
+    "Without Accessibility, %@ cannot be detected, so the toggle key is off until Accessibility is granted.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ohne Bedienungshilfen wird %@ nicht erkannt, deshalb ist die Start/Stopp-Taste aus, bis die Bedienungshilfen erlaubt sind."
           }
         }
       }
