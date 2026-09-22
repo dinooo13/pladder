@@ -346,6 +346,11 @@ final class AppModel {
             )
         case .failed:
             releaseInstant = nil
+        case .recordingDiscarded:
+            // Escape: no paste follows, so no timing line either, but the
+            // microphone did go off and the user should hear it.
+            releaseInstant = nil
+            if settings.playSounds { SoundPlayer.playStop() }
         case .keyboardBounceObserved:
             // That wait comes before `recordingStopped`, so the timing line
             // cannot show it; this line is what explains a felt delay.

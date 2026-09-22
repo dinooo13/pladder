@@ -768,3 +768,96 @@ private let keyC: UInt16 = 0x08
         #expect(g.pressed(.dictate, at: at(5_000)) == .init(action: .start(.dictate)))
     }
 }
+
+/// The Escape rule of `HotkeyChordSet`.
+@Suite struct CancelKeyTests {
+    private let escapeKey: UInt16 = 0x35
+    private let keyD: UInt16 = 0x02
+    private static let escape = [HotkeyMonitorEvent(role: .dictate, event: .escape)]
+
+    private func optionSpaceSet() -> HotkeyChordSet {
+        HotkeyChordSet(chords: [.dictate: .optionSpace, .toggle: Hotkey(leftControl, 0x02)])
+    }
+
+    @Test func escapeIsTheCancelKeyOnlyWhileEnabled() {
+        var set = optionSpaceSet()
+        #expect(set.keyDown(escapeKey, modifiers: []) == .init())
+        #expect(set.keyUp(escapeKey, modifiers: []) == .init())
+        set.cancelKeyEnabled = true
+        #expect(set.keyDown(escapeKey, modifiers: []) == .init(events: Self.escape, swallow: true))
+        #expect(set.keyDown(escapeKey, isRepeat: true, modifiers: []) == .init(swallow: true))
+        #expect(set.keyUp(escapeKey, modifiers: []) == .init(swallow: true))
+        // And the next Escape is the cancel key again.
+        #expect(set.keyDown(escapeKey, modifiers: []).events == Self.escape)
+    }
+
+    @Test func escapeKeyUpIsSwallowedAfterDisabling() {
+        var set = optionSpaceSet()
+        set.cancelKeyEnabled = true
+        _ = set.keyDown(escapeKey, modifiers: [])
+        set.cancelKeyEnabled = false
+        #expect(set.keyDown(escapeKey, isRepeat: true, modifiers: []) == .init(swallow: true))
+        #expect(set.keyUp(escapeKey, modifiers: []) == .init(swallow: true))
+        #expect(set.keyDown(escapeKey, modifiers: []) == .init())
+    }
+
+    @Test func escapeWithForeignModifiersPassesThrough() {
+        // Cmd+Option+Escape is Force Quit, recording or not.
+        var set = optionSpaceSet()
+        set.cancelKeyEnabled = true
+        _ = set.flagsChanged(modifiers: [leftCommand, leftOption])
+        #expect(set.keyDown(escapeKey, modifiers: [leftCommand, leftOption]) == .init())
+        #expect(set.keyUp(escapeKey, modifiers: [leftCommand, leftOption]) == .init())
+    }
+
+    @Test func escapeWithTheChordsOwnModifiersCancels() {
+        var set = optionSpaceSet()
+        set.cancelKeyEnabled = true
+        _ = set.flagsChanged(modifiers: [rightOption])
+        #expect(set.keyDown(space, modifiers: [rightOption]).events == [HotkeyMonitorEvent(role: .dictate, event: .pressed)])
+        #expect(set.keyDown(escapeKey, modifiers: [rightOption]) == .init(events: Self.escape, swallow: true))
+    }
+
+    @Test func escapeNeverReachesTheChordTrackers() {
+        // Inside the interruption window a foreign key would cancel the
+        // press; the cancel key is caught first, so only `.escape` comes out.
+        let start = ContinuousClock.now
+        var set = HotkeyChordSet(chords: [.dictate: .rightCommand])
+        set.cancelKeyEnabled = true
+        _ = set.flagsChanged(modifiers: [rightCommand], at: start)
+        #expect(
+            set.keyDown(escapeKey, modifiers: [rightCommand], at: start + .milliseconds(100))
+                == .init(events: Self.escape, swallow: true))
+        #expect(set.keyUp(escapeKey, modifiers: [rightCommand], at: start + .milliseconds(150)) == .init(swallow: true))
+        // The chord is still engaged: letting go is its ordinary release.
+        #expect(
+            set.flagsChanged(modifiers: [], at: start + .seconds(3)).events
+                == [HotkeyMonitorEvent(role: .dictate, event: .released(submit: false))])
+    }
+
+    @Test func aChordContainingEscapeIsNotTheCancelKey() {
+        var set = HotkeyChordSet(chords: [.dictate: Hotkey(leftOption, escapeKey)])
+        set.cancelKeyEnabled = true
+        _ = set.flagsChanged(modifiers: [leftOption])
+        #expect(
+            set.keyDown(escapeKey, modifiers: [leftOption])
+                == .init(events: [HotkeyMonitorEvent(role: .dictate, event: .pressed)], swallow: true))
+    }
+
+    @Test func aSendKeyContainingEscapeIsNotTheCancelKey() {
+        var set = HotkeyChordSet(chords: [.dictate: .rightCommand], submitKey: Hotkey(escapeKey))
+        set.cancelKeyEnabled = true
+        _ = set.flagsChanged(modifiers: [rightCommand])
+        #expect(set.keyDown(escapeKey, modifiers: [rightCommand]) == .init(swallow: true))
+        _ = set.keyUp(escapeKey, modifiers: [rightCommand])
+        #expect(set.flagsChanged(modifiers: []).events == [HotkeyMonitorEvent(role: .dictate, event: .released(submit: true))])
+    }
+
+    @Test func resetKeepsTheCancelKey() {
+        var set = optionSpaceSet()
+        set.cancelKeyEnabled = true
+        _ = set.reset()
+        #expect(set.cancelKeyEnabled)
+        #expect(set.keyDown(escapeKey, modifiers: []).events == Self.escape)
+    }
+}

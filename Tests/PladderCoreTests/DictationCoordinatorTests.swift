@@ -91,6 +91,10 @@ final class FakeHotkey: HotkeyMonitor, @unchecked Sendable {
     }
     /// Any event, for a test that stamps its own instants.
     func send(_ event: HotkeyMonitorEvent) { continuation?.yield(event) }
+    /// Every `setCancelKeyEnabled` call, in order.
+    private(set) var cancelKeyEnabled: [Bool] = []
+    func setCancelKeyEnabled(_ enabled: Bool) { cancelKeyEnabled.append(enabled) }
+    func escape() { continuation?.yield(HotkeyMonitorEvent(role: .dictate, event: .escape)) }
 }
 
 /// Stands in for the on-device model: records what it was asked, answers
@@ -372,6 +376,7 @@ final class EventLog: @unchecked Sendable {
         case .inserted: name = "inserted"
         case .failed: name = "failed"
         case .keyboardBounceObserved: name = "keyboardBounceObserved"
+        case .recordingDiscarded: name = "recordingDiscarded"
         }
         lock.withLock {
             _names.append(name)
@@ -1718,6 +1723,123 @@ final class EventLog: @unchecked Sendable {
         #expect(await waitUntil { events.names.contains("keyboardBounceObserved") })
         await c.inFlight?.value
         #expect(events.names.filter { $0 == "keyboardBounceObserved" }.count == 1)
+    }
+}
+
+// MARK: - Escape
+
+@MainActor
+@Suite struct EscapeTests {
+    @Test func escapeDiscardsWithoutPastingAndAnnouncesIt() async {
+        let hotkey = FakeHotkey()
+        let events = EventLog()
+        let (c, output, capture) = makeCoordinator(hotkeyMonitor: hotkey, events: events)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        hotkey.press()
+        #expect(await waitUntil { c.state.isRecording })
+        hotkey.escape()
+        #expect(await waitUntil { c.state == .idle })
+        await c.inFlight?.value
+        try? await Task.sleep(for: .milliseconds(20))
+        #expect(await capture.stopCount == 1)
+        #expect(output.inserted.isEmpty)
+        // No `recordingStopped`, so no timing line; `recordingDiscarded` is
+        // what plays the stop sound.
+        #expect(events.names == ["recordingStarted", "recordingDiscarded"])
+        #expect(hotkey.cancelKeyEnabled == [true, false])
+    }
+
+    @Test func theReleaseAfterEscapeDoesNothing() async {
+        let hotkey = FakeHotkey()
+        let (c, output, capture) = makeCoordinator(hotkeyMonitor: hotkey)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        hotkey.press()
+        #expect(await waitUntil { c.state.isRecording })
+        hotkey.escape()
+        hotkey.release()
+        try? await Task.sleep(for: .milliseconds(50))
+        #expect(c.state == .idle)
+        #expect(c.inFlight == nil)
+        #expect(await capture.stopCount == 1)
+        #expect(output.inserted.isEmpty)
+    }
+
+    @Test func escapeWhileIdleDoesNothing() async {
+        let hotkey = FakeHotkey()
+        let events = EventLog()
+        let (c, _, capture) = makeCoordinator(hotkeyMonitor: hotkey, events: events)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        hotkey.escape()
+        try? await Task.sleep(for: .milliseconds(30))
+        #expect(c.state == .idle)
+        #expect(events.names.isEmpty)
+        #expect(await capture.stopCount == 0)
+        #expect(hotkey.cancelKeyEnabled.isEmpty)
+    }
+
+    @Test func escapeWhileLatchedDiscards() async {
+        var settings = Settings(engineID: EchoEngine.engineID)
+        settings.toggleHotkey = settings.hotkey
+        let hotkey = FakeHotkey()
+        let (c, output, _) = makeCoordinator(settings: settings, hotkeyMonitor: hotkey)
+        c.holdThreshold = .seconds(2)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        hotkey.press()
+        #expect(await waitUntil { c.state.isRecording })
+        hotkey.release()
+        #expect(await waitUntil { c.isLatched })
+        hotkey.escape()
+        #expect(await waitUntil { c.state == .idle })
+        #expect(!c.isLatched)
+        #expect(output.inserted.isEmpty)
+        // Not latched any more: the next press starts a recording.
+        try? await Task.sleep(for: .milliseconds(80))
+        hotkey.press()
+        #expect(await waitUntil { c.state.isRecording })
+        await c.cancelRecording()
+    }
+
+    @Test func escapePressedRestoresTheOutputDevice() async {
+        var settings = Settings(engineID: EchoEngine.engineID)
+        settings.muteOutputWhileDictating = true
+        let muter = FakeOutputMuter()
+        let (c, _, _) = makeCoordinator(settings: settings, outputMuter: muter)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed()
+        await c.escapePressed()
+        #expect(await waitUntil { muter.endedCount == 1 })
+    }
+
+    @Test func theCancelKeyIsOnlyOnWhileRecording() async {
+        let hotkey = FakeHotkey()
+        let (c, _, _) = makeCoordinator(hotkeyMonitor: hotkey)
+        c.maximumDuration = .milliseconds(60)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        // A dictation.
+        hotkey.press()
+        #expect(await waitUntil { c.state.isRecording })
+        hotkey.release()
+        #expect(await waitUntil { c.inFlight != nil })
+        await c.inFlight?.value
+        #expect(hotkey.cancelKeyEnabled == [true, false])
+        // An interrupted press, past the bounce window of that release.
+        try? await Task.sleep(for: .milliseconds(80))
+        hotkey.press()
+        #expect(await waitUntil { c.state.isRecording })
+        hotkey.cancel()
+        #expect(await waitUntil { c.state == .idle })
+        #expect(hotkey.cancelKeyEnabled == [true, false, true, false])
+        // The cap.
+        await c.hotkeyPressed()
+        #expect(await waitUntil { !c.state.isRecording })
+        await c.inFlight?.value
+        #expect(hotkey.cancelKeyEnabled == [true, false, true, false, true, false])
     }
 }
 
