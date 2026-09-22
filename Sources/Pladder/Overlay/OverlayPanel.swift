@@ -107,11 +107,18 @@ final class OverlayPanel: NSPanel {
                 }
             })
         } else {
-            setFrame(final, display: false)
+            // A dive that is still running keeps driving the frame after a
+            // plain `setFrame`, so the panel would finish below the screen
+            // edge with the hint on it. Only an animated frame supersedes
+            // it: the clipboard hint arriving mid-dive (a transcription that
+            // outlasts the collapse) brings the pill back up inside the fade.
+            let diving = isVisible && frame != final
+            if !diving { setFrame(final, display: false) }
             orderFrontRegardless()
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = 0.15
                 context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                if diving { animator().setFrame(final, display: true) }
                 animator().alphaValue = 1
             }
         }
