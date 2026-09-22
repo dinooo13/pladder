@@ -6,6 +6,11 @@ import Observation
 /// Flow: hotkey pressed -> capture starts -> hotkey released -> capture stops ->
 /// engine transcribes -> pipeline processes -> (polish hotkey: model refines ->)
 /// output inserts -> idle.
+///
+/// A press of the toggle chord, or a tap of a hybrid chord shorter than
+/// `holdThreshold`, leaves the recording running with `isLatched` set until
+/// the next press of any chord or the cap. `HotkeyGestureTracker` decides
+/// which; the coordinator only carries out what it says.
 @MainActor
 @Observable
 public final class DictationCoordinator {
@@ -22,6 +27,11 @@ public final class DictationCoordinator {
     /// True from a polish-hotkey press until that cycle ends, so the overlay
     /// can keep the pill up across the release.
     public private(set) var willPolish = false
+
+    /// True while a recording continues after its chord was let go: a toggle
+    /// press or a hybrid tap. The overlay draws it differently so the user
+    /// knows the microphone is still on.
+    public private(set) var isLatched = false
 
     /// The transcribe → process → insert work for the most recent release.
     /// Exposed so callers (and tests) can await completion of a cycle.
@@ -58,7 +68,8 @@ public final class DictationCoordinator {
     /// which is what happens when Accessibility is granted. Nil means "listen
     /// for the stored chord". Applies to the dictate chord only; the polish
     /// chord has no stand-in and is simply not registered when Carbon cannot
-    /// take it.
+    /// take it. A toggle chord equal to the stored chord follows the
+    /// override, so a stood-in hybrid key stays hybrid.
     public var hotkeyOverride: Hotkey? {
         didSet {
             guard hotkeyOverride != oldValue else { return }
@@ -85,6 +96,17 @@ public final class DictationCoordinator {
     /// real, for example while a secure password field has focus and global
     /// monitors receive nothing, and this keeps the microphone from staying on.
     public var maximumDuration: Duration = .seconds(600)
+    /// A hybrid chord released sooner than this after its press latches the
+    /// recording; a later release stops it. Handy and VoiceInk use 300 to
+    /// 500 ms.
+    public var holdThreshold: Duration = .milliseconds(400)
+    /// A press this soon after a release of the same chord is the keyboard
+    /// bouncing, not the user. See `HotkeyGestureTracker`.
+    public var bounceWindow: Duration = .milliseconds(50)
+    /// Seeds the gesture tracker: every stopping release waits `bounceWindow`
+    /// first. A real keyboard turns this on by bouncing once; tests turn it
+    /// on here.
+    public var deferReleases = false
     /// How long an error stays on screen before returning to idle.
     public var errorDisplayDuration: Duration = .seconds(2)
     /// How long the "press ⌘V" hint stays on screen before returning to idle.
@@ -113,6 +135,11 @@ public final class DictationCoordinator {
     /// Only one of the two is ever on screen, so they share a task.
     private var transientResetTask: Task<Void, Never>?
     private var maxDurationTask: Task<Void, Never>?
+    /// Hold, toggle or hybrid: what each chord's press and release mean.
+    /// Rebuilt with the monitor, never per dictation.
+    private var gesture = HotkeyGestureTracker(modes: [:])
+    /// Waits out the bounce window of a deferred release.
+    private var settleTask: Task<Void, Never>?
 
     /// Wall-clock time of each stage between the hotkey release and the paste.
     public struct CycleTiming: Sendable, Equatable {
@@ -144,6 +171,11 @@ public final class DictationCoordinator {
         case recordingStopped
         case inserted(Transcript, CycleTiming)
         case failed(DictationFailure)
+        /// The gesture tracker has seen a same-chord press inside the bounce
+        /// window, and from now on holds every stopping release for
+        /// `bounceWindow` first. Emitted once, so a felt delay has an
+        /// explanation in the log.
+        case keyboardBounceObserved
     }
 
     public init(
@@ -186,6 +218,7 @@ public final class DictationCoordinator {
         levelTask?.cancel()
         transientResetTask?.cancel()
         maxDurationTask?.cancel()
+        settleTask?.cancel()
         if state.isRecording {
             Task { await cancelRecording() }
         }
@@ -229,10 +262,12 @@ public final class DictationCoordinator {
         // so this runs only on real changes.
         pipeline = makePipeline(settings)
         if old.hotkey != settings.hotkey || old.submitKey != settings.submitKey
-            || old.polishHotkey != settings.polishHotkey {
+            || old.polishHotkey != settings.polishHotkey
+            || old.toggleHotkey != settings.toggleHotkey {
             // The old key's release will never arrive on the new stream.
             // The submit key counts too: the restarted monitor would never
-            // deliver the pending release for the old configuration.
+            // deliver the pending release for the old configuration. So does
+            // the toggle key, which may also turn the key hybrid or back.
             if state.isRecording {
                 Task { await cancelRecording() }
             }
@@ -396,31 +431,111 @@ public final class DictationCoordinator {
     private func startHotkey() {
         hotkeyTask?.cancel()
         hotkeyMonitor.stop()
+        startGesture()
         var chords: [HotkeyRole: Hotkey] = [.dictate: hotkeyOverride ?? settings.hotkey]
-        // A polish chord that is the dictate chord would fire both trackers
-        // at once; the settings row says why it does nothing.
-        if !settings.polishHotkey.isEmpty, settings.polishHotkey != chords[.dictate] {
+        if let toggle = separateToggleChord { chords[.toggle] = toggle }
+        // A polish chord that is already another role's chord would fire both
+        // trackers at once; the settings row says why it does nothing.
+        let polish = settings.polishHotkey.canonical
+        if !polish.isEmpty, !chords.values.contains(where: { $0.canonical == polish }) {
             chords[.polish] = settings.polishHotkey
         }
         let stream = hotkeyMonitor.start(chords: chords, submitKey: settings.submitKey)
         hotkeyTask = Task { [weak self] in
             for await tagged in stream {
                 guard let self else { return }
+                // When the key moved, not when this loop got to it: a press
+                // waits here for the microphone to start.
+                let at = tagged.instant ?? .now
+                // Only the chord that started the recording may end it, and
+                // the gesture tracker is what knows which one that is: with
+                // nested chords the other tracker reports the hand-over as its
+                // own release.
                 switch tagged.event {
-                case .pressed: await self.hotkeyPressed(role: tagged.role)
-                // Only the chord that started the recording may end it: with
-                // nested chords the other tracker reports the hand-over as
-                // its own release.
+                case .pressed:
+                    let wasDeferring = self.gesture.deferReleases
+                    let outcome = self.gesture.pressed(tagged.role, at: at)
+                    if self.gesture.deferReleases, !wasDeferring { self.onEvent(.keyboardBounceObserved) }
+                    await self.act(outcome)
                 case .released(let submit):
-                    if tagged.role == self.cycleRole { self.hotkeyReleased(submit: submit) }
+                    await self.act(self.gesture.released(tagged.role, submit: submit, at: at))
                 // Another key went down right after the chord: the user typed
                 // Cmd+C, not a dictation. Drop the audio without transcribing,
                 // without a stop sound and without a timing line.
                 case .cancelled:
-                    if tagged.role == self.cycleRole { await self.cancelRecording() }
+                    await self.act(self.gesture.interrupted(tagged.role))
                 }
             }
         }
+    }
+
+    /// A toggle chord equal to the push-to-talk chord, stored or standing in
+    /// for it, is not a second chord but the hybrid mode of the first: two
+    /// roles cannot share a chord, and a stand-in that replaces a hybrid
+    /// chord keeps it hybrid.
+    private var toggleIsHybrid: Bool {
+        let toggle = settings.toggleHotkey.canonical
+        guard !toggle.isEmpty else { return false }
+        return toggle == settings.hotkey.canonical || toggle == hotkeyOverride?.canonical
+    }
+
+    /// The toggle chord when it is a chord of its own; nil when it is off or
+    /// hybrid.
+    private var separateToggleChord: Hotkey? {
+        settings.toggleHotkey.isEmpty || toggleIsHybrid ? nil : settings.toggleHotkey
+    }
+
+    /// A fresh tracker for a fresh monitor session. A bounce seen before is
+    /// remembered: the keyboard has not changed because the monitor did.
+    private func startGesture() {
+        settleTask?.cancel()
+        settleTask = nil
+        isLatched = false
+        gesture = HotkeyGestureTracker(
+            modes: [.dictate: toggleIsHybrid ? .hybrid : .hold, .polish: .hold, .toggle: .toggle],
+            holdThreshold: holdThreshold,
+            bounceWindow: bounceWindow,
+            deferReleases: deferReleases || gesture.deferReleases
+        )
+    }
+
+    /// Carries out what the gesture tracker decided.
+    private func act(_ outcome: HotkeyGestureTracker.Outcome) async {
+        if let settle = outcome.settle { armSettle(settle) }
+        switch outcome.action {
+        case .start(let role):
+            await hotkeyPressed(role: role)
+            // A press the state machine refused (engine loading, a cycle in
+            // flight, a microphone that failed) must not leave the tracker
+            // holding or latching a recording that never began.
+            if !state.isRecording { gesture.reset() }
+        case .stop(let submit):
+            hotkeyReleased(submit: submit)
+        case .discard:
+            await cancelRecording()
+        case nil:
+            break
+        }
+        isLatched = gesture.isLatched && state.isRecording
+    }
+
+    private func armSettle(_ settle: HotkeyGestureTracker.Settle) {
+        settleTask?.cancel()
+        settleTask = Task { [weak self] in
+            try? await Task.sleep(for: settle.after)
+            guard let self, !Task.isCancelled else { return }
+            // A stale token, one a bounce overtook, is ignored by the tracker.
+            await self.act(self.gesture.timerFired(token: settle.token))
+        }
+    }
+
+    /// The recording ended, however: the gesture starts over. Synchronous,
+    /// so on the release path it costs nothing before `recordingStopped`.
+    private func endGesture() {
+        settleTask?.cancel()
+        settleTask = nil
+        gesture.reset()
+        isLatched = false
     }
 
     /// Public so tests and a menu item can drive the state machine directly.
@@ -510,6 +625,9 @@ public final class DictationCoordinator {
     /// With `submit`, Return follows the pasted text.
     public func hotkeyReleased(submit: Bool = false) {
         guard state.isRecording else { return }
+        // Whatever ended it — the chord, a toggle press, the cap — a latched
+        // recording is over and the next press starts a new one.
+        endGesture()
         levelTask?.cancel()
         maxDurationTask?.cancel()
         feedTask?.cancel()
@@ -635,6 +753,7 @@ public final class DictationCoordinator {
     /// Cancel an in-progress recording without transcribing.
     public func cancelRecording() async {
         guard state.isRecording else { return }
+        endGesture()
         levelTask?.cancel()
         maxDurationTask?.cancel()
         stopWarmupLoop()

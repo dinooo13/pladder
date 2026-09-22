@@ -103,6 +103,9 @@ final class AppModel {
     /// for Add or Dismiss. Kept for the app's life or until answered.
     private(set) var proposals: [CorrectionProposal] = []
     static let maximumProposals = 3
+    /// Hotkey behaviour worth knowing about after the fact, such as a
+    /// keyboard that bounces.
+    private static let hotkeyLog = Logger(subsystem: "de.dinooo13.pladder", category: "hotkey")
 
     /// Settings live in the coordinator (it reacts to hotkey/engine changes);
     /// this forwards and persists. Applying the appearance covers every
@@ -343,6 +346,10 @@ final class AppModel {
             )
         case .failed:
             releaseInstant = nil
+        case .keyboardBounceObserved:
+            // That wait comes before `recordingStopped`, so the timing line
+            // cannot show it; this line is what explains a felt delay.
+            Self.hotkeyLog.notice("keyboard bounce observed: releases now settle for 50 ms before stopping")
         }
     }
 
@@ -409,7 +416,8 @@ final class AppModel {
         // seeing key-downs, so a chord with a regular key is dead there.
         // Carbon can take over only for a chord it can register, and a
         // modifier-only chord is unaffected by secure input anyway, so both
-        // stay on the tap and nothing swaps.
+        // stay on the tap and nothing swaps. The push-to-talk chord alone
+        // decides; the toggle chord follows whichever monitor is up.
         let wantsTap = accessibilityTrusted
             && !(sustained && settings.hotkey.canBeRegisteredWithoutAccessibility)
         let flipped = wantsTap != hotkeyUsesTap

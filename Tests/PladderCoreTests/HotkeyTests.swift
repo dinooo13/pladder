@@ -325,6 +325,25 @@ private let keyC: UInt16 = 0x08
         let settings = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
         #expect(settings.submitKey.keyCodes.isEmpty)
     }
+
+    @Test func settingsWithoutToggleHotkeyIsOff() throws {
+        let json = #"{"engineID":"echo"}"#
+        let settings = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
+        #expect(settings.toggleHotkey.isEmpty)
+    }
+
+    @Test func settingsWithEmptyToggleHotkeyStaysEmpty() throws {
+        let json = #"{"engineID":"echo","toggleHotkey":{"keyCodes":[]}}"#
+        let settings = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
+        #expect(settings.toggleHotkey.isEmpty)
+    }
+
+    @Test func toggleHotkeyRoundTrips() throws {
+        var settings = Settings(engineID: EchoEngine.engineID)
+        settings.toggleHotkey = .optionSpace
+        let data = try JSONEncoder().encode(settings)
+        #expect(try JSONDecoder().decode(Settings.self, from: data).toggleHotkey == .optionSpace)
+    }
 }
 
 @Suite struct SystemWideRegistrationTests {
@@ -553,5 +572,199 @@ private let keyC: UInt16 = 0x08
         #expect(
             t.keyDown(keyC, modifiers: [rightCommand], at: t0 + .milliseconds(300))
                 == .init(event: .released(submit: false)))
+    }
+}
+
+/// Instants are passed in; nothing sleeps.
+@Suite struct HotkeyGestureTrackerTests {
+    typealias Tracker = HotkeyGestureTracker
+    private let t0 = ContinuousClock.now
+    private func at(_ ms: Int) -> ContinuousClock.Instant { t0 + .milliseconds(ms) }
+
+    private static let hold: [HotkeyRole: Tracker.Mode] = [.dictate: .hold]
+    private static let hybrid: [HotkeyRole: Tracker.Mode] = [.dictate: .hybrid]
+    private static let twoChords: [HotkeyRole: Tracker.Mode] = [.dictate: .hold, .toggle: .toggle]
+
+    @Test func holdModeStopsAtRelease() {
+        var g = Tracker(modes: Self.hold)
+        #expect(g.pressed(.dictate, at: at(0)) == .init(action: .start(.dictate)))
+        #expect(g.released(.dictate, submit: false, at: at(100)) == .init(action: .stop(submit: false)))
+        #expect(!g.isLatched)
+    }
+
+    @Test func submitIsCarriedThroughAHold() {
+        var g = Tracker(modes: Self.hold)
+        _ = g.pressed(.dictate, at: at(0))
+        #expect(g.released(.dictate, submit: true, at: at(2_000)) == .init(action: .stop(submit: true)))
+    }
+
+    @Test func aRoleWithoutAModeHolds() {
+        var g = Tracker(modes: [:])
+        _ = g.pressed(.polish, at: at(0))
+        #expect(g.released(.polish, submit: false, at: at(100)).action == .stop(submit: false))
+    }
+
+    @Test func toggleModeLatchesAndStopsOnTheNextPress() {
+        var g = Tracker(modes: Self.twoChords)
+        #expect(g.pressed(.toggle, at: at(0)) == .init(action: .start(.toggle)))
+        // However long the press, a toggle chord latches.
+        #expect(g.released(.toggle, submit: false, at: at(2_000)) == .init())
+        #expect(g.isLatched)
+        #expect(g.pressed(.toggle, at: at(9_000)) == .init(action: .stop(submit: false)))
+        #expect(!g.isLatched)
+    }
+
+    @Test func hybridTapLatches() {
+        var g = Tracker(modes: Self.hybrid)
+        _ = g.pressed(.dictate, at: at(0))
+        #expect(g.released(.dictate, submit: false, at: at(200)) == .init())
+        #expect(g.isLatched)
+        #expect(g.pressed(.dictate, at: at(5_000)) == .init(action: .stop(submit: false)))
+    }
+
+    @Test func hybridHoldStops() {
+        var g = Tracker(modes: Self.hybrid)
+        _ = g.pressed(.dictate, at: at(0))
+        #expect(g.released(.dictate, submit: false, at: at(800)) == .init(action: .stop(submit: false)))
+        #expect(!g.isLatched)
+    }
+
+    @Test func aReleaseAtTheThresholdIsAHold() {
+        var g = Tracker(modes: Self.hybrid)
+        _ = g.pressed(.dictate, at: at(0))
+        #expect(g.released(.dictate, submit: false, at: at(400)).action == .stop(submit: false))
+    }
+
+    @Test func aShorterThresholdIsRespected() {
+        var g = Tracker(modes: Self.hybrid, holdThreshold: .milliseconds(100))
+        _ = g.pressed(.dictate, at: at(0))
+        #expect(g.released(.dictate, submit: false, at: at(150)).action == .stop(submit: false))
+    }
+
+    @Test func anyChordEndsALatchedRecording() {
+        var g = Tracker(modes: Self.twoChords)
+        _ = g.pressed(.toggle, at: at(0))
+        _ = g.released(.toggle, submit: false, at: at(100))
+        #expect(g.pressed(.dictate, at: at(3_000)) == .init(action: .stop(submit: false)))
+    }
+
+    @Test func theReleaseOfTheEndingPressIsIgnored() {
+        var g = Tracker(modes: Self.hybrid)
+        _ = g.pressed(.dictate, at: at(0))
+        _ = g.released(.dictate, submit: false, at: at(100))
+        _ = g.pressed(.dictate, at: at(3_000))
+        #expect(g.released(.dictate, submit: true, at: at(3_100)) == .init())
+        // And the next press is a fresh start.
+        #expect(g.pressed(.dictate, at: at(6_000)) == .init(action: .start(.dictate)))
+    }
+
+    @Test func aSecondChordWhileHeldIsIgnored() {
+        var g = Tracker(modes: Self.twoChords)
+        _ = g.pressed(.dictate, at: at(0))
+        #expect(g.pressed(.toggle, at: at(500)) == .init())
+        #expect(g.released(.toggle, submit: false, at: at(600)) == .init())
+        #expect(g.released(.dictate, submit: false, at: at(900)).action == .stop(submit: false))
+    }
+
+    @Test func interruptionDiscards() {
+        var g = Tracker(modes: Self.hybrid)
+        _ = g.pressed(.dictate, at: at(0))
+        #expect(g.interrupted(.dictate) == .init(action: .discard))
+        #expect(!g.isLatched)
+        #expect(g.pressed(.dictate, at: at(2_000)) == .init(action: .start(.dictate)))
+    }
+
+    @Test func anotherChordsInterruptionIsIgnored() {
+        // Nested chords: the other tracker's cancel is the hand-over.
+        var g = Tracker(modes: Self.twoChords)
+        _ = g.pressed(.dictate, at: at(0))
+        #expect(g.interrupted(.toggle) == .init())
+        #expect(g.released(.dictate, submit: false, at: at(900)).action == .stop(submit: false))
+    }
+
+    @Test func aBouncePressIsIgnoredAndTurnsDeferralOn() {
+        var g = Tracker(modes: Self.hold)
+        _ = g.pressed(.dictate, at: at(0))
+        // Not deferring yet: the first bounce costs this hold.
+        #expect(g.released(.dictate, submit: false, at: at(2_000)).action == .stop(submit: false))
+        #expect(!g.deferReleases)
+        #expect(g.pressed(.dictate, at: at(2_010)) == .init())
+        #expect(g.deferReleases)
+        #expect(g.released(.dictate, submit: false, at: at(2_020)) == .init())
+    }
+
+    @Test func withDeferralAReleaseSettlesFirst() {
+        var g = Tracker(modes: Self.hold, deferReleases: true)
+        _ = g.pressed(.dictate, at: at(0))
+        #expect(
+            g.released(.dictate, submit: false, at: at(2_000))
+                == .init(settle: .init(token: 1, after: .milliseconds(50))))
+        #expect(g.timerFired(token: 1) == .init(action: .stop(submit: false)))
+        #expect(g.timerFired(token: 1) == .init())
+    }
+
+    @Test func aBounceDuringSettleResumesTheHold() {
+        var g = Tracker(modes: Self.hold, deferReleases: true)
+        _ = g.pressed(.dictate, at: at(0))
+        #expect(g.released(.dictate, submit: false, at: at(2_000)).settle?.token == 1)
+        #expect(g.pressed(.dictate, at: at(2_010)) == .init())
+        #expect(g.released(.dictate, submit: false, at: at(3_000)).settle?.token == 2)
+        #expect(g.timerFired(token: 1) == .init())
+        #expect(g.timerFired(token: 2) == .init(action: .stop(submit: false)))
+    }
+
+    @Test func aBounceKeepsTheHoldsStart() {
+        // A hybrid hold that bounced at 500 ms is still a hold, not a new tap.
+        var g = Tracker(modes: Self.hybrid, deferReleases: true)
+        _ = g.pressed(.dictate, at: at(0))
+        #expect(g.released(.dictate, submit: false, at: at(500)).settle != nil)
+        _ = g.pressed(.dictate, at: at(510))
+        #expect(g.released(.dictate, submit: false, at: at(600)).settle != nil)
+        #expect(!g.isLatched)
+    }
+
+    @Test func submitSurvivesABounce() {
+        var g = Tracker(modes: Self.hold, deferReleases: true)
+        _ = g.pressed(.dictate, at: at(0))
+        _ = g.released(.dictate, submit: true, at: at(2_000))
+        _ = g.pressed(.dictate, at: at(2_010))
+        let token = g.released(.dictate, submit: false, at: at(3_000)).settle?.token ?? 0
+        #expect(g.timerFired(token: token) == .init(action: .stop(submit: true)))
+    }
+
+    @Test func aLatchIsNeverDeferred() {
+        var g = Tracker(modes: Self.hybrid, deferReleases: true)
+        _ = g.pressed(.dictate, at: at(0))
+        #expect(g.released(.dictate, submit: false, at: at(150)) == .init())
+        #expect(g.isLatched)
+    }
+
+    @Test func aBounceNeverEndsALatch() {
+        var g = Tracker(modes: Self.hybrid)
+        _ = g.pressed(.dictate, at: at(0))
+        _ = g.released(.dictate, submit: false, at: at(150))
+        #expect(g.pressed(.dictate, at: at(160)) == .init())
+        #expect(g.isLatched)
+    }
+
+    @Test func aBounceAfterTheClosingTapDoesNotStartAgain() {
+        var g = Tracker(modes: Self.hybrid)
+        _ = g.pressed(.dictate, at: at(0))
+        _ = g.released(.dictate, submit: false, at: at(150))
+        #expect(g.pressed(.dictate, at: at(4_000)).action == .stop(submit: false))
+        _ = g.released(.dictate, submit: false, at: at(4_100))
+        #expect(g.pressed(.dictate, at: at(4_110)) == .init())
+    }
+
+    @Test func resetKeepsDeferralAndClearsTheLatch() {
+        var g = Tracker(modes: Self.hybrid)
+        _ = g.pressed(.dictate, at: at(0))
+        _ = g.released(.dictate, submit: false, at: at(100))
+        _ = g.pressed(.dictate, at: at(110))
+        #expect(g.isLatched && g.deferReleases)
+        g.reset()
+        #expect(!g.isLatched)
+        #expect(g.deferReleases)
+        #expect(g.pressed(.dictate, at: at(5_000)) == .init(action: .start(.dictate)))
     }
 }
