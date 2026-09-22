@@ -12,10 +12,17 @@ public enum HotkeyRole: String, Sendable, Hashable, CaseIterable, Comparable {
 public struct HotkeyMonitorEvent: Sendable, Equatable {
     public var role: HotkeyRole
     public var event: HotkeyEvent
+    /// When the key moved, stamped by the monitor as the keystroke arrives.
+    /// The coordinator times holds from this rather than from when it gets
+    /// round to the event: a press waits for the microphone to start, and a
+    /// release queued behind it must not look longer than it was. Nil from a
+    /// source that does not stamp, a test fake say; the reader uses now.
+    public var instant: ContinuousClock.Instant?
 
-    public init(role: HotkeyRole, event: HotkeyEvent) {
+    public init(role: HotkeyRole, event: HotkeyEvent, instant: ContinuousClock.Instant? = nil) {
         self.role = role
         self.event = event
+        self.instant = instant
     }
 }
 

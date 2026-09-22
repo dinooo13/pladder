@@ -266,6 +266,7 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
         }
 
         let kind = GetEventKind(event)
+        let now = ContinuousClock.now
         let (outcome, continuation) = lock.withLock {
             () -> (HotkeyMonitorEvent?, AsyncStream<HotkeyMonitorEvent>.Continuation?) in
             // An event for a hot key we have already replaced.
@@ -274,12 +275,14 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
             switch Int(kind) {
             case kEventHotKeyPressed:
                 guard state.pressed.insert(role).inserted else { return (nil, nil) }
-                return (HotkeyMonitorEvent(role: role, event: .pressed), state.continuation)
+                return (HotkeyMonitorEvent(role: role, event: .pressed, instant: now), state.continuation)
             case kEventHotKeyReleased:
                 guard state.pressed.remove(role) != nil else { return (nil, nil) }
                 // No send key here: posting the Return it asks for needs the
                 // grant this monitor exists to do without.
-                return (HotkeyMonitorEvent(role: role, event: .released(submit: false)), state.continuation)
+                return (
+                    HotkeyMonitorEvent(role: role, event: .released(submit: false), instant: now),
+                    state.continuation)
             default:
                 return (nil, nil)
             }
