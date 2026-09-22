@@ -411,6 +411,7 @@ final class AppModel {
         switch coordinator.state {
         case .recording: return String(localized: "Recording…")
         case .transcribing: return String(localized: "Transcribing…")
+        case .polishing: return String(localized: "Polishing…")
         case .inserting: return String(localized: "Inserting…")
         case .error(let failure): return String(localized: "Error: \(failure.text)")
         case .copied: return String(localized: "Copied — press ⌘V")
