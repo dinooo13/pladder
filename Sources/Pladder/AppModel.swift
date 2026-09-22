@@ -154,7 +154,10 @@ final class AppModel {
             url: Self.settingsURL,
             defaults: Settings(engineID: FluidAudioIncrementalEngine.engineID)
         )
-        Self.migrateLegacySettings(to: Self.settingsURL)
+        // A test copy starts from the defaults, not from an old install.
+        if Self.settingsPathOverride == nil {
+            Self.migrateLegacySettings(to: Self.settingsURL)
+        }
         self.store = store
 
         // One read: the store moves an undecodable file aside on load, so a
@@ -208,8 +211,19 @@ final class AppModel {
         events.handler = { [weak self] event, at in self?.handle(event, at: at) }
     }
 
+    /// `PLADDER_SETTINGS_PATH` points a copy launched for testing at a file
+    /// of its own, so it neither reads nor writes the configuration of the
+    /// copy in daily use; every recorder commit is saved at once. Development
+    /// only: no UI, and a normal launch never has it set.
+    static var settingsPathOverride: String? {
+        guard let path = ProcessInfo.processInfo.environment["PLADDER_SETTINGS_PATH"],
+              !path.isEmpty else { return nil }
+        return path
+    }
+
     static var settingsURL: URL {
-        FileManager.default
+        if let path = settingsPathOverride { return URL(filePath: path) }
+        return FileManager.default
             .homeDirectoryForCurrentUser
             .appending(path: "Library/Application Support/Pladder/settings.json")
     }
