@@ -14,7 +14,7 @@ enum MenuBarIcon {
         /// Bars follow the input level, quantised to `levelSteps` so the
         /// image cache stays bounded.
         case recording(step: Int)
-        /// Transcribing or inserting: dimmed to read as "busy".
+        /// Transcribing, polishing or inserting: dimmed to read as "busy".
         case busy
         /// Engine unavailable or an error: slashed like `mic.slash`.
         case off
@@ -32,7 +32,7 @@ enum MenuBarIcon {
                 // input level means.
                 let amp = CGFloat(WaveformMeter.amplitude(for: level))
                 self = .recording(step: Int((amp * CGFloat(Self.levelSteps - 1)).rounded()))
-            case .transcribing, .inserting: self = .busy
+            case .transcribing, .polishing, .inserting: self = .busy
             case .unavailable, .error: self = .off
             }
         }

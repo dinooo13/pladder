@@ -97,6 +97,7 @@ private enum OverlayPhase: Equatable {
     case empty
     case recording
     case transcribing
+    case polishing
     case copied
     case error(DictationFailure)
 
@@ -104,6 +105,7 @@ private enum OverlayPhase: Equatable {
         switch state {
         case .recording: self = .recording
         case .transcribing: self = .transcribing
+        case .polishing: self = .polishing
         case .copied: self = .copied
         // The controller never mirrors `.inserting` onto the model, so this
         // is only reached by a preview, and it draws nothing.
@@ -290,6 +292,16 @@ struct OverlayPill: View {
                     .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(.primary)
             }
+        case .polishing:
+            // Only a dictation started with the polish key gets here, and it
+            // waits seconds rather than milliseconds, so the pill says why.
+            HStack(spacing: 10) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Polishing…")
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(.primary)
+            }
         case .copied:
             // Nothing pasted the text, so the user has to. The one thing the
             // pill still says after a release: the paste that is normally the
@@ -395,7 +407,7 @@ struct OverlayPill: View {
                         .transition(.opacity)
                 }
             }
-        case .transcribing:
+        case .transcribing, .polishing:
             ProgressView()
                 .controlSize(.small)
         case .copied:
