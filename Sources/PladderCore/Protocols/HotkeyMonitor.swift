@@ -1,9 +1,11 @@
 import Foundation
 
 /// Which chord fired. The coordinator starts a recording for either and
-/// decides at release what the dictation goes through.
+/// decides at release what the dictation goes through. `toggle` is only a
+/// chord of its own when it differs from the dictate chord; equal, it makes
+/// the dictate chord hybrid instead (see `HotkeyGestureTracker`).
 public enum HotkeyRole: String, Sendable, Hashable, CaseIterable, Comparable {
-    case dictate, polish
+    case dictate, polish, toggle
 
     public static func < (a: Self, b: Self) -> Bool { a.rawValue < b.rawValue }
 }

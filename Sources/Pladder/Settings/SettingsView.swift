@@ -93,10 +93,27 @@ private struct GeneralSettingsView: View {
                         .foregroundStyle(.orange)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                LabeledContent("Toggle key") {
+                    HotkeyRecorderField(
+                        hotkey: $model.settings.toggleHotkey,
+                        onRecordingChanged: { model.coordinator.isHotkeySuspended = $0 },
+                        requiresRegularKey: model.hotkeyNeedsRegularKey,
+                        allowsEmpty: true,
+                        systemShortcuts: model.systemShortcuts
+                    )
+                }
+                if let warning = toggleKeyWarning {
+                    Label(warning, systemImage: "exclamationmark.triangle")
+                        .font(.callout)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 LabeledContent("Send key") {
                     HotkeyRecorderField(
                         hotkey: $model.settings.submitKey,
-                        onRecordingChanged: { model.coordinator.isHotkeySuspended = $0 }
+                        onRecordingChanged: { model.coordinator.isHotkeySuspended = $0 },
+                        // Empty has always meant off; now the field can say so.
+                        allowsEmpty: true
                     )
                 }
                 if let warning = submitKeyWarning {
@@ -108,7 +125,10 @@ private struct GeneralSettingsView: View {
             } header: {
                 Text("Push to Talk")
             } footer: {
-                FootnoteText("Hold to record, release to insert. Press the send key while recording and Return is pressed after the text. Click a field and press any key combination to assign it.")
+                VStack(alignment: .leading, spacing: 4) {
+                    FootnoteText("Hold to record, release to insert. Press the send key while recording and Return is pressed after the text. Click a field and press any key combination to assign it.")
+                    FootnoteText("Tap the toggle key to start recording and tap it again to insert. Set it to the same combination as the key and a short tap toggles while a hold still works as before. Delete clears a field.")
+                }
             }
 
             Section {
@@ -241,6 +261,23 @@ private struct GeneralSettingsView: View {
         }
         guard hotkey.modifierKeyCodes.isEmpty, !hotkey.keyCodes.isEmpty else { return nil }
         return String(localized: "Without a modifier, \(hotkey.displayName) can no longer be typed in other apps while Pladder is running.")
+    }
+
+    /// Nothing for an empty toggle key, or one equal to the key: that one is
+    /// hybrid, and whatever stands in for the key stands in for it too.
+    /// Otherwise a chord Carbon cannot register listens for nothing without
+    /// Accessibility, and has no stand-in of its own, since the only candidate
+    /// is the push-to-talk stand-in; and macOS may own the chord.
+    private var toggleKeyWarning: String? {
+        let toggle = model.settings.toggleHotkey
+        guard !toggle.isEmpty, toggle.canonical != model.settings.hotkey.canonical else { return nil }
+        if !model.accessibilityTrusted && !toggle.canBeRegisteredWithoutAccessibility {
+            return String(localized: "Without Accessibility, \(toggle.displayName) cannot be detected, so the toggle key is off until Accessibility is granted.")
+        }
+        if let owner = model.systemShortcutConflict(for: toggle) {
+            return conflictWarning(owner: owner, chord: toggle)
+        }
+        return nil
     }
 
     /// An enabled macOS shortcut is dispatched by the window server before
