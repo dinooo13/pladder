@@ -61,6 +61,7 @@ You type long prompts all day. Speech is three to four times faster than typing,
 - **Nothing leaves your Mac.** The speech model runs on the Neural Engine. There is no account, no server, no telemetry, and the app makes no network requests after the one-time model download.
 - **It knows your words.** A dictionary turns what the model hears into what you meant. "clode code" becomes "Claude Code", "get hub" becomes "GitHub", every time, at zero cost in latency. List a word on its own and near misses of it are repaired too, so "Chat G P T" comes out as "ChatGPT" without you predicting every way the model might mangle it.
 - **It skips over the ums.** Hesitation sounds — "uh", "um", German "äh"/"ähm", Spanish "eh" — are dropped before the text is pasted. Still no cost in latency. Only English, German and Spanish fillers are covered for now; other languages pass through unchanged.
+- **Polish it when you want to.** Hold a second key instead and Apple's on-device model cleans the transcript before it is pasted: "wait, no, Friday" becomes "Friday", spoken numbers become digits, "first… second…" becomes a list. A second or two, still on your Mac, and only when you ask.
 - **It behaves like part of macOS.** A menu bar app with a Liquid Glass status pill, a standard settings window, and nothing in the Dock.
 - **Twenty-five languages, detected automatically.** English, German, Spanish, French and the rest of Europe in the same session, with no setting to flip.
 - **Free and MIT.** The source is here. Read it, build it, change it.
@@ -148,6 +149,9 @@ Option+Space is Alfred's default hotkey and a common Raycast choice, and it type
 
 **Can it press Return for me?**
 Yes. Press the send key, Right Option by default, at any point while you hold the push-to-talk key, and Return is pressed after the text is pasted. That sends a chat message or runs a terminal command without touching the keyboard again. The send key can be changed in Settings, like the push-to-talk key.
+
+**Can it clean up what I said?**
+Record a key for Dictate and polish in Settings and hold that instead. The dictation goes through Apple Intelligence on your Mac before it is pasted, which takes a second or two. It needs Apple Intelligence turned on in System Settings; without it that key pastes the text as dictated.
 
 **What about long dictations?**
 Recordings stop at 10 minutes, so a lost key-up never leaves the microphone on. Audio longer than 15 seconds is transcribed in overlapping windows.
