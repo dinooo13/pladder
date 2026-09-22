@@ -26,7 +26,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Steuerungstaste"
+            "value": "Ctrl"
           }
         }
       }
@@ -36,7 +36,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rückschritttaste"
+            "value": "Löschtaste"
           }
         }
       }
@@ -296,7 +296,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ziffernblock-Eingabe"
+            "value": "Enter (Ziffernblock)"
           }
         }
       }
@@ -326,7 +326,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Linke Steuerungstaste"
+            "value": "Linke Ctrl-Taste"
           }
         }
       }
@@ -416,7 +416,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Zeilenschalter"
+            "value": "Eingabetaste"
           }
         }
       }
@@ -446,7 +446,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rechte Steuerungstaste"
+            "value": "Rechte Ctrl-Taste"
           }
         }
       }
@@ -496,7 +496,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tabulatortaste"
+            "value": "Tab"
           }
         }
       }
