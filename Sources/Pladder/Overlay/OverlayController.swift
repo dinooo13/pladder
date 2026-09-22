@@ -156,10 +156,13 @@ final class OverlayController {
             // Deliberately *not* updating the model here: the pill keeps
             // whatever it was showing — the recording row, the spinner, the
             // clipboard hint — and leaves the screen with it. `scheduleHide`
-            // resets the model once the panel is out.
+            // resets the model once the panel is out. The clipboard hint
+            // leaves the way a pasted dictation does, collapsing into the
+            // disc and diving, so the two paths end alike; only the spinner
+            // and an error fade in place.
             cancelSpinner()
             guard visible else { return }
-            scheduleHide(after: .zero, flight: false)
+            scheduleHide(after: .zero, flight: model.state == .copied)
         }
     }
 
