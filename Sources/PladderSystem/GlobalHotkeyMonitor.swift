@@ -2,7 +2,7 @@ import CoreGraphics
 import Foundation
 import PladderCore
 
-/// Watches the push-to-talk chord with a session-wide CGEvent tap.
+/// Watches the push-to-talk chords with a session-wide CGEvent tap.
 ///
 /// A tap rather than `NSEvent` monitors because the chord may contain a regular
 /// key: when the user picks Control+Space, the Space must not also land in the
@@ -20,14 +20,14 @@ import PladderCore
 /// `CGEvent.tapCreate` returns nil and we simply try again every couple of
 /// seconds, so the hotkey comes alive the moment the user ticks the box.
 ///
-/// Which keys are down is `HotkeyChordTracker`'s business; this class only
+/// Which keys are down is `HotkeyChordSet`'s business; this class only
 /// translates events and owns the tap. It is `@unchecked Sendable`: all mutable
 /// state lives behind `lock`, and the tap is created and torn down on the tap
 /// thread, whose run loop it is attached to.
 public final class GlobalHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
     private struct State {
-        var continuation: AsyncStream<HotkeyEvent>.Continuation?
-        var tracker: HotkeyChordTracker?
+        var continuation: AsyncStream<HotkeyMonitorEvent>.Continuation?
+        var chords: HotkeyChordSet?
         var modifiers = ModifierKeyState()
         var tap: TapHandle?
         /// Bumped by every `start`/`stop` so an install that was scheduled onto
@@ -54,17 +54,17 @@ public final class GlobalHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
 
     // MARK: HotkeyMonitor
 
-    public func start(hotkey: Hotkey, submitKey: Hotkey) -> AsyncStream<HotkeyEvent> {
+    public func start(chords: [HotkeyRole: Hotkey], submitKey: Hotkey) -> AsyncStream<HotkeyMonitorEvent> {
         // Starting twice replaces the previous session rather than stacking taps.
         stop()
 
-        let (stream, continuation) = AsyncStream<HotkeyEvent>.makeStream(
+        let (stream, continuation) = AsyncStream<HotkeyMonitorEvent>.makeStream(
             bufferingPolicy: .unbounded)
 
         let generation: UInt64 = lock.withLock {
             state.generation &+= 1
             state.continuation = continuation
-            state.tracker = HotkeyChordTracker(hotkey: hotkey, submitKey: submitKey)
+            state.chords = HotkeyChordSet(chords: chords, submitKey: submitKey)
             state.modifiers = ModifierKeyState()
             return state.generation
         }
@@ -86,7 +86,7 @@ public final class GlobalHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
             state.generation &+= 1
             let result = (state.continuation, state.tap)
             state.continuation = nil
-            state.tracker = nil
+            state.chords = nil
             state.tap = nil
             return result
         }
@@ -174,32 +174,32 @@ public final class GlobalHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
 
         let keyCode = UInt16(truncatingIfNeeded: event.getIntegerValueField(.keyboardEventKeycode))
         let flags = event.flags.rawValue
-        // One read per event, on the tap thread: the tracker times the
+        // One read per event, on the tap thread: the trackers time the
         // interruption window from it.
         let now = ContinuousClock.now
 
         let (outcome, continuation) = lock.withLock {
-            () -> (HotkeyChordTracker.Outcome, AsyncStream<HotkeyEvent>.Continuation?) in
-            guard state.tracker != nil else { return (.init(), nil) }
-            let outcome: HotkeyChordTracker.Outcome
+            () -> (HotkeyChordSet.Outcome, AsyncStream<HotkeyMonitorEvent>.Continuation?) in
+            guard state.chords != nil else { return (.init(), nil) }
+            let outcome: HotkeyChordSet.Outcome
             switch type {
             case .keyDown:
                 let isRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
-                outcome = state.tracker!.keyDown(
+                outcome = state.chords!.keyDown(
                     keyCode, isRepeat: isRepeat, modifiers: state.modifiers.held(flags: flags), at: now)
             case .keyUp:
-                outcome = state.tracker!.keyUp(
+                outcome = state.chords!.keyUp(
                     keyCode, modifiers: state.modifiers.held(flags: flags), at: now)
             case .flagsChanged:
                 let modifiers = state.modifiers.update(changedKey: keyCode, flags: flags)
-                outcome = state.tracker!.flagsChanged(modifiers: modifiers, at: now)
+                outcome = state.chords!.flagsChanged(modifiers: modifiers, at: now)
             default:
                 return (.init(), nil)
             }
             return (outcome, state.continuation)
         }
 
-        if let event = outcome.event { continuation?.yield(event) }
+        for event in outcome.events { continuation?.yield(event) }
         return outcome.swallow
     }
 
@@ -207,14 +207,14 @@ public final class GlobalHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
     /// with a keyboard interrupt. Turn it back on and start from a clean slate,
     /// since events were missed while it was off.
     private func reenable() {
-        let (tap, event, continuation) = lock.withLock {
-            () -> (TapHandle?, HotkeyEvent?, AsyncStream<HotkeyEvent>.Continuation?) in
-            let event = state.tracker?.reset()
+        let (tap, events, continuation) = lock.withLock {
+            () -> (TapHandle?, [HotkeyMonitorEvent], AsyncStream<HotkeyMonitorEvent>.Continuation?) in
+            let events = state.chords?.reset() ?? []
             state.modifiers = ModifierKeyState()
-            return (state.tap, event, state.continuation)
+            return (state.tap, events, state.continuation)
         }
         if let tap { CGEvent.tapEnable(tap: tap.port, enable: true) }
-        if let event { continuation?.yield(event) }
+        for event in events { continuation?.yield(event) }
     }
 
     // MARK: Helpers

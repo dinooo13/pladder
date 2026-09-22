@@ -1,12 +1,33 @@
 import Foundation
 
-/// Watches for the push-to-talk chord system wide and reports press and release.
+/// Which chord fired. The coordinator starts a recording for either and
+/// decides at release what the dictation goes through.
+public enum HotkeyRole: String, Sendable, Hashable, CaseIterable, Comparable {
+    case dictate, polish
+
+    public static func < (a: Self, b: Self) -> Bool { a.rawValue < b.rawValue }
+}
+
+/// One tracker's transition, tagged with the chord it belongs to.
+public struct HotkeyMonitorEvent: Sendable, Equatable {
+    public var role: HotkeyRole
+    public var event: HotkeyEvent
+
+    public init(role: HotkeyRole, event: HotkeyEvent) {
+        self.role = role
+        self.event = event
+    }
+}
+
+/// Watches for the push-to-talk chords system wide and reports press and release.
 public protocol HotkeyMonitor: Sendable {
-    /// Starts monitoring and returns a stream of events. `submitKey` is the
-    /// chord that, pressed while the hotkey is held, asks for Return after the
+    /// Starts monitoring and returns a stream of events, each tagged with the
+    /// role of the chord it belongs to. Each chord is matched on its own; a
+    /// chord in the set that is empty is ignored. `submitKey` is the chord
+    /// that, pressed while any of them is held, asks for Return after the
     /// paste; an empty chord turns that off. Cancelling the consuming task or
     /// calling `stop()` ends monitoring.
-    func start(hotkey: Hotkey, submitKey: Hotkey) -> AsyncStream<HotkeyEvent>
+    func start(chords: [HotkeyRole: Hotkey], submitKey: Hotkey) -> AsyncStream<HotkeyMonitorEvent>
     func stop()
 }
 
