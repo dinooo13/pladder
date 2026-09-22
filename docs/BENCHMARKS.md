@@ -193,6 +193,20 @@ The line looks like:
 release-to-paste 0.312 s: stop 0.012, engine 0.250, process 0.003, paste 0.014; audio 4.2 s
 ```
 
+A dictation started with the polish hotkey logs its own line, with the model
+call as a fifth stage:
+
+```
+polished release-to-paste 1.912 s: stop 0.012, engine 0.250, process 0.003, polish 1.620, paste 0.014; audio 6.1 s
+```
+
+`polish` is the model call; it exists only for dictations started with the
+polish hotkey, and the plain line is unchanged for everything else. It is
+`0.000` when the transcript was under four words and the model was skipped.
+The prompt's own cost and output are measured with
+`swift run -c release pladder-cli polish <text file>`, which runs it cold and
+warm.
+
 What each stage contains:
 
 - `stop` is `AudioCapture.stop()`: removing the tap and collecting the
