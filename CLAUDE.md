@@ -81,3 +81,4 @@ The developer dictates with a running Pladder all day, often into Claude session
 - Never `pkill -x Pladder` or `killall Pladder`: that also kills the copy in use, mid-recording, and the text is lost. Stop only the copy you launched: `pkill -f "$PWD/dist/Pladder.app"`.
 - Do not post synthetic hotkey events unless the user has asked for a live UI test. Every running copy reacts to them, so they start, cut short, or paste the user's recordings.
 - Do not edit `~/Library/Application Support/Pladder/settings.json`; it is the live configuration.
+- A copy launched for testing gets its own settings file with `PLADDER_SETTINGS_PATH=/tmp/<branch>/settings.json "$PWD/dist/Pladder.app/Contents/MacOS/Pladder"`, and a different chord from the copy in use, so the two never fire together. Launched as the bare binary so the environment reaches it; its command line still contains `$PWD/dist/Pladder.app`, so the `pkill -f` above stops it.
