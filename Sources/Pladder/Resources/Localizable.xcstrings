@@ -11,12 +11,12 @@
         }
       }
     },
-    "%@ is a macOS keyboard shortcut, so %@ may never reach Pladder. Change one of them.": {
+    "%@ is a macOS keyboard shortcut, so %@ may never reach Pladder. Record another combination.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$@ ist ein macOS-Kurzbefehl, deshalb kommt %2$@ vielleicht nie bei Pladder an. Ändere eins von beiden."
+            "value": "%1$@ ist ein macOS-Kurzbefehl, deshalb kommt %2$@ vielleicht nie bei Pladder an. Nimm eine andere Kombination auf."
           }
         }
       }
@@ -127,16 +127,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Gemächlich"
-          }
-        }
-      }
-    },
-    "Choose a key combination in Settings (Accessibility is off)": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tastenkombination in den Einstellungen wählen (Bedienungshilfen sind aus)"
           }
         }
       }
@@ -651,12 +641,12 @@
         }
       }
     },
-    "Needed for a modifier-only key such as Right Command and for pasting. Without it another key stands in (the menu says which) and the text is copied for you to paste with ⌘V; a standard account needs an administrator to switch it on.": {
+    "Needed for a modifier-only key such as Right Command, for the send key and for pasting. Without it Option+Space still works and the text is copied for you to paste with ⌘V; a standard account needs an administrator to switch it on.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nötig für eine reine Sondertaste wie die rechte Befehlstaste und fürs Einfügen. Ohne sie springt eine andere Taste ein (das Menü sagt welche) und der Text wird nur kopiert, du fügst ihn dann mit ⌘V ein. In einem Standardaccount muss ein Admin das einschalten."
+            "value": "Nötig für eine reine Sondertaste wie die rechte Befehlstaste, für die Sendetaste und fürs Einfügen. Ohne sie funktioniert Wahltaste + Leertaste weiterhin, der Text wird aber nur kopiert, du fügst ihn dann mit ⌘V ein. In einem Standardaccount muss ein Admin das einschalten."
           }
         }
       }
@@ -1127,16 +1117,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ohne Bedienungshilfen wird %1$@ nicht erkannt, deshalb springt %2$@ ein, bis die Bedienungshilfen erlaubt sind. Nimm eine Kombination mit einer normalen Taste auf, wenn du eine eigene willst."
-          }
-        }
-      }
-    },
-    "Without Accessibility, %@ cannot be detected. Choose a combination with a regular key, such as Control+Shift+D.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ohne Bedienungshilfen wird %@ nicht erkannt. Wähle eine Kombination mit einer normalen Taste, zum Beispiel Ctrl + Umschalttaste + D."
           }
         }
       }
