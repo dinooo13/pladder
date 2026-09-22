@@ -971,6 +971,16 @@
         }
       }
     },
+    "Recording — press %@ to stop": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aufnahme läuft — zum Beenden %@ drücken"
+          }
+        }
+      }
+    },
     "Recording…": {
       "localizations": {
         "de": {
