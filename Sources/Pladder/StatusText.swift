@@ -1,5 +1,6 @@
 import Foundation
 import PladderCore
+import PladderRefine
 
 /// The wording for every state `PladderCore` and `PladderEngines` report as a
 /// value.
@@ -61,6 +62,25 @@ extension DictationFailure {
         case .pasteKeystroke:
             String(localized: "Could not create the paste keystroke. Try again, or restart Pladder.")
         case .other(let detail): detail
+        }
+    }
+}
+
+extension OnDeviceModelAvailability {
+    /// The sentence under the Dictate and polish row, nil when the model can
+    /// run. Each says what the key does meanwhile: it still records and
+    /// pastes, only without the polish.
+    var polishKeyText: String? {
+        switch self {
+        case .available: nil
+        case .appleIntelligenceNotEnabled:
+            String(localized: "Apple Intelligence is off, so this key pastes the text as dictated. Turn it on in System Settings.")
+        case .deviceNotEligible:
+            String(localized: "This Mac cannot run Apple Intelligence, so this key pastes the text as dictated.")
+        case .modelNotReady:
+            String(localized: "The Apple Intelligence model is still downloading, so this key pastes the text as dictated for now.")
+        case .unavailable:
+            String(localized: "Apple Intelligence is unavailable, so this key pastes the text as dictated.")
         }
     }
 }
