@@ -6,7 +6,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ ist ein macOS-Tastaturkurzbefehl und wird ebenfalls ausgelöst."
+            "value": "%@ ist ein macOS-Kurzbefehl und wird ebenfalls ausgelöst."
           }
         }
       }
@@ -16,7 +16,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$@ ist ein macOS-Tastaturkurzbefehl, daher erreicht %2$@ Pladder möglicherweise nie. Ändere eines von beiden."
+            "value": "%1$@ ist ein macOS-Kurzbefehl, deshalb kommt %2$@ vielleicht nie bei Pladder an. Ändere eins von beiden."
           }
         }
       }
@@ -26,7 +26,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ ist Teil der Push-to-Talk-Taste und kann daher nie einzeln gedrückt werden."
+            "value": "%@ gehört zur Push-to-Talk-Taste und kann deshalb nie allein gedrückt werden."
           }
         }
       }
@@ -146,7 +146,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Klicken und dann die gewünschte Taste oder Tastenkombination drücken."
+            "value": "Klicken, dann die Taste oder Kombination drücken."
           }
         }
       }
@@ -156,7 +156,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Klicken und dann die gewünschte Taste oder Tastenkombination drücken. Ohne Bedienungshilfen muss die Kombination eine normale Taste enthalten, zum Beispiel Steuerungstaste + Umschalttaste + D."
+            "value": "Klicken, dann die Taste oder Kombination drücken. Ohne Bedienungshilfen braucht die Kombination eine normale Taste, zum Beispiel Ctrl + Umschalttaste + D."
           }
         }
       }
@@ -186,7 +186,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Der Tastendruck zum Einfügen konnte nicht erzeugt werden. Versuche es erneut oder starte Pladder neu."
+            "value": "Der Tastendruck zum Einfügen konnte nicht ausgelöst werden. Versuch es noch mal oder starte Pladder neu."
           }
         }
       }
@@ -196,7 +196,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Diese Datei konnte nicht gelesen werden. Sie sollte ein JSON-Array aus { from, to, matchCase } sein."
+            "value": "Die Datei konnte nicht gelesen werden. Erwartet wird ein JSON-Array aus { from, to, matchCase }."
           }
         }
       }
@@ -206,7 +206,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Diese Datei konnte nicht geschrieben werden: %@"
+            "value": "Die Datei konnte nicht gespeichert werden: %@"
           }
         }
       }
@@ -266,7 +266,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Jedes Diktat durchläuft diese der Reihe nach, bevor es eingefügt wird."
+            "value": "Jedes Diktat läuft der Reihe nach durch diese Schritte, bevor es eingefügt wird."
           }
         }
       }
@@ -376,7 +376,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Zum Aufnehmen gedrückt halten, zum Einfügen loslassen. Wird während der Aufnahme die Sendetaste gedrückt, folgt nach dem Text ein Zeilenschalter. Zum Zuweisen ein Feld anklicken und eine beliebige Tastenkombination drücken."
+            "value": "Halten zum Aufnehmen, loslassen zum Einfügen. Drückst du während der Aufnahme die Sendetaste, wird nach dem Text Enter gedrückt. Klick auf ein Feld und drück eine Tastenkombination, um sie zuzuweisen."
           }
         }
       }
@@ -386,7 +386,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Anfragelimit von Hugging Face"
+            "value": "Rate-Limit bei Hugging Face"
           }
         }
       }
@@ -466,7 +466,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "„Gehört als“ leer lassen, um ein Wort aufzuführen, das korrigiert werden soll, wenn es fast richtig erkannt wird."
+            "value": "Lass „Gehört als“ leer, um ein Wort einzutragen, das korrigiert werden soll, wenn es fast richtig erkannt wird."
           }
         }
       }
@@ -496,7 +496,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Modell wird geladen"
+            "value": "Modell lädt"
           }
         }
       }
@@ -636,7 +636,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ton während des Diktierens stummschalten"
+            "value": "Ton beim Diktieren stummschalten"
           }
         }
       }
@@ -646,7 +646,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "NVIDIA Parakeet über FluidAudio, läuft auf der Neural Engine. Beim ersten Verwenden ca. 700 MB Download."
+            "value": "NVIDIA Parakeet über FluidAudio, läuft auf der Neural Engine. Beim ersten Start ca. 700 MB Download."
           }
         }
       }
@@ -656,7 +656,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Erforderlich für eine reine Sondertaste wie die rechte Befehlstaste und für das Einfügen. Ohne sie springt eine andere Taste ein (das Menü nennt sie) und der Text wird nur kopiert, sodass du ihn mit ⌘V einfügen kannst; in einem Standardaccount kann das nur ein Administrator aktivieren."
+            "value": "Nötig für eine reine Sondertaste wie die rechte Befehlstaste und fürs Einfügen. Ohne sie springt eine andere Taste ein (das Menü sagt welche) und der Text wird nur kopiert, du fügst ihn dann mit ⌘V ein. In einem Standardaccount muss ein Admin das einschalten."
           }
         }
       }
@@ -696,7 +696,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nur %@ hat Pladder erreicht. Falls du zusätzlich eine normale Taste gedrückt hast, gehört dieser Kurzbefehl macOS oder einer anderen App; probiere eine andere Taste, zum Beispiel Steuerungstaste + Umschalttaste + D."
+            "value": "Bei Pladder ist nur %@ angekommen. Falls du auch eine normale Taste gedrückt hast, gehört der Kurzbefehl macOS oder einer anderen App; probier eine andere Taste, zum Beispiel Ctrl + Umschalttaste + D."
           }
         }
       }
@@ -766,7 +766,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Die gewünschte Taste oder Tastenkombination drücken. Esc bricht ab."
+            "value": "Taste oder Kombination drücken. Esc bricht ab."
           }
         }
       }
@@ -776,7 +776,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Die gewünschte Taste oder Tastenkombination drücken. Esc bricht ab. Ohne Bedienungshilfen muss die Kombination eine normale Taste enthalten, zum Beispiel Steuerungstaste + Umschalttaste + D."
+            "value": "Taste oder Kombination drücken. Esc bricht ab. Ohne Bedienungshilfen braucht die Kombination eine normale Taste, zum Beispiel Ctrl + Umschalttaste + D."
           }
         }
       }
@@ -796,7 +796,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Verarbeitungsschritte"
+            "value": "Schritte"
           }
         }
       }
@@ -836,7 +836,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bereit — %@ gedrückt halten"
+            "value": "Bereit — %@ halten"
           }
         }
       }
@@ -846,7 +846,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bereit — %@ gedrückt halten (Bedienungshilfen sind aus)"
+            "value": "Bereit — %@ halten (Bedienungshilfen sind aus)"
           }
         }
       }
@@ -856,7 +856,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bereit — %@ gedrückt halten (Sichere Tastatureingabe ist an)"
+            "value": "Bereit — %@ halten (Sichere Tastatureingabe ist an)"
           }
         }
       }
@@ -896,7 +896,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Repariert knapp danebenliegende Erkennungen der Wörter, die du im Tab „Wörterbuch“ mit leerem „Gehört als“ aufführst."
+            "value": "Korrigiert fast richtig erkannte Wörter, die du im Tab „Wörterbuch“ mit leerem „Gehört als“ einträgst."
           }
         }
       }
@@ -936,7 +936,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sichere Tastatureingabe ist an. Eine jetzt aufgezeichnete Tastenkombination erreicht Pladder möglicherweise nicht, und eine ohne normale Taste löst erst aus, wenn sie wieder aus ist."
+            "value": "Sichere Tastatureingabe ist an. Eine jetzt aufgenommene Kombination kommt vielleicht nicht bei Pladder an, und eine ohne normale Taste funktioniert erst, wenn sie wieder aus ist."
           }
         }
       }
@@ -956,7 +956,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Trennt aufeinanderfolgende Diktate, damit eingefügte Passagen lesbar bleiben."
+            "value": "Damit aufeinanderfolgende Diktate nicht zusammenkleben."
           }
         }
       }
@@ -976,7 +976,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Wird beim Diktieren angezeigt: fliegt als Kreis von der unteren Bildschirmkante herauf und entfaltet sich an seinem Platz. „Menü“ verlässt sich allein auf die Welle in der Menüleiste; Fehler erscheinen weiterhin."
+            "value": "Wird beim Diktieren angezeigt: kommt als Kreis vom unteren Bildschirmrand hoch und faltet sich an Ort und Stelle auf. „Menü“ zeigt nur die Welle in der Menüleiste; Fehler erscheinen trotzdem."
           }
         }
       }
@@ -1016,7 +1016,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Entfernt Verzögerungslaute wie „äh“ und „ähm“ aus englischen, deutschen und spanischen Transkripten."
+            "value": "Entfernt Füllwörter wie „äh“ und „ähm“ aus englischen, deutschen und spanischen Transkripten."
           }
         }
       }
@@ -1046,7 +1046,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Die Sendetaste benötigt die Bedienungshilfen."
+            "value": "Die Sendetaste braucht die Bedienungshilfen."
           }
         }
       }
@@ -1086,7 +1086,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kürzt das Transkript an den Rändern und fasst Folgen von Leerzeichen zusammen."
+            "value": "Entfernt Leerzeichen am Anfang und Ende und fasst mehrere Leerzeichen zu einem zusammen."
           }
         }
       }
@@ -1106,7 +1106,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Einen Satz eingeben, um zu sehen, wie die Regeln ihn verändern"
+            "value": "Gib einen Satz ein und sieh, was die Regeln daraus machen"
           }
         }
       }
@@ -1116,7 +1116,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nur ganze Wörter. Längere Wendungen haben Vorrang. Am Satzanfang wird die Groß-/Kleinschreibung übernommen, sofern „Groß-/Kleinschreibung beachten“ nicht aktiv ist."
+            "value": "Nur ganze Wörter. Längere Wendungen gewinnen. Am Satzanfang wird die Großschreibung übernommen, außer „Groß-/Kleinschreibung beachten“ ist an."
           }
         }
       }
@@ -1126,7 +1126,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ohne Bedienungshilfen kann %1$@ nicht erkannt werden, daher springt %2$@ ein, bis die Bedienungshilfen erlaubt sind. Zeichne eine Kombination mit einer normalen Taste auf, um eine eigene zu wählen."
+            "value": "Ohne Bedienungshilfen wird %1$@ nicht erkannt, deshalb springt %2$@ ein, bis die Bedienungshilfen erlaubt sind. Nimm eine Kombination mit einer normalen Taste auf, wenn du eine eigene willst."
           }
         }
       }
@@ -1136,7 +1136,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ohne Bedienungshilfen kann %@ nicht erkannt werden. Wähle eine Kombination mit einer normalen Taste, zum Beispiel Steuerungstaste + Umschalttaste + D."
+            "value": "Ohne Bedienungshilfen wird %@ nicht erkannt. Wähle eine Kombination mit einer normalen Taste, zum Beispiel Ctrl + Umschalttaste + D."
           }
         }
       }
@@ -1206,7 +1206,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "sieh beim Sprechen zu"
+            "value": "live mitlesen"
           }
         }
       }
@@ -1226,7 +1226,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "die Übertragung stockte"
+            "value": "die Übertragung ist hängen geblieben"
           }
         }
       }
