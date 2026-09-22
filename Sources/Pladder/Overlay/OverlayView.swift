@@ -398,9 +398,16 @@ struct OverlayPill: View {
         case .transcribing:
             ProgressView()
                 .controlSize(.small)
-        // An error and the clipboard hint are rendered as the row above, so
-        // they never reach this; `.inserting` is never mirrored onto the model.
-        case .inserting, .copied, .error, .idle, .unavailable:
+        case .copied:
+            // The hint leaves by the dive like a pasted dictation, and the
+            // disc it collapses into keeps the row's clipboard glyph rather
+            // than going empty, so what slides away still says what happened.
+            Image(systemName: "doc.on.clipboard")
+                .foregroundStyle(.secondary)
+                .transition(.opacity)
+        // An error is rendered as the row above, so it never reaches this;
+        // `.inserting` is never mirrored onto the model.
+        case .inserting, .error, .idle, .unavailable:
             Color.clear
         }
     }
