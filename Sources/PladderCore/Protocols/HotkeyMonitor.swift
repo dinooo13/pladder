@@ -38,6 +38,12 @@ public protocol HotkeyMonitor: Sendable {
     /// calling `stop()` ends monitoring.
     func start(chords: [HotkeyRole: Hotkey], submitKey: Hotkey) -> AsyncStream<HotkeyMonitorEvent>
     func stop()
+    /// While true a plain Escape is the cancel key: reported as `.escape` and
+    /// kept from other apps. The coordinator turns it on when a recording
+    /// starts and off when it ends, so Escape is never taken system wide
+    /// between recordings. Must return at once: it is called on the release
+    /// path. `start` and `stop` turn it off.
+    func setCancelKeyEnabled(_ enabled: Bool)
 }
 
 public enum HotkeyEvent: Sendable, Equatable {
@@ -51,6 +57,10 @@ public enum HotkeyEvent: Sendable, Equatable {
     /// recording is dropped without transcribing. Only the event tap can
     /// produce this; Carbon never sees the interrupting key.
     case cancelled
+    /// The cancel key went down while enabled (`setCancelKeyEnabled`): drop
+    /// the recording. Belongs to no chord, so no chord tracker produces it;
+    /// the monitors tag it `.dictate` and the coordinator ignores the role.
+    case escape
 }
 
 /// The push-to-talk chord: one or more physical keys that must be held together.

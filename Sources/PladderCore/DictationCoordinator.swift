@@ -9,8 +9,11 @@ import Observation
 ///
 /// A press of the toggle chord, or a tap of a hybrid chord shorter than
 /// `holdThreshold`, leaves the recording running with `isLatched` set until
-/// the next press of any chord or the cap. `HotkeyGestureTracker` decides
-/// which; the coordinator only carries out what it says.
+/// the next press of any chord, Escape, or the cap. `HotkeyGestureTracker`
+/// decides which; the coordinator only carries out what it says.
+///
+/// Escape is the cancel key while a recording is on, and only then: the
+/// monitor is told at the start and the end of every recording.
 @MainActor
 @Observable
 public final class DictationCoordinator {
@@ -171,6 +174,10 @@ public final class DictationCoordinator {
         case recordingStopped
         case inserted(Transcript, CycleTiming)
         case failed(DictationFailure)
+        /// Escape ended the recording; nothing is transcribed. The app plays
+        /// the stop sound so the user hears the microphone go off, unlike an
+        /// interrupted press, which is silent by design.
+        case recordingDiscarded
         /// The gesture tracker has seen a same-chord press inside the bounce
         /// window, and from now on holds every stopping release for
         /// `bounceWindow` first. Emitted once, so a felt delay has an
@@ -464,6 +471,9 @@ public final class DictationCoordinator {
                 // without a stop sound and without a timing line.
                 case .cancelled:
                     await self.act(self.gesture.interrupted(tagged.role))
+                // Escape while a recording is on: drop it, and say so.
+                case .escape:
+                    await self.escapePressed()
                 }
             }
         }
@@ -529,13 +539,16 @@ public final class DictationCoordinator {
         }
     }
 
-    /// The recording ended, however: the gesture starts over. Synchronous,
-    /// so on the release path it costs nothing before `recordingStopped`.
+    /// The recording ended, however: the gesture starts over and Escape is
+    /// the system's again. Synchronous, and the monitor call only flips a
+    /// flag or queues work on the main thread, so on the release path this
+    /// costs nothing before `recordingStopped`.
     private func endGesture() {
         settleTask?.cancel()
         settleTask = nil
         gesture.reset()
         isLatched = false
+        hotkeyMonitor.setCancelKeyEnabled(false)
     }
 
     /// Public so tests and a menu item can drive the state machine directly.
@@ -562,6 +575,8 @@ public final class DictationCoordinator {
         // Flip state before the await so the overlay reacts on key-down and a
         // second concurrent press cannot start capture twice.
         state = .recording(level: 0)
+        // Escape cancels from here on, and while the microphone comes up.
+        hotkeyMonitor.setCancelKeyEnabled(true)
         do {
             let levels = try await capture.start()
             guard state.isRecording else {
@@ -616,6 +631,7 @@ public final class DictationCoordinator {
             }
         } catch {
             willPolish = false
+            endGesture()
             fail(.microphone(detail: error.localizedDescription))
         }
     }
@@ -774,6 +790,15 @@ public final class DictationCoordinator {
             await streaming.abandonUtterance()
         }
         drainPendingUnloads()
+    }
+
+    /// Escape while recording: drop the audio without transcribing and say
+    /// so, before the microphone has finished stopping, so the stop sound is
+    /// not late. Public so tests can drive it.
+    public func escapePressed() async {
+        guard state.isRecording else { return }
+        onEvent(.recordingDiscarded)
+        await cancelRecording()
     }
 
     /// The text is on the clipboard but nothing pasted it, so say so for a

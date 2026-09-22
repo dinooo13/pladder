@@ -147,7 +147,7 @@ private struct GeneralSettingsView: View {
                 // another key can add its own line.
                 VStack(alignment: .leading, spacing: 4) {
                     FootnoteText("Hold to record, release to insert. Press the send key while recording and Return is pressed after the text. Click a field and press any key combination to assign it.")
-                    FootnoteText("Tap the toggle key to start recording and tap it again to insert. Set it to the same combination as the key and a short tap toggles while a hold still works as before. Delete clears a field.")
+                    FootnoteText("Tap the toggle key to start recording and tap it again to insert. Set it to the same combination as the key and a short tap toggles while a hold still works as before. Escape discards a recording. Delete clears a field.")
                     FootnoteText("Hold the Dictate and polish key instead and Apple Intelligence cleans up the transcript on this Mac before it is pasted: self-corrections, spoken punctuation and numbers, lists. That takes a second or two.")
                 }
             }

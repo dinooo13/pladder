@@ -20,6 +20,12 @@ import PladderCore
 /// `CGEvent.tapCreate` returns nil and we simply try again every couple of
 /// seconds, so the hotkey comes alive the moment the user ticks the box.
 ///
+/// Several chords share the tap through `HotkeyChordSet`, which also decides
+/// when Escape is the cancel key. Under Secure Event Input the tap sees no
+/// key-downs at all, so Escape cannot cancel on the tap then; a modifier-only
+/// chord keeps the tap in that state (see `AppModel.refreshPermissions`), and
+/// its recording ends by letting go, the next press, or the cap.
+///
 /// Which keys are down is `HotkeyChordSet`'s business; this class only
 /// translates events and owns the tap. It is `@unchecked Sendable`: all mutable
 /// state lives behind `lock`, and the tap is created and torn down on the tap
@@ -94,6 +100,12 @@ public final class GlobalHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
         // the tap is already detached from `state`, so that is a no-op.
         continuation?.finish()
         removeTap(tap)
+    }
+
+    /// A flag flip under the lock, nothing else: the tap reads it on the next
+    /// key event.
+    public func setCancelKeyEnabled(_ enabled: Bool) {
+        lock.withLock { state.chords?.cancelKeyEnabled = enabled }
     }
 
     // MARK: Tap
