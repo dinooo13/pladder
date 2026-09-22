@@ -1061,12 +1061,12 @@
         }
       }
     },
-    "Tap the toggle key to start recording and tap it again to insert. Set it to the same combination as the key and a short tap toggles while a hold still works as before. Delete clears a field.": {
+    "Tap the toggle key to start recording and tap it again to insert. Set it to the same combination as the key and a short tap toggles while a hold still works as before. Escape discards a recording. Delete clears a field.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tipp die Start/Stopp-Taste an, um die Aufnahme zu starten, und tipp sie noch mal an, um einzufügen. Gibst du ihr dieselbe Kombination wie der Taste, startet und stoppt ein kurzes Antippen, und Halten funktioniert wie bisher. Die Löschtaste leert ein Feld."
+            "value": "Tipp die Start/Stopp-Taste an, um die Aufnahme zu starten, und tipp sie noch mal an, um einzufügen. Gibst du ihr dieselbe Kombination wie der Taste, startet und stoppt ein kurzes Antippen, und Halten funktioniert wie bisher. Esc verwirft eine Aufnahme. Die Löschtaste leert ein Feld."
           }
         }
       }

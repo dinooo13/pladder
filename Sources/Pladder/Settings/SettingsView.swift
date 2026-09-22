@@ -127,7 +127,7 @@ private struct GeneralSettingsView: View {
             } footer: {
                 VStack(alignment: .leading, spacing: 4) {
                     FootnoteText("Hold to record, release to insert. Press the send key while recording and Return is pressed after the text. Click a field and press any key combination to assign it.")
-                    FootnoteText("Tap the toggle key to start recording and tap it again to insert. Set it to the same combination as the key and a short tap toggles while a hold still works as before. Delete clears a field.")
+                    FootnoteText("Tap the toggle key to start recording and tap it again to insert. Set it to the same combination as the key and a short tap toggles while a hold still works as before. Escape discards a recording. Delete clears a field.")
                 }
             }
 
