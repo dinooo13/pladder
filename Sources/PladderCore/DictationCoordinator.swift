@@ -4,7 +4,7 @@ import Observation
 /// The push-to-talk state machine. Owns no I/O itself; everything is injected.
 ///
 /// Flow: hotkey pressed -> capture starts -> hotkey released -> capture stops ->
-/// engine transcribes -> pipeline processes -> (polish hotkey: model refines ->)
+/// engine transcribes -> pipeline processes -> (polish setting: model refines ->)
 /// output inserts -> idle.
 ///
 /// A press of the toggle chord, or a tap of a hybrid chord shorter than
@@ -27,8 +27,10 @@ public final class DictationCoordinator {
     /// is cleared the moment the key is released. Nil in every other style.
     public private(set) var partialTranscript: String?
 
-    /// True from a polish-hotkey press until that cycle ends, so the overlay
-    /// can keep the pill up across the release.
+    /// True when the current dictation is on its way through the refiner, so
+    /// the overlay can keep the pill up across the release. Read off
+    /// `settings.polishDictations` at key-down, so flipping the setting
+    /// mid-recording cannot change this cycle.
     public private(set) var willPolish = false
 
     /// True while a recording continues after its chord was let go: a toggle
@@ -69,9 +71,8 @@ public final class DictationCoordinator {
     /// Command, which the default Option+Space then stands in for. The stored
     /// chord is left untouched and comes back the moment this is cleared,
     /// which is what happens when Accessibility is granted. Nil means "listen
-    /// for the stored chord". Applies to the dictate chord only; the polish
-    /// chord has no stand-in and is simply not registered when Carbon cannot
-    /// take it. A toggle chord equal to the stored chord follows the
+    /// for the stored chord". Applies to the dictate chord only; a toggle
+    /// chord equal to the stored chord follows the
     /// override, so a stood-in hybrid key stays hybrid.
     public var hotkeyOverride: Hotkey? {
         didSet {
@@ -122,8 +123,8 @@ public final class DictationCoordinator {
     /// Silences the speakers while the mic is open, when the setting is on.
     /// Nil in tests and wherever the app does not want the behaviour at all.
     private let outputMuter: (any OutputMuter)?
-    /// The polish hotkey's second pass. Nil where there is none, which makes
-    /// the polish key a plain dictation.
+    /// The polish setting's second pass. Nil where there is none, which makes
+    /// the polish a no-op.
     private let refiner: (any TranscriptRefiner)?
     private var hotkeyMonitor: any HotkeyMonitor
     private let makePipeline: @Sendable (Settings) -> ProcessorPipeline
@@ -269,7 +270,6 @@ public final class DictationCoordinator {
         // so this runs only on real changes.
         pipeline = makePipeline(settings)
         if old.hotkey != settings.hotkey || old.submitKey != settings.submitKey
-            || old.polishHotkey != settings.polishHotkey
             || old.toggleHotkey != settings.toggleHotkey {
             // The old key's release will never arrive on the new stream.
             // The submit key counts too: the restarted monitor would never
@@ -441,12 +441,6 @@ public final class DictationCoordinator {
         startGesture()
         var chords: [HotkeyRole: Hotkey] = [.dictate: hotkeyOverride ?? settings.hotkey]
         if let toggle = separateToggleChord { chords[.toggle] = toggle }
-        // A polish chord that is already another role's chord would fire both
-        // trackers at once; the settings row says why it does nothing.
-        let polish = settings.polishHotkey.canonical
-        if !polish.isEmpty, !chords.values.contains(where: { $0.canonical == polish }) {
-            chords[.polish] = settings.polishHotkey
-        }
         let stream = hotkeyMonitor.start(chords: chords, submitKey: settings.submitKey)
         hotkeyTask = Task { [weak self] in
             for await tagged in stream {
@@ -502,7 +496,7 @@ public final class DictationCoordinator {
         settleTask = nil
         isLatched = false
         gesture = HotkeyGestureTracker(
-            modes: [.dictate: toggleIsHybrid ? .hybrid : .hold, .polish: .hold, .toggle: .toggle],
+            modes: [.dictate: toggleIsHybrid ? .hybrid : .hold, .toggle: .toggle],
             holdThreshold: holdThreshold,
             bounceWindow: bounceWindow,
             deferReleases: deferReleases || gesture.deferReleases
@@ -552,8 +546,6 @@ public final class DictationCoordinator {
     }
 
     /// Public so tests and a menu item can drive the state machine directly.
-    /// `role` is the chord that was pressed; it decides what the dictation
-    /// goes through at release.
     public func hotkeyPressed(role: HotkeyRole = .dictate) async {
         // `.copied` is the hint from the previous dictation, not a busy state:
         // a press replaces it rather than being dropped.
@@ -567,7 +559,7 @@ public final class DictationCoordinator {
         // the settings switch engines mid-recording.
         cycleEngine = loader.engine
         cycleRole = role
-        willPolish = role == .polish
+        willPolish = settings.polishDictations
         partialTranscript = nil
         // Read once, at press: switching the style mid-recording must not
         // leave the loop half live, with nothing warming the engine.
@@ -721,8 +713,8 @@ public final class DictationCoordinator {
                 becomeIdle()
                 return
             }
-            // The polish key's one branch; on the normal path it costs a Bool
-            // read. A refiner that cannot help returns nil and the text goes
+            // The polish setting's one branch; off, it costs a Bool read.
+            // A refiner that cannot help returns nil and the text goes
             // out as dictated.
             var final = processed
             if willPolish, let refiner, Self.wordCount(processed) >= minimumPolishWords {

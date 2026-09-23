@@ -600,8 +600,8 @@ private let keyC: UInt16 = 0x08
 
     @Test func aRoleWithoutAModeHolds() {
         var g = Tracker(modes: [:])
-        _ = g.pressed(.polish, at: at(0))
-        #expect(g.released(.polish, submit: false, at: at(100)).action == .stop(submit: false))
+        _ = g.pressed(.toggle, at: at(0))
+        #expect(g.released(.toggle, submit: false, at: at(100)).action == .stop(submit: false))
     }
 
     @Test func toggleModeLatchesAndStopsOnTheNextPress() {

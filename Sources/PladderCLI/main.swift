@@ -28,7 +28,7 @@ import PladderRefine
 //                                         how many there were and what they cost. The
 //                                         `identical:` column then also proves the live
 //                                         passes leave the release's windows alone.
-//   pladder-cli polish <text file | ->    run the polish hotkey's prompt over a transcript
+//   pladder-cli polish <text file | ->    run the polisher over a transcript over a transcript
 //                                         with Apple's on-device model: once cold, once
 //                                         after prepare() and a two-second wait, the way
 //                                         a real press warms it. Prints both timings.
@@ -461,7 +461,7 @@ func runPacedBench(dir: String, runs: Int, pause: Double, includeShort: Bool, li
 // MARK: - Polish
 
 /// Runs `TranscriptPolisher` over one transcript twice and prints what the
-/// polish key would paste. The first run is cold (no `prepare()`), the second
+/// polish toggle would paste. The first run is cold (no `prepare()`), the second
 /// warm, which is what a real press gets: the session is made and prewarmed
 /// at key-down, seconds before the release.
 func runPolish(_ path: String, instructionsPath: String?) async throws {

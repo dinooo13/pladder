@@ -44,11 +44,11 @@ final class AppModel {
     /// someone visits System Settings. Never on a key press.
     private(set) var systemShortcuts: Set<Hotkey> = []
 
-    /// Whether Apple Intelligence can polish right now, for the polish key's
-    /// row. Polled with the permissions: it can be switched on or off in
-    /// System Settings while the app runs, and the read is cheap. The
-    /// coordinator never asks; an unavailable model makes the polish key a
-    /// plain dictation on its own.
+    /// Whether Apple Intelligence can polish right now, for the polish
+    /// toggle's row. Polled with the permissions: it can be switched on or
+    /// off in System Settings while the app runs, and the read is cheap. The
+    /// coordinator never asks; an unavailable model makes the toggle a
+    /// no-op that pastes as dictated.
     private(set) var polishAvailability: OnDeviceModelAvailability = TranscriptPolisher.availability
 
     /// The default chord, standing in for a stored chord Carbon cannot

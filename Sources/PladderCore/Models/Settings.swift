@@ -40,9 +40,10 @@ public struct Settings: Codable, Sendable, Equatable {
     /// end with Return, which sends a chat message or runs a command. Empty
     /// turns it off.
     public var submitKey: Hotkey
-    /// A dictation started with this chord runs through the on-device model
-    /// before it is pasted. Empty, the default, means there is no such chord.
-    public var polishHotkey: Hotkey
+    /// Every dictation runs through the on-device model before it is pasted.
+    /// Experimental and off by default: the model costs one to three seconds,
+    /// so this sits on the normal hotkey's release path.
+    public var polishDictations: Bool
     /// A chord that starts a recording on one press and ends it on the next.
     /// The same chord as `hotkey` makes that key hybrid: a tap latches, a hold
     /// stops at release. Empty, the default, turns it off.
@@ -72,7 +73,7 @@ public struct Settings: Codable, Sendable, Equatable {
         engineID: EngineID,
         hotkey: Hotkey = .optionSpace,
         submitKey: Hotkey = .rightOption,
-        polishHotkey: Hotkey = Hotkey(keyCodes: []),
+        polishDictations: Bool = false,
         toggleHotkey: Hotkey = Hotkey(keyCodes: []),
         disabledProcessors: Set<String> = [],
         dictionary: [DictionaryEntry] = [],
@@ -88,7 +89,7 @@ public struct Settings: Codable, Sendable, Equatable {
         self.engineID = engineID
         self.hotkey = hotkey
         self.submitKey = submitKey
-        self.polishHotkey = polishHotkey
+        self.polishDictations = polishDictations
         self.toggleHotkey = toggleHotkey
         self.disabledProcessors = disabledProcessors
         self.dictionary = dictionary
@@ -105,9 +106,11 @@ public struct Settings: Codable, Sendable, Equatable {
     // Decoding tolerates missing keys so adding a field in a later version
     // never makes an existing settings file unreadable.
     private enum CodingKeys: String, CodingKey {
-        case engineID, hotkey, submitKey, polishHotkey, disabledProcessors, dictionary, appendTrailingSpace, launchAtLogin, playSounds, appearance
+        case engineID, hotkey, submitKey, polishDictations, disabledProcessors, dictionary, appendTrailingSpace, launchAtLogin, playSounds, appearance
         case overlayStyle, overlayGlass, overlayAnimationSpeed, muteOutputWhileDictating
         case toggleHotkey
+        // Read once for the migration, never written.
+        case polishHotkey
     }
 
     public init(from decoder: Decoder) throws {
@@ -119,8 +122,12 @@ public struct Settings: Codable, Sendable, Equatable {
         // Unlike the hotkey, an empty submit key is meaningful: it is how the
         // feature is switched off.
         submitKey = try c.decodeIfPresent(Hotkey.self, forKey: .submitKey) ?? .rightOption
-        // Empty means off, like the submit key.
-        polishHotkey = try c.decodeIfPresent(Hotkey.self, forKey: .polishHotkey) ?? Hotkey(keyCodes: [])
+        // Once a chord of its own, the polish is now a Processing toggle.
+        // A stored chord migrates to `true`, so the feature the user asked
+        // for turns on with the update; nothing is written under the old key.
+        let legacyPolish = try c.decodeIfPresent(Hotkey.self, forKey: .polishHotkey) ?? Hotkey(keyCodes: [])
+        polishDictations = try c.decodeIfPresent(Bool.self, forKey: .polishDictations)
+            ?? (!legacyPolish.isEmpty)
         // Like the submit key, empty is meaningful: off.
         toggleHotkey = try c.decodeIfPresent(Hotkey.self, forKey: .toggleHotkey) ?? Hotkey(keyCodes: [])
         disabledProcessors = try c.decodeIfPresent(Set<String>.self, forKey: .disabledProcessors) ?? []
@@ -133,6 +140,27 @@ public struct Settings: Codable, Sendable, Equatable {
         overlayGlass = try c.decodeIfPresent(Bool.self, forKey: .overlayGlass) ?? true
         overlayAnimationSpeed = try c.decodeIfPresent(OverlayAnimationSpeed.self, forKey: .overlayAnimationSpeed) ?? .quick
         muteOutputWhileDictating = try c.decodeIfPresent(Bool.self, forKey: .muteOutputWhileDictating) ?? false
+    }
+
+    // Encoding mirrors the synthesized one, minus the legacy `polishHotkey`
+    // key that only the decoder above reads.
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(engineID, forKey: .engineID)
+        try c.encode(hotkey, forKey: .hotkey)
+        try c.encode(submitKey, forKey: .submitKey)
+        try c.encode(polishDictations, forKey: .polishDictations)
+        try c.encode(toggleHotkey, forKey: .toggleHotkey)
+        try c.encode(disabledProcessors, forKey: .disabledProcessors)
+        try c.encode(dictionary, forKey: .dictionary)
+        try c.encode(appendTrailingSpace, forKey: .appendTrailingSpace)
+        try c.encode(launchAtLogin, forKey: .launchAtLogin)
+        try c.encode(playSounds, forKey: .playSounds)
+        try c.encode(muteOutputWhileDictating, forKey: .muteOutputWhileDictating)
+        try c.encode(appearance, forKey: .appearance)
+        try c.encode(overlayStyle, forKey: .overlayStyle)
+        try c.encode(overlayGlass, forKey: .overlayGlass)
+        try c.encode(overlayAnimationSpeed, forKey: .overlayAnimationSpeed)
     }
 
     public func isProcessorEnabled(_ id: String) -> Bool {

@@ -5,7 +5,7 @@ import Foundation
 /// chord of its own when it differs from the dictate chord; equal, it makes
 /// the dictate chord hybrid instead (see `HotkeyGestureTracker`).
 public enum HotkeyRole: String, Sendable, Hashable, CaseIterable, Comparable {
-    case dictate, polish, toggle
+    case dictate, toggle
 
     public static func < (a: Self, b: Self) -> Bool { a.rawValue < b.rawValue }
 }

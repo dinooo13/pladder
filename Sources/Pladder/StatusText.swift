@@ -67,20 +67,20 @@ extension DictationFailure {
 }
 
 extension OnDeviceModelAvailability {
-    /// The sentence under the Dictate and polish row, nil when the model can
-    /// run. Each says what the key does meanwhile: it still records and
-    /// pastes, only without the polish.
+    /// The sentence under the "Polish dictations" toggle, nil when the model
+    /// can run. Each says what dictations do meanwhile: they paste as
+    /// dictated, only without the polish.
     var polishKeyText: String? {
         switch self {
         case .available: nil
         case .appleIntelligenceNotEnabled:
-            String(localized: "Apple Intelligence is off, so this key pastes the text as dictated. Turn it on in System Settings.")
+            String(localized: "Apple Intelligence is off, so dictations paste as dictated. Turn it on in System Settings.")
         case .deviceNotEligible:
-            String(localized: "This Mac cannot run Apple Intelligence, so this key pastes the text as dictated.")
+            String(localized: "This Mac cannot run Apple Intelligence, so dictations paste as dictated.")
         case .modelNotReady:
-            String(localized: "The Apple Intelligence model is still downloading, so this key pastes the text as dictated for now.")
+            String(localized: "The Apple Intelligence model is still downloading, so dictations paste as dictated for now.")
         case .unavailable:
-            String(localized: "Apple Intelligence is unavailable, so this key pastes the text as dictated.")
+            String(localized: "Apple Intelligence is unavailable, so dictations paste as dictated.")
         }
     }
 }

@@ -7,7 +7,7 @@ public enum DictationState: Equatable, Sendable {
     case recording(level: Float)
     case transcribing
     /// The model is cleaning the transcript; only a dictation started with
-    /// the polish hotkey gets here.
+    /// the refiner gets here.
     case polishing
     case inserting
     /// Transcript is on the clipboard for the user to paste; shown briefly,
