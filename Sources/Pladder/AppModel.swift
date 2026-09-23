@@ -94,6 +94,18 @@ final class AppModel {
     /// Hotkey behaviour worth knowing about after the fact, such as a
     /// keyboard that bounces.
     private static let hotkeyLog = Logger(subsystem: "de.dinooo13.pladder", category: "hotkey")
+    /// The correction learner's stages. They quote the user's words, so the
+    /// text is `.private`: `log show` prints it only with private data on.
+    private nonisolated static let learningLog = Logger(subsystem: "de.dinooo13.pladder", category: "learning")
+
+    /// Watches a field after the paste and proposes what the user corrected.
+    private let learner: CorrectionLearner
+    private let dismissedCorrections: DismissedCorrections
+    private let proposalRelay = ProposalRelay()
+    /// Corrections the model agreed with, newest first, waiting in the menu
+    /// for Add or Dismiss. Kept for the app's life or until answered.
+    private(set) var proposals: [CorrectionProposal] = []
+    static let maximumProposals = 3
 
     /// Settings live in the coordinator (it reacts to hotkey/engine changes);
     /// this forwards and persists. Applying the appearance covers every
@@ -201,7 +213,7 @@ final class AppModel {
         let events = self.events
         let trusted = Permissions.isAccessibilityTrusted
         hotkeyUsesTap = trusted
-        coordinator = DictationCoordinator(
+        let coordinator = DictationCoordinator(
             settings: initial,
             registry: registry,
             capture: AVAudioEngineCapture(),
@@ -218,9 +230,26 @@ final class AppModel {
             },
             onEvent: { [events] event in events.send(event) }
         )
+        self.coordinator = coordinator
+
+        // Nothing here runs before the paste: `handle(.inserted)` hands the
+        // pasted text over, and the learner watches and reviews on its own
+        // thread and task.
+        let dismissed = DismissedCorrections(url: Self.dismissedCorrectionsURL)
+        dismissedCorrections = dismissed
+        let proposalRelay = self.proposalRelay
+        learner = CorrectionLearner(
+            observer: AXPasteObserver(),
+            reviewer: FoundationModelsCorrectionReviewer(),
+            dismissed: dismissed,
+            dictionary: { await coordinator.settings.dictionary },
+            log: { Self.learningLog.info("\($0, privacy: .private)") },
+            onProposal: { proposalRelay.send($0) }
+        )
 
         overlay = OverlayController(coordinator: coordinator)
         events.handler = { [weak self] event, at in self?.handle(event, at: at) }
+        proposalRelay.handler = { [weak self] proposal in self?.propose(proposal) }
     }
 
     /// `PLADDER_SETTINGS_PATH` points a copy launched for testing at a file
@@ -238,6 +267,12 @@ final class AppModel {
         return FileManager.default
             .homeDirectoryForCurrentUser
             .appending(path: "Library/Application Support/Pladder/settings.json")
+    }
+
+    /// The corrections the user dismissed, beside the settings but not in
+    /// them (see `DismissedCorrections`).
+    static var dismissedCorrectionsURL: URL {
+        settingsURL.deletingLastPathComponent().appending(path: "dismissed-corrections.json")
     }
 
     /// One-time migration from the pre-rename location. The dictionary and
@@ -286,6 +321,13 @@ final class AppModel {
             releaseInstant = instant
             if settings.playSounds { SoundPlayer.playStop() }
         case .inserted(let transcript, let timing):
+            defer {
+                // Strictly after the paste and off the measured window, which
+                // ended when the coordinator emitted this event: the learner
+                // spawns its own task and reads the field on its own thread.
+                // Without the grant nothing was pasted, only copied.
+                if accessibilityTrusted { learner.pasted(transcript.text) }
+            }
             guard let released = releaseInstant else { return }
             releaseInstant = nil
             let total = Self.seconds(instant - released)
@@ -314,6 +356,46 @@ final class AppModel {
             // cannot show it; this line is what explains a felt delay.
             Self.hotkeyLog.notice("keyboard bounce observed: releases now settle for 50 ms before stopping")
         }
+    }
+
+    // MARK: Learned corrections
+
+    private func propose(_ proposal: CorrectionProposal) {
+        let key = proposal.pair.key
+        guard !proposals.contains(where: { $0.pair.key == key }),
+              !Self.dictionary(settings.dictionary, has: proposal.pair.heard) else { return }
+        proposals = Array(([proposal] + proposals).prefix(Self.maximumProposals))
+    }
+
+    /// Adds `heard → corrected` to the dictionary, overwriting a rule with the
+    /// same `from` the way the Dictionary tab's import does. Through the
+    /// settings setter, so it is saved and the next dictation uses it.
+    func acceptProposal(_ proposal: CorrectionProposal) {
+        proposals.removeAll { $0.id == proposal.id }
+        let from = proposal.pair.heard.lowercased()
+        var dictionary = settings.dictionary
+        let entry = DictionaryEntry(from: proposal.pair.heard, to: proposal.pair.corrected)
+        if let index = dictionary.firstIndex(where: {
+            $0.from.trimmingCharacters(in: .whitespaces).lowercased() == from
+        }) {
+            dictionary[index].to = entry.to
+            dictionary[index].matchCase = false
+        } else {
+            dictionary.append(entry)
+        }
+        settings.dictionary = dictionary
+    }
+
+    /// Drops the line and remembers the pair so it is never proposed again.
+    func dismissProposal(_ proposal: CorrectionProposal) {
+        proposals.removeAll { $0.id == proposal.id }
+        let dismissed = dismissedCorrections
+        Task { await dismissed.dismiss(proposal.pair) }
+    }
+
+    private static func dictionary(_ entries: [DictionaryEntry], has heard: String) -> Bool {
+        let key = heard.lowercased()
+        return entries.contains { $0.from.trimmingCharacters(in: .whitespaces).lowercased() == key }
     }
 
     private static func seconds(_ duration: Duration) -> Double {
@@ -531,6 +613,17 @@ final class AppModel {
             return String(head[..<space]) + "…"
         }
         return head + "…"
+    }
+}
+
+/// Bridges the learner's proposals onto the main actor, and lets the learner
+/// be built before `self` exists, as `EventRelay` does for the coordinator.
+@MainActor
+final class ProposalRelay {
+    var handler: ((CorrectionProposal) -> Void)?
+
+    nonisolated func send(_ proposal: CorrectionProposal) {
+        Task { @MainActor in self.handler?(proposal) }
     }
 }
 
