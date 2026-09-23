@@ -114,15 +114,14 @@ final class OverlayController {
                 if visible { scheduleHide(after: .zero, flight: false) }
                 return
             }
-            // A polish cycle is seconds, not milliseconds: keep the pill up,
-            // say what is happening, and let `.polishing` and then `.idle`
-            // take over.
+            // The pill stays up so the flight out does not start before it
+            // has begun: the polish pass is seconds, not milliseconds, and
+            // the pill carries on showing the recording row across it.
             if coordinator.willPolish {
                 cancelSpinner()
                 model.partialTranscript = nil
                 model.state = .transcribing
                 cancelHide()
-                present(flight: true)
                 return
             }
             // A new partial can re-run this while the spinner is already
@@ -130,21 +129,34 @@ final class OverlayController {
             guard spinnerTask == nil else { return }
             if visible { scheduleHide(after: .zero, flight: true) }
             // Only a transcription that outlasts the delay — a cold engine, a
-            // long merge, a release inside a warm pass — brings the pill back.
+            // long merge, a release inside a warm pass, the polish pass that
+            // runs with `polishDictations` set — brings the pill back.
             spinnerTask = Task { [weak self] in
                 try? await Task.sleep(for: Self.spinnerDelay)
                 guard !Task.isCancelled, let self, self.running else { return }
-                guard self.coordinator.state == .transcribing, self.model.style != .menuBar else { return }
+                // Transcription still finishing, or the polish pass running:
+                // the state may have moved on between the delay and here.
+                switch self.coordinator.state {
+                case .transcribing, .polishing: break
+                default: return
+                }
+                guard self.model.style != .menuBar else { return }
                 self.model.partialTranscript = nil
                 self.model.state = .transcribing
                 self.cancelHide()
                 self.present(flight: true)
             }
         case .polishing:
+            // Menu never shows the pill (errors aside), so a polish pass in
+            // Menu style fades whatever may be on screen out.
             guard model.style != .menuBar else {
                 if visible { scheduleHide(after: .zero, flight: false) }
                 return
             }
+            // The pill is already up from `.transcribing` — kept there across
+            // the model pass — so this only morphs it onto the Polishing
+            // row. `present` stays for the case where the pass began without
+            // it, e.g. a discard in between: it would then fly in fresh.
             cancelSpinner()
             model.state = state
             cancelHide()
