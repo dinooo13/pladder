@@ -264,12 +264,19 @@ public final class AXPasteObserver: PastedTextObserver, @unchecked Sendable {
         }
 
         func handle(_ notification: String, element changed: AXUIElement) {
+            if notification != "AXValueChanged" {
+                AXPasteObserver.log.info("watch sees \(notification, privacy: .public)")
+            }
             switch notification {
             case "AXValueChanged":
                 read()
             case "AXFocusedUIElementChanged":
-                // Some apps re-announce the element that already has focus.
+                // Some apps re-announce the element that already has focus,
+                // and WebKit does so right after a paste with a new object for
+                // the same textarea, so identity is not enough: the watch ends
+                // only once the element itself says it lost focus.
                 if CFEqual(changed, element) { return }
+                if Reader.value(element, "AXFocused") as? Bool == true { return }
                 finish(finalRead: true)
             case "AXUIElementDestroyed":
                 finish(finalRead: false)
