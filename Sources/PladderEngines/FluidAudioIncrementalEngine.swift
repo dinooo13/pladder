@@ -37,7 +37,7 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
     private var fedSampleCount = 0
     /// The samples themselves, kept only so `livePass` has something to
     /// transcribe; the session holds its own copy for the real windows. At the
-    /// coordinator's 120 s cap this is 7.7 MB, and it is dropped the moment
+    /// coordinator's 10 min cap this is 38 MB, and it is dropped the moment
     /// the utterance ends, one way or the other.
     private var liveAudio: [Float] = []
     private var loadTask: Task<Void, Error>?

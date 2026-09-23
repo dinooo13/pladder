@@ -74,7 +74,7 @@ public final class DictationCoordinator {
     /// Recordings are cut off after this long. A release event can be lost for
     /// real, for example while a secure password field has focus and global
     /// monitors receive nothing, and this keeps the microphone from staying on.
-    public var maximumDuration: Duration = .seconds(120)
+    public var maximumDuration: Duration = .seconds(600)
     /// How long an error stays on screen before returning to idle.
     public var errorDisplayDuration: Duration = .seconds(2)
     /// How long the "press ⌘V" hint stays on screen before returning to idle.
