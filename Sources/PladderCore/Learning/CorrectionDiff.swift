@@ -42,7 +42,9 @@ public enum CorrectionDiff {
     /// two-word paste can still be corrected.
     static let rewriteAllowance = 2
     /// The alignment table's bound; past it the reading is skipped rather
-    /// than a quadratic table built. A 120 s dictation is far below it.
+    /// than a quadratic table built. A dictation of a few minutes is far
+    /// below it; one near the 10 min cap can pass it, and then nothing is
+    /// learned from that paste.
     static let maximumCells = 4_000_000
 
     /// Pairs in text order, empty when there is nothing to learn.

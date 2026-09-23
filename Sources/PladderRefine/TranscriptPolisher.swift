@@ -46,9 +46,10 @@ public actor TranscriptPolisher: TranscriptRefiner {
         """
 
     /// Above this the transcript is split at sentence ends into windows of
-    /// about `chunkSize` words, each its own call. The context window is
-    /// about 4k tokens and a 120 s dictation is about 350 words, so this is
-    /// insurance rather than a path anyone takes.
+    /// about `chunkSize` words, each its own call with its own timeout. The
+    /// context window is about 4k tokens and a minute of speech is about 175
+    /// words, so a dictation past about three and a half minutes takes this
+    /// path; one near the 10 min cap is about six calls.
     public static let chunkThreshold = 600
     static let chunkSize = 300
 
@@ -173,8 +174,8 @@ public actor TranscriptPolisher: TranscriptRefiner {
 
     // MARK: Chunking
 
-    /// The transcript as it is when it is short, which is every dictation
-    /// the 120 s cap allows; otherwise windows of about `chunkSize` words,
+    /// The transcript as it is when it is short, which is most dictations;
+    /// otherwise windows of about `chunkSize` words,
     /// cut after a sentence end so no window starts mid-sentence.
     static func chunks(of text: String) -> [String] {
         let words = text.split(whereSeparator: \.isWhitespace)
