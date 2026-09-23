@@ -37,8 +37,14 @@ public enum OnDeviceModelError: Error, Sendable, Equatable {
 public struct OnDeviceLanguageModel: Sendable {
     public let instructions: String
     /// Greedy: same transcript, same answer, so the CLI harness measures the
-    /// prompt and not the dice.
+    /// prompt and not the dice. The macOS 27 SDK renamed the label to
+    /// `samplingMode:` and deprecated `sampling:`; the macOS 26 SDK, which CI
+    /// builds with, has only `sampling:`. Both run on macOS 26.
+    #if compiler(>=6.4)
     public var options = GenerationOptions(samplingMode: .greedy)
+    #else
+    public var options = GenerationOptions(sampling: .greedy)
+    #endif
     /// Wall-clock budget for one call. Past it the call is abandoned and
     /// `respond` throws `.timedOut`.
     public var timeout: Duration
