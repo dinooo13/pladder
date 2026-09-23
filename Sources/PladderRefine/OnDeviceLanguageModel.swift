@@ -29,7 +29,7 @@ public enum OnDeviceModelError: Error, Sendable, Equatable {
 ///   always runs in a detached task and the caller only awaits its value.
 /// - The system model serialises requests, so a call abandoned at the
 ///   timeout blocks the next one. It is parked and the next call drains it
-///   before it starts.
+///   before it starts, within that call's own budget.
 /// - Sessions carry a transcript: one session per exchange, then dropped,
 ///   so nothing leaks from one dictation into the next.
 /// - Greedy sampling: the same prompt gives the same answer, so a harness
@@ -37,8 +37,14 @@ public enum OnDeviceModelError: Error, Sendable, Equatable {
 public struct OnDeviceLanguageModel: Sendable {
     public let instructions: String
     /// Greedy: same transcript, same answer, so the CLI harness measures the
-    /// prompt and not the dice.
+    /// prompt and not the dice. The macOS 27 SDK renamed the label to
+    /// `samplingMode:` and deprecated `sampling:`; the macOS 26 SDK, which CI
+    /// builds with, has only `sampling:`. Both run on macOS 26.
+    #if compiler(>=6.4)
     public var options = GenerationOptions(samplingMode: .greedy)
+    #else
+    public var options = GenerationOptions(sampling: .greedy)
+    #endif
     /// Wall-clock budget for one call. Past it the call is abandoned and
     /// `respond` throws `.timedOut`.
     public var timeout: Duration
@@ -112,13 +118,16 @@ public struct OnDeviceLanguageModel: Sendable {
     /// model call that ignores cancellation would still hold the paste. A
     /// one-shot `AsyncStream` lets the loser be abandoned. Both tasks are
     /// detached so neither inherits the caller's actor.
+    ///
+    /// The drain of an abandoned call runs inside the budget, not before it:
+    /// a call that never comes back would otherwise hold every later paste
+    /// with no limit at all.
     private func race<Value: Sendable>(
         _ work: @escaping @Sendable () async throws -> Value
     ) async throws -> Value {
-        await Self.drain()
-
         let (stream, continuation) = AsyncStream<Attempt<Value>>.makeStream()
         let call = Task.detached(priority: .userInitiated) {
+            await Self.drain()
             do {
                 continuation.yield(.value(try await work()))
             } catch {
