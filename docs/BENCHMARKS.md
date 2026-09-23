@@ -38,9 +38,9 @@ them.
 | 10s | 10 s | One encoder pass. FluidAudio's encoder window is 15 s. |
 | 30s | 30 s | Chunked path: 15 s windows with 2 s overlap, up to four decoded concurrently. |
 | 60s | 60 s | Chunked path. |
-| 2m | 2 min | The app's recording cap. |
-| 5m | 5 min | Beyond the cap, CLI only. Bounds the extreme case. |
-| 10m | 10 min | Beyond the cap, CLI only. Heats the chip, so it runs last. |
+| 2m | 2 min | A long dictation. |
+| 5m | 5 min | A very long dictation. |
+| 10m | 10 min | The app's recording cap. Heats the chip, so it runs last. |
 
 30 s through 10 min show whether engine time grows linearly with chunk count
 and whether accuracy degrades at chunk seams, which FluidAudio's own notes

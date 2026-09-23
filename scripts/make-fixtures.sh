@@ -10,8 +10,8 @@
 #   VOICE=<name>   say voice, default Samantha (en_US, ships with macOS)
 #   RATE=<wpm>     speaking rate, default 175
 #
-# Lengths: 10 s (one encoder window), 30 s, 60 s, 2 min (the app's recording
-# cap), 5 min and 10 min (beyond the cap, CLI only). The script is read in
+# Lengths: 10 s (one encoder window), 30 s, 60 s, 2 min, 5 min and 10 min (the
+# app's recording cap). The script is read in
 # sentence order, wrapping around for the long fixtures, until the estimated
 # duration reaches the target, so each file is a whole number of sentences.
 set -euo pipefail

@@ -150,7 +150,7 @@ Option+Space is Alfred's default hotkey and a common Raycast choice, and it type
 Yes. Press the send key, Right Option by default, at any point while you hold the push-to-talk key, and Return is pressed after the text is pasted. That sends a chat message or runs a terminal command without touching the keyboard again. The send key can be changed in Settings, like the push-to-talk key.
 
 **What about long dictations?**
-Recordings stop at 120 seconds, so a lost key-up never leaves the microphone on. Audio longer than 15 seconds is transcribed in overlapping windows.
+Recordings stop at 10 minutes, so a lost key-up never leaves the microphone on. Audio longer than 15 seconds is transcribed in overlapping windows.
 
 ## Contributing
 

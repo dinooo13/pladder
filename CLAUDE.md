@@ -47,7 +47,7 @@ swift run -c release pladder-cli bench bench/fixtures --paced     # feed at real
 | Post-processing | Filler remover, dictionary replacer, fuzzy custom-word corrector, whitespace normaliser, in that order | No latency, no network. The Apple Intelligence cleanup step was removed because it sat on the critical path without anyone measuring what it cost |
 | Mute while dictating | Off by default; `kAudioDevicePropertyMute` on the default output device 200 ms into a recording, restored off the release path | Music or a call otherwise goes into the microphone. The delay means a tap-and-release never toggles anything; a device the user had already muted is left alone, and the device that was muted is the one unmuted even if the default changed meanwhile |
 | UI language | Follows the macOS system language; no setting | String Catalogs (`Localizable.xcstrings` in the app, `KeyNames.xcstrings` in `PladderSystem`) are compiled by `swift build`; `bundle.sh` merges their `.lproj` folders into `Pladder.app/Contents/Resources`, so `Bundle.main` serves them and no code names a bundle. `swift run` shows English. Core and Engines emit enum cases; the app turns them into text. German first; more languages are catalog contributions |
-| Recording cap | 120 s | Keeps the microphone from staying on when a key-up is lost |
+| Recording cap | 10 min | Keeps the microphone from staying on when a key-up is lost |
 | Benchmark | A script run by hand, not a test | A benchmark that fails on noise gets ignored |
 
 ## Pluggability rules
@@ -66,7 +66,7 @@ swift run -c release pladder-cli bench bench/fixtures --paced     # feed at real
 - **Long recordings.** FluidAudio's encoder window is 15 s. Longer audio is split into windows and stitched, and seams can drop or duplicate words. Those windows now run while the key is held rather than at release, so the wait is flat with length, but the seam risk is unchanged: it is the same layout and the same merge. The paced benchmark guards it by requiring the text to be byte-identical to transcribing the whole recording at once, and the 30 s to 10 min fixtures watch the word error rate.
 - **Clipboard clobbering.** Output saves the pasteboard, pastes, and restores it after a short delay.
 - **Permissions.** Accessibility and Microphone grants are keyed to the code signature. `bundle.sh` signs with an Apple Development or Developer ID certificate when one is in the keychain; an ad-hoc signature changes on every build and resets both grants.
-- **Lost key-up.** When the 120 s watchdog fires, the coordinator transcribes and pastes as if the user had released. Discarding is probably the right behaviour; tracked separately.
+- **Lost key-up.** When the 10 min watchdog fires, the coordinator transcribes and pastes as if the user had released. Discarding is probably the right behaviour; tracked separately.
 
 ## Working on this Mac while Pladder is in use
 
