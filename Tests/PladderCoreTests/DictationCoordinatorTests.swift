@@ -1333,6 +1333,35 @@ final class EventLog: @unchecked Sendable {
         #expect(Array(fake.lastChords.keys) == [.dictate])
     }
 
+    @Test func polishChordEqualToTheToggleChordIsNotRegistered() async {
+        let fake = FakeHotkey()
+        var settings = Self.settings()
+        settings.toggleHotkey = Self.polishChord
+        let (c, _, _) = makeCoordinator(settings: settings, hotkeyMonitor: fake)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        #expect(fake.lastChords == [.dictate: .optionSpace, .toggle: Self.polishChord])
+    }
+
+    @Test func polishKeyIsHeldNotLatchedBesideAToggleKey() async {
+        let fake = FakeHotkey()
+        let refiner = FakeRefiner()
+        var settings = Self.settings()
+        settings.toggleHotkey = Hotkey(0x3B, 0x3A, 0x31)
+        let (c, output, _) = makeCoordinator(
+            engineText: Self.sentence, settings: settings, hotkeyMonitor: fake, refiner: refiner)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        fake.press(.polish)
+        #expect(await waitUntil { c.state.isRecording })
+        try? await Task.sleep(for: .milliseconds(350))
+        // A short press: the toggle key would latch here, the polish key stops.
+        fake.release(.polish)
+        #expect(await waitUntil { output.inserted.count == 1 })
+        #expect(refiner.calls == [Self.sentence])
+        #expect(!c.isLatched)
+    }
+
     @Test func polishChordChangeRestartsTheMonitor() async {
         let fake = FakeHotkey()
         let (c, output, capture) = makeCoordinator(hotkeyMonitor: fake)
