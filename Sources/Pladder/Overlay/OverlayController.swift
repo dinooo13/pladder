@@ -182,7 +182,12 @@ final class OverlayController {
             // and an error fade in place.
             cancelSpinner()
             guard visible else { return }
-            scheduleHide(after: .zero, flight: model.state == .copied)
+            // The clipboard hint collapses into the disc and dives; so does a
+            // polished dictation's pill, which is a recording pill held up
+            // across the model pass. The spinner and an error fade in place.
+            scheduleHide(
+                after: .zero,
+                flight: model.state == .copied || model.state == .polishing)
         }
     }
 
