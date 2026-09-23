@@ -79,8 +79,6 @@ final class OverlayController {
             // Read so a new partial re-arms this too: between two passes the
             // state stays `.recording` and nothing else would fire.
             _ = coordinator.partialTranscript
-            // A latch changes nothing else: the state stays `.recording`.
-            _ = coordinator.isLatched
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self, self.running else { return }
@@ -105,7 +103,6 @@ final class OverlayController {
             }
             model.state = state
             model.partialTranscript = coordinator.partialTranscript
-            model.latched = coordinator.isLatched
             cancelHide()
             schedulePresent()
         case .transcribing:
@@ -272,7 +269,6 @@ final class OverlayController {
             self.model.presentation = .hidden
             self.model.state = .idle
             self.model.partialTranscript = nil
-            self.model.latched = false
         }
     }
 }

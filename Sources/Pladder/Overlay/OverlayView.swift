@@ -27,10 +27,6 @@ final class OverlayModel {
     /// What the engine has heard so far, for the Live Transcript style. Nil in
     /// every other style, and nil again the moment the key is released.
     var partialTranscript: String?
-    /// The chord was let go and the microphone is still on: a toggle press or
-    /// a hybrid tap. The red dot squares off into a stop sign so the user can
-    /// tell a latched recording from a held one.
-    var latched = false
     init() {}
 }
 
@@ -135,8 +131,7 @@ struct OverlayView: View {
             glass: model.glass,
             partial: model.partialTranscript,
             presentation: model.presentation,
-            animationSpeed: model.speed,
-            latched: model.latched
+            animationSpeed: model.speed
         )
             // Glass carries its own edge highlight; this is only enough shadow
             // to lift the pill off a light desktop. The flat background gets
@@ -174,9 +169,6 @@ struct OverlayPill: View {
     /// expanding out of it. Settings replicas never fly, so they keep the
     /// default.
     var animationSpeed: OverlayAnimationSpeed = .quick
-    /// A latched recording: the dot is drawn as a stop square. Settings
-    /// replicas keep the default.
-    var latched = false
 
     @Namespace private var glassNamespace
     /// Minimal shows a pulsing dot for the first 0.7 s, then the bars.
@@ -289,7 +281,7 @@ struct OverlayPill: View {
         switch state {
         case .recording(let level):
             HStack(spacing: 10) {
-                RecordingDot(latched: latched)
+                RecordingDot()
                 LevelBars(level: level, count: 14, maxHeight: 32, opacity: 1, seeded: isPreview)
             }
         case .transcribing:
@@ -349,7 +341,7 @@ struct OverlayPill: View {
         switch state {
         case .recording(let level):
             HStack(spacing: 10) {
-                RecordingDot(latched: latched)
+                RecordingDot()
                 LevelBars(level: level, count: 8, maxHeight: 24, opacity: 1, seeded: isPreview)
                 LiveTranscriptText(
                     text: partial ?? "",
@@ -397,17 +389,7 @@ struct OverlayPill: View {
         switch state {
         case .recording(let level):
             ZStack {
-                if latched {
-                    // The square and a narrower wave side by side: the disc
-                    // still shows the level, and the square says the
-                    // microphone stays on without the key. 8 + 6 + 21 pt fits
-                    // the 44 pt disc.
-                    HStack(spacing: 6) {
-                        RecordingDot(latched: true)
-                        LevelBars(level: level, count: 4, maxHeight: 20, opacity: 0.8, seeded: isPreview)
-                    }
-                    .transition(.opacity)
-                } else if showsDot {
+                if showsDot {
                     // The pulse is Minimal's own start-of-take cue. A row
                     // style flying in keeps the dot at the row's size, so
                     // the dot it hands over to on arrival is the same dot.
@@ -530,20 +512,14 @@ struct LiveTranscriptText: View {
 }
 
 /// The red "live" dot, shared by Compact, Minimal and the settings replicas.
-/// Latched, it squares off into a stop sign: the recording carries on until
-/// the next press.
 struct RecordingDot: View {
     var size: CGFloat = 8
-    var latched = false
 
     var body: some View {
-        // One shape whose corners animate: a square with half-size corners is
-        // the circle, so the dot morphs rather than swaps.
-        RoundedRectangle(cornerRadius: latched ? 2 : size / 2, style: .continuous)
+        Circle()
             .fill(.red)
             .frame(width: size, height: size)
             .shadow(color: .red.opacity(0.6), radius: 4)
-            .animation(.smooth(duration: 0.2), value: latched)
     }
 }
 
