@@ -1,3 +1,4 @@
+import AppKit
 import ApplicationServices
 import Foundation
 import PladderCore
@@ -121,7 +122,12 @@ public final class AXPasteObserver: PastedTextObserver, @unchecked Sendable {
     private func focusedTextElement() -> Target? {
         let system = AXUIElementCreateSystemWide()
         AXUIElementSetMessagingTimeout(system, messagingTimeout)
-        guard let app = Reader.element(system, "AXFocusedApplication") else {
+        // The system-wide focused application comes back empty now and
+        // then, seen live with Safari frontmost; the workspace's frontmost
+        // app is the same answer by another route.
+        guard let app = Reader.element(system, "AXFocusedApplication")
+            ?? NSWorkspace.shared.frontmostApplication.map({ AXUIElementCreateApplication($0.processIdentifier) })
+        else {
             Self.log.info("no focused application")
             return nil
         }
