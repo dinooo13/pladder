@@ -20,7 +20,7 @@ This compiles a release build, wraps it into `Pladder.app`, signs it, copies it 
 ## First launch
 
 1. **Grant Microphone** when macOS asks. That is what records your voice.
-2. **Grant Accessibility** when prompted. System Settings opens on the Accessibility list; switch Pladder on. That is what lets Pladder see the push-to-talk key in other apps and paste the result. It does not need Input Monitoring.
+2. **Grant Accessibility** when prompted. System Settings opens on the Accessibility list; switch Pladder on. That is what lets Pladder see the push-to-talk key in other apps, paste the result, and notice when you correct a word it got wrong. It does not need Input Monitoring.
 
    On a standard (non-administrator) account, ticking that box asks for an administrator password, so ask an admin to do it once — the grant is keyed to the app's code signature and survives updates. Without it Pladder still works in a reduced form: Option+Space works the same, any combination with a regular key can be recorded in Settings (a modifier-only key such as Right Command needs Accessibility, and Option+Space stands in for it until then), and the transcript is left on the clipboard for you to paste with ⌘V. Managed Macs can pre-approve Accessibility for Pladder with an MDM Privacy Preferences Policy Control (PPPC) profile, which needs no prompt at all.
 
@@ -112,7 +112,10 @@ Pladder pastes into whatever has keyboard focus when the key is released. Click 
 A push-to-talk key without a modifier is swallowed system wide while Pladder runs, so a bare letter or Space would become untypeable. Settings warns about this; use a modifier or a chord.
 
 **Where are the settings?**
-`~/Library/Application Support/Pladder/settings.json`, plain JSON. The dictionary can also be imported and exported from the Dictionary tab.
+`~/Library/Application Support/Pladder/settings.json`, plain JSON. The dictionary can also be imported and exported from the Dictionary tab. Corrections you answered Dismiss to are kept beside it in `dismissed-corrections.json`; delete that file to be asked about them again.
+
+**A word I corrected is never proposed.**
+Proposals need Accessibility and Apple Intelligence, and appear in the menu bar menu up to a minute after the dictation, or as soon as you click away from the field. Only a word or two changed into something that sounds alike is proposed; a change of case, a rewording or an edit next to the dictation is not. Terminals, and apps such as Claude Code that run in one, show a screen rather than a text field, so nothing is learned there.
 
 **How do I see the release-to-paste time?**
 Every dictation logs one line:
