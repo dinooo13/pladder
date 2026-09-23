@@ -51,6 +51,16 @@
         }
       }
     },
+    "Add": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hinzufügen"
+          }
+        }
+      }
+    },
     "Add a rule": {
       "localizations": {
         "de": {
@@ -281,6 +291,16 @@
         }
       }
     },
+    "Dismiss": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verwerfen"
+          }
+        }
+      }
+    },
     "Download failed: %@ (Retry resumes it)": {
       "localizations": {
         "de": {
@@ -497,6 +517,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bei der Anmeldung öffnen"
+          }
+        }
+      }
+    },
+    "Learned “%@” → “%@”?": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "„%1$@“ → „%2$@“ ins Wörterbuch?"
           }
         }
       }

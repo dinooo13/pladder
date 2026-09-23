@@ -66,6 +66,20 @@ private struct MenuContent: View {
             }
         }
 
+        // A correction the user made by hand after a paste, which the
+        // on-device model agreed is a reusable spelling. A menu line rather
+        // than an overlay toast: the pill is click-through by construction,
+        // and a proposal arriving a minute later should wait, not interrupt.
+        if !model.proposals.isEmpty {
+            Divider()
+            ForEach(model.proposals) { proposal in
+                Menu("Learned “\(proposal.pair.heard)” → “\(proposal.pair.corrected)”?") {
+                    Button("Add") { model.acceptProposal(proposal) }
+                    Button("Dismiss") { model.dismissProposal(proposal) }
+                }
+            }
+        }
+
         Divider()
 
         Button("Settings…") {
