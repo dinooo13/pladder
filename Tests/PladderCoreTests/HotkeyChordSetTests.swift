@@ -15,10 +15,10 @@ private func event(_ role: HotkeyRole, _ event: HotkeyEvent) -> HotkeyMonitorEve
 
 @Suite struct HotkeyChordSetTests {
     @Test func eachChordReportsItsOwnRole() {
-        var set = HotkeyChordSet(chords: [.dictate: .optionSpace, .polish: Hotkey(leftControl, space)])
+        var set = HotkeyChordSet(chords: [.dictate: .optionSpace, .toggle: Hotkey(leftControl, space)])
         #expect(set.flagsChanged(modifiers: [leftControl]) == .init())
-        #expect(set.keyDown(space, modifiers: [leftControl]) == .init(events: [event(.polish, .pressed)], swallow: true))
-        #expect(set.keyUp(space, modifiers: [leftControl]) == .init(events: [event(.polish, .released(submit: false))], swallow: true))
+        #expect(set.keyDown(space, modifiers: [leftControl]) == .init(events: [event(.toggle, .pressed)], swallow: true))
+        #expect(set.keyUp(space, modifiers: [leftControl]) == .init(events: [event(.toggle, .released(submit: false))], swallow: true))
         #expect(set.flagsChanged(modifiers: []) == .init())
 
         #expect(set.flagsChanged(modifiers: [leftOption]) == .init())
@@ -28,7 +28,7 @@ private func event(_ role: HotkeyRole, _ event: HotkeyEvent) -> HotkeyMonitorEve
 
     @Test func swallowIsTheUnionOfTheTrackers() {
         // Only the polish tracker swallows the Space; the set still drops it.
-        var set = HotkeyChordSet(chords: [.dictate: .rightCommand, .polish: Hotkey(leftControl, space)])
+        var set = HotkeyChordSet(chords: [.dictate: .rightCommand, .toggle: Hotkey(leftControl, space)])
         #expect(set.flagsChanged(modifiers: [leftControl]) == .init())
         #expect(set.keyDown(space, modifiers: [leftControl]).swallow)
         #expect(set.keyUp(space, modifiers: [leftControl]).swallow)
@@ -37,7 +37,7 @@ private func event(_ role: HotkeyRole, _ event: HotkeyEvent) -> HotkeyMonitorEve
     }
 
     @Test func anEmptyChordIsIgnored() {
-        var set = HotkeyChordSet(chords: [.dictate: .optionSpace, .polish: Hotkey(keyCodes: [])])
+        var set = HotkeyChordSet(chords: [.dictate: .optionSpace, .toggle: Hotkey(keyCodes: [])])
         var single = HotkeyChordTracker(hotkey: .optionSpace)
         #expect(set.flagsChanged(modifiers: [leftOption]) == .init())
         #expect(single.flagsChanged(modifiers: [leftOption]) == .init())
@@ -50,32 +50,32 @@ private func event(_ role: HotkeyRole, _ event: HotkeyEvent) -> HotkeyMonitorEve
 
     @Test func nestedChordsHandOverBetweenRoles() {
         let start = ContinuousClock.now
-        var set = HotkeyChordSet(chords: [.dictate: .rightCommand, .polish: Hotkey(rightCommand, rightOption)])
+        var set = HotkeyChordSet(chords: [.dictate: .rightCommand, .toggle: Hotkey(rightCommand, rightOption)])
         #expect(set.flagsChanged(modifiers: [rightCommand], at: start) == .init(events: [event(.dictate, .pressed)]))
         // Right Option inside the window: the lone Right Command was the
         // start of the longer chord, not a dictation.
         #expect(
             set.flagsChanged(modifiers: [rightCommand, rightOption], at: start + .milliseconds(100))
-                == .init(events: [event(.dictate, .cancelled), event(.polish, .pressed)])
+                == .init(events: [event(.dictate, .cancelled), event(.toggle, .pressed)])
         )
         #expect(
             set.flagsChanged(modifiers: [], at: start + .seconds(3))
-                == .init(events: [event(.polish, .released(submit: false))])
+                == .init(events: [event(.toggle, .released(submit: false))])
         )
     }
 
     @Test func resetReleasesEveryEngagedChord() {
-        var set = HotkeyChordSet(chords: [.dictate: .rightCommand, .polish: Hotkey(leftControl, space)])
+        var set = HotkeyChordSet(chords: [.dictate: .rightCommand, .toggle: Hotkey(leftControl, space)])
         _ = set.flagsChanged(modifiers: [leftControl])
         _ = set.keyDown(space, modifiers: [leftControl])
-        #expect(set.reset() == [event(.polish, .released(submit: false))])
+        #expect(set.reset() == [event(.toggle, .released(submit: false))])
         // Nothing is engaged after a reset.
         #expect(set.reset() == [])
     }
 
     @Test func theSubmitKeyArmsEitherChord() {
         var set = HotkeyChordSet(
-            chords: [.dictate: .rightCommand, .polish: Hotkey(leftControl, space)],
+            chords: [.dictate: .rightCommand, .toggle: Hotkey(leftControl, space)],
             submitKey: Hotkey(returnKey))
         _ = set.flagsChanged(modifiers: [rightCommand])
         #expect(set.keyDown(returnKey, modifiers: [rightCommand]).swallow)
@@ -86,15 +86,15 @@ private func event(_ role: HotkeyRole, _ event: HotkeyEvent) -> HotkeyMonitorEve
         _ = set.keyDown(space, modifiers: [leftControl])
         #expect(set.keyDown(returnKey, modifiers: [leftControl]).swallow)
         _ = set.keyUp(returnKey, modifiers: [leftControl])
-        #expect(set.keyUp(space, modifiers: [leftControl]).events == [event(.polish, .released(submit: true))])
+        #expect(set.keyUp(space, modifiers: [leftControl]).events == [event(.toggle, .released(submit: true))])
     }
 
     @Test func eventsComeInRoleOrder() {
         // Built in the other order; the events still come out dictate first.
         let start = ContinuousClock.now
-        var set = HotkeyChordSet(chords: [.polish: Hotkey(rightCommand, rightOption), .dictate: .rightCommand])
+        var set = HotkeyChordSet(chords: [.toggle: Hotkey(rightCommand, rightOption), .dictate: .rightCommand])
         _ = set.flagsChanged(modifiers: [rightCommand], at: start)
         let handOver = set.flagsChanged(modifiers: [rightCommand, rightOption], at: start + .milliseconds(10))
-        #expect(handOver.events.map(\.role) == [.dictate, .polish])
+        #expect(handOver.events.map(\.role) == [.dictate, .toggle])
     }
 }

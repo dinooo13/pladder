@@ -116,25 +116,7 @@ private struct GeneralSettingsView: View {
                         allowsEmpty: true
                     )
                 }
-                if let warning = submitKeyWarning {
-                    Label(warning, systemImage: "exclamationmark.triangle")
-                        .font(.callout)
-                        .foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                // The polish hotkey's one row. It stays when Apple
-                // Intelligence is off, so the chord can be recorded before it
-                // is turned on; the warning says what the key does meanwhile.
-                LabeledContent("Dictate and polish") {
-                    HotkeyRecorderField(
-                        hotkey: $model.settings.polishHotkey,
-                        onRecordingChanged: { model.coordinator.isHotkeySuspended = $0 },
-                        requiresRegularKey: model.hotkeyNeedsRegularKey,
-                        allowsEmpty: true,
-                        systemShortcuts: model.systemShortcuts
-                    )
-                }
-                if let warning = polishKeyWarning {
+                 if let warning = submitKeyWarning {
                     Label(warning, systemImage: "exclamationmark.triangle")
                         .font(.callout)
                         .foregroundStyle(.orange)
@@ -148,7 +130,6 @@ private struct GeneralSettingsView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     FootnoteText("Hold to record, release to insert. Press the send key while recording and Return is pressed after the text. Click a field and press any key combination to assign it.")
                     FootnoteText("Tap the toggle key to start recording and tap it again to insert. Set it to the same combination as the key and a short tap toggles while a hold still works as before. Escape discards a recording. Delete clears a field.")
-                    FootnoteText("Hold the Dictate and polish key instead and Apple Intelligence cleans up the transcript on this Mac before it is pasted: self-corrections, spoken punctuation and numbers, lists. That takes a second or two.")
                 }
             }
 
@@ -320,34 +301,6 @@ private struct GeneralSettingsView: View {
         return String(localized: "\(submitKey.displayName) is part of the push-to-talk key, so it can never be pressed separately.")
     }
 
-    /// In order: nothing to say while the key is off; the push-to-talk
-    /// chord itself is never registered twice, so it would never polish;
-    /// Apple Intelligence cannot run, so the key pastes the text as dictated;
-    /// macOS owns the chord; Carbon cannot register it without
-    /// Accessibility, and there is no stand-in for this key; and the same
-    /// warning as the push-to-talk key for a chord without a modifier.
-    private var polishKeyWarning: String? {
-        let polish = model.settings.polishHotkey
-        guard !polish.isEmpty else { return nil }
-        if polish == (model.standInHotkey ?? model.settings.hotkey) {
-            return String(localized: "\(polish.displayName) is also the push-to-talk key, so it never polishes. Record a different combination.")
-        }
-        if polish.canonical == model.settings.toggleHotkey.canonical {
-            return String(localized: "\(polish.displayName) is also the toggle key, so it never polishes. Record a different combination.")
-        }
-        if let reason = model.polishAvailability.polishKeyText {
-            return reason
-        }
-        if let owner = model.systemShortcutConflict(for: polish) {
-            return conflictWarning(owner: owner, chord: polish)
-        }
-        if !model.accessibilityTrusted, !polish.canBeRegisteredWithoutAccessibility {
-            return String(localized: "Without Accessibility, \(polish.displayName) cannot be detected, so this key is off until Accessibility is granted.")
-        }
-        guard polish.modifierKeyCodes.isEmpty else { return nil }
-        return String(localized: "Without a modifier, \(polish.displayName) can no longer be typed in other apps while Pladder is running.")
-    }
-
     private var launchAtLogin: Binding<Bool> {
         Binding(
             get: { LaunchAtLogin.isEnabled },
@@ -395,6 +348,20 @@ private struct ProcessingSettingsView: View {
                 Text("Output")
             } footer: {
                 FootnoteText("Separates consecutive dictations so pasted runs stay readable.")
+            }
+
+            Section {
+                Toggle("Polish dictations", isOn: $model.settings.polishDictations)
+                if let warning = model.polishAvailability.polishKeyText {
+                    Label(warning, systemImage: "exclamationmark.triangle")
+                        .font(.callout)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } header: {
+                Text("Experimental")
+            } footer: {
+                FootnoteText("Before the text is pasted, Apple Intelligence cleans it up on this Mac: self-corrections, spoken punctuation and numbers, lists. This adds a second or two to every dictation, and anything the model cannot fix is pasted as dictated.")
             }
         }
         .formStyle(.grouped)

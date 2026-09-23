@@ -12,7 +12,7 @@ struct PolishedTranscript {
     var cleanedText: String
 }
 
-/// The polish hotkey's refiner: the cleanup prompt on `OnDeviceLanguageModel`.
+/// The polish toggle's refiner: the cleanup prompt on `OnDeviceLanguageModel`.
 ///
 /// Best effort throughout. Unavailable, refused, timed out, empty: `refine`
 /// returns nil and the coordinator pastes the text as dictated. An actor for

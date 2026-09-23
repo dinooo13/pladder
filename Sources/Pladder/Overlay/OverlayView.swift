@@ -293,7 +293,7 @@ struct OverlayPill: View {
                     .foregroundStyle(.primary)
             }
         case .polishing:
-            // Only a dictation started with the polish key gets here, and it
+            // Only a dictation on its way to the refiner gets here, and it
             // waits seconds rather than milliseconds, so the pill says why.
             HStack(spacing: 10) {
                 ProgressView()

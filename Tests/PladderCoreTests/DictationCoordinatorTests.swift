@@ -1153,21 +1153,20 @@ final class EventLog: @unchecked Sendable {
     }
 }
 
-// MARK: - Polish hotkey
+// MARK: - Polish toggle
 
 @MainActor
-@Suite struct PolishHotkeyTests {
+@Suite struct PolishToggleTests {
     /// Long enough to clear `minimumPolishWords`.
     private static let sentence = "send it on Friday please"
-    private static let polishChord = Hotkey(0x3B, 0x31)
 
-    private static func settings(polish: Hotkey = polishChord) -> Settings {
+    private static func settings(polish: Bool = true) -> Settings {
         var s = Settings(engineID: EchoEngine.engineID)
-        s.polishHotkey = polish
+        s.polishDictations = polish
         return s
     }
 
-    @Test func polishHotkeyRoutesThroughTheRefiner() async {
+    @Test func polishRoutesThroughTheRefiner() async {
         let refiner = FakeRefiner()
         let events = EventLog()
         let hotkey = FakeHotkey()
@@ -1176,9 +1175,9 @@ final class EventLog: @unchecked Sendable {
             hotkeyMonitor: hotkey, refiner: refiner, events: events)
         c.start()
         #expect(await waitUntil { c.state == .idle })
-        hotkey.press(.polish)
+        hotkey.press()
         #expect(await waitUntil { c.state.isRecording })
-        hotkey.release(.polish)
+        hotkey.release()
         #expect(await waitUntil { c.inFlight != nil })
         await c.inFlight?.value
         #expect(output.inserted == ["polished "])
@@ -1192,7 +1191,7 @@ final class EventLog: @unchecked Sendable {
         let events = EventLog()
         let hotkey = FakeHotkey()
         let (c, output, _) = makeCoordinator(
-            engineText: Self.sentence, settings: Self.settings(),
+            engineText: Self.sentence, settings: Self.settings(polish: false),
             hotkeyMonitor: hotkey, refiner: refiner, events: events)
         c.start()
         #expect(await waitUntil { c.state == .idle })
@@ -1214,7 +1213,7 @@ final class EventLog: @unchecked Sendable {
         let (c, output, _) = makeCoordinator(engineText: "", settings: Self.settings(), refiner: refiner)
         c.start()
         #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed(role: .polish)
+        await c.hotkeyPressed()
         c.hotkeyReleased()
         await c.inFlight?.value
         #expect(output.inserted.isEmpty)
@@ -1229,7 +1228,7 @@ final class EventLog: @unchecked Sendable {
             engineText: "one two three", settings: Self.settings(), refiner: refiner, events: events)
         c.start()
         #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed(role: .polish)
+        await c.hotkeyPressed()
         c.hotkeyReleased()
         await c.inFlight?.value
         #expect(output.inserted == ["one two three "])
@@ -1243,7 +1242,7 @@ final class EventLog: @unchecked Sendable {
             engineText: "one two three four", settings: Self.settings(), refiner: refiner)
         c.start()
         #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed(role: .polish)
+        await c.hotkeyPressed()
         c.hotkeyReleased()
         await c.inFlight?.value
         #expect(refiner.calls == ["one two three four"])
@@ -1258,7 +1257,7 @@ final class EventLog: @unchecked Sendable {
             engineText: Self.sentence, settings: Self.settings(), refiner: refiner, events: events)
         c.start()
         #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed(role: .polish)
+        await c.hotkeyPressed()
         c.hotkeyReleased()
         await c.inFlight?.value
         #expect(refiner.calls == [Self.sentence])
@@ -1271,22 +1270,22 @@ final class EventLog: @unchecked Sendable {
         #expect(c.state == .idle)
     }
 
-    @Test func withoutARefinerThePolishKeyIsAPlainDictation() async {
+    @Test func withoutARefinerPolishIsAPlainDictation() async {
         let (c, output, _) = makeCoordinator(engineText: Self.sentence, settings: Self.settings())
         c.start()
         #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed(role: .polish)
+        await c.hotkeyPressed()
         c.hotkeyReleased()
         await c.inFlight?.value
         #expect(output.inserted == [Self.sentence + " "])
     }
 
-    @Test func polishPressWarmsTheRefiner() async {
+    @Test func polishSettingWarmsTheRefiner() async {
         let refiner = FakeRefiner()
         let (c, _, _) = makeCoordinator(engineText: Self.sentence, settings: Self.settings(), refiner: refiner)
         c.start()
         #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed(role: .polish)
+        await c.hotkeyPressed()
         #expect(await waitUntil { refiner.prepareCount == 1 })
         #expect(c.state.isRecording)
         #expect(refiner.calls.isEmpty)
@@ -1297,7 +1296,7 @@ final class EventLog: @unchecked Sendable {
         let (c, output, _) = makeCoordinator(engineText: Self.sentence, settings: Self.settings(), refiner: refiner)
         c.start()
         #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed(role: .polish)
+        await c.hotkeyPressed()
         #expect(c.willPolish)
         c.hotkeyReleased()
         #expect(await waitUntil { c.state == .polishing })
@@ -1309,99 +1308,42 @@ final class EventLog: @unchecked Sendable {
         #expect(output.inserted == ["polished "])
     }
 
-    @Test func polishChordIsHandedToTheMonitor() async {
-        let fake = FakeHotkey()
-        let (c, _, _) = makeCoordinator(settings: Self.settings(), hotkeyMonitor: fake)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        #expect(fake.lastChords == [.dictate: .optionSpace, .polish: Self.polishChord])
-    }
-
-    @Test func emptyPolishChordIsNotRegistered() async {
-        let fake = FakeHotkey()
-        let (c, _, _) = makeCoordinator(hotkeyMonitor: fake)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        #expect(Array(fake.lastChords.keys) == [.dictate])
-    }
-
-    @Test func polishChordEqualToTheDictateChordIsNotRegistered() async {
-        let fake = FakeHotkey()
-        let (c, _, _) = makeCoordinator(settings: Self.settings(polish: .optionSpace), hotkeyMonitor: fake)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        #expect(Array(fake.lastChords.keys) == [.dictate])
-    }
-
-    @Test func polishChordEqualToTheToggleChordIsNotRegistered() async {
+    @Test func aSecondChordIsStillRegisteredWhenPolishIsAToggle() async {
         let fake = FakeHotkey()
         var settings = Self.settings()
-        settings.toggleHotkey = Self.polishChord
+        settings.toggleHotkey = Hotkey(0x3B, 0x3A, 0x31)
         let (c, _, _) = makeCoordinator(settings: settings, hotkeyMonitor: fake)
         c.start()
         #expect(await waitUntil { c.state == .idle })
-        #expect(fake.lastChords == [.dictate: .optionSpace, .toggle: Self.polishChord])
-    }
-
-    @Test func polishKeyIsHeldNotLatchedBesideAToggleKey() async {
-        let fake = FakeHotkey()
-        let refiner = FakeRefiner()
-        var settings = Self.settings()
-        settings.toggleHotkey = Hotkey(0x3B, 0x3A, 0x31)
-        let (c, output, _) = makeCoordinator(
-            engineText: Self.sentence, settings: settings, hotkeyMonitor: fake, refiner: refiner)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        fake.press(.polish)
-        #expect(await waitUntil { c.state.isRecording })
-        try? await Task.sleep(for: .milliseconds(350))
-        // A short press: the toggle key would latch here, the polish key stops.
-        fake.release(.polish)
-        #expect(await waitUntil { output.inserted.count == 1 })
-        #expect(refiner.calls == [Self.sentence])
-        #expect(!c.isLatched)
-    }
-
-    @Test func polishChordChangeRestartsTheMonitor() async {
-        let fake = FakeHotkey()
-        let (c, output, capture) = makeCoordinator(hotkeyMonitor: fake)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        #expect(fake.startCount == 1)
-        await c.hotkeyPressed()
-        #expect(c.state.isRecording)
-        c.settings.polishHotkey = Self.polishChord
-        #expect(fake.startCount == 2)
-        #expect(fake.lastChords[.polish] == Self.polishChord)
-        // Dropped like a hotkey change: the restarted monitor would never
-        // deliver the pending release.
-        #expect(await waitUntil { c.state == .idle })
-        #expect(await capture.stopCount == 1)
-        #expect(output.inserted.isEmpty)
+        #expect(fake.lastChords == [.dictate: .optionSpace, .toggle: Hotkey(0x3B, 0x3A, 0x31)])
     }
 
     @Test func theOverrideAppliesOnlyToTheDictateChord() async {
         let fake = FakeHotkey()
         let standIn = Hotkey(0x3B, 0x38, 0x31)
-        let (c, _, _) = makeCoordinator(settings: Self.settings(), hotkeyMonitor: fake)
+        var settings = Self.settings()
+        settings.toggleHotkey = Hotkey(0x3B, 0x3A, 0x31)
+        let (c, _, _) = makeCoordinator(settings: settings, hotkeyMonitor: fake)
         c.hotkeyOverride = standIn
         c.start()
         #expect(await waitUntil { c.state == .idle })
         #expect(fake.lastChords[.dictate] == standIn)
-        #expect(fake.lastChords[.polish] == Self.polishChord)
+        #expect(fake.lastChords[.toggle] == Hotkey(0x3B, 0x3A, 0x31))
     }
 
     @Test func aReleaseFromTheOtherChordIsIgnored() async {
         let hotkey = FakeHotkey()
         let refiner = FakeRefiner()
+        var settings = Self.settings(polish: false)
+        settings.toggleHotkey = Hotkey(0x3B, 0x3A, 0x31)
         let (c, output, _) = makeCoordinator(
-            engineText: Self.sentence, settings: Self.settings(), hotkeyMonitor: hotkey, refiner: refiner)
+            engineText: Self.sentence, settings: settings, hotkeyMonitor: hotkey, refiner: refiner)
         c.start()
         #expect(await waitUntil { c.state == .idle })
         hotkey.press(.dictate)
         #expect(await waitUntil { c.state.isRecording })
-        hotkey.release(.polish)
-        hotkey.cancel(.polish)
+        hotkey.release(.toggle)
+        hotkey.cancel(.toggle)
         // Give the stream a moment to deliver both; neither may end the take.
         try? await Task.sleep(for: .milliseconds(50))
         #expect(c.state.isRecording)
@@ -1412,16 +1354,16 @@ final class EventLog: @unchecked Sendable {
         #expect(refiner.calls.isEmpty)
     }
 
-    @Test func cancelledPolishPressDropsTheRecording() async {
+    @Test func cancelledPolishDictationDropsTheRecording() async {
         let hotkey = FakeHotkey()
         let refiner = FakeRefiner()
         let (c, output, capture) = makeCoordinator(
             engineText: Self.sentence, settings: Self.settings(), hotkeyMonitor: hotkey, refiner: refiner)
         c.start()
         #expect(await waitUntil { c.state == .idle })
-        hotkey.press(.polish)
+        hotkey.press()
         #expect(await waitUntil { c.state.isRecording })
-        hotkey.cancel(.polish)
+        hotkey.cancel()
         #expect(await waitUntil { c.state == .idle })
         #expect(await capture.stopCount == 1)
         #expect(output.inserted.isEmpty)
@@ -1429,15 +1371,15 @@ final class EventLog: @unchecked Sendable {
         #expect(!c.willPolish)
     }
 
-    @Test func submitWorksOnThePolishPath() async {
+    @Test func submitWorksOnThePolishedPath() async {
         let hotkey = FakeHotkey()
         let (c, output, _) = makeCoordinator(
             engineText: Self.sentence, settings: Self.settings(), hotkeyMonitor: hotkey, refiner: FakeRefiner())
         c.start()
         #expect(await waitUntil { c.state == .idle })
-        hotkey.press(.polish)
+        hotkey.press()
         #expect(await waitUntil { c.state.isRecording })
-        hotkey.release(.polish, submit: true)
+        hotkey.release(submit: true)
         #expect(await waitUntil { c.inFlight != nil })
         await c.inFlight?.value
         #expect(output.inserted == ["polished "])
@@ -1448,7 +1390,7 @@ final class EventLog: @unchecked Sendable {
         let (c, _, _) = makeCoordinator(settings: Self.settings(), refiner: FakeRefiner())
         c.start()
         #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed(role: .polish)
+        await c.hotkeyPressed()
         #expect(c.willPolish)
         await c.cancelRecording()
         #expect(!c.willPolish)
@@ -1883,7 +1825,7 @@ final class EventLog: @unchecked Sendable {
         var changed = defaults
         changed.hotkey = .rightOption
         changed.submitKey = Hotkey(0x24)
-        changed.polishHotkey = Hotkey(0x3B, 0x31)
+        changed.polishDictations = true
         changed.dictionary = [DictionaryEntry(from: "a", to: "b")]
         try store.save(changed)
         #expect(store.load() == changed)
@@ -1897,12 +1839,21 @@ final class EventLog: @unchecked Sendable {
         #expect(decoded.dictionary.count == 1)
         #expect(decoded.hotkey == .optionSpace)
         #expect(decoded.submitKey == .rightOption)
-        #expect(decoded.polishHotkey.isEmpty)
+        #expect(!decoded.polishDictations)
         #expect(decoded.appendTrailingSpace == true)
         #expect(decoded.appearance == .system)
         #expect(decoded.overlayStyle == .compact)
         #expect(decoded.overlayGlass == true)
         #expect(decoded.overlayAnimationSpeed == .quick)
+    }
+
+    @Test func legacyPolishChordMigratesToTheToggle() throws {
+        let json = #"{"engineID":"echo","polishHotkey":{"keyCodes":[59,31]}}"#
+        let decoded = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
+        #expect(decoded.polishDictations)
+        // The toggle stays off over a legacy chord stored empty.
+        let off = try JSONDecoder().decode(Settings.self, from: Data(#"{"engineID":"echo","polishHotkey":{"keyCodes":[]}}"#.utf8))
+        #expect(!off.polishDictations)
     }
 
     @Test func appearancePersists() throws {

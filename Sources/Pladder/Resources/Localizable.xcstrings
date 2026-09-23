@@ -121,26 +121,6 @@
         }
       }
     },
-    "Apple Intelligence is off, so this key pastes the text as dictated. Turn it on in System Settings.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Apple Intelligence ist aus, deshalb fügt diese Taste den Text so ein, wie er diktiert wurde. Schalte es in den Systemeinstellungen ein."
-          }
-        }
-      }
-    },
-    "Apple Intelligence is unavailable, so this key pastes the text as dictated.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Apple Intelligence ist nicht verfügbar, deshalb fügt diese Taste den Text so ein, wie er diktiert wurde."
-          }
-        }
-      }
-    },
     "Applies your replacement rules. Edit them in the Dictionary tab.": {
       "localizations": {
         "de": {
@@ -281,16 +261,6 @@
         }
       }
     },
-    "Dictate and polish": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Diktieren und überarbeiten"
-          }
-        }
-      }
-    },
     "Dictionary": {
       "localizations": {
         "de": {
@@ -427,16 +397,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Gehört als"
-          }
-        }
-      }
-    },
-    "Hold the Dictate and polish key instead and Apple Intelligence cleans up the transcript on this Mac before it is pasted: self-corrections, spoken punctuation and numbers, lists. That takes a second or two.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hältst du stattdessen die Taste für Diktieren und überarbeiten, räumt Apple Intelligence das Transkript auf diesem Mac vor dem Einfügen auf: Selbstkorrekturen, gesprochene Satzzeichen und Zahlen, Listen. Das dauert ein bis zwei Sekunden."
           }
         }
       }
@@ -1171,32 +1131,12 @@
         }
       }
     },
-    "The Apple Intelligence model is still downloading, so this key pastes the text as dictated for now.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Das Modell für Apple Intelligence wird noch geladen, deshalb fügt diese Taste den Text vorerst so ein, wie er diktiert wurde."
-          }
-        }
-      }
-    },
     "The send key needs Accessibility.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
             "value": "Die Sendetaste braucht die Bedienungshilfen."
-          }
-        }
-      }
-    },
-    "This Mac cannot run Apple Intelligence, so this key pastes the text as dictated.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dieser Mac kann Apple Intelligence nicht ausführen, deshalb fügt diese Taste den Text so ein, wie er diktiert wurde."
           }
         }
       }
@@ -1417,6 +1357,76 @@
           "stringUnit": {
             "state": "translated",
             "value": "⚠️ „a“ → „b“ und „b“ → „a“ heben sich gegenseitig auf; diese Regeln werden ignoriert."
+          }
+        }
+      }
+    },
+    "Polish dictations": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diktate polieren"
+          }
+        }
+      }
+    },
+    "Experimental": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Experimentell"
+          }
+        }
+      }
+    },
+    "Apple Intelligence is off, so dictations paste as dictated. Turn it on in System Settings.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence ist aus, deshalb fügen Diktate den Text so ein, wie er diktiert wurde. Schalte es in den Systemeinstellungen ein."
+          }
+        }
+      }
+    },
+    "This Mac cannot run Apple Intelligence, so dictations paste as dictated.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieser Mac kann Apple Intelligence nicht ausführen, deshalb fügen Diktate den Text so ein, wie er diktiert wurde."
+          }
+        }
+      }
+    },
+    "The Apple Intelligence model is still downloading, so dictations paste as dictated for now.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Modell für Apple Intelligence wird noch geladen, deshalb fügen Diktate den Text vorerst so ein, wie er diktiert wurde."
+          }
+        }
+      }
+    },
+    "Apple Intelligence is unavailable, so dictations paste as dictated.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence ist nicht verfügbar, deshalb fügen Diktate den Text so ein, wie er diktiert wurde."
+          }
+        }
+      }
+    },
+    "Before the text is pasted, Apple Intelligence cleans it up on this Mac: self-corrections, spoken punctuation and numbers, lists. This adds a second or two to every dictation, and anything the model cannot fix is pasted as dictated.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bevor der Text eingefügt wird, bereinigt Apple Intelligence ihn auf diesem Mac: Selbstkorrekturen, gesprochene Satzzeichen und Zahlen, Listen. Das fügt jedem Diktat ein bis zwei Sekunden hinzu, und alles, was das Modell nicht beheben kann, wird so eingefügt, wie es diktiert wurde."
           }
         }
       }
