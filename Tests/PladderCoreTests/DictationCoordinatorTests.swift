@@ -1840,6 +1840,7 @@ final class EventLog: @unchecked Sendable {
         #expect(decoded.hotkey == .optionSpace)
         #expect(decoded.submitKey == .rightOption)
         #expect(!decoded.polishDictations)
+        #expect(decoded.polishModel == .appleIntelligence)
         #expect(decoded.appendTrailingSpace == true)
         #expect(decoded.appearance == .system)
         #expect(decoded.overlayStyle == .compact)
@@ -1854,6 +1855,21 @@ final class EventLog: @unchecked Sendable {
         // The toggle stays off over a legacy chord stored empty.
         let off = try JSONDecoder().decode(Settings.self, from: Data(#"{"engineID":"echo","polishHotkey":{"keyCodes":[]}}"#.utf8))
         #expect(!off.polishDictations)
+    }
+
+    @Test func polishModelPersists() throws {
+        var settings = Settings(engineID: EchoEngine.engineID)
+        settings.polishModel = .s1Mini8Bit
+        let decoded = try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(settings))
+        #expect(decoded.polishModel == .s1Mini8Bit)
+    }
+
+    @Test func anUnknownPolishModelFallsBackToApples() throws {
+        // Written by a newer build that knows a model this one does not.
+        let json = #"{"engineID":"echo","polishDictations":true,"polishModel":"someFutureModel"}"#
+        let decoded = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
+        #expect(decoded.polishModel == .appleIntelligence)
+        #expect(decoded.polishDictations)
     }
 
     @Test func appearancePersists() throws {

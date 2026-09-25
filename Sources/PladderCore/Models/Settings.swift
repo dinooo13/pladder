@@ -32,6 +32,18 @@ public enum OverlayAnimationSpeed: String, Codable, Sendable, CaseIterable, Equa
     }
 }
 
+/// Which model the polish runs through. Pure data; PladderRefine maps each
+/// case to a model and the app words it.
+public enum PolishModel: String, Codable, Sendable, CaseIterable, Equatable {
+    /// Apple's on-device model, part of macOS: nothing to download.
+    case appleIntelligence
+    /// S1-mini by Superwhisper at full precision (16-bit), downloaded once.
+    case s1Mini
+    /// The same model at 8-bit: about half the download and memory, and
+    /// faster, for a little accuracy (docs/BENCHMARKS.md).
+    case s1Mini8Bit
+}
+
 /// Everything the user can change. Persisted as JSON by `SettingsStore`.
 public struct Settings: Codable, Sendable, Equatable {
     public var engineID: EngineID
@@ -44,6 +56,8 @@ public struct Settings: Codable, Sendable, Equatable {
     /// Experimental and off by default: the model costs one to three seconds,
     /// so this sits on the normal hotkey's release path.
     public var polishDictations: Bool
+    /// What `polishDictations` runs the text through.
+    public var polishModel: PolishModel
     /// A chord that starts a recording on one press and ends it on the next.
     /// The same chord as `hotkey` makes that key hybrid: a tap latches, a hold
     /// stops at release. Empty, the default, turns it off.
@@ -74,6 +88,7 @@ public struct Settings: Codable, Sendable, Equatable {
         hotkey: Hotkey = .optionSpace,
         submitKey: Hotkey = .rightOption,
         polishDictations: Bool = false,
+        polishModel: PolishModel = .appleIntelligence,
         toggleHotkey: Hotkey = Hotkey(keyCodes: []),
         disabledProcessors: Set<String> = [],
         dictionary: [DictionaryEntry] = [],
@@ -90,6 +105,7 @@ public struct Settings: Codable, Sendable, Equatable {
         self.hotkey = hotkey
         self.submitKey = submitKey
         self.polishDictations = polishDictations
+        self.polishModel = polishModel
         self.toggleHotkey = toggleHotkey
         self.disabledProcessors = disabledProcessors
         self.dictionary = dictionary
@@ -106,7 +122,7 @@ public struct Settings: Codable, Sendable, Equatable {
     // Decoding tolerates missing keys so adding a field in a later version
     // never makes an existing settings file unreadable.
     private enum CodingKeys: String, CodingKey {
-        case engineID, hotkey, submitKey, polishDictations, disabledProcessors, dictionary, appendTrailingSpace, launchAtLogin, playSounds, appearance
+        case engineID, hotkey, submitKey, polishDictations, polishModel, disabledProcessors, dictionary, appendTrailingSpace, launchAtLogin, playSounds, appearance
         case overlayStyle, overlayGlass, overlayAnimationSpeed, muteOutputWhileDictating
         case toggleHotkey
         // Read once for the migration, never written.
@@ -128,6 +144,9 @@ public struct Settings: Codable, Sendable, Equatable {
         let legacyPolish = try c.decodeIfPresent(Hotkey.self, forKey: .polishHotkey) ?? Hotkey(keyCodes: [])
         polishDictations = try c.decodeIfPresent(Bool.self, forKey: .polishDictations)
             ?? (!legacyPolish.isEmpty)
+        // A model this build does not know, say from a newer version, falls
+        // back to Apple's rather than making the whole file unreadable.
+        polishModel = (try? c.decodeIfPresent(PolishModel.self, forKey: .polishModel)) ?? .appleIntelligence
         // Like the submit key, empty is meaningful: off.
         toggleHotkey = try c.decodeIfPresent(Hotkey.self, forKey: .toggleHotkey) ?? Hotkey(keyCodes: [])
         disabledProcessors = try c.decodeIfPresent(Set<String>.self, forKey: .disabledProcessors) ?? []
@@ -150,6 +169,7 @@ public struct Settings: Codable, Sendable, Equatable {
         try c.encode(hotkey, forKey: .hotkey)
         try c.encode(submitKey, forKey: .submitKey)
         try c.encode(polishDictations, forKey: .polishDictations)
+        try c.encode(polishModel, forKey: .polishModel)
         try c.encode(toggleHotkey, forKey: .toggleHotkey)
         try c.encode(disabledProcessors, forKey: .disabledProcessors)
         try c.encode(dictionary, forKey: .dictionary)

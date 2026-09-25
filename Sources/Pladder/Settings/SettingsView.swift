@@ -1,6 +1,7 @@
 import AVFoundation
 import SwiftUI
 import PladderCore
+import PladderRefine
 
 import PladderSystem
 
@@ -352,19 +353,58 @@ private struct ProcessingSettingsView: View {
 
             Section {
                 Toggle("Polish dictations", isOn: $model.settings.polishDictations)
-                if let warning = model.polishAvailability.polishKeyText {
-                    Label(warning, systemImage: "exclamationmark.triangle")
-                        .font(.callout)
-                        .foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
+                Picker("Model", selection: $model.settings.polishModel) {
+                    ForEach(PolishModel.allCases, id: \.self) { choice in
+                        Text(choice.displayName).tag(choice)
+                    }
                 }
+                polishModelStatus
             } header: {
                 Text("Experimental")
             } footer: {
-                FootnoteText("Before the text is pasted, Apple Intelligence cleans it up on this Mac: self-corrections, spoken punctuation and numbers, lists. This adds a second or two to every dictation, and anything the model cannot fix is pasted as dictated.")
+                FootnoteText("Before the text is pasted, the model cleans it up on this Mac: self-corrections, spoken punctuation, lists. Apple Intelligence adds one to two seconds to every dictation, S1-mini by Superwhisper about half a second. S1-mini is trained on English, also handles German and Spanish, and is downloaded once from Hugging Face when you pick it. Anything a model cannot fix is pasted as dictated.")
             }
         }
         .formStyle(.grouped)
+    }
+
+    /// What stands between the chosen model and a polished dictation:
+    /// Apple Intelligence switched off, or an S1-mini file still to come.
+    @ViewBuilder
+    private var polishModelStatus: some View {
+        if let status = model.polishModelStatus {
+            switch status {
+            case .ready:
+                EmptyView()
+            case .missing:
+                FootnoteText("Downloads when polish is on.")
+            case .downloading(let fraction):
+                ProgressView(value: fraction) {
+                    Text("Downloading \(model.settings.polishModel.displayName)…")
+                        .font(.callout)
+                } currentValueLabel: {
+                    Text(fraction, format: .percent.precision(.fractionLength(0)))
+                }
+            case .verifying:
+                ProgressView {
+                    Text("Checking the download…").font(.callout)
+                }
+            case .failed(let failure):
+                HStack(alignment: .firstTextBaseline) {
+                    Label(failure.text, systemImage: "exclamationmark.triangle")
+                        .font(.callout)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer()
+                    Button("Try Again") { model.retryPolishModelDownload() }
+                }
+            }
+        } else if let warning = model.polishAvailability.polishKeyText {
+            Label(warning, systemImage: "exclamationmark.triangle")
+                .font(.callout)
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     /// Settings stores the *disabled* IDs, so absence means on.
