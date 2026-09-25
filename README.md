@@ -61,7 +61,8 @@ You type long prompts all day. Speech is three to four times faster than typing,
 - **Nothing leaves your Mac.** The speech model runs on the Neural Engine. There is no account, no server, no telemetry, and the app makes no network requests after the one-time model download.
 - **It knows your words.** A dictionary turns what the model hears into what you meant. "clode code" becomes "Claude Code", "get hub" becomes "GitHub", every time, at zero cost in latency. List a word on its own and near misses of it are repaired too, so "Chat G P T" comes out as "ChatGPT" without you predicting every way the model might mangle it. Correct a word by hand after a dictation and Pladder offers to remember it — checked on device, added only when you say so.
 - **It skips over the ums.** Hesitation sounds — "uh", "um", German "äh"/"ähm", Spanish "eh" — are dropped before the text is pasted. Still no cost in latency. Only English, German and Spanish fillers are covered for now; other languages pass through unchanged.
-- **Polish it when you want to.** Hold a second key instead and Apple's on-device model cleans the transcript before it is pasted: "wait, no, Friday" becomes "Friday", spoken numbers become digits, "first… second…" becomes a list. A second or two, still on your Mac, and only when you ask.
+- **Say "comma" and get one.** Spoken punctuation — "comma", "question mark", "new paragraph", German "Fragezeichen", Spanish "signo de interrogación" — becomes the mark itself, with no cost in latency.
+- **Polish it if you like.** Turn on the experimental polish and a small model cleans the transcript on your Mac before it is pasted: "wait, no, Friday" becomes "Friday", "first… second…" becomes a list. Apple's on-device model takes a second or two; S1-mini by Superwhisper, downloaded once when you pick it, about half a second.
 - **It behaves like part of macOS.** A menu bar app with a Liquid Glass status pill, a standard settings window, and nothing in the Dock.
 - **Twenty-five languages, detected automatically.** English, German, Spanish, French and the rest of Europe in the same session, with no setting to flip.
 - **Free and MIT.** The source is here. Read it, build it, change it.
@@ -94,7 +95,7 @@ Privacy here is not a policy, it is how the thing is built.
 
 - **Audio never leaves the Mac.** The microphone is open only while the key is held, and macOS shows the orange indicator only then. Audio goes from the microphone to the Neural Engine and is discarded.
 - **Text never leaves the Mac.** The transcript exists long enough to be pasted. Your previous clipboard is put back afterwards. After a paste, Pladder watches the field it pasted into for up to a minute through Accessibility, to notice when you fix a word; it reads only the pasted words and a little context, keeps nothing, and asks before adding anything to the dictionary.
-- **No network.** The only request Pladder ever makes is the one-time download of the speech model from Hugging Face, about 700 MB, on first launch. After that it works with Wi-Fi off. There is no update check, no crash reporter, no analytics.
+- **No network.** The only request Pladder ever makes is the one-time download of the speech model from Hugging Face, about 700 MB, on first launch, and, only if you pick S1-mini for the experimental polish, the one-time download of that model from Hugging Face too. After that it works with Wi-Fi off. There is no update check, no crash reporter, no analytics.
 - **No account.** Nothing to sign up for, nothing to log in to, nothing to cancel.
 - **Auditable.** The app is about five thousand lines of Swift under the MIT license, and none of them open a network connection. The model download is FluidAudio's, and it runs once.
 
@@ -151,7 +152,7 @@ Option+Space is Alfred's default hotkey and a common Raycast choice, and it type
 Yes. Press the send key, Right Option by default, at any point while you hold the push-to-talk key, and Return is pressed after the text is pasted. That sends a chat message or runs a terminal command without touching the keyboard again. The send key can be changed in Settings, like the push-to-talk key.
 
 **Can it clean up what I said?**
-Record a key for Dictate and polish in Settings and hold that instead. The dictation goes through Apple Intelligence on your Mac before it is pasted, which takes a second or two. It needs Apple Intelligence turned on in System Settings; without it that key pastes the text as dictated.
+Turn on Polish dictations in Settings, Processing, and pick a model. Apple Intelligence needs nothing downloaded but takes a second or two and needs Apple Intelligence turned on in System Settings. S1-mini by Superwhisper is downloaded once from Hugging Face (1.5 GB, or 805 MB at 8-bit) and takes about half a second; it is trained on English and also handles German and Spanish. Anything a model cannot fix is pasted as dictated.
 
 **Can I toggle instead of holding?**
 Yes. Record a toggle key in Settings: one tap starts a recording, the next tap inserts it. Give it the same combination as the push-to-talk key and that key does both: tap to start and tap again to insert, or hold and release as before. Escape discards a recording either way.
