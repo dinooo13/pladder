@@ -43,6 +43,20 @@ import Testing
         #expect(try await run("Umm, i'll be there soon") == "I'll be there soon")
     }
 
+    @Test func capitalisesAfterAFillerThatOpensALaterSentence() async throws {
+        #expect(try await run("Ich habe einen Test geschrieben. Ähm, beim Timeout bin ich unsicher.")
+            == "Ich habe einen Test geschrieben. Beim Timeout bin ich unsicher.")
+        #expect(try await run("Done? uh, what next") == "Done? What next")
+        #expect(try await run("Stop! Äh äh, weiter") == "Stop! Weiter")
+        #expect(try await run("Añadí una prueba. Eh, no estoy seguro.", hint: { _ in "es" })
+            == "Añadí una prueba. No estoy seguro.")
+    }
+
+    @Test func leavesCaseAloneAfterAFillerMidSentence() async throws {
+        #expect(try await run("Ich weiß, äh, nicht") == "Ich weiß nicht")
+        #expect(try await run("the build, uh, passed") == "the build passed")
+    }
+
     @Test func consumesNeighbouringCommasForUniversalFillers() async throws {
         #expect(try await run("we could, uh, ship it") == "we could ship it")
     }

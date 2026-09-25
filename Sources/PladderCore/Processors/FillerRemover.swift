@@ -120,26 +120,51 @@ public struct FillerRemover: TextProcessor {
         var out = ""
         out.reserveCapacity(text.count)
         var cursor = 0
+        // Set by a filler that opened a sentence, and spent on the first
+        // letter that follows it: "Test. Ähm, beim Timeout" keeps "Beim"
+        // a sentence start, as a filler opening the transcript always did.
+        var capitalizeNext = false
+        func append(_ segment: String) {
+            guard capitalizeNext, let letter = segment.firstIndex(where: { !$0.isWhitespace }) else {
+                out += segment
+                return
+            }
+            capitalizeNext = false
+            out += segment[..<letter]
+            out += segment[letter].uppercased()
+            out += segment[segment.index(after: letter)...]
+        }
         for match in matches {
-            out += ns.substring(with: NSRange(location: cursor, length: match.range.location - cursor))
+            let before = ns.substring(with: NSRange(location: cursor, length: match.range.location - cursor))
+            append(before)
+            if !capitalizeNext { capitalizeNext = Self.endsSentence(out) }
             cursor = match.range.upperBound
             out += " "
         }
-        out += ns.substring(from: cursor)
+        append(ns.substring(from: cursor))
 
-        var result = spaceRun.stringByReplacingMatches(
+        return spaceRun.stringByReplacingMatches(
             in: out,
             range: NSRange(location: 0, length: (out as NSString).length),
             withTemplate: " ")
             .trimmingCharacters(in: .whitespaces)
-        guard !result.isEmpty else { return "" }
+    }
 
-        if matches[0].range.location == 0,
-           let first = result.first,
-           first.isLowercase
-        {
-            result = String(first).uppercased() + result.dropFirst()
+    /// Whether text ends where a sentence may start: nothing yet, or a full
+    /// stop, question or exclamation mark. An ellipsis trails off rather
+    /// than ending one.
+    private static func endsSentence(_ text: String) -> Bool {
+        // From the end, since this runs once per filler on the text so far.
+        var end = text.endIndex
+        while end > text.startIndex, text[text.index(before: end)].isWhitespace {
+            end = text.index(before: end)
         }
-        return result
+        guard end > text.startIndex else { return true }
+        let head = text[..<end]
+        switch head.last {
+        case "!", "?": return true
+        case ".": return !head.hasSuffix("..")
+        default: return false
+        }
     }
 }
