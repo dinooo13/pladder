@@ -27,6 +27,7 @@ swift run -c release pladder-cli <audio file> # transcribe one file, print timin
 swift run -c release pladder-cli bench bench/fixtures            # whole-buffer benchmark
 swift run -c release pladder-cli bench bench/fixtures --paced     # feed at real time, time endUtterance, check identity
 swift run -c release pladder-cli polish <text file>   # run the polish prompt over a transcript, print both timings
+./scripts/overlay-demo.sh [dir] [--style …] [--speed …]  # play every overlay path with stand-ins, record the screen, cut contact sheets
 ```
 
 ## Decisions
@@ -83,5 +84,6 @@ The developer dictates with a running Pladder all day, often into Claude session
 
 - Never `pkill -x Pladder` or `killall Pladder`: that also kills the copy in use, mid-recording, and the text is lost. Stop only the copy you launched: `pkill -f "$PWD/dist/Pladder.app"`.
 - Do not post synthetic hotkey events unless the user has asked for a live UI test. Every running copy reacts to them, so they start, cut short, or paste the user's recordings.
+- To see an overlay change, run `scripts/overlay-demo.sh` and read its contact sheets. It drives the real coordinator and pill with stand-ins for the engine, microphone, paste and hotkey, so nothing reaches a running copy.
 - Do not edit `~/Library/Application Support/Pladder/settings.json`; it is the live configuration.
 - A copy launched for testing gets its own settings file with `PLADDER_SETTINGS_PATH=/tmp/<branch>/settings.json "$PWD/dist/Pladder.app/Contents/MacOS/Pladder"`, and a different chord from the copy in use, so the two never fire together. Launched as the bare binary so the environment reaches it; its command line still contains `$PWD/dist/Pladder.app`, so the `pkill -f` above stops it.

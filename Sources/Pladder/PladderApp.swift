@@ -13,9 +13,11 @@ struct PladderApp: App {
         let model = AppModel()
         _model = State(initialValue: model)
         // Deferred to the first run-loop turn so the app has finished launching
-        // before we prompt for Accessibility. The screenshot mode never
-        // starts the hotkey, microphone or engine; it only opens windows.
-        if let directory = Screenshots.directory {
+        // before we prompt for Accessibility. The screenshot and overlay demo
+        // modes never start the hotkey, microphone or engine.
+        if OverlayDemo.isRequested {
+            Task { @MainActor in await OverlayDemo.run() }
+        } else if let directory = Screenshots.directory {
             Task { @MainActor in await Screenshots.run(into: directory) }
         } else {
             Task { @MainActor in model.start() }
