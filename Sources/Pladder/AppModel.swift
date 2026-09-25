@@ -198,15 +198,17 @@ final class AppModel {
 
         // Processors, in pipeline order: fillers go first so the dictionary sees
         // cleaned text, the fuzzy custom-word corrector runs after the exact
-        // replacer so it only sees what the replacer could not fix, and
-        // whitespace is tidied last. Each entry is a factory so a processor that
-        // needs settings builds itself from them; nothing here knows which
-        // processor that is.
+        // replacer so it only sees what the replacer could not fix, whitespace
+        // is tidied next, and spoken punctuation comes last, because the
+        // whitespace step would fold its paragraph breaks back into spaces.
+        // Each entry is a factory so a processor that needs settings builds
+        // itself from them; nothing here knows which processor that is.
         let processorFactories: [@Sendable (Settings) -> any TextProcessor] = [
             { _ in FillerRemover(languageHint: { TranscriptLanguage.hint(for: $0) }) },
             { DictionaryReplacer(entries: $0.dictionary) },
             { CustomWordCorrector(entries: $0.dictionary) },
             { _ in WhitespaceNormalizer() },
+            { _ in SpokenPunctuation(languageHint: { TranscriptLanguage.hint(for: $0) }) },
         ]
         self.processors = processorFactories.map { $0(initial) }
 
