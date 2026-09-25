@@ -1430,6 +1430,26 @@
           }
         }
       }
+    },
+    "Spoken punctuation": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gesprochene Satzzeichen"
+          }
+        }
+      }
+    },
+    "Turns spoken marks such as “comma”, “question mark” and “new paragraph” into the marks themselves, in English, German and Spanish.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Macht aus gesprochenen Zeichen wie „Komma“, „Fragezeichen“ und „neuer Absatz“ die Zeichen selbst, auf Englisch, Deutsch und Spanisch."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
