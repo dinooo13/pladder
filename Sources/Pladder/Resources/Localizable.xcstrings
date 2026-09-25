@@ -1421,16 +1421,6 @@
         }
       }
     },
-    "Before the text is pasted, Apple Intelligence cleans it up on this Mac: self-corrections, spoken punctuation and numbers, lists. This adds a second or two to every dictation, and anything the model cannot fix is pasted as dictated.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bevor der Text eingefügt wird, bereinigt Apple Intelligence ihn auf diesem Mac: Selbstkorrekturen, gesprochene Satzzeichen und Zahlen, Listen. Das fügt jedem Diktat ein bis zwei Sekunden hinzu, und alles, was das Modell nicht beheben kann, wird so eingefügt, wie es diktiert wurde."
-          }
-        }
-      }
-    },
     "Spoken punctuation": {
       "localizations": {
         "de": {
@@ -1447,6 +1437,126 @@
           "stringUnit": {
             "state": "translated",
             "value": "Macht aus gesprochenen Zeichen wie „Komma“, „Fragezeichen“ und „neuer Absatz“ die Zeichen selbst, auf Englisch, Deutsch und Spanisch."
+          }
+        }
+      }
+    },
+    "Model": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modell"
+          }
+        }
+      }
+    },
+    "Apple Intelligence": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence"
+          }
+        }
+      }
+    },
+    "S1-mini by Superwhisper (1.5 GB)": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "S1-mini von Superwhisper (1,5 GB)"
+          }
+        }
+      }
+    },
+    "S1-mini by Superwhisper, 8-bit (805 MB)": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "S1-mini von Superwhisper, 8 Bit (805 MB)"
+          }
+        }
+      }
+    },
+    "Downloads when polish is on.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wird geladen, sobald „Diktate polieren“ an ist."
+          }
+        }
+      }
+    },
+    "Downloading %@…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ wird geladen…"
+          }
+        }
+      }
+    },
+    "Checking the download…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download wird geprüft…"
+          }
+        }
+      }
+    },
+    "Try Again": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erneut versuchen"
+          }
+        }
+      }
+    },
+    "The download stopped, so dictations paste as dictated.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Download wurde abgebrochen, Diktate werden deshalb unverändert eingefügt."
+          }
+        }
+      }
+    },
+    "The download did not match the published model and was deleted, so dictations paste as dictated.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Download passte nicht zum veröffentlichten Modell und wurde gelöscht, Diktate werden deshalb unverändert eingefügt."
+          }
+        }
+      }
+    },
+    "The model could not be saved, probably for lack of disk space, so dictations paste as dictated.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Modell konnte nicht gespeichert werden, vermutlich fehlt Speicherplatz. Diktate werden deshalb unverändert eingefügt."
+          }
+        }
+      }
+    },
+    "Before the text is pasted, the model cleans it up on this Mac: self-corrections, spoken punctuation, lists. Apple Intelligence adds one to two seconds to every dictation, S1-mini by Superwhisper about half a second. S1-mini is trained on English, also handles German and Spanish, and is downloaded once from Hugging Face when you pick it. Anything a model cannot fix is pasted as dictated.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bevor der Text eingefügt wird, bereinigt ihn das Modell auf diesem Mac: Selbstkorrekturen, gesprochene Satzzeichen, Listen. Apple Intelligence braucht dafür ein bis zwei Sekunden pro Diktat, S1-mini von Superwhisper etwa eine halbe. S1-mini ist auf Englisch trainiert, kann auch Deutsch und Spanisch und wird einmalig von Hugging Face geladen, wenn du es auswählst. Was ein Modell nicht bereinigen kann, wird unverändert eingefügt."
           }
         }
       }

@@ -45,9 +45,18 @@ let package = Package(
             ]
         ),
 
-        // Apple's on-device model behind the polish hotkey. The only target
-        // that imports FoundationModels.
-        .target(name: "PladderRefine", dependencies: ["PladderCore"]),
+        // The polish models: Apple's on-device model, the only target that
+        // imports FoundationModels, and S1-mini through llama.cpp.
+        .target(name: "PladderRefine", dependencies: ["PladderCore", "llama"]),
+
+        // llama.cpp's own prebuilt release, Metal included: a dynamic
+        // framework that scripts/bundle.sh embeds in the app. Pinned by
+        // release and checksum; bump both together.
+        .binaryTarget(
+            name: "llama",
+            url: "https://github.com/ggml-org/llama.cpp/releases/download/b11191/llama-b11191-xcframework.zip",
+            checksum: "c8f9af07555a15b00a87334e13a21320596178c58bbafa2d7c4915c574e7086e"
+        ),
 
         // The menu bar app.
         .executableTarget(
@@ -73,7 +82,7 @@ let package = Package(
         // engines, or run the benchmark (see docs/BENCHMARKS.md).
         .executableTarget(
             name: "PladderCLI",
-            dependencies: ["PladderCore", "PladderEngines", "PladderAudio", "PladderBench", "PladderRefine"]
+            dependencies: ["PladderCore", "PladderEngines", "PladderAudio", "PladderBench", "PladderRefine", "PladderSystem"]
         ),
 
         .testTarget(name: "PladderCoreTests", dependencies: ["PladderCore"]),

@@ -84,3 +84,29 @@ extension OnDeviceModelAvailability {
         }
     }
 }
+
+extension PolishModel {
+    /// The picker's wording. S1-mini's licence asks for its name exactly
+    /// so: "S1-mini" by "Superwhisper".
+    var displayName: String {
+        switch self {
+        case .appleIntelligence: String(localized: "Apple Intelligence")
+        case .s1Mini: String(localized: "S1-mini by Superwhisper (1.5 GB)")
+        case .s1Mini8Bit: String(localized: "S1-mini by Superwhisper, 8-bit (805 MB)")
+        }
+    }
+}
+
+extension ModelFileFailure {
+    /// Each says what dictations do meanwhile, like the Apple sentences.
+    var text: String {
+        switch self {
+        case .download:
+            String(localized: "The download stopped, so dictations paste as dictated.")
+        case .checksum:
+            String(localized: "The download did not match the published model and was deleted, so dictations paste as dictated.")
+        case .disk:
+            String(localized: "The model could not be saved, probably for lack of disk space, so dictations paste as dictated.")
+        }
+    }
+}
