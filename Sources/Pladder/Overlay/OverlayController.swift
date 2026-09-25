@@ -16,6 +16,11 @@ final class OverlayController {
     private var presentTask: Task<Void, Never>?
     private var running = false
     private var visible = false
+    /// The pill is being held up across a polish pass. It leaves by the dive
+    /// like a pasted dictation, not by the spinner's fade, and that has to
+    /// hold even when `.polishing` never comes: a transcript under the
+    /// polish minimum is pasted straight from `.transcribing`.
+    private var heldForPolish = false
 
     /// How long transcription has to run before the pill comes back to say so.
     /// A normal dictation is pasted well inside this, and progress shown for
@@ -94,6 +99,7 @@ final class OverlayController {
         switch state {
         case .recording:
             cancelSpinner()
+            heldForPolish = false
             // Menu Bar relies on the menu bar glyph alone, so nothing is
             // presented. If the style was switched mid-dictation the pill may
             // already be up; fade it out the same way idle does.
@@ -114,11 +120,11 @@ final class OverlayController {
                 if visible { scheduleHide(after: .zero, flight: false) }
                 return
             }
-            // The pill stays up so the flight out does not start before it
-            // has begun: the polish pass is seconds, not milliseconds, and
-            // the pill carries on showing the recording row across it.
+            // A polish cycle is seconds, not milliseconds: the pill stays up
+            // and says what is happening until `.idle` dives it out.
             if coordinator.willPolish {
                 cancelSpinner()
+                heldForPolish = true
                 model.partialTranscript = nil
                 model.state = .transcribing
                 cancelHide()
@@ -129,18 +135,11 @@ final class OverlayController {
             guard spinnerTask == nil else { return }
             if visible { scheduleHide(after: .zero, flight: true) }
             // Only a transcription that outlasts the delay — a cold engine, a
-            // long merge, a release inside a warm pass, the polish pass that
-            // runs with `polishDictations` set — brings the pill back.
+            // long merge, a release inside a warm pass — brings the pill back.
             spinnerTask = Task { [weak self] in
                 try? await Task.sleep(for: Self.spinnerDelay)
                 guard !Task.isCancelled, let self, self.running else { return }
-                // Transcription still finishing, or the polish pass running:
-                // the state may have moved on between the delay and here.
-                switch self.coordinator.state {
-                case .transcribing, .polishing: break
-                default: return
-                }
-                guard self.model.style != .menuBar else { return }
+                guard self.coordinator.state == .transcribing, self.model.style != .menuBar else { return }
                 self.model.partialTranscript = nil
                 self.model.state = .transcribing
                 self.cancelHide()
@@ -153,11 +152,11 @@ final class OverlayController {
                 if visible { scheduleHide(after: .zero, flight: false) }
                 return
             }
-            // The pill is already up from `.transcribing` — kept there across
-            // the model pass — so this only morphs it onto the Polishing
-            // row. `present` stays for the case where the pass began without
-            // it, e.g. a discard in between: it would then fly in fresh.
+            // Normally the pill is already up from `.transcribing` and this
+            // only morphs it onto the Polishing row; `present` covers a
+            // release inside the present delay, where it flies in fresh.
             cancelSpinner()
+            heldForPolish = true
             model.state = state
             cancelHide()
             present(flight: true)
@@ -171,6 +170,7 @@ final class OverlayController {
             // must never be silent. They fade in place rather than fly: an
             // alarm should be there at once, not arrive a moment later.
             cancelSpinner()
+            heldForPolish = false
             model.state = state
             cancelHide()
             present(flight: false)
@@ -190,16 +190,14 @@ final class OverlayController {
             // clipboard hint — and leaves the screen with it. `scheduleHide`
             // resets the model once the panel is out. The clipboard hint
             // leaves the way a pasted dictation does, collapsing into the
-            // disc and diving, so the two paths end alike; only the spinner
-            // and an error fade in place.
+            // disc and diving, so the two paths end alike, and so does a
+            // pill held up across a polish pass; only the spinner and an
+            // error fade in place.
             cancelSpinner()
+            let flight = model.state == .copied || heldForPolish
+            heldForPolish = false
             guard visible else { return }
-            // The clipboard hint collapses into the disc and dives; so does a
-            // polished dictation's pill, which is a recording pill held up
-            // across the model pass. The spinner and an error fade in place.
-            scheduleHide(
-                after: .zero,
-                flight: model.state == .copied || model.state == .polishing)
+            scheduleHide(after: .zero, flight: flight)
         }
     }
 
