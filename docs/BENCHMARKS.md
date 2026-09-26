@@ -244,6 +244,25 @@ cues and mangled one German sentence around a code identifier. Its load, at
 the first key-down after launch or a model switch, is well under a second
 from a warm disk and happens while the user speaks.
 
+A German fine-tune of S1-mini, `Joni000000000/s1-mini-de-v3` (Q4_K_M, 397 MB,
+trained on real Parakeet German output), was judged with
+`polish-set --gguf <file> --control <line>` and not added:
+
+| Control line styling | Word error (en / de / es) | Exact of 42 | Polish median |
+|---|---|---|---|
+| semi-formal (the app's) | 0.106 (0.033 / 0.132 / 0.153) | 19 | 0.25 s |
+| semi-casual | 0.108 (0.033 / 0.139 / 0.153) | 19 | 0.25 s |
+| casual | 0.096 (0.009 / 0.130 / 0.149) | 21 | 0.25 s |
+
+In German it turned "Nächster Punkt" enumerations into lines (keeping the cue
+words), wrote "3. März" and placed the comma after "Ich glaube", where
+S1-mini did not; but it left "für vier, Entschuldigung, fünf Personen"
+unresolved, dropped a code identifier, and fused "Build taggen". Part of its
+higher error is its own convention of keeping small counts as words. Its
+English and Spanish answers were the same as S1-mini 8-bit's in 23 of 28
+cases despite its card calling it German only. It is 4-bit only; a 14-case
+German slice is too small to overrule its author's 69 probes either way.
+
 LFM2.5-1.2B-Instruct and Gemma 3 1B, run with Pladder's own prompt, were
 tried and dropped: the first described or answered the transcript instead
 of cleaning it, the second mostly returned it untouched. MLX 4-bit S1-mini

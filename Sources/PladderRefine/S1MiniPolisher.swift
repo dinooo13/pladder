@@ -25,12 +25,16 @@ public actor S1MiniPolisher: TranscriptRefiner {
     /// (semi-casual lower-cases sentence starts, formal rewrites "let's" as
     /// "let us"), and lists lets spoken enumerations become lines without
     /// forcing a list where there is none. Chosen on the polish set.
-    static let controlLine = "[Styling: semi-formal] [Structure: lists] [Context: general]"
+    public static let controlLine = "[Styling: semi-formal] [Structure: lists] [Context: general]"
 
     /// The part of the prompt that never changes, decoded once at load.
     /// Qwen's chat format, written out: the model's template would add the
     /// same, and a thinking block must stay empty (`enable_thinking=False`).
-    static let promptPrefix = "<|im_start|>system\n\(systemPrompt)<|im_end|>\n<|im_start|>user\n\(controlLine)\n"
+    static let promptPrefix = promptPrefix(control: controlLine)
+
+    static func promptPrefix(control: String) -> String {
+        "<|im_start|>system\n\(systemPrompt)<|im_end|>\n<|im_start|>user\n\(control)\n"
+    }
 
     static func promptSuffix(for transcript: String) -> String {
         "\(transcript)<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
@@ -49,10 +53,20 @@ public actor S1MiniPolisher: TranscriptRefiner {
     private static let log = Logger(subsystem: "de.dinooo13.pladder", category: "polish")
 
     /// `location` is where `ModelFiles` keeps `file`.
-    public init(file: ModelFile, location: URL, timeout: Duration = .seconds(8)) {
+    /// The control line this polisher sends; the CLI can try another.
+    private let control: String
+
+    /// `location` is where `ModelFiles` keeps `file`. `control` is for the
+    /// CLI, which judges a style or a fine-tune of S1-mini before it goes in;
+    /// the app always uses the default.
+    public init(
+        file: ModelFile, location: URL, timeout: Duration = .seconds(8),
+        control: String = S1MiniPolisher.controlLine
+    ) {
         self.file = file
         self.location = location
         self.timeout = timeout
+        self.control = control
     }
 
     /// Loads the model if its file is there. Called at key-down, so a first
@@ -128,7 +142,8 @@ public actor S1MiniPolisher: TranscriptRefiner {
         if let loading { return await loading.value }
         guard FileManager.default.fileExists(atPath: location.path) else { return nil }
         let path = location.path
-        let task = Task { try? await LlamaModel.load(path: path, prefix: Self.promptPrefix) }
+        let prefix = Self.promptPrefix(control: control)
+        let task = Task { try? await LlamaModel.load(path: path, prefix: prefix) }
         loading = task
         let model = await task.value
         // `unload()` during the load cancelled this task: drop the result.
