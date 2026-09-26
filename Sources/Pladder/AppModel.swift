@@ -51,6 +51,19 @@ final class AppModel {
     /// no-op that pastes as dictated.
     private(set) var polishAvailability: OnDeviceModelAvailability = TranscriptPolisher.availability
 
+    /// Where the chosen polish model's file stands; nil for Apple's, which
+    /// has none. Shown under the model picker.
+    private(set) var polishModelStatus: ModelFileStatus?
+    /// The coordinator's refiner; `applyPolishModel` points it at the model
+    /// the settings name.
+    private let polishRouter: PolishRouter
+    private let applePolisher = TranscriptPolisher()
+    /// The S1-mini polisher for the chosen file, nil while Apple's is chosen.
+    /// Only one is ever held, so switching frees the other's memory.
+    private var s1MiniPolisher: S1MiniPolisher?
+    private let modelFiles: ModelFiles
+    private let modelStatusRelay = ModelStatusRelay()
+
     /// The default chord, standing in for a stored chord Carbon cannot
     /// register while Accessibility is missing. The stored chord is never
     /// rewritten and returns with the grant.
@@ -135,6 +148,9 @@ final class AppModel {
                 // modifier-only one does.
                 updateEffectiveHotkey()
             }
+            if newValue.polishModel != old.polishModel || newValue.polishDictations != old.polishDictations {
+                applyPolishModel()
+            }
             try? store.save(newValue)
         }
     }
@@ -198,17 +214,26 @@ final class AppModel {
 
         // Processors, in pipeline order: fillers go first so the dictionary sees
         // cleaned text, the fuzzy custom-word corrector runs after the exact
-        // replacer so it only sees what the replacer could not fix, and
-        // whitespace is tidied last. Each entry is a factory so a processor that
-        // needs settings builds itself from them; nothing here knows which
-        // processor that is.
+        // replacer so it only sees what the replacer could not fix, whitespace
+        // is tidied next, and spoken punctuation comes last, because the
+        // whitespace step would fold its paragraph breaks back into spaces.
+        // Each entry is a factory so a processor that needs settings builds
+        // itself from them; nothing here knows which processor that is.
         let processorFactories: [@Sendable (Settings) -> any TextProcessor] = [
             { _ in FillerRemover(languageHint: { TranscriptLanguage.hint(for: $0) }) },
             { DictionaryReplacer(entries: $0.dictionary) },
             { CustomWordCorrector(entries: $0.dictionary) },
             { _ in WhitespaceNormalizer() },
+            { _ in SpokenPunctuation(languageHint: { TranscriptLanguage.hint(for: $0) }) },
         ]
         self.processors = processorFactories.map { $0(initial) }
+
+        let router = PolishRouter(applePolisher)
+        polishRouter = router
+        let modelStatusRelay = self.modelStatusRelay
+        modelFiles = ModelFiles(directory: ModelFiles.defaultDirectory) { file, status in
+            modelStatusRelay.send(file, status)
+        }
 
         let events = self.events
         let trusted = Permissions.isAccessibilityTrusted
@@ -221,7 +246,7 @@ final class AppModel {
             outputMuter: OutputMuteController(
                 control: CoreAudioOutputMute(),
                 log: { Self.muteLog.info("\($0, privacy: .public)") }),
-            refiner: TranscriptPolisher(),
+            refiner: router,
             hotkeyMonitor: trusted ? tapHotkey : carbonHotkey,
             makePipeline: { s in
                 ProcessorPipeline(processorFactories.map { $0(s) }, onFailure: { id, error in
@@ -250,6 +275,10 @@ final class AppModel {
         overlay = OverlayController(coordinator: coordinator)
         events.handler = { [weak self] event, at in self?.handle(event, at: at) }
         proposalRelay.handler = { [weak self] proposal in self?.propose(proposal) }
+        modelStatusRelay.handler = { [weak self] file, status in
+            guard let self, ModelFile(for: self.settings.polishModel) == file else { return }
+            self.polishModelStatus = status
+        }
     }
 
     /// `PLADDER_SETTINGS_PATH` points a copy launched for testing at a file
@@ -300,7 +329,57 @@ final class AppModel {
         }
         overlay.start()
         coordinator.start()
+        applyPolishModel()
         startPermissionMirroring()
+    }
+
+    // MARK: Polish model
+
+    /// Points the coordinator's refiner at the chosen model. An S1-mini file
+    /// is downloaded only while polish is on and that model is chosen, the
+    /// one network use besides the speech model's; it is loaded at the first
+    /// key-down, not here, and freed when polish goes off or another model
+    /// is picked.
+    private func applyPolishModel() {
+        guard let file = ModelFile(for: settings.polishModel) else {
+            releaseS1Mini()
+            polishRouter.use(applePolisher)
+            polishModelStatus = nil
+            return
+        }
+        if s1MiniPolisher?.file != file {
+            releaseS1Mini()
+            let polisher = S1MiniPolisher(file: file, location: modelFiles.location(of: file))
+            s1MiniPolisher = polisher
+            polishRouter.use(polisher)
+        }
+        let polishing = settings.polishDictations
+        if !polishing, let polisher = s1MiniPolisher {
+            Task { await polisher.unload() }
+        }
+        if polishing {
+            Task.detached(priority: .utility) { await S1MiniPolisher.warmUpRuntime() }
+        }
+        let files = modelFiles
+        Task { [weak self] in
+            if polishing { await files.ensure(file) }
+            let status = await files.status(of: file)
+            guard let self, ModelFile(for: self.settings.polishModel) == file else { return }
+            self.polishModelStatus = status
+        }
+    }
+
+    /// Tries a failed download again; the picker's "Try Again".
+    func retryPolishModelDownload() {
+        guard let file = ModelFile(for: settings.polishModel) else { return }
+        let files = modelFiles
+        Task { await files.ensure(file) }
+    }
+
+    private func releaseS1Mini() {
+        guard let polisher = s1MiniPolisher else { return }
+        s1MiniPolisher = nil
+        Task { await polisher.unload() }
     }
 
     func stop() {
@@ -333,7 +412,7 @@ final class AppModel {
             let total = Self.seconds(instant - released)
             // A polish cycle gets its own line, so the plain one stays the
             // number the benchmark rule watches; one predicate finds both.
-            let polish = timing.polish.map { "polish \(fmt($0)), " } ?? ""
+            let polish = timing.polish.map { "polish \(fmt($0)) (\(settings.polishModel.rawValue)), " } ?? ""
             let label = timing.polish == nil ? "release-to-paste" : "polished release-to-paste"
             let stages = "stop \(fmt(timing.captureStop)), engine \(fmt(timing.engine)), " +
                 "process \(fmt(timing.processing)), \(polish)paste \(fmt(timing.insert))"
@@ -613,6 +692,18 @@ final class AppModel {
             return String(head[..<space]) + "…"
         }
         return head + "…"
+    }
+}
+
+/// Bridges `ModelFiles`' status changes onto the main actor, and lets the
+/// files be set up before `self` exists, as `EventRelay` does for the
+/// coordinator.
+@MainActor
+final class ModelStatusRelay {
+    var handler: ((ModelFile, ModelFileStatus) -> Void)?
+
+    nonisolated func send(_ file: ModelFile, _ status: ModelFileStatus) {
+        Task { @MainActor in self.handler?(file, status) }
     }
 }
 

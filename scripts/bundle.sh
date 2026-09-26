@@ -43,6 +43,18 @@ rm -rf "$APP"
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 
 cp "$BIN_DIR/Pladder" "$CONTENTS/MacOS/Pladder"
+# llama.cpp, which runs the S1-mini polish, is a dynamic framework (the
+# binary target in Package.swift). SwiftPM leaves it beside the binary and
+# links with @loader_path; the app keeps it in Contents/Frameworks, where
+# the added search path finds it. Apple Silicon only, so the Intel slice
+# goes.
+mkdir -p "$CONTENTS/Frameworks"
+ditto "$BIN_DIR/llama.framework" "$CONTENTS/Frameworks/llama.framework"
+LLAMA_BIN="$CONTENTS/Frameworks/llama.framework/Versions/A/llama"
+if lipo -archs "$LLAMA_BIN" | grep -q x86_64; then
+	lipo -remove x86_64 "$LLAMA_BIN" -output "$LLAMA_BIN"
+fi
+install_name_tool -add_rpath "@executable_path/../Frameworks" "$CONTENTS/MacOS/Pladder"
 cp "$PLIST" "$CONTENTS/Info.plist"
 printf 'APPL????' > "$CONTENTS/PkgInfo"
 # App icon, rendered by scripts/make-icon.swift and packed with iconutil.
@@ -78,9 +90,22 @@ if [[ -z "${CODESIGN_IDENTITY:-}" ]]; then
 	CODESIGN_IDENTITY=${CODESIGN_IDENTITY:--}
 fi
 echo "Signing with: $CODESIGN_IDENTITY"
+# The hardened runtime only loads libraries signed by the app's own team, and
+# two ad-hoc signatures count as different teams, so an ad-hoc build would
+# refuse its own llama.framework at launch. It goes without the hardened
+# runtime; a certificate build keeps it.
+RUNTIME=(--options runtime)
+if [[ "$CODESIGN_IDENTITY" == "-" ]]; then
+	RUNTIME=()
+fi
+# Inside out: the framework first, with the same identity.
+codesign --force --sign "$CODESIGN_IDENTITY" \
+	${RUNTIME[@]+"${RUNTIME[@]}"} \
+	--timestamp=none \
+	"$CONTENTS/Frameworks/llama.framework"
 codesign --force --sign "$CODESIGN_IDENTITY" \
 	--entitlements "$ROOT/scripts/Pladder.entitlements" \
-	--options runtime \
+	${RUNTIME[@]+"${RUNTIME[@]}"} \
 	--timestamp=none \
 	"$APP"
 

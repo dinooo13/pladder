@@ -194,18 +194,98 @@ release-to-paste 0.312 s: stop 0.012, engine 0.250, process 0.003, paste 0.014; 
 ```
 
 A polished dictation logs its own line, with the model
-call as a fifth stage:
+call as a fifth stage and the model it ran on:
 
 ```
-polished release-to-paste 1.912 s: stop 0.012, engine 0.250, process 0.003, polish 1.620, paste 0.014; audio 6.1 s
+polished release-to-paste 1.912 s: stop 0.012, engine 0.250, process 0.003, polish 1.620 (appleIntelligence), paste 0.014; audio 6.1 s
 ```
 
 `polish` is the model call; it exists only for dictations run with the
 experimental polish toggle on, and the plain line is unchanged for everything else. It is
 `0.000` when the transcript was under four words and the model was skipped.
 The prompt's own cost and output are measured with
-`swift run -c release pladder-cli polish <text file>`, which runs it cold and
-warm.
+`swift run -c release pladder-cli polish <text file> [--model …]`, which runs
+it cold and warm, and a model as a whole with the polish set below.
+
+## Polish models
+
+`docs/polish-set.json` holds 42 dictations, 14 each in English, German and
+Spanish, with the text that should be pasted: self-corrections, spoken
+punctuation, number words, both kinds of spoken list, a question and a
+request that must not be answered, clean text that must come back
+unchanged, code identifiers, repeats, an email and a longer passage. The
+inputs are hand-written in the shape Parakeet produces, with fillers left
+in; real dictation mostly arrives with numbers already as digits.
+
+```sh
+swift run -c release pladder-cli polish-set docs/polish-set.json --model apple|s1-mini|s1-mini-8bit
+```
+
+runs the app's processors over each input, then the model, warm, and prints
+every answer, the word error rate against the expected text (case and
+punctuation ignored), how many answers match exactly (everything counts) and
+the polish time. Greedy decoding throughout, so a rerun gives the same
+answers.
+
+M1 MacBook Air, 16 GB, macOS 27.0, September 2026:
+
+| Model | Word error (en / de / es) | Exact of 42 | Polish median | p90 |
+|---|---|---|---|---|
+| Apple Intelligence (macOS 27) | 0.108 (0.037 / 0.152 / 0.135) | 18 | 1.66 s | 2.07 s |
+| S1-mini, full precision (f16, 1.5 GB) | 0.071 (0.021 / 0.115 / 0.078) | 22 | 0.49 s | 0.86 s |
+| S1-mini, 8-bit (Q8_0, 805 MB) | 0.091 (0.008 / 0.115 / 0.149) | 21 | 0.34 s | 0.61 s |
+
+What the numbers do not show: Apple's model translated two dictations into
+English (a German question, a Spanish self-correction), changed "halb acht"
+to "8:00", and wrote no list as separate lines. S1-mini, trained on English
+only, translated nothing and resolved the German and Spanish
+self-corrections, but ignores "Nächster Punkt" and "Siguiente punto" as list
+cues and mangled one German sentence around a code identifier. Its load, at
+the first key-down after launch or a model switch, is well under a second
+from a warm disk and happens while the user speaks.
+
+A German fine-tune of S1-mini, `Joni000000000/s1-mini-de-v3` (Q4_K_M, 397 MB,
+trained on real Parakeet German output), was judged with
+`polish-set --gguf <file> --control <line>` and not added:
+
+| Control line styling | Word error (en / de / es) | Exact of 42 | Polish median |
+|---|---|---|---|
+| semi-formal (the app's) | 0.106 (0.033 / 0.132 / 0.153) | 19 | 0.25 s |
+| semi-casual | 0.108 (0.033 / 0.139 / 0.153) | 19 | 0.25 s |
+| casual | 0.096 (0.009 / 0.130 / 0.149) | 21 | 0.25 s |
+
+In German it turned "Nächster Punkt" enumerations into lines (keeping the cue
+words), wrote "3. März" and placed the comma after "Ich glaube", where
+S1-mini did not; but it left "für vier, Entschuldigung, fünf Personen"
+unresolved, dropped a code identifier, and fused "Build taggen". Part of its
+higher error is its own convention of keeping small counts as words. Its
+English and Spanish answers were the same as S1-mini 8-bit's in 23 of 28
+cases despite its card calling it German only. It is 4-bit only; a 14-case
+German slice is too small to overrule its author's 69 probes either way.
+
+LFM2.5-1.2B-Instruct and Gemma 3 1B, run with Pladder's own prompt, were
+tried and dropped: the first described or answered the transcript instead
+of cleaning it, the second mostly returned it untouched. MLX 4-bit S1-mini
+was faster still but lost German and Spanish.
+
+## Processors
+
+The processors run on every dictation, so their cost is measured on the
+fixtures' text through the whole pipeline (filler remover with the app's
+language hint, dictionary, custom words, whitespace, spoken punctuation),
+median of 31 runs, M1. "Typical" has a filler in every sentence; "worst" adds
+a spoken question mark to every sentence.
+
+| Fixture | main, typical | spoken punctuation, typical | main, worst | spoken punctuation, worst |
+|---|---|---|---|---|
+| 10s | 1.53 ms | 1.97 ms | 1.51 ms | 1.62 ms |
+| 60s | 1.71 ms | 1.81 ms | 1.73 ms | 2.04 ms |
+| 2m | 1.96 ms | 2.14 ms | 2.00 ms | 2.61 ms |
+| 10m | 3.77 ms | 4.83 ms | 4.13 ms | 6.85 ms |
+
+The floor of about 1.5 ms is the language recogniser the filler remover asks
+whenever an ambiguous filler is present. Differences under a millisecond at
+10 s are noise.
 
 What each stage contains:
 

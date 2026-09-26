@@ -61,6 +61,9 @@ public actor TranscriptPolisher: TranscriptRefiner {
             case guided
             /// Plain `respond(to:)`, after guided generation could not decode.
             case plain
+            /// A local model completing the prompt format it was trained on
+            /// (`S1MiniPolisher`).
+            case completion
         }
 
         /// Nil when the model could not help; paste the input as it is.
@@ -175,17 +178,18 @@ public actor TranscriptPolisher: TranscriptRefiner {
     // MARK: Chunking
 
     /// The transcript as it is when it is short, which is most dictations;
-    /// otherwise windows of about `chunkSize` words,
-    /// cut after a sentence end so no window starts mid-sentence.
-    static func chunks(of text: String) -> [String] {
+    /// otherwise windows of about `size` words (`chunkSize` by default),
+    /// cut after a sentence end so no window starts mid-sentence. The
+    /// S1-mini polisher passes its own, smaller numbers.
+    static func chunks(of text: String, threshold: Int = chunkThreshold, size: Int = chunkSize) -> [String] {
         let words = text.split(whereSeparator: \.isWhitespace)
-        guard words.count > chunkThreshold else { return [text] }
+        guard words.count > threshold else { return [text] }
         var windows: [String] = []
         var current: [Substring] = []
         for word in words {
             current.append(word)
             let endsSentence = word.last.map { ".?!".contains($0) } ?? false
-            if current.count >= chunkSize, endsSentence {
+            if current.count >= size, endsSentence {
                 windows.append(current.joined(separator: " "))
                 current = []
             }
