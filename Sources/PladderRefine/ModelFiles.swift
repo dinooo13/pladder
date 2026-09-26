@@ -36,8 +36,9 @@ public struct ModelFile: Sendable, Equatable {
         }
     }
 
-    /// Internal for the tests, which download a local file.
-    init(fileName: String, url: URL, sha256: String, byteCount: Int64) {
+    /// For the tests, which download a local file, and the CLI, which runs
+    /// a model file that is not in the picker.
+    public init(fileName: String, url: URL, sha256: String, byteCount: Int64) {
         self.fileName = fileName
         self.url = url
         self.sha256 = sha256

@@ -36,10 +36,14 @@ import PladderSystem
 //                                         file is downloaded first if the app has not yet.
 //       [--instructions <file>]           Apple only: try another system prompt before
 //                                         committing it.
+//       [--gguf <file>]                   instead of --model: any S1-mini-family GGUF, such as a
+//                                         fine-tune being judged before it goes in the picker.
+//       [--control <line>]                S1-mini only: another control line than the app's.
 //   pladder-cli polish-set <set.json>     run a polish model over a test set (docs/polish-set.json)
 //       [--model <name>]                  after the app's processors, warm, and print each
 //                                         answer, the word error rate against the expected
 //                                         text per language, exact matches and timings.
+//       [--gguf <file>] [--control <line>] as for polish.
 //
 // Fixtures are audio files with a sibling .txt holding the spoken script, as
 // produced by scripts/make-fixtures.sh.
@@ -49,8 +53,8 @@ func usage() -> Never {
     usage: pladder-cli <audio file>
            pladder-cli bench <fixtures dir> [--runs N] [--pause S]
            pladder-cli bench <fixtures dir> --paced [--runs N] [--pause S] [--all] [--live]
-           pladder-cli polish <text file | -> [--model apple|s1-mini|s1-mini-8bit] [--instructions <file>]
-           pladder-cli polish-set <set.json> [--model apple|s1-mini|s1-mini-8bit]
+           pladder-cli polish <text file | -> [--model apple|s1-mini|s1-mini-8bit | --gguf <file>] [--control <line>] [--instructions <file>]
+           pladder-cli polish-set <set.json> [--model apple|s1-mini|s1-mini-8bit | --gguf <file>] [--control <line>]
 
     """.utf8))
     exit(2)
@@ -472,7 +476,7 @@ func runPacedBench(dir: String, runs: Int, pause: Double, includeShort: Bool, li
 /// polish toggle would paste. The first run is cold (no `prepare()`), the second
 /// warm, which is what a real press gets: the session is made and prewarmed
 /// at key-down, seconds before the release.
-func runPolish(_ path: String, model: PolishModel, instructionsPath: String?) async throws {
+func runPolish(_ path: String, model: PolishModel, options: PolishOptions) async throws {
     let text: String
     if path == "-" {
         text = String(decoding: FileHandle.standardInput.readDataToEndOfFile(), as: UTF8.self)
@@ -498,7 +502,7 @@ func runPolish(_ path: String, model: PolishModel, instructionsPath: String?) as
         }
     }
 
-    let polisher = try await makePolisher(model, instructionsPath: instructionsPath)
+    let polisher = try await makePolisher(model, options: options)
     show("cold", await polisher.polish(transcript))
     await polisher.prepare()
     try await Task.sleep(for: .seconds(2))
@@ -511,10 +515,29 @@ struct CLIPolisher {
     let prepare: @Sendable () async -> Void
 }
 
+/// What the command line changes about a polisher; nil is the app's own.
+struct PolishOptions {
+    var instructionsPath: String?
+    var gguf: String?
+    var control: String?
+}
+
 /// The polisher the app would use for `model`, downloading an S1-mini file
-/// into the app's own model directory first if it is not there yet.
-func makePolisher(_ model: PolishModel, instructionsPath: String? = nil) async throws -> CLIPolisher {
+/// into the app's own model directory first if it is not there yet. With
+/// `--gguf`, an S1-mini polisher over that file instead.
+func makePolisher(_ model: PolishModel, options: PolishOptions = PolishOptions()) async throws -> CLIPolisher {
+    let instructionsPath = options.instructionsPath
+    if let gguf = options.gguf {
+        if instructionsPath != nil { usage() }
+        let url = URL(fileURLWithPath: gguf)
+        let file = ModelFile(fileName: url.lastPathComponent, url: url, sha256: "", byteCount: 0)
+        let polisher = S1MiniPolisher(file: file, location: url, control: options.control ?? S1MiniPolisher.controlLine)
+        print("model: \(gguf)")
+        if let control = options.control { print("control: \(control)") }
+        return CLIPolisher(polish: { await polisher.polish($0) }, prepare: { await polisher.prepare() })
+    }
     guard let file = ModelFile(for: model) else {
+        if options.control != nil { usage() }
         let polisher: TranscriptPolisher
         if let instructionsPath {
             let instructions = try String(contentsOf: URL(fileURLWithPath: instructionsPath), encoding: .utf8)
@@ -539,8 +562,10 @@ func makePolisher(_ model: PolishModel, instructionsPath: String? = nil) async t
         FileHandle.standardError.write(Data("\(file.fileName): \(status)\n".utf8))
         exit(1)
     }
-    let polisher = S1MiniPolisher(file: file, location: await files.location(of: file))
+    let polisher = S1MiniPolisher(
+        file: file, location: files.location(of: file), control: options.control ?? S1MiniPolisher.controlLine)
     print("model: \(file.fileName)")
+    if let control = options.control { print("control: \(control)") }
     return CLIPolisher(polish: { await polisher.polish($0) }, prepare: { await polisher.prepare() })
 }
 
@@ -557,13 +582,13 @@ struct PolishCase: Decodable {
 /// first, then the polish, warm. Prints every answer, then per-language word
 /// error rates against the expected text (case and punctuation ignored),
 /// exact matches (everything counts) and the polish time.
-func runPolishSet(_ path: String, model: PolishModel) async throws {
+func runPolishSet(_ path: String, model: PolishModel, options: PolishOptions) async throws {
     let cases = try JSONDecoder().decode([PolishCase].self, from: Data(contentsOf: URL(fileURLWithPath: path)))
     let hint: @Sendable (String) -> String? = { TranscriptLanguage.hint(for: $0) }
     let pipeline = ProcessorPipeline([
         FillerRemover(languageHint: hint), WhitespaceNormalizer(), SpokenPunctuation(languageHint: hint),
     ])
-    let polisher = try await makePolisher(model)
+    let polisher = try await makePolisher(model, options: options)
     await polisher.prepare()
     // The first call pays for whatever prepare() could not warm.
     _ = await polisher.polish("Warm up.")
@@ -647,7 +672,7 @@ case "bench":
     }
 case "polish", "polish-set":
     let command = arguments.removeFirst()
-    var instructionsPath: String?
+    var options = PolishOptions()
     var model = PolishModel.appleIntelligence
     var textPath: String?
     while let arg = arguments.first {
@@ -655,7 +680,11 @@ case "polish", "polish-set":
         if arg == "--instructions", command == "polish" {
             guard let value = arguments.first else { usage() }
             arguments.removeFirst()
-            instructionsPath = value
+            options.instructionsPath = value
+        } else if arg == "--gguf" || arg == "--control" {
+            guard let value = arguments.first else { usage() }
+            arguments.removeFirst()
+            if arg == "--gguf" { options.gguf = value } else { options.control = value }
         } else if arg == "--model" {
             guard let value = arguments.first, let chosen = polishModel(named: value) else { usage() }
             arguments.removeFirst()
@@ -668,9 +697,9 @@ case "polish", "polish-set":
     }
     guard let textPath else { usage() }
     if command == "polish" {
-        try await runPolish(textPath, model: model, instructionsPath: instructionsPath)
+        try await runPolish(textPath, model: model, options: options)
     } else {
-        try await runPolishSet(textPath, model: model)
+        try await runPolishSet(textPath, model: model, options: options)
     }
 case let path?:
     try await transcribeFile(path)
