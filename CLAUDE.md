@@ -22,7 +22,7 @@ Before and after any change that touches the code between `recordingStopped` and
 swift build                                   # debug build of everything
 swift test                                    # unit tests, well under a second
 ./scripts/bundle.sh [--run] [--install]       # release build → dist/Pladder.app, signed
-swift run -c release pladder-cli <audio file> # transcribe one file, print timing
+swift run -c release pladder-cli <audio file> [--process] [--verbose] # transcribe one file to stdout; --process runs the app's processors, --verbose adds timing
 ./scripts/make-fixtures.sh                    # synthesise benchmark fixtures into bench/fixtures (gitignored)
 swift run -c release pladder-cli bench bench/fixtures            # whole-buffer benchmark
 swift run -c release pladder-cli bench bench/fixtures --paced     # feed at real time, time endUtterance, check identity
@@ -62,7 +62,7 @@ swift run -c release pladder-cli polish-set docs/polish-set.json --model s1-mini
 
 - `PladderCore` imports Foundation only. It never imports FluidAudio, AVFoundation or AppKit, so tests compile fast and engines are truly swappable.
 - Adding an engine: implement `TranscriptionEngine` in its own file under `PladderEngines`, register it in the `EngineRegistry` built in `AppModel`. One file plus one registry line; the settings picker reads the registry. The engine lifecycle — building, loading, status polling and swapping — lives in `EngineLoader`.
-- Adding a processor: implement `TextProcessor` in its own file, append a factory to `processorFactories` in `AppModel`. The pipeline is rebuilt when settings change, never per dictation. A processor sits on the critical path, so the benchmark rule applies.
+- Adding a processor: implement `TextProcessor` in its own file, append a factory to `StandardProcessors.factories` in `PladderSystem`, which the app and `pladder-cli --process` both build from. The pipeline is rebuilt when settings change, never per dictation. A processor sits on the critical path, so the benchmark rule applies.
 - Adding a polish model: a `PolishModel` case in `Settings`, a `ModelFile` pinned to a commit with its SHA-256 if it downloads, a `TranscriptRefiner` in `PladderRefine`, and a branch in `AppModel.applyPolishModel`; `PolishRouter` hands it the calls, the picker and `polish-set` read the enum. Judge it with `pladder-cli polish-set` before it goes in.
 - Adding a prompt: build an `OnDeviceLanguageModel(instructions:)` in `PladderRefine` and call `respond(to:)` or `respond(to:generating:)`; availability, prewarm, timeout and the drain of an abandoned call come with it. The coordinator only ever sees `TranscriptRefiner`.
 - The correction learner's two seams are protocols in `PladderCore`, `PastedTextObserver` and `CorrectionReviewer`, with fakes in the tests; the Accessibility and Foundation Models implementations live in `PladderSystem` (`AXPasteObserver`) and `PladderRefine` (`FoundationModelsCorrectionReviewer`).
