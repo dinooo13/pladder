@@ -75,11 +75,14 @@ A free Apple ID is enough for an Apple Development certificate: sign in to Xcode
 
 ### Command-line transcriber
 
-`pladder-cli` loads the same engine and prints the transcript for any audio file. It is the quickest way to check the model without the GUI, and prints timing so you can see the real-time factor on your machine.
+`pladder-cli` loads the same engine and prints the transcript for any audio file, and nothing else, so a script can read it. It is the quickest way to check the model without the GUI. `--verbose` adds timing, so you can see the real-time factor on your machine, and `--process` runs the app's processors over the text with your dictionary.
 
 ```sh
 swift run -c release pladder-cli recording.wav
+swift run -c release pladder-cli recording.wav --process --verbose
 ```
+
+It reads WAV, M4A, MP3, FLAC, CAF and Ogg Opus. To use it as the speech-to-text of another program, see [docs/HERMES.md](docs/HERMES.md).
 
 `pladder-cli bench <dir>` runs the benchmark over synthetic fixtures. See [docs/BENCHMARKS.md](docs/BENCHMARKS.md) for the procedure and the M1 baseline.
 

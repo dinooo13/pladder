@@ -157,6 +157,9 @@ Turn on Polish dictations in Settings, Processing, and pick a model. Apple Intel
 **Can I toggle instead of holding?**
 Yes. Record a toggle key in Settings: one tap starts a recording, the next tap inserts it. Give it the same combination as the push-to-talk key and that key does both: tap to start and tap again to insert, or hold and release as before. Escape discards a recording either way.
 
+**Can another program use it for speech-to-text?**
+Yes. `pladder-cli` transcribes an audio file and prints only the text, so anything that runs a command for speech-to-text can use it. [docs/HERMES.md](docs/HERMES.md) sets it up for Hermes Agent's voice messages.
+
 **What about long dictations?**
 Recordings stop at 10 minutes, so a lost key-up never leaves the microphone on. Audio longer than 15 seconds is transcribed in overlapping windows.
 
