@@ -10,7 +10,13 @@ import PladderSystem
 
 // Developer tool.
 //
-//   pladder-cli <audio file>              load Parakeet, print the transcript and timing
+//   pladder-cli <audio file>              load Parakeet, print the transcript and nothing else,
+//                                         so a script or another program's STT hook can read
+//                                         stdout. Errors go to stderr with exit status 1.
+//       [--process]                       run the app's processors over it with the app's
+//                                         dictionary and toggles, read from its settings file
+//                                         (or PLADDER_SETTINGS_PATH), which is never written.
+//       [--verbose]                       also print the load and processing times.
 //   pladder-cli bench <fixtures dir>      run the benchmark (see docs/BENCHMARKS.md)
 //       [--runs N]                        runs per fixture, default 6; the first is discarded.
 //                                         Use 11 to settle a result near the noise line.
@@ -50,7 +56,7 @@ import PladderSystem
 
 func usage() -> Never {
     FileHandle.standardError.write(Data("""
-    usage: pladder-cli <audio file>
+    usage: pladder-cli <audio file> [--process] [--verbose]
            pladder-cli bench <fixtures dir> [--runs N] [--pause S]
            pladder-cli bench <fixtures dir> --paced [--runs N] [--pause S] [--all] [--live]
            pladder-cli polish <text file | -> [--model apple|s1-mini|s1-mini-8bit | --gguf <file>] [--control <line>] [--instructions <file>]
@@ -95,7 +101,11 @@ func loadEngine(_ engine: any TranscriptionEngine) async throws -> Duration {
         while !Task.isCancelled {
             if case .downloading(let p) = await engine.status, let p {
                 let pct = Int(p * 100)
-                if pct != lastPrinted { print("downloading \(pct)%"); lastPrinted = pct }
+                // stderr, so a first run's download never lands in a transcript.
+                if pct != lastPrinted {
+                    FileHandle.standardError.write(Data("downloading \(pct)%\n".utf8))
+                    lastPrinted = pct
+                }
             }
             try? await Task.sleep(for: .milliseconds(500))
         }
@@ -171,15 +181,52 @@ func thermalTag() -> String {
 
 // MARK: - Transcribe one file
 
-func transcribeFile(_ path: String) async throws {
-    let engine = FluidAudioIncrementalEngine()
-    let loadTime = try await loadEngine(engine)
-    print(String(format: "model ready in %.1fs", seconds(loadTime)))
+/// The app's settings, for `--process`. Decoded here rather than through
+/// `SettingsStore.load()`, which moves a file it cannot decode aside: a CLI
+/// built from another branch must never touch the live configuration.
+func appSettings() -> Settings {
+    let url = ProcessInfo.processInfo.environment["PLADDER_SETTINGS_PATH"].flatMap { $0.isEmpty ? nil : URL(filePath: $0) }
+        ?? FileManager.default.homeDirectoryForCurrentUser
+            .appending(path: "Library/Application Support/Pladder/settings.json")
+    let fallback = Settings(engineID: FluidAudioIncrementalEngine.engineID)
+    guard let data = try? Data(contentsOf: url) else { return fallback }
+    do {
+        return try JSONDecoder().decode(Settings.self, from: data)
+    } catch {
+        FileHandle.standardError.write(Data("pladder-cli: \(url.path): \(error); processing with the defaults\n".utf8))
+        return fallback
+    }
+}
 
-    let samples = try loadSamples(URL(fileURLWithPath: path))
-    let transcript = try await engine.transcribe(samples)
-    print(String(format: "audio %.2fs, processed in %.3fs (%.0fx realtime)", transcript.audioDuration, transcript.processingTime, transcript.realtimeFactor))
-    print("TEXT: \(transcript.text)")
+func transcribeFile(_ path: String, process: Bool, verbose: Bool) async {
+    do {
+        let engine = FluidAudioIncrementalEngine()
+        let loadTime = try await loadEngine(engine)
+        if verbose { print(String(format: "model ready in %.1fs", seconds(loadTime))) }
+
+        let samples = try loadSamples(URL(fileURLWithPath: path))
+        let transcript = try await engine.transcribe(samples)
+        var text = transcript.text
+        if process {
+            let settings = appSettings()
+            let pipeline = ProcessorPipeline(StandardProcessors.factories.map { $0(settings) }, onFailure: { id, error in
+                FileHandle.standardError.write(Data("pladder-cli: processor \(id) failed: \(error)\n".utf8))
+            })
+            text = await pipeline.run(text, disabled: settings.disabledProcessors)
+        }
+        if verbose {
+            print(String(format: "audio %.2fs, processed in %.3fs (%.0fx realtime)", transcript.audioDuration, transcript.processingTime, transcript.realtimeFactor))
+            if process { print("RAW: \(transcript.text)") }
+            print("TEXT: \(text)")
+        } else {
+            print(text)
+        }
+    } catch {
+        // A file Core Audio cannot open (WebM, say) is the likely failure; a
+        // message and a status rather than a trap, for whatever called us.
+        FileHandle.standardError.write(Data("pladder-cli: \(path): \(error)\n".utf8))
+        exit(1)
+    }
 }
 
 // MARK: - Benchmark
@@ -701,6 +748,21 @@ case "polish", "polish-set":
     } else {
         try await runPolishSet(textPath, model: model, options: options)
     }
-case let path?:
-    try await transcribeFile(path)
+default:
+    var process = false
+    var verbose = false
+    var path: String?
+    for arg in arguments {
+        if arg == "--process" {
+            process = true
+        } else if arg == "--verbose" {
+            verbose = true
+        } else if path == nil {
+            path = arg
+        } else {
+            usage()
+        }
+    }
+    guard let path else { usage() }
+    await transcribeFile(path, process: process, verbose: verbose)
 }
