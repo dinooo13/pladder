@@ -11,6 +11,7 @@ private let leftShift: UInt16 = 0x38
 private let space: UInt16 = 0x31
 private let keyA: UInt16 = 0x00
 private let keyC: UInt16 = 0x08
+private let keyV: UInt16 = 0x09
 
 @Suite struct HotkeyChordTrackerTests {
     @Test func loneModifierPressesAndReleases() {
@@ -164,6 +165,20 @@ private let keyC: UInt16 = 0x08
         #expect(t.keyDown(returnKey, isRepeat: true, modifiers: [rightCommand]) == .init(swallow: true))
         #expect(t.keyUp(returnKey, modifiers: [rightCommand]) == .init(swallow: true))
         #expect(t.flagsChanged(modifiers: []) == .init(event: .released(submit: true)))
+    }
+
+    @Test func defaultSubmitKeyWorksWithTheHandHoldingTheChord() {
+        // Option+Space held, V tapped at once: V arms the release rather than
+        // interrupting it, and is swallowed so the app never sees Option+V.
+        var t = HotkeyChordTracker(hotkey: .optionSpace, submitKey: .keyV)
+        #expect(t.flagsChanged(modifiers: [leftOption]) == .init())
+        #expect(t.keyDown(space, modifiers: [leftOption]) == .init(event: .pressed, swallow: true))
+        #expect(t.keyDown(keyV, modifiers: [leftOption]) == .init(swallow: true))
+        #expect(t.keyUp(keyV, modifiers: [leftOption]) == .init(swallow: true))
+        #expect(t.keyUp(space, modifiers: [leftOption]) == .init(event: .released(submit: true), swallow: true))
+        // Afterwards V types again.
+        #expect(t.keyDown(keyV, modifiers: []) == .init())
+        #expect(t.keyUp(keyV, modifiers: []) == .init())
     }
 
     @Test func submitKeyPassesThroughWhenNotEngaged() {

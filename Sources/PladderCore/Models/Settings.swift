@@ -49,7 +49,8 @@ public struct Settings: Codable, Sendable, Equatable {
     public var engineID: EngineID
     public var hotkey: Hotkey
     /// Pressed at any point while `hotkey` is held, this makes the dictation
-    /// end with Return, which sends a chat message or runs a command. Empty
+    /// end with Return, which sends a chat message or runs a command. V by
+    /// default, within reach of the hand holding the default hotkey. Empty
     /// turns it off.
     public var submitKey: Hotkey
     /// Every dictation runs through the on-device model before it is pasted.
@@ -86,7 +87,7 @@ public struct Settings: Codable, Sendable, Equatable {
     public init(
         engineID: EngineID,
         hotkey: Hotkey = .optionSpace,
-        submitKey: Hotkey = .rightOption,
+        submitKey: Hotkey = .keyV,
         polishDictations: Bool = false,
         polishModel: PolishModel = .appleIntelligence,
         toggleHotkey: Hotkey = Hotkey(keyCodes: []),
@@ -137,7 +138,7 @@ public struct Settings: Codable, Sendable, Equatable {
         hotkey = decodedHotkey.flatMap { $0.keyCodes.isEmpty ? nil : $0 } ?? .optionSpace
         // Unlike the hotkey, an empty submit key is meaningful: it is how the
         // feature is switched off.
-        submitKey = try c.decodeIfPresent(Hotkey.self, forKey: .submitKey) ?? .rightOption
+        submitKey = try c.decodeIfPresent(Hotkey.self, forKey: .submitKey) ?? .keyV
         // Once a chord of its own, the polish is now a Processing toggle.
         // A stored chord migrates to `true`, so the feature the user asked
         // for turns on with the update; nothing is written under the old key.
