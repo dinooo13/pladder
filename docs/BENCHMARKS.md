@@ -308,3 +308,11 @@ reported a held key as released and pressed again, and every release since
 then has waited 50 ms before `recordingStopped`. That wait is felt but is not
 in the `release-to-paste` number. A latched recording's release-to-paste runs
 from the closing press.
+
+A `clipboard read 0.008 s after Cmd+V` line in the `paste` category follows
+each paste: when the target app read the transcript, measured from Cmd+V, so it
+comes on top of `release-to-paste`, which ends when Cmd+V is posted. The transcript is
+served from Pladder's main thread, so a value well above the usual few
+milliseconds in an app that normally reads fast means that thread was busy.
+`clipboard not read within 8 s of Cmd+V; restoring` means nothing read it:
+the paste went somewhere that takes no text.
