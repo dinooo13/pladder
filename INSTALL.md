@@ -10,8 +10,8 @@
 ## Build and install
 
 ```sh
-git clone https://github.com/dinooo13/speakup.git
-cd speakup
+git clone https://github.com/dinooo13/pladder.git
+cd pladder
 ./scripts/bundle.sh --install --run
 ```
 
@@ -24,7 +24,7 @@ This compiles a release build, wraps it into `Pladder.app`, signs it, copies it 
 
    On a standard (non-administrator) account, ticking that box asks for an administrator password, so ask an admin to do it once — the grant is keyed to the app's code signature and survives updates. Without it Pladder still works in a reduced form: Option+Space works the same, any combination with a regular key can be recorded in Settings (a modifier-only key such as Right Command needs Accessibility, and Option+Space stands in for it until then), and the transcript is left on the clipboard for you to paste with ⌘V. Managed Macs can pre-approve Accessibility for Pladder with an MDM Privacy Preferences Policy Control (PPPC) profile, which needs no prompt at all.
 
-   Apple Intelligence, if it is on, powers the optional Dictate and polish key; nothing else needs it.
+   Apple Intelligence, if it is on, powers learned corrections and, if you pick it, the experimental polish; nothing else needs it.
 3. **Wait for the model.** The first run downloads the Parakeet TDT v3 CoreML models from Hugging Face into `~/Library/Application Support/FluidAudio/Models` and compiles them. The menu bar icon shows progress, and the push-to-talk key is disabled until the engine is ready. This happens once; later launches load in well under a second.
 
 Then click into any text field, hold **Option+Space**, say something, and let go.
