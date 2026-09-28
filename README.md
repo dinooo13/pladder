@@ -29,7 +29,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/hero.gif" width="900" alt="Dictating a prompt into Claude Code with Pladder: hold Option+Space and speak while the Live pill shows the words, tap Right Option to send, let go; the prompt is pasted and sent and Claude starts working">
+  <img src="docs/images/hero.gif" width="900" alt="Dictating a prompt into Claude Code with Pladder: hold Option+Space and speak while the Live pill shows the words, tap V to send, let go; the prompt is pasted and sent and Claude starts working">
 </p>
 
 <p align="center"><em>Hold. Release. Pasted.</em></p>
@@ -50,7 +50,7 @@ Audio and text never leave the Mac. The microphone is open only while you hold t
 
 ## Built for agents
 
-Pladder pastes into whatever has focus, so it works in every terminal and editor: Claude Code, Codex and OpenCode, Cursor, and anything else with a text field. It was made for the loop where you talk to an agent, it works, and you talk again. Hold the key, describe the change, tap Right Option while you talk, and let go: the prompt is pasted, Return is pressed, and the agent is running before your hands are back on the keyboard.
+Pladder pastes into whatever has focus, so it works in every terminal and editor: Claude Code, Codex and OpenCode, Cursor, and anything else with a text field. It was made for the loop where you talk to an agent, it works, and you talk again. Hold Option+Space, describe the change, tap V with the same hand, and let go: the prompt is pasted, Return is pressed, and the agent is running while your other hand never left the mouse.
 
 A dictionary fixes the words speech models get wrong: product names, libraries, commands, your project's jargon. "clode code" becomes "Claude Code", every time, at no cost in latency.
 
