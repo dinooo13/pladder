@@ -1838,7 +1838,7 @@ final class EventLog: @unchecked Sendable {
         #expect(decoded.engineID == EchoEngine.engineID)
         #expect(decoded.dictionary.count == 1)
         #expect(decoded.hotkey == .optionSpace)
-        #expect(decoded.submitKey == .rightOption)
+        #expect(decoded.submitKey == .keyV)
         #expect(!decoded.polishDictations)
         #expect(decoded.polishModel == .appleIntelligence)
         #expect(decoded.appendTrailingSpace == true)

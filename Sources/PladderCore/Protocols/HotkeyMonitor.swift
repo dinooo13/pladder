@@ -213,8 +213,13 @@ public struct Hotkey: Codable, Sendable, Hashable {
     /// Right Command (kVK_RightCommand = 0x36). The default before
     /// Option+Space; still the usual modifier-only choice.
     public static let rightCommand = Hotkey(0x36)
-    /// Right Option (kVK_RightOption = 0x3D).
+    /// Right Option (kVK_RightOption = 0x3D). The send key before V.
     public static let rightOption = Hotkey(0x3D)
+    /// V (kVK_ANSI_V = 0x09). The default send key: the index finger of the
+    /// hand holding Option+Space rests on it, so the other hand can stay on
+    /// the mouse. A key position, so it is in the same place on every layout;
+    /// the recorder names it after what it types there.
+    public static let keyV = Hotkey(0x09)
     /// Function key (kVK_Function = 0x3F). Requires the Fn key not be bound
     /// elsewhere in System Settings > Keyboard.
     public static let function = Hotkey(0x3F)
