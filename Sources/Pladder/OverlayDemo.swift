@@ -21,8 +21,8 @@ enum OverlayDemo {
         let name: String
         let text: String
         var polish = false
-        /// How long the engine takes; past the overlay's spinner delay it
-        /// brings the pill back.
+        /// How long the engine takes; past the pill's collapse it holds the
+        /// disc, spinner in it, until the paste.
         var engineDelay: Duration = .milliseconds(200)
         var result: InsertResult = .pasted
     }
@@ -31,6 +31,8 @@ enum OverlayDemo {
 
     private static let scenarios = [
         Scenario(name: "plain", text: sentence),
+        // Just past the collapse, like a release inside an engine pass.
+        Scenario(name: "late", text: sentence, engineDelay: .milliseconds(450)),
         Scenario(name: "slow", text: sentence, engineDelay: .milliseconds(900)),
         Scenario(name: "copied", text: sentence, result: .copied),
         Scenario(name: "polish", text: sentence, polish: true),

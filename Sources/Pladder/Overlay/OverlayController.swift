@@ -12,20 +12,19 @@ final class OverlayController {
     private lazy var panel = OverlayPanel(model: model)
 
     private var hideTask: Task<Void, Never>?
-    private var spinnerTask: Task<Void, Never>?
     private var presentTask: Task<Void, Never>?
     private var running = false
     private var visible = false
     /// The pill is being held up across a polish pass. It leaves by the dive
-    /// like a pasted dictation, not by the spinner's fade, and that has to
-    /// hold even when `.polishing` never comes: a transcript under the
-    /// polish minimum is pasted straight from `.transcribing`.
+    /// like a pasted dictation, not by the fade, and that has to hold even
+    /// when `.polishing` never comes: a transcript under the polish minimum
+    /// is pasted straight from `.transcribing`.
     private var heldForPolish = false
-
-    /// How long transcription has to run before the pill comes back to say so.
-    /// A normal dictation is pasted well inside this, and progress shown for
-    /// work shorter than the indicator's own animation says nothing.
-    private static let spinnerDelay: Duration = .milliseconds(300)
+    /// The pill gathered into the disc at the release before the text was
+    /// pasted, and waits there with a spinner in it until the `.idle` branch
+    /// sends it down. Diving at once and flying back up to say
+    /// "Transcribing…" put one release through two exits.
+    private var holdingDisc = false
 
     /// How long a press has to last before the pill appears. Cmd+C, Cmd+V and
     /// Cmd+Tab all begin with the same modifier as the default chord and are
@@ -48,10 +47,10 @@ final class OverlayController {
     func stop() {
         running = false
         cancelPresent()
-        cancelSpinner()
         hideTask?.cancel()
         panel.orderOut(nil)
         visible = false
+        holdingDisc = false
     }
 
     /// Pushes the app's appearance onto the panel. Borderless panels that are
@@ -98,7 +97,6 @@ final class OverlayController {
         if !state.isRecording { cancelPresent() }
         switch state {
         case .recording:
-            cancelSpinner()
             heldForPolish = false
             // Menu Bar relies on the menu bar glyph alone, so nothing is
             // presented. If the style was switched mid-dictation the pill may
@@ -112,10 +110,12 @@ final class OverlayController {
             cancelHide()
             schedulePresent()
         case .transcribing:
-            // The pill dives back down from the recording row it was showing
-            // at the release, and the model is deliberately left alone so
-            // that is what flies away. The text normally lands well inside
-            // the flight, and the paste is the confirmation.
+            // The pill gathers into the disc from the recording row it was
+            // showing at the release, and the model is deliberately left
+            // alone so that is what gathers. The text normally lands inside
+            // the gathering, the disc dives, and the paste is the
+            // confirmation; a transcription that outlasts it holds the disc
+            // (`scheduleHide`).
             guard model.style != .menuBar else {
                 if visible { scheduleHide(after: .zero, flight: false) }
                 return
@@ -123,28 +123,17 @@ final class OverlayController {
             // A polish cycle is seconds, not milliseconds: the pill stays up
             // and says what is happening until `.idle` dives it out.
             if coordinator.willPolish {
-                cancelSpinner()
                 heldForPolish = true
                 model.partialTranscript = nil
                 model.state = .transcribing
                 cancelHide()
                 return
             }
-            // A new partial can re-run this while the spinner is already
-            // armed or on screen; only the first `.transcribing` acts.
-            guard spinnerTask == nil else { return }
-            if visible { scheduleHide(after: .zero, flight: true) }
-            // Only a transcription that outlasts the delay — a cold engine, a
-            // long merge, a release inside a warm pass — brings the pill back.
-            spinnerTask = Task { [weak self] in
-                try? await Task.sleep(for: Self.spinnerDelay)
-                guard !Task.isCancelled, let self, self.running else { return }
-                guard self.coordinator.state == .transcribing, self.model.style != .menuBar else { return }
-                self.model.partialTranscript = nil
-                self.model.state = .transcribing
-                self.cancelHide()
-                self.present(flight: true)
-            }
+            // A new partial can re-run this once the pill is on its way out;
+            // only the first `.transcribing` acts. A pill that was never up
+            // stays down: the paste is the confirmation.
+            guard visible else { return }
+            scheduleHide(after: .zero, flight: true)
         case .polishing:
             // Menu never shows the pill (errors aside), so a polish pass in
             // Menu style fades whatever may be on screen out.
@@ -155,7 +144,6 @@ final class OverlayController {
             // Normally the pill is already up from `.transcribing` and this
             // only morphs it onto the Polishing row; `present` covers a
             // release inside the present delay, where it flies in fresh.
-            cancelSpinner()
             heldForPolish = true
             model.state = state
             cancelHide()
@@ -164,12 +152,11 @@ final class OverlayController {
             // Milliseconds long, and `.idle` or `.copied` follows at once, so
             // nothing is shown and nothing is hidden here: hiding would
             // flicker between the paste and the clipboard hint.
-            cancelSpinner()
+            break
         case .error:
             // Errors show in every style, Menu Bar included: a failed paste
             // must never be silent. They fade in place rather than fly: an
             // alarm should be there at once, not arrive a moment later.
-            cancelSpinner()
             heldForPolish = false
             model.state = state
             cancelHide()
@@ -180,22 +167,27 @@ final class OverlayController {
             // pasted it, so the user has to be told in every style. No hide is
             // scheduled here — the coordinator holds `.copied` for its display
             // duration and the `.idle` branch below hides the pill after it.
-            cancelSpinner()
             model.state = state
             cancelHide()
             present(flight: false)
         case .idle, .unavailable:
             // Deliberately *not* updating the model here: the pill keeps
-            // whatever it was showing — the recording row, the spinner, the
+            // whatever it was showing — the recording row, the disc, the
             // clipboard hint — and leaves the screen with it. `scheduleHide`
             // resets the model once the panel is out. The clipboard hint
             // leaves the way a pasted dictation does, collapsing into the
             // disc and diving, so the two paths end alike, and so does a
-            // pill held up across a polish pass; only the spinner and an
-            // error fade in place.
-            cancelSpinner()
+            // pill held up across a polish pass; only a discarded recording
+            // and an error fade in place.
             let flight = model.state == .copied || heldForPolish
             heldForPolish = false
+            // The disc has already gathered and was waiting for this.
+            if holdingDisc {
+                holdingDisc = false
+                hideTask?.cancel()
+                hideTask = Task { [weak self] in await self?.dive() }
+                return
+            }
             guard visible else { return }
             scheduleHide(after: .zero, flight: flight)
         }
@@ -210,11 +202,15 @@ final class OverlayController {
     private func present(flight: Bool) {
         guard !visible else { return }
         visible = true
+        holdingDisc = false
         if flight {
             model.presentation = .flyingIn
             panel.show(flight: true) {
                 // The view animates on every presentation change, so this
-                // expands the disc into the style's shape.
+                // expands the disc into the style's shape. A release during
+                // the flight has already gathered it for the dive, and a
+                // waiting disc must not open into the row.
+                guard self.visible else { return }
                 self.model.presentation = .settled
             }
         } else {
@@ -249,11 +245,6 @@ final class OverlayController {
         hideTask = nil
     }
 
-    private func cancelSpinner() {
-        spinnerTask?.cancel()
-        spinnerTask = nil
-    }
-
     /// `flight` matches the presentation: a recording pill dives back down
     /// through the screen's bottom edge, anything else fades in place.
     private func scheduleHide(after delay: Duration, flight: Bool) {
@@ -269,21 +260,43 @@ final class OverlayController {
                 self.model.presentation = .flyingOut
                 try? await Task.sleep(for: .seconds(self.model.speed.morphDuration))
                 guard !Task.isCancelled, !self.visible else { return }
-                self.panel.hide(flight: true)
-                try? await Task.sleep(for: .seconds(self.model.speed.flightDuration))
+                // Nothing pasted yet — a cold engine, a release inside an
+                // engine pass — so the disc stays where it is, a spinner in
+                // place of the wave, until the `.idle` branch sends it down.
+                // The hint and an error open out of it in place.
+                switch self.coordinator.state {
+                case .transcribing, .polishing, .inserting, .copied, .error:
+                    self.model.state = .transcribing
+                    self.holdingDisc = true
+                    return
+                case .idle, .unavailable, .recording:
+                    await self.dive()
+                }
             } else {
                 self.panel.hide(flight: false)
                 try? await Task.sleep(for: .seconds(OverlayPanel.fadeOutDuration))
+                guard !Task.isCancelled, !self.visible else { return }
+                self.park()
             }
-            // Once the panel is out, put the model back to idle. `OverlayPill`
-            // restarts the Minimal dot and its pulse when the phase *leaves*
-            // `.recording`, so a model left at the last recording level would
-            // open the next take on bare bars. A press inside the flight
-            // cancels this task, so that one take skips the dot intro.
-            guard !Task.isCancelled, !self.visible else { return }
-            self.model.presentation = .hidden
-            self.model.state = .idle
-            self.model.partialTranscript = nil
         }
+    }
+
+    /// Slides the gathered disc down behind the screen edge, then parks it.
+    private func dive() async {
+        panel.hide(flight: true)
+        try? await Task.sleep(for: .seconds(model.speed.flightDuration))
+        guard !Task.isCancelled, !visible else { return }
+        park()
+    }
+
+    /// Once the panel is out, put the model back to idle. `OverlayPill`
+    /// restarts the Minimal dot and its pulse when the phase *leaves*
+    /// `.recording`, so a model left at the last recording level would open
+    /// the next take on bare bars. A press inside the flight cancels the hide,
+    /// so that one take skips the dot intro.
+    private func park() {
+        model.presentation = .hidden
+        model.state = .idle
+        model.partialTranscript = nil
     }
 }
