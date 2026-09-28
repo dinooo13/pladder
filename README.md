@@ -29,19 +29,8 @@
   <a href="#faq">FAQ</a>
 </p>
 
-<!--
-  Hero GIF goes here: six to eight seconds of holding Option+Space, saying a
-  prompt into Claude Code, letting go, the text landing, the agent starting.
-  Record with QuickTime or `screencapture -v`, convert with ffmpeg + gifski.
-  Replace the picture below with:
-  <p align="center"><img src="docs/images/hero.gif" width="800" alt="Dictating a prompt into Claude Code with Pladder"></p>
--->
-
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/styles-dark.png">
-    <img src="docs/images/styles-light.png" width="900" alt="The Pladder pill while dictating, in its four styles: Compact with a level meter, Minimal disc, Live transcript, Menu Bar glyph">
-  </picture>
+  <img src="docs/images/hero.gif" width="900" alt="Dictating a prompt into Claude Code with Pladder: hold Option+Space and speak while the Live pill shows the words, tap Right Option to send, let go; the prompt is pasted and sent and Claude starts working">
 </p>
 
 <p align="center"><em>Hold. Release. Pasted.</em></p>
@@ -102,6 +91,13 @@ Privacy here is not a policy, it is how the thing is built.
 ## Choose your style
 
 A small pill at the bottom of the screen shows a red dot and a live level meter while you speak, and is gone the moment you let go; the pasted text is the confirmation. Only when transcription takes longer than usual — the first dictation after launch, say — does a spinner say so. It never takes focus from the app you are typing into. Show as much or as little of it as you like.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/styles-dark.png">
+    <img src="docs/images/styles-light.png" width="900" alt="The Pladder pill while dictating, in its four styles: Compact with a level meter, Minimal disc, Live transcript, Menu Bar glyph">
+  </picture>
+</p>
 
 - **Compact.** The full pill with the level meter. You always know it is listening.
 - **Minimal.** A small disc with a pulse. Enough to see it is on, not enough to look at.
