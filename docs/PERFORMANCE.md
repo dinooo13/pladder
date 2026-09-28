@@ -70,7 +70,9 @@ paste, it happens somewhere else.
   `AVAudioEngine.pause()` blocks until the current device buffer completes.
   The samples are already complete when it starts, so the orange indicator
   goes off a few milliseconds later and nobody waits for it.
-- **The old clipboard is restored after the paste**, not before it.
+- **The old clipboard is restored after the paste**, not before it, and
+  and not before the target app has read the transcript. The transcript is
+  a pasteboard promise, so the read reports itself.
 - **The Return for the send key is posted from a detached task**, 50 ms
   after Cmd+V.
 
