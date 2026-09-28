@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Plays one dictation per overlay path (plain, slow transcription, clipboard
-# hint, polish, polish on a transcript too short to polish) through the real
-# coordinator and pill, records the screen, and cuts a contact sheet per path
-# from the release to the end of the fly-out, each frame labelled with its
-# time and the coordinator's state. Read the sheets to see what an overlay
-# change does without dictating. Needs Screen Recording for the terminal
-# that runs it; keep the pointer on the main display, where the pill shows
-# and screencapture records.
+# Plays one dictation per overlay path (plain, late and slow transcription,
+# clipboard hint, polish, polish on a transcript too short to polish) through
+# the real coordinator and pill, records the screen, and cuts a contact sheet
+# per path from the release to the end of the fly-out, each frame labelled
+# with its time and the coordinator's state. Read the sheets to see what an
+# overlay change does without dictating. Needs Screen Recording for the
+# terminal that runs it; keep the pointer on the main display, where the pill
+# shows and screencapture records.
 #
 # The demo never starts the hotkey, the microphone, the engine or the paste,
 # so it is safe to run while another Pladder is in use.
