@@ -21,7 +21,7 @@ Any key or combination can take its place: record it in Settings by pressing it.
 
 ### Send
 
-Press the send key, Right Option by default, at any point while you hold the push-to-talk key, and Return is pressed after the text is pasted. That sends a chat message, a prompt to an agent or a terminal command without touching the keyboard again. The send key can be changed in Settings, like the push-to-talk key.
+Press the send key, V by default, at any point while you hold the push-to-talk key, and Return is pressed after the text is pasted. That sends a chat message, a prompt to an agent or a terminal command without touching the keyboard again. V sits under the index finger of the hand holding Option+Space, so you can dictate and send with one hand and keep the other on the mouse. It is taken only while the push-to-talk key is held; the rest of the time V types as usual. The send key can be changed in Settings, like the push-to-talk key.
 
 ### Toggle
 
@@ -33,7 +33,7 @@ Escape discards a recording without transcribing, held or toggled. It is taken o
 
 ### Without Accessibility
 
-On an account that cannot grant Accessibility, Pladder still works in a reduced form: Option+Space behaves the same, any combination with a regular key can be recorded, and the transcript is left on the clipboard for you to paste with ⌘V. [INSTALL.md](../INSTALL.md#first-launch) explains the grant.
+On an account that cannot grant Accessibility, Pladder still works in a reduced form: Option+Space behaves the same, any combination with a regular key can be recorded, and the transcript is left on the clipboard for you to paste with ⌘V. The send key needs Accessibility, like the paste. [INSTALL.md](../INSTALL.md#first-launch) explains the grant.
 
 ## Your words
 
