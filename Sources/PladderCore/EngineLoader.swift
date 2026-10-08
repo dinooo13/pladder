@@ -11,19 +11,25 @@ public final class EngineLoader {
     public var onStatusChange: (EngineStatus) -> Void = { _ in }
 
     private let registry: EngineRegistry
+    private let pollInterval: Duration
     private var pollTask: Task<Void, Never>?
+    private var loadTask: Task<Void, Never>?
 
-    public init(registry: EngineRegistry, engineID: EngineID) {
+    /// `pollInterval` is how often a loading engine's status is read; the
+    /// tests shorten it.
+    public init(registry: EngineRegistry, engineID: EngineID, pollInterval: Duration = .milliseconds(250)) {
         guard let engine = registry.make(engineID) else {
             preconditionFailure("EngineRegistry has no engines")
         }
         self.registry = registry
+        self.pollInterval = pollInterval
         self.engine = engine
     }
 
     /// Loads the current engine, or re-runs a failed load.
     public func load() {
         pollTask?.cancel()
+        loadTask?.cancel()
         let engine = self.engine
         // The poll is the single writer of `status` while loading, so the
         // failure text always comes from the engine itself.
@@ -31,21 +37,26 @@ public final class EngineLoader {
             guard let self else { return }
             await self.pollStatus(of: engine)
         }
-        Task { [weak self] in
+        // An engine's load cannot be cancelled, only outlived: a `select` or
+        // a second `load` while this one is in flight cancels the task, and
+        // the identity check keeps an engine that is no longer current from
+        // writing its status or stopping its successor's poll.
+        loadTask = Task { [weak self] in
             guard let self else { return }
+            let status: EngineStatus
             do {
                 try await engine.load()
+                status = await engine.status
             } catch {
-                let status = await engine.status
-                if case .failed = status {
-                    self.setStatus(status)
+                let reported = await engine.status
+                if case .failed = reported {
+                    status = reported
                 } else {
-                    self.setStatus(.failed(.loadFailed(detail: error.localizedDescription)))
+                    status = .failed(.loadFailed(detail: error.localizedDescription))
                 }
-                self.pollTask?.cancel()
-                return
             }
-            self.setStatus(await engine.status)
+            guard !Task.isCancelled, engine === self.engine else { return }
+            self.setStatus(status)
             self.pollTask?.cancel()
         }
     }
@@ -66,6 +77,7 @@ public final class EngineLoader {
 
     public func stop() {
         pollTask?.cancel()
+        loadTask?.cancel()
     }
 
     /// Cheap polling of the engine's status while it loads, so the UI can show
@@ -79,7 +91,7 @@ public final class EngineLoader {
             case .ready, .failed: return
             default: break
             }
-            try? await Task.sleep(for: .milliseconds(250))
+            try? await Task.sleep(for: pollInterval)
         }
     }
 
