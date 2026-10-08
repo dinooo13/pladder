@@ -19,7 +19,7 @@ import Testing
         let pasteboard = Self.namedPasteboard()
         defer { pasteboard.releaseGlobally() }
 
-        _ = PasteboardOutput.Snapshot.write("hello", to: pasteboard)
+        _ = ClipboardSnapshot.write("hello", to: pasteboard)
 
         #expect(pasteboard.string(forType: .string) == "hello")
         let item = try #require(pasteboard.pasteboardItems?.first)
@@ -33,7 +33,7 @@ import Testing
         defer { pasteboard.releaseGlobally() }
 
         let before = pasteboard.changeCount
-        let returned = PasteboardOutput.Snapshot.write("hello", to: pasteboard)
+        let returned = ClipboardSnapshot.write("hello", to: pasteboard)
 
         #expect(returned == pasteboard.changeCount)
         #expect(returned > before)
@@ -49,8 +49,8 @@ import Testing
         pasteboard.clearContents()
         pasteboard.writeObjects([original])
 
-        let snapshot = PasteboardOutput.Snapshot.capture(from: pasteboard)
-        let ourChangeCount = PasteboardOutput.Snapshot.write("transcript", to: pasteboard)
+        let snapshot = ClipboardSnapshot.capture(from: pasteboard)
+        let ourChangeCount = ClipboardSnapshot.write("transcript", to: pasteboard)
         #expect(pasteboard.string(forType: .string) == "transcript")
 
         snapshot.restore(ifChangeCountIs: ourChangeCount, on: pasteboard)
@@ -67,14 +67,66 @@ import Testing
 
         pasteboard.clearContents()
         pasteboard.setString("user text", forType: .string)
-        let snapshot = PasteboardOutput.Snapshot.capture(from: pasteboard)
-        let ourChangeCount = PasteboardOutput.Snapshot.write("transcript", to: pasteboard)
+        let snapshot = ClipboardSnapshot.capture(from: pasteboard)
+        let ourChangeCount = ClipboardSnapshot.write("transcript", to: pasteboard)
 
         pasteboard.clearContents()
         pasteboard.setString("something the user copied", forType: .string)
         snapshot.restore(ifChangeCountIs: ourChangeCount, on: pasteboard)
 
         #expect(pasteboard.string(forType: .string) == "something the user copied")
+    }
+
+    // MARK: Items too large to keep
+
+    @Test func aSnapshotOfOnlyOversizedItemsLeavesTheTranscript() {
+        let pasteboard = Self.namedPasteboard()
+        defer { pasteboard.releaseGlobally() }
+        pasteboard.clearContents()
+        pasteboard.setString("a copied video, say", forType: .string)
+
+        let snapshot = ClipboardSnapshot.capture(from: pasteboard, maximumItemBytes: 4)
+        #expect(snapshot.items.isEmpty)
+        #expect(snapshot.droppedItems == 1)
+        let ourChangeCount = ClipboardSnapshot.write("transcript", to: pasteboard)
+        snapshot.restore(ifChangeCountIs: ourChangeCount, on: pasteboard)
+
+        // Not wiped: the transcript is the lesser loss.
+        #expect(pasteboard.string(forType: .string) == "transcript")
+    }
+
+    @Test func anOversizedItemIsLeftOutAndTheRestRestored() {
+        let pasteboard = Self.namedPasteboard()
+        defer { pasteboard.releaseGlobally() }
+        let small = NSPasteboardItem()
+        small.setString("small", forType: .string)
+        let large = NSPasteboardItem()
+        large.setString("this one is far too large", forType: .string)
+        pasteboard.clearContents()
+        pasteboard.writeObjects([small, large])
+
+        let snapshot = ClipboardSnapshot.capture(from: pasteboard, maximumItemBytes: 8)
+        #expect(snapshot.items.count == 1)
+        #expect(snapshot.droppedItems == 1)
+        let ourChangeCount = ClipboardSnapshot.write("transcript", to: pasteboard)
+        snapshot.restore(ifChangeCountIs: ourChangeCount, on: pasteboard)
+
+        #expect(pasteboard.pasteboardItems?.count == 1)
+        #expect(pasteboard.string(forType: .string) == "small")
+    }
+
+    @Test func anEmptyClipboardIsRestoredEmpty() {
+        let pasteboard = Self.namedPasteboard()
+        defer { pasteboard.releaseGlobally() }
+        pasteboard.clearContents()
+
+        let snapshot = ClipboardSnapshot.capture(from: pasteboard)
+        #expect(snapshot.items.isEmpty)
+        #expect(snapshot.droppedItems == 0)
+        let ourChangeCount = ClipboardSnapshot.write("transcript", to: pasteboard)
+        snapshot.restore(ifChangeCountIs: ourChangeCount, on: pasteboard)
+
+        #expect(pasteboard.string(forType: .string) == nil)
     }
 
     // MARK: The transcript as a promise
@@ -95,7 +147,7 @@ import Testing
         let reads = Reads()
         let promise = TranscriptPromise("hello") { _, _ in reads.record() }
 
-        let changeCount = PasteboardOutput.Snapshot.publish(promise, to: pasteboard)
+        let changeCount = ClipboardSnapshot.publish(promise, to: pasteboard)
 
         #expect(changeCount == pasteboard.changeCount)
         #expect(reads.count == 0)
@@ -110,10 +162,10 @@ import Testing
         defer { pasteboard.releaseGlobally() }
         pasteboard.clearContents()
         pasteboard.setString("user text", forType: .string)
-        let snapshot = PasteboardOutput.Snapshot.capture(from: pasteboard)
+        let snapshot = ClipboardSnapshot.capture(from: pasteboard)
 
         let promise = TranscriptPromise("transcript") { _, _ in }
-        let ourChangeCount = PasteboardOutput.Snapshot.publish(promise, to: pasteboard)
+        let ourChangeCount = ClipboardSnapshot.publish(promise, to: pasteboard)
         #expect(pasteboard.string(forType: .string) == "transcript")
         snapshot.restore(ifChangeCountIs: ourChangeCount, on: pasteboard)
 
@@ -124,7 +176,7 @@ import Testing
 
     private static let posted = ContinuousClock.now
     private static func due(read: Duration?) -> Duration {
-        PasteboardOutput.restoreDue(
+        ClipboardKeeper.restoreDue(
             posted: posted, lastRead: read.map { posted + $0 },
             floor: .milliseconds(400), settle: .milliseconds(200), cap: .seconds(8)) - posted
     }

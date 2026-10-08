@@ -32,11 +32,15 @@ public protocol TextOutput: Sendable {
 
     /// Lets the output do slow preparation, such as snapshotting the
     /// clipboard, while the user is still speaking. Called at key-down; not
-    /// on the release-to-paste path.
+    /// on the release-to-paste path. Idempotent: a second call with nothing
+    /// changed since the first is cheap, so it may be called again at
+    /// release, overlapping the engine pass, to catch a clipboard the user
+    /// changed while speaking.
     func prepare() async
 
     /// Completes anything the output still owes the user right now instead
-    /// of on its timer: the clipboard restore. Called when the app quits.
+    /// of on its timer: the clipboard restore. Called when the app quits,
+    /// when a detached timer would die with the process.
     func flush() async
 }
 
