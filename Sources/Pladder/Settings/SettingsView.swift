@@ -81,7 +81,7 @@ private struct GeneralSettingsView: View {
                 LabeledContent("Key") {
                     HotkeyRecorderField(
                         hotkey: $model.settings.hotkey,
-                        onRecordingChanged: { model.coordinator.isHotkeySuspended = $0 },
+                        setHotkeySuspended: { model.coordinator.isHotkeySuspended = $0 },
                         // The send key is off without Accessibility anyway, so
                         // only the push-to-talk key is constrained.
                         requiresRegularKey: model.hotkeys.hotkeyNeedsRegularKey,
@@ -97,7 +97,7 @@ private struct GeneralSettingsView: View {
                 LabeledContent("Toggle key") {
                     HotkeyRecorderField(
                         hotkey: $model.settings.toggleHotkey,
-                        onRecordingChanged: { model.coordinator.isHotkeySuspended = $0 },
+                        setHotkeySuspended: { model.coordinator.isHotkeySuspended = $0 },
                         requiresRegularKey: model.hotkeys.hotkeyNeedsRegularKey,
                         allowsEmpty: true,
                         systemShortcuts: model.hotkeys.systemShortcuts
@@ -112,7 +112,7 @@ private struct GeneralSettingsView: View {
                 LabeledContent("Send key") {
                     HotkeyRecorderField(
                         hotkey: $model.settings.submitKey,
-                        onRecordingChanged: { model.coordinator.isHotkeySuspended = $0 },
+                        setHotkeySuspended: { model.coordinator.isHotkeySuspended = $0 },
                         // Empty has always meant off; now the field can say so.
                         allowsEmpty: true
                     )

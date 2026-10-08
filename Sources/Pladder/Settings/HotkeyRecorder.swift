@@ -16,9 +16,11 @@ import SwiftUI
 /// Escape on its own cancels; Delete on its own clears, where that is allowed.
 struct HotkeyRecorderField: View {
     @Binding var hotkey: Hotkey
-    /// Called with `true` while recording. The caller suspends the global
-    /// monitor so the keys used to define the new chord cannot fire the old one.
-    var onRecordingChanged: (Bool) -> Void
+    /// Called with `true` when a recording starts with no other field
+    /// recording and `false` when the last one ends; recording in another
+    /// field ends this one. The caller suspends the global monitor meanwhile,
+    /// so the keys used to define the new chord cannot fire the old one.
+    var setHotkeySuspended: (Bool) -> Void
     /// Set while Accessibility is missing: a chord is then registered with
     /// Carbon, which needs exactly one regular key, so modifier-only chords
     /// are refused instead of being stored and silently never firing.
@@ -41,7 +43,8 @@ struct HotkeyRecorderField: View {
                     recorder.begin(
                         requiresRegularKey: requiresRegularKey,
                         allowsEmpty: allowsEmpty,
-                        systemShortcuts: systemShortcuts
+                        systemShortcuts: systemShortcuts,
+                        setHotkeySuspended: setHotkeySuspended
                     ) { hotkey = $0 }
                 }
             } label: {
@@ -60,7 +63,6 @@ struct HotkeyRecorderField: View {
                     .frame(maxWidth: 260, alignment: .trailing)
             }
         }
-        .onChange(of: recorder.isRecording) { _, isRecording in onRecordingChanged(isRecording) }
         .onDisappear { recorder.cancel() }
     }
 
@@ -131,9 +133,13 @@ final class HotkeyRecorder {
         requiresRegularKey: Bool = false,
         allowsEmpty: Bool = false,
         systemShortcuts: Set<Hotkey> = [],
+        setHotkeySuspended: @escaping (Bool) -> Void,
         commit: @escaping (Hotkey) -> Void
     ) {
-        cancel()
+        // A restart keeps the session rather than resuming and suspending
+        // the hotkey in between.
+        tearDown()
+        RecordingSlot.shared.claim(for: self, setHotkeySuspended: setHotkeySuspended)
         self.commit = commit
         self.requiresRegularKey = requiresRegularKey
         self.allowsEmpty = allowsEmpty
@@ -194,9 +200,7 @@ final class HotkeyRecorder {
                 return true
             }
             if allowsEmpty, Int(key.keyCode) == kVK_Delete, heldModifiers.isEmpty, pending == nil {
-                let commit = self.commit
-                end()
-                commit?(Hotkey(keyCodes: []))
+                end(committing: Hotkey(keyCodes: []))
                 return true
             }
             heldKeys.insert(key.keyCode)
@@ -231,9 +235,7 @@ final class HotkeyRecorder {
                     notice = String(localized: "Only \(pending.sideAgnosticDisplayName) reached Pladder. If you pressed a regular key too, macOS or another app owns that shortcut; try a different key, for example Control+Shift+D.")
                     return
                 }
-                let commit = self.commit
-                end()
-                commit?(pending.canonical)
+                end(committing: pending.canonical)
             }
         } else if !held.isSubset(of: pending?.keyCodes ?? []) {
             // A key went down that is not part of the chord so far: the chord
@@ -249,7 +251,18 @@ final class HotkeyRecorder {
         }
     }
 
-    private func end() {
+    /// Ends the recording. A chord to commit is stored before the hotkey is
+    /// given back, so the monitor restarts once, with the new chord, rather
+    /// than with the old one and then again.
+    private func end(committing chord: Hotkey? = nil) {
+        let commit = self.commit
+        tearDown()
+        if let chord { commit?(chord) }
+        RecordingSlot.shared.release(by: self)
+    }
+
+    /// Everything but the session: the monitors and what was pressed.
+    private func tearDown() {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
         if let resignObserver { NotificationCenter.default.removeObserver(resignObserver) }
@@ -266,5 +279,36 @@ final class HotkeyRecorder {
         heldModifiers = []
         modifierState = ModifierKeyState()
         isRecording = false
+    }
+}
+
+/// The app's one `HotkeyRecordingSession` and the recorder holding it. The
+/// session decides; this keeps the object to cancel and the closure that
+/// suspended the hotkey, which is the one that resumes it.
+@MainActor
+private final class RecordingSlot {
+    static let shared = RecordingSlot()
+
+    private var session = HotkeyRecordingSession<ObjectIdentifier>()
+    private weak var holder: HotkeyRecorder?
+    private var setHotkeySuspended: ((Bool) -> Void)?
+
+    func claim(for recorder: HotkeyRecorder, setHotkeySuspended: @escaping (Bool) -> Void) {
+        let begin = session.begin(ObjectIdentifier(recorder))
+        let displaced = holder
+        holder = recorder
+        self.setHotkeySuspended = setHotkeySuspended
+        // After the session has moved on, so the displaced recorder's own
+        // `release` is a no-op and the hotkey stays down.
+        if begin.displaced != nil { displaced?.cancel() }
+        if begin.suspends { setHotkeySuspended(true) }
+    }
+
+    func release(by recorder: HotkeyRecorder) {
+        guard session.end(ObjectIdentifier(recorder)) else { return }
+        holder = nil
+        let resume = setHotkeySuspended
+        setHotkeySuspended = nil
+        resume?(false)
     }
 }
