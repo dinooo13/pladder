@@ -12,6 +12,7 @@ struct OverlayView: View {
     var body: some View {
         OverlayPill(
             state: model.state,
+            level: model.level,
             style: model.style,
             glass: model.glass,
             partial: model.partialTranscript,

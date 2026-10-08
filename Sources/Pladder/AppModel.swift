@@ -264,7 +264,7 @@ final class AppModel {
 
     /// The app icon's waveform glyph, varied by state (see `MenuBarIcon`).
     var menuBarImage: NSImage {
-        MenuBarIcon.image(for: coordinator.state)
+        MenuBarIcon.image(for: coordinator.state, level: coordinator.inputLevel)
     }
 
     /// One line describing what the app is doing right now.

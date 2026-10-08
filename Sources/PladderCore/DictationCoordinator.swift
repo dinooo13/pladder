@@ -25,6 +25,9 @@ public final class DictationCoordinator {
     public private(set) var engineStatus: EngineStatus = .unloaded
     public private(set) var lastTranscript: Transcript?
     public private(set) var lastError: DictationFailure?
+    /// The microphone's level while recording, 0...1, for the meters. Zero
+    /// otherwise.
+    public private(set) var inputLevel: Float = 0
 
     /// What the engine makes of the recording so far, for the Live Transcript
     /// overlay. Display only: it is never processed and never inserted, and it
@@ -546,7 +549,8 @@ public final class DictationCoordinator {
         let live = settings.liveTranscript
         // Flip state before the await so the overlay reacts on key-down and a
         // second concurrent press cannot start capture twice.
-        state = .recording(level: 0)
+        state = .recording
+        inputLevel = 0
         recording += 1
         let mine = recording
         // Escape cancels from here on, and while the microphone comes up.
@@ -581,7 +585,7 @@ public final class DictationCoordinator {
         levelTask = Task { [weak self] in
             for await level in levels {
                 guard let self, self.state.isRecording else { return }
-                self.state = .recording(level: level)
+                self.inputLevel = level
             }
         }
         maxDurationTask = Task { [weak self, clock, maximumDuration] in
@@ -722,6 +726,7 @@ public final class DictationCoordinator {
         hotkeyMonitor.setCancelKeyEnabled(false)
         levelTask?.cancel()
         levelTask = nil
+        inputLevel = 0
         maxDurationTask?.cancel()
         maxDurationTask = nil
         feedTask?.cancel()

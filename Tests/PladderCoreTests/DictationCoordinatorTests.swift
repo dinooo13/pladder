@@ -537,7 +537,7 @@ final class EventLog: @unchecked Sendable {
         #expect(await waitUntil { c.state == .idle })
         await c.hotkeyPressed()
         await capture.emitLevel(0.7)
-        #expect(await waitUntil { c.state == .recording(level: 0.7) })
+        #expect(await waitUntil { c.inputLevel == 0.7 })
         c.hotkeyReleased()
         await c.inFlight?.value
     }

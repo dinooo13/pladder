@@ -41,6 +41,7 @@ final class OverlayController {
         guard !running else { return }
         running = true
         observe()
+        observeLevel()
         apply(coordinator.state)
     }
 
@@ -87,6 +88,26 @@ final class OverlayController {
                 guard let self, self.running else { return }
                 self.apply(self.coordinator.state)
                 self.observe()
+            }
+        }
+    }
+
+    /// The meter's level, on its own loop: it changes twenty times a second
+    /// while recording, and only the bars need to hear about it, not the
+    /// presentation logic `apply` runs.
+    private func observeLevel() {
+        withObservationTracking {
+            _ = coordinator.inputLevel
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self, self.running else { return }
+                // Only while recording: at the release the pill gathers from
+                // the row it was showing, last level included, and the level
+                // dropping to zero would flatten the bars mid-gather.
+                if self.coordinator.state.isRecording {
+                    self.model.level = self.coordinator.inputLevel
+                }
+                self.observeLevel()
             }
         }
     }

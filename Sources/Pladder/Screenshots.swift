@@ -110,13 +110,14 @@ private struct Wallpaper: View {
 /// A pill exactly as the overlay shows it, shadow included.
 private struct Pill: View {
     let state: DictationState
+    var level: Float = 0
     var style: OverlayStyle = .compact
     var scale: CGFloat = 1
     /// The words so far, for the Live Transcript pill.
     var partial: String?
 
     var body: some View {
-        OverlayPill(state: state, style: style, glass: true, isPreview: true, partial: partial)
+        OverlayPill(state: state, level: level, style: style, glass: true, isPreview: true, partial: partial)
             // A tile is narrower than the live row, and the proposed size
             // would squeeze the glass but not the row inside it; the pill
             // takes its own size and is scaled to fit instead.
@@ -134,16 +135,17 @@ private struct StylesFigure: View {
     var body: some View {
         HStack(alignment: .top, spacing: 24) {
             tile("Compact") {
-                Pill(state: .recording(level: 0.6), scale: 1.15)
+                Pill(state: .recording, level: 0.6, scale: 1.15)
             }
             tile("Minimal") {
-                Pill(state: .recording(level: 0.6), style: .minimal, scale: 1.15)
+                Pill(state: .recording, level: 0.6, style: .minimal, scale: 1.15)
             }
             tile("Live") {
                 // The real live row, at its real width: 440 pt of capsule
                 // scaled to fit the tile.
                 Pill(
-                    state: .recording(level: 0.6),
+                    state: .recording,
+                    level: 0.6,
                     style: .liveTranscript,
                     scale: 0.6,
                     partial: "the words show up as you say them, right here"
@@ -173,7 +175,7 @@ private struct StylesFigure: View {
     private var menuBar: some View {
         HStack(spacing: 14) {
             Spacer()
-            Image(nsImage: MenuBarIcon.image(for: .recording(level: 0.6)))
+            Image(nsImage: MenuBarIcon.image(for: .recording, level: 0.6))
                 .renderingMode(.template)
             Image(systemName: "wifi")
             Image(systemName: "battery.75percent")
@@ -207,7 +209,7 @@ private struct SocialFigure: View {
                         }
                     }
                     .foregroundStyle(.white)
-                    Pill(state: .recording(level: 0.6), scale: 1.5)
+                    Pill(state: .recording, level: 0.6, scale: 1.5)
                         .padding(.top, 24)
                 }
             }
