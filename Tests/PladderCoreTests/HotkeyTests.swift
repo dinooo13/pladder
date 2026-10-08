@@ -697,6 +697,38 @@ private let keyV: UInt16 = 0x09
         #expect(g.released(.dictate, submit: false, at: at(900)).action == .stop(submit: false))
     }
 
+    // The hand-over in the order `HotkeyChordSet` reports it, end first.
+
+    @Test func aDictateChordInsideTheToggleChordHandsOver() {
+        var g = Tracker(modes: Self.twoChords)
+        #expect(g.pressed(.dictate, at: at(0)) == .init(action: .start(.dictate)))
+        #expect(g.interrupted(.dictate) == .init(action: .discard))
+        #expect(g.pressed(.toggle, at: at(100)) == .init(action: .start(.toggle)))
+    }
+
+    @Test func aToggleChordInsideTheDictateChordHandsOver() {
+        // The same the other way round: the dictate chord records and its
+        // release stops it.
+        var g = Tracker(modes: Self.twoChords)
+        #expect(g.pressed(.toggle, at: at(0)) == .init(action: .start(.toggle)))
+        #expect(g.interrupted(.toggle) == .init(action: .discard))
+        #expect(g.pressed(.dictate, at: at(100)) == .init(action: .start(.dictate)))
+        #expect(g.released(.dictate, submit: false, at: at(3_000)) == .init(action: .stop(submit: false)))
+        #expect(!g.isLatched)
+    }
+
+    @Test func pastTheWindowAToggleChordsHandOverEndsItsRecording() {
+        // Its release latches, and the dictate press is the next press of
+        // any chord: the toggle recording stops, nothing is left latched,
+        // and the dictate chord's own release is ignored.
+        var g = Tracker(modes: Self.twoChords)
+        _ = g.pressed(.toggle, at: at(0))
+        #expect(g.released(.toggle, submit: false, at: at(1_500)) == .init())
+        #expect(g.pressed(.dictate, at: at(1_500)) == .init(action: .stop(submit: false)))
+        #expect(!g.isLatched)
+        #expect(g.released(.dictate, submit: false, at: at(3_000)) == .init())
+    }
+
     @Test func aBouncePressIsIgnoredAndTurnsDeferralOn() {
         var g = Tracker(modes: Self.hold)
         _ = g.pressed(.dictate, at: at(0))
