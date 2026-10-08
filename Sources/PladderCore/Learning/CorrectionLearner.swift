@@ -69,15 +69,12 @@ public final class CorrectionLearner: Sendable {
         log("\(pairs.count) candidates")
         guard !pairs.isEmpty else { return }
 
-        let known = Set(await dictionary().compactMap { entry -> String? in
-            let from = entry.from.trimmingCharacters(in: .whitespaces).lowercased()
-            return from.isEmpty ? nil : from
-        })
+        let rules = await dictionary()
         var seen: Set<String> = []
         var proposed = 0
         for pair in pairs where seen.insert(pair.key).inserted {
             let name = "\(pair.heard) → \(pair.corrected)"
-            if known.contains(pair.heard.lowercased()) {
+            if rules.hasRule(for: pair.heard) {
                 log("in the dictionary \(name)")
                 continue
             }

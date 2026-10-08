@@ -207,7 +207,7 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
         return Transcript(
             text: result.text,
             audioDuration: Double(fedSampleCount) / CapturedAudio.sampleRate,
-            processingTime: Self.seconds(elapsed),
+            processingTime: elapsed.timeInterval,
             engineID: id
         )
     }
@@ -316,11 +316,6 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
     /// The grid the live window's left edge moves on, 5 s: long enough that
     /// the window still holds 10 s of context at its narrowest.
     private static let windowHopSamples = 80_000
-
-    private static func seconds(_ duration: Duration) -> Double {
-        let parts = duration.components
-        return Double(parts.seconds) + Double(parts.attoseconds) / 1e18
-    }
 
     /// What the menu says under `Model failed:` when the load throws.
     ///

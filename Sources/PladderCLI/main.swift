@@ -128,11 +128,6 @@ func loadEngine(_ engine: any TranscriptionEngine) async throws -> Duration {
     return clock.now - started
 }
 
-func seconds(_ duration: Duration) -> Double {
-    let parts = duration.components
-    return Double(parts.seconds) + Double(parts.attoseconds) / 1e18
-}
-
 func median(_ values: [Double]) -> Double {
     let sorted = values.sorted()
     guard !sorted.isEmpty else { return 0 }
@@ -202,7 +197,7 @@ func transcribeFile(_ path: String, process: Bool, verbose: Bool) async {
     do {
         let engine = FluidAudioIncrementalEngine()
         let loadTime = try await loadEngine(engine)
-        if verbose { print(String(format: "model ready in %.1fs", seconds(loadTime))) }
+        if verbose { print(String(format: "model ready in %.1fs", loadTime.timeInterval)) }
 
         let samples = try loadSamples(URL(fileURLWithPath: path))
         let transcript = try await engine.transcribe(samples)
@@ -282,7 +277,7 @@ func runBench(dir: String, runs: Int, pause: Double) async throws {
     print("")
 
     let loadTime = try await loadEngine(engine)
-    print(String(format: "model load (cold): %.2f s", seconds(loadTime)))
+    print(String(format: "model load (cold): %.2f s", loadTime.timeInterval))
     if let bytes = physicalFootprintBytes() {
         print(String(format: "memory after load: %.0f MB (physical footprint)", Double(bytes) / 1_048_576))
     }
@@ -301,7 +296,7 @@ func runBench(dir: String, runs: Int, pause: Double) async throws {
             if pause > 0 { try await Task.sleep(for: .seconds(pause)) }
             let started = clock.now
             let transcript = try await engine.transcribe(fixture.samples)
-            let elapsed = seconds(clock.now - started)
+            let elapsed = (clock.now - started).timeInterval
             let wer = WordErrorRate.compute(reference: fixture.reference, hypothesis: transcript.text)
             let thermal = thermalTag()
             throttled = throttled || !thermal.isEmpty
@@ -395,7 +390,7 @@ func runPacedBench(dir: String, runs: Int, pause: Double, includeShort: Bool, li
     print("")
 
     let loadTime = try await loadEngine(engine)
-    print(String(format: "model load (cold): %.2f s", seconds(loadTime)))
+    print(String(format: "model load (cold): %.2f s", loadTime.timeInterval))
     print("")
 
     struct Row {
@@ -427,7 +422,7 @@ func runPacedBench(dir: String, runs: Int, pause: Double, includeShort: Bool, li
                 while !Task.isCancelled {
                     let started = clock.now
                     _ = await engine.livePass()
-                    passes.record(seconds(clock.now - started))
+                    passes.record((clock.now - started).timeInterval)
                     try? await Task.sleep(for: .milliseconds(500))
                 }
             } : nil
@@ -448,7 +443,7 @@ func runPacedBench(dir: String, runs: Int, pause: Double, includeShort: Bool, li
             liveTask?.cancel()
             let started = clock.now
             let transcript = try await engine.endUtterance(tail)
-            let elapsed = seconds(clock.now - started)
+            let elapsed = (clock.now - started).timeInterval
             var final = transcript
             final.audioDuration = fixture.duration
             lastText = final.text
@@ -480,7 +475,7 @@ func runPacedBench(dir: String, runs: Int, pause: Double, includeShort: Bool, li
         if pause > 0 { try await Task.sleep(for: .seconds(pause)) }
         let batchStarted = clock.now
         let batchTranscript = try await engine.transcribe(fixture.samples)
-        let batchElapsed = seconds(clock.now - batchStarted)
+        let batchElapsed = (clock.now - batchStarted).timeInterval
         let batchWer = WordErrorRate.compute(reference: fixture.reference, hypothesis: batchTranscript.text)
         print(String(format: "%@ whole: %.3f s, WER %.1f%%", fixture.name, batchElapsed, batchWer * 100))
         let difference = firstWordDifference(batch: batchTranscript.text, paced: lastText)
@@ -539,7 +534,7 @@ func runPolish(_ path: String, model: PolishModel, options: PolishOptions) async
 
     func show(_ label: String, _ report: TranscriptPolisher.Report) {
         print("")
-        let timing = String(format: "%.3f", seconds(report.elapsed))
+        let timing = String(format: "%.3f", report.elapsed.timeInterval)
         if let polished = report.text {
             print("\(label): \(timing) s, \(report.wordsIn) words in, \(report.wordsOut) out, \(report.mode.rawValue)")
             print(polished)
@@ -647,12 +642,12 @@ func runPolishSet(_ path: String, model: PolishModel, options: PolishOptions) as
         let processed = await pipeline.run(item.input)
         let report = await polisher.polish(processed)
         let output = report.text ?? processed
-        times.append(seconds(report.elapsed))
+        times.append(report.elapsed.timeInterval)
         rates[item.lang, default: []].append(WordErrorRate.compute(reference: item.expected, hypothesis: output))
         let matched = output.trimmingCharacters(in: .whitespacesAndNewlines) == item.expected
         if matched { exact += 1 }
         let failure = report.failure.map { " (\($0))" } ?? ""
-        print(String(format: "%@ %-26@ %5.2f s%@", matched ? "=" : " ", item.id, seconds(report.elapsed), failure))
+        print(String(format: "%@ %-26@ %5.2f s%@", matched ? "=" : " ", item.id, report.elapsed.timeInterval, failure))
         print("    \(output.replacingOccurrences(of: "\n", with: "⏎"))")
     }
     print("")

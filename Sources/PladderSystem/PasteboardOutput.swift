@@ -261,8 +261,7 @@ public actor PasteboardOutput: TextOutput {
     private func transcriptRead(_ promise: TranscriptPromise, at instant: ContinuousClock.Instant) {
         guard let current = pending, current.promise === promise, let posted = current.posted else { return }
         if current.lastRead == nil {
-            let after = (instant - posted).components
-            let seconds = Double(after.seconds) + Double(after.attoseconds) / 1e18
+            let seconds = (instant - posted).timeInterval
             Self.log.notice("clipboard read \(seconds, format: .fixed(precision: 3)) s after Cmd+V")
         }
         pending?.lastRead = instant
