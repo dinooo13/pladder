@@ -1,9 +1,35 @@
+import AppKit
 import SwiftUI
 import PladderCore
 
+/// The pill's type and meter geometry, in one place: every row draws with
+/// these, and the live row measures its words and works out its width from
+/// them, so the measurement can never drift from what is drawn.
+enum PillMetrics {
+    static let fontSize: CGFloat = 13
+    static let font = Font.system(size: fontSize, weight: .medium, design: .rounded)
+    /// The same face as an `NSFont`, for measuring.
+    @MainActor static let nsFont: NSFont = {
+        let base = NSFont.systemFont(ofSize: fontSize, weight: .medium)
+        guard let descriptor = base.fontDescriptor.withDesign(.rounded),
+              let rounded = NSFont(descriptor: descriptor, size: fontSize)
+        else { return base }
+        return rounded
+    }()
+    /// Between the dot, the meter and the words or label of a row.
+    static let rowSpacing: CGFloat = 10
+    static let dotSize: CGFloat = 8
+    static let barWidth: CGFloat = 3
+    static let barSpacing: CGFloat = 3
+
+    static func barsWidth(count: Int) -> CGFloat {
+        CGFloat(count) * barWidth + CGFloat(max(count - 1, 0)) * barSpacing
+    }
+}
+
 /// The red "live" dot, shared by Compact, Minimal and the settings replicas.
 struct RecordingDot: View {
-    var size: CGFloat = 8
+    var size: CGFloat = PillMetrics.dotSize
 
     var body: some View {
         Circle()
@@ -84,11 +110,11 @@ struct LevelBars: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 3) {
+        HStack(alignment: .center, spacing: PillMetrics.barSpacing) {
             ForEach(0..<count, id: \.self) { index in
                 Capsule()
                     .fill(.primary.opacity(opacity))
-                    .frame(width: 3, height: max(3, heights[index] * maxHeight))
+                    .frame(width: PillMetrics.barWidth, height: max(PillMetrics.barWidth, heights[index] * maxHeight))
             }
         }
         .frame(height: maxHeight)

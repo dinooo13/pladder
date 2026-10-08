@@ -53,12 +53,11 @@ final class OverlayController {
         holdingDisc = false
     }
 
-    /// Pushes the app's appearance onto the panel. Borderless panels that are
-    /// never key or main do not reliably follow an `NSApp.appearance` change
-    /// after creation, so it is set explicitly.
+    /// Pushes the app's appearance onto the pill's SwiftUI scheme. The panel
+    /// itself takes it at every `show`: a borderless panel that is never key
+    /// or main does not reliably follow an `NSApp.appearance` change.
     func applyAppearance(_ appearance: Appearance) {
         model.appearance = appearance
-        panel.appearance = appearance == .system ? NSApp.appearance : NSAppearance(named: appearance == .dark ? .darkAqua : .aqua)
     }
 
     /// Pushes the overlay style and background choice onto the model, which

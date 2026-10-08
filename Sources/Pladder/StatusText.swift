@@ -1,6 +1,7 @@
 import Foundation
 import PladderCore
 import PladderRefine
+import PladderSystem
 
 /// The wording for every state `PladderCore` and `PladderEngines` report as a
 /// value.
@@ -209,6 +210,26 @@ enum ProcessorText {
         case SpokenPunctuation.processorID:
             String(localized: "Turns spoken marks such as “comma”, “question mark” and “new paragraph” into the marks themselves, in English, German and Spanish.")
         default: ""
+        }
+    }
+}
+
+extension HotkeyWarning {
+    /// The sentence under the recorder field.
+    @MainActor var text: String {
+        switch self {
+        case .standIn(let stored, let standIn):
+            String(localized: "Without Accessibility, \(stored.displayName) cannot be detected, so \(standIn.sideAgnosticDisplayName) stands in for it until Accessibility is granted. Record a combination with a regular key to choose your own.")
+        case .systemShortcut(let owner, let chord):
+            String(localized: "\(owner.sideAgnosticDisplayName) is a macOS keyboard shortcut, so \(chord.displayName) may never reach Pladder. Record another combination.")
+        case .noModifier(let hotkey):
+            String(localized: "Without a modifier, \(hotkey.displayName) can no longer be typed in other apps while Pladder is running.")
+        case .toggleNeedsAccessibility(let toggle):
+            String(localized: "Without Accessibility, \(toggle.displayName) cannot be detected, so the toggle key is off until Accessibility is granted.")
+        case .sendKeyNeedsAccessibility:
+            String(localized: "The send key needs Accessibility.")
+        case .sendKeyInsideChord(let key):
+            String(localized: "\(key.displayName) is part of the push-to-talk key, so it can never be pressed separately.")
         }
     }
 }

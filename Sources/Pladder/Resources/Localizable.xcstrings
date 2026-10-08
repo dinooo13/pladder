@@ -21,26 +21,6 @@
         }
       }
     },
-    "%@ is also the push-to-talk key, so it never polishes. Record a different combination.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ ist schon die Push-to-Talk-Taste, deshalb wird damit nie überarbeitet. Nimm eine andere Kombination auf."
-          }
-        }
-      }
-    },
-    "%@ is also the toggle key, so it never polishes. Record a different combination.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ ist auch die Start/Stopp-Taste, deshalb wird damit nie überarbeitet. Nimm eine andere Kombination auf."
-          }
-        }
-      }
-    },
     "%@ is part of the push-to-talk key, so it can never be pressed separately.": {
       "localizations": {
         "de": {
@@ -1237,16 +1217,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ohne Bedienungshilfen wird %@ nicht erkannt, deshalb ist die Start/Stopp-Taste aus, bis die Bedienungshilfen erlaubt sind."
-          }
-        }
-      }
-    },
-    "Without Accessibility, %@ cannot be detected, so this key is off until Accessibility is granted.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ohne Bedienungshilfen wird %@ nicht erkannt, deshalb ist diese Taste aus, bis die Bedienungshilfen erlaubt sind."
           }
         }
       }
