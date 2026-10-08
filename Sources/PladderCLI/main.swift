@@ -28,6 +28,11 @@ import PladderCore
 //                                         how many there were and what they cost. The
 //                                         `identical:` column then also proves the live
 //                                         passes leave the release's windows alone.
+//   pladder-cli bench-process <fixtures dir>
+//                                         time the processor pipeline on the fixtures' text,
+//                                         with a filler in every sentence and with a spoken
+//                                         question mark as well (see docs/BENCHMARKS.md).
+//       [--runs N]                        runs per variant, default 31; the first is discarded.
 //   pladder-cli polish <text file | ->    run the polisher over a transcript: once cold,
 //                                         once after prepare() and a two-second wait, the
 //                                         way a real press warms it. Prints both timings.
@@ -48,14 +53,15 @@ import PladderCore
 // produced by scripts/make-fixtures.sh.
 //
 // This file parses the command line and dispatches; each command lives in a
-// file of its own: Transcribe.swift, Bench.swift (whole-buffer and paced) and
-// Polish.swift, with the shared helpers in Support.swift.
+// file of its own: Transcribe.swift, Bench.swift (whole-buffer and paced),
+// BenchProcess.swift and Polish.swift, with the shared helpers in Support.swift.
 
 func usage() -> Never {
     eprint("""
     usage: pladder-cli <audio file> [--process] [--verbose]
            pladder-cli bench <fixtures dir> [--runs N] [--pause S]
            pladder-cli bench <fixtures dir> --paced [--runs N] [--pause S] [--all] [--live]
+           pladder-cli bench-process <fixtures dir> [--runs N]
            pladder-cli polish <text file | -> [--model \(PolishModel.cliNames) | --gguf <file>] [--control <line>] [--instructions <file>]
            pladder-cli polish-set <set.json> [--model \(PolishModel.cliNames) | --gguf <file>] [--control <line>]
     """)
@@ -106,6 +112,9 @@ case "bench":
         if includeShort || live { usage() }
         try await runBench(dir: dir, runs: runs, pause: pause)
     }
+case "bench-process":
+    arguments.removeFirst()
+    await ProcessorBench.run(arguments: arguments)
 case "polish", "polish-set":
     let command = arguments.removeFirst()
     var options = PolishOptions()
