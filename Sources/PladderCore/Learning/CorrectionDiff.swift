@@ -22,9 +22,11 @@ import Foundation
 ///   used instead.
 /// - A hunk is a candidate only when both sides are one or two words, it
 ///   lies wholly inside the pasted text, it holds no punctuation, each side
-///   is at most `maximumPairLength` characters without control characters,
-///   and it is more than a change of case (those are the issue's rule: a
-///   capital is a matter of the sentence, not of the word).
+///   is at most `maximumPairLength` characters, and it is more than a change
+///   of case (those are the issue's rule: a capital is a matter of the
+///   sentence, not of the word). A control character is not a word
+///   character, so it is a punctuation token and fails the punctuation rule,
+///   and so is a comma: neither can reach a pair.
 /// - Insertions and deletions are ignored: adding or dropping a word is
 ///   editing, not correcting a misheard one.
 /// - More than `maximumHunks` changes inside the paste, or more than half its
@@ -225,15 +227,9 @@ public enum CorrectionDiff {
               (1...maximumWordsPerSide).contains(corrected.count) else { return nil }
         let from = heard.map(\.text).joined(separator: " ")
         let to = corrected.map(\.text).joined(separator: " ")
+        // Differing only in case covers differing not at all.
         guard from.count <= maximumPairLength, to.count <= maximumPairLength,
-              !from.contains(","),
-              !hasControlCharacter(from), !hasControlCharacter(to),
-              from != to,
               from.lowercased() != to.lowercased() else { return nil }
         return CorrectionPair(heard: from, corrected: to)
-    }
-
-    private static func hasControlCharacter(_ text: String) -> Bool {
-        text.unicodeScalars.contains { $0.properties.generalCategory == .control }
     }
 }

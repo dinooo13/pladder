@@ -14,6 +14,20 @@ import Testing
         #expect(ContinuousClock.now - started < .milliseconds(100))
     }
 
+    /// Chromium's tree is asked for only where it is missing: no focus at
+    /// all, or a bare web area. An app that already exposes a focus of its
+    /// own (Finder, a terminal, a button) is left as it is.
+    @Test func manualAccessibilityOnlyWhereTheTreeIsMissing() {
+        #expect(AXPasteObserver.wantsManualAccessibility(hasFocus: false, focusedRole: nil))
+        #expect(AXPasteObserver.wantsManualAccessibility(hasFocus: true, focusedRole: "AXWebArea"))
+        #expect(!AXPasteObserver.wantsManualAccessibility(hasFocus: true, focusedRole: "AXList"))
+        #expect(!AXPasteObserver.wantsManualAccessibility(hasFocus: true, focusedRole: "AXOutline"))
+        #expect(!AXPasteObserver.wantsManualAccessibility(hasFocus: true, focusedRole: "AXButton"))
+        #expect(!AXPasteObserver.wantsManualAccessibility(hasFocus: true, focusedRole: nil))
+        // A secure field is a text field's role with a subrole: never asked.
+        #expect(!AXPasteObserver.wantsManualAccessibility(hasFocus: true, focusedRole: "AXTextField"))
+    }
+
     @Test func theWindowIsThePastePlusAMargin() {
         let window = PasteWindow(start: 1_000, length: 20, characterCount: 5_000)
         #expect(window.windowStart == 1_000 - 64)

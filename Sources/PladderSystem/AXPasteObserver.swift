@@ -18,8 +18,9 @@ import os
 /// 1. No grant → nil at once.
 /// 2. The focused element of the focused app must be a text area, text field
 ///    or combo box, and never a secure field. Chromium and Electron build
-///    their tree only for an assistive technology, so once per app
-///    `AXManualAccessibility` is switched on and the focus read again.
+///    their tree only for an assistive technology, so once per app that shows
+///    no focus at all, or only a web area, `AXManualAccessibility` is
+///    switched on and the focus read again.
 /// 3. The paste is found just before the caret, with and without the
 ///    trailing space the output may have added. The target app reads the
 ///    pasteboard on its own run loop, so this is retried a few times.
@@ -68,6 +69,17 @@ public final class AXPasteObserver: PastedTextObserver, @unchecked Sendable {
     }
 
     deinit {
+        // `current` belongs to the AX thread, but nothing can reach it any
+        // more: every block sent there holds `self` strongly, so none is
+        // queued, and a session's `onFinish` holds it weakly, which reads nil
+        // from here on. So it is read here and ended there, where its
+        // observer and timer live, and its caller gets nil instead of
+        // waiting for ever. `nonisolated(unsafe)` for that hand-over: the
+        // session is used on the AX thread only, before and after.
+        nonisolated(unsafe) let session = current
+        if session != nil {
+            thread.perform { session?.abandon() }
+        }
         thread.finish()
     }
 
@@ -137,14 +149,16 @@ public final class AXPasteObserver: PastedTextObserver, @unchecked Sendable {
               pid != ProcessInfo.processInfo.processIdentifier else { return nil }
 
         var element = Reader.element(app, "AXFocusedUIElement")
-        if !Self.isTextField(element), manualAccessibility.insert(pid).inserted {
+        if Self.wantsManualAccessibility(
+               hasFocus: element != nil, focusedRole: element.flatMap { Reader.string($0, "AXRole") }),
+           manualAccessibility.insert(pid).inserted {
             // Chromium and Electron switch their tree on for this; it is
             // their convention, not declared in the SDK. Not
             // AXEnhancedUserInterface, which is VoiceOver's and changes how
             // some apps move their windows.
             let result = AXUIElementSetAttributeValue(app, "AXManualAccessibility" as CFString, kCFBooleanTrue)
             Self.log.info("manual accessibility: \(result.rawValue, privacy: .public)")
-            Thread.sleep(forTimeInterval: 0.2)
+            Thread.sleep(forTimeInterval: Self.manualAccessibilitySettle)
             element = Reader.element(app, "AXFocusedUIElement")
         }
         guard let element, Self.isTextField(element) else {
@@ -157,6 +171,22 @@ public final class AXPasteObserver: PastedTextObserver, @unchecked Sendable {
     }
 
     private static let textRoles: Set<String> = ["AXTextArea", "AXTextField", "AXComboBox"]
+
+    /// How long a Chromium app gets to build its tree after
+    /// `AXManualAccessibility` is set, before the focus is read again. Paid
+    /// once per app, on the AX thread, long after the paste.
+    static let manualAccessibilitySettle: TimeInterval = 0.2
+
+    /// Whether to ask for Chromium's tree: only when the app shows no focused
+    /// element at all, the state Chromium and Electron are in until an
+    /// assistive technology asks, or the focus is a web area with nothing
+    /// inside it exposed. Never for an app that already exposes a focus of
+    /// another kind (Finder's list, a terminal's screen, a button): the flag
+    /// stays on for the app's lifetime, and an app that honours it keeps its
+    /// whole tree up to date from then on, which costs it on every change.
+    static func wantsManualAccessibility(hasFocus: Bool, focusedRole: String?) -> Bool {
+        !hasFocus || focusedRole == "AXWebArea"
+    }
 
     private static func isTextField(_ element: AXUIElement?) -> Bool {
         guard let element, let role = Reader.string(element, "AXRole"), textRoles.contains(role) else {
@@ -294,8 +324,21 @@ public final class AXPasteObserver: PastedTextObserver, @unchecked Sendable {
         }
 
         func finish(finalRead: Bool) {
-            guard let continuation else { return }
+            guard continuation != nil else { return }
             if finalRead { read() }
+            AXPasteObserver.log.info("watch ended with \(self.readings.count, privacy: .public) readings")
+            end(with: PasteObservation(
+                before: split.before, pasted: split.pasted, after: split.after, readings: readings))
+        }
+
+        /// Ends the watch with nothing for the caller: the observer is going
+        /// away.
+        func abandon() {
+            end(with: nil)
+        }
+
+        private func end(with observation: PasteObservation?) {
+            guard let continuation else { return }
             if let observer {
                 for (target, name) in Self.notifications(element: element, app: app) {
                     AXObserverRemoveNotification(observer, target, name as CFString)
@@ -306,9 +349,7 @@ public final class AXPasteObserver: PastedTextObserver, @unchecked Sendable {
             if let timer { CFRunLoopTimerInvalidate(timer) }
             timer = nil
             self.continuation = nil
-            AXPasteObserver.log.info("watch ended with \(self.readings.count, privacy: .public) readings")
-            continuation.resume(returning: PasteObservation(
-                before: split.before, pasted: split.pasted, after: split.after, readings: readings))
+            continuation.resume(returning: observation)
             onFinish?()
             onFinish = nil
         }
@@ -326,11 +367,20 @@ struct PasteWindow: Equatable {
     let windowStart: Int
     let windowEnd: Int
 
+    /// The margin read either side of the paste is a quarter of its length
+    /// (`marginDivisor`), and never less than `minimumMargin` characters, so
+    /// a short paste still has a sentence or so around it to align against.
+    static let minimumMargin = 64
+    static let marginDivisor = 4
+    /// How far past twice its own size the window may grow while the user
+    /// types on after the paste: room for a correction that adds words.
+    static let growthAllowance = 1_024
+
     init(start: Int, length: Int, characterCount: Int) {
         self.start = start
         self.length = length
         self.characterCount = characterCount
-        let margin = max(64, length / 4)
+        let margin = max(Self.minimumMargin, length / Self.marginDivisor)
         windowStart = max(0, start - margin)
         windowEnd = min(characterCount, start + length + margin)
     }
@@ -341,11 +391,11 @@ struct PasteWindow: Equatable {
 
     /// The window now. Its end moves with the field's length, on the
     /// assumption that the edits are the user's corrections inside it, and
-    /// grows by at most twice the window, so typing on after the paste never
-    /// turns into reading a whole document.
+    /// grows to at most twice the window plus `growthAllowance`, so typing on
+    /// after the paste never turns into reading a whole document.
     func readRange(characterCount count: Int) -> CFRange {
         let size = windowEnd - windowStart
-        let end = min(count, windowEnd + (count - characterCount), windowStart + 2 * size + 1024)
+        let end = min(count, windowEnd + (count - characterCount), windowStart + 2 * size + Self.growthAllowance)
         return CFRange(location: windowStart, length: max(0, end - windowStart))
     }
 

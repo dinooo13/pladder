@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 @testable import PladderCore
 
@@ -29,19 +30,24 @@ final class FakeCorrectionReviewer: CorrectionReviewer, @unchecked Sendable {
     private let lock = NSLock()
     private let verdicts: [String: Bool]
     private let failing: Set<String>
+    private let failure: any Error
     private var _calls: [(heard: String, corrected: String, sentence: String)] = []
 
-    init(available: Bool = true, verdicts: [String: Bool] = [:], failing: Set<String> = []) {
+    init(
+        available: Bool = true, verdicts: [String: Bool] = [:], failing: Set<String> = [],
+        failure: any Error = Failure()
+    ) {
         isAvailable = available
         self.verdicts = verdicts
         self.failing = failing
+        self.failure = failure
     }
 
     var calls: [(heard: String, corrected: String, sentence: String)] { lock.withLock { _calls } }
 
     func isReusableCorrection(heard: String, corrected: String, sentence: String) async throws -> Bool {
         lock.withLock { _calls.append((heard, corrected, sentence)) }
-        if failing.contains(heard) { throw Failure() }
+        if failing.contains(heard) { throw failure }
         return verdicts[heard] ?? true
     }
 }
@@ -68,11 +74,15 @@ final class ProposalLog: @unchecked Sendable {
         reviewer: FakeCorrectionReviewer,
         dismissed: DismissedCorrections = temporaryDismissed(),
         dictionary: [DictionaryEntry] = [],
+        log: @escaping @Sendable (String) -> Void = { _ in },
+        waitUntilQuiet: @escaping @Sendable () async -> Void = {},
         proposals: ProposalLog
     ) -> CorrectionLearner {
         CorrectionLearner(
             observer: observer, reviewer: reviewer, dismissed: dismissed,
             dictionary: { dictionary },
+            log: log,
+            waitUntilQuiet: waitUntilQuiet,
             onProposal: { proposals.append($0) })
     }
 
@@ -201,10 +211,98 @@ final class ProposalLog: @unchecked Sendable {
         #expect(reviewer.calls.first?.corrected == "Claude")
     }
 
+    /// A recording or a polished dictation is in flight: the review waits
+    /// for the model to be free rather than eat into the polish budget.
+    @Test func theReviewWaitsUntilTheGateOpens() async {
+        let gate = Gate()
+        let observer = FakePasteObserver([Self.observation("I tried Claud today", "I tried Claude today")])
+        let reviewer = FakeCorrectionReviewer()
+        let proposals = ProposalLog()
+        let task = Self.learner(
+            observer: observer, reviewer: reviewer, waitUntilQuiet: { await gate.pass() }, proposals: proposals)
+            .pasted("I tried Claud today")
+
+        await gate.untilSomeoneWaits()
+        #expect(reviewer.calls.isEmpty)
+        #expect(proposals.pairs.isEmpty)
+
+        await gate.open()
+        await task.value
+        #expect(reviewer.calls.count == 1)
+        #expect(proposals.pairs == [claud])
+    }
+
+    @Test func theGateIsNotAskedWhenNothingIsReviewed() async {
+        let gate = Gate()
+        let observer = FakePasteObserver([Self.observation("see you on Friday then", "see you on Monday then")])
+        await Self.learner(
+            observer: observer, reviewer: FakeCorrectionReviewer(), waitUntilQuiet: { await gate.pass() },
+            proposals: ProposalLog())
+            .pasted("see you on Friday then").value
+        #expect(await gate.arrivals == 0)
+    }
+
+    /// A model error can quote the prompt, which is the user's words.
+    @Test func aReviewerErrorIsLoggedByCaseNotByText() async {
+        enum ModelError: Error { case generation(String) }
+        let observer = FakePasteObserver([Self.observation("I tried Claud today", "I tried Claude today")])
+        let reviewer = FakeCorrectionReviewer(
+            failing: ["Claud"], failure: ModelError.generation("HEARD: Claud SENTENCE: I tried Claud today"))
+        let lines = LogLines()
+        await Self.learner(observer: observer, reviewer: reviewer, log: { lines.append($0) }, proposals: ProposalLog())
+            .pasted("I tried Claud today").value
+        let failed = lines.all.first { $0.hasPrefix("review failed") }
+        #expect(failed?.hasSuffix(": ModelError.generation") == true)
+        #expect(failed?.contains("SENTENCE") == false)
+    }
+
+    @Test func errorsAreDescribedByTypeAndCase() {
+        enum Plain: Error { case timedOut }
+        struct Opaque: Error { let words = "secret" }
+        #expect(CorrectionLearner.describe(Plain.timedOut) == "Plain.timedOut")
+        #expect(CorrectionLearner.describe(Opaque()) == "Opaque")
+        let ns = NSError(domain: "FM", code: 7, userInfo: [NSLocalizedDescriptionKey: "secret"])
+        #expect(CorrectionLearner.describe(ns) == "NSError FM 7")
+    }
+
     @Test func aLongPasteIsCutAroundThePair() {
         let pasted = String(repeating: "word ", count: 200) + "Claud" + String(repeating: " word", count: 200)
         let sentence = CorrectionLearner.sentence(around: "Claud", in: pasted)
         #expect(sentence.count == CorrectionLearner.sentenceLimit)
         #expect(sentence.contains("Claud"))
     }
+}
+
+/// Holds everyone who passes until it is opened, and counts them.
+private actor Gate {
+    private var isOpen = false
+    private var waiting: [CheckedContinuation<Void, Never>] = []
+    private var watchers: [CheckedContinuation<Void, Never>] = []
+    private(set) var arrivals = 0
+
+    func pass() async {
+        arrivals += 1
+        for watcher in watchers { watcher.resume() }
+        watchers = []
+        guard !isOpen else { return }
+        await withCheckedContinuation { waiting.append($0) }
+    }
+
+    func open() {
+        isOpen = true
+        for waiter in waiting { waiter.resume() }
+        waiting = []
+    }
+
+    /// Returns once somebody has arrived at the gate.
+    func untilSomeoneWaits() async {
+        guard arrivals == 0 else { return }
+        await withCheckedContinuation { watchers.append($0) }
+    }
+}
+
+private final class LogLines: Sendable {
+    private let lines = Mutex<[String]>([])
+    var all: [String] { lines.withLock { $0 } }
+    func append(_ line: String) { lines.withLock { $0.append(line) } }
 }
