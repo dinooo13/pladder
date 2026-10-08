@@ -60,6 +60,29 @@ import Testing
         }
     }
 
+    @Test func aMarkAfterAnArticleIsTheNoun() async throws {
+        #expect(try await run("add a semicolon after the return") == "add a semicolon after the return")
+        #expect(try await run("the Oxford comma debate") == "the Oxford comma debate")
+        #expect(try await run("ein großes Fragezeichen dahinter") == "ein großes Fragezeichen dahinter")
+        #expect(try await run("Let's start a new paragraph here") == "Let's start a new paragraph here")
+        #expect(try await run("A semicolon joins two clauses") == "A semicolon joins two clauses")
+        #expect(try await run("falta un punto y coma aquí") == "falta un punto y coma aquí")
+    }
+
+    @Test func aMarkAfterANounOrAPronounIsStillDictated() async throws {
+        // "end" is no adjective, so "the end" is a whole noun phrase and the
+        // comma after it is dictated.
+        #expect(try await run("read it to the end comma and then stop") == "read it to the end, and then stop")
+        // "that" and "das" end a question as often as they start a noun
+        // phrase, so on their own they are no evidence.
+        #expect(try await run("What is that question mark") == "What is that?")
+        #expect(try await run("Was ist das Fragezeichen") == "Was ist das?")
+        // A capital A in mid-sentence is the letter, not the article.
+        #expect(try await run("take plan A comma not plan B") == "take plan A, not plan B")
+        // The speech model's own mark ends the noun phrase.
+        #expect(try await run("I read the book. Full stop.") == "I read the book.")
+    }
+
     @Test func spanishComaNeedsSpanishEvidence() async throws {
         #expect(try await run("The patient was in a coma for a week.", hint: { _ in "en" })
             == "The patient was in a coma for a week.")
