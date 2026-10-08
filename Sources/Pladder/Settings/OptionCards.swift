@@ -69,13 +69,7 @@ struct DesktopThumbnail<Content: View>: View {
     private var resolved: ColorScheme { scheme ?? environmentScheme }
 
     var body: some View {
-        LinearGradient(
-            colors: resolved == .dark
-                ? [Color(red: 0.30, green: 0.36, blue: 0.70), Color(red: 0.10, green: 0.12, blue: 0.32)]
-                : [Color(red: 0.62, green: 0.78, blue: 0.97), Color(red: 0.24, green: 0.46, blue: 0.88)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        DesktopWash(scheme: resolved)
         // Overlay rather than ZStack: a scaled-down pill still lays out at
         // its full size, and in a ZStack that would stretch the gradient so
         // the card only shows its middle. The card clips whatever hangs out.
@@ -149,8 +143,6 @@ private struct DiagonalHalf: Shape {
 struct OverlayStyleThumbnail: View {
     let style: OverlayStyle
     let glass: Bool
-
-    @Environment(\.colorScheme) private var scheme
 
     private static let previewLevel: Float = 0.55
 
@@ -251,5 +243,21 @@ struct AnimationSpeedThumbnail: View {
         case .quick: "hare.fill"
         case .expressive: "tortoise.fill"
         }
+    }
+}
+
+/// The diagonal wash a stand-in desktop is painted with, in the option cards
+/// and the README screenshots alike.
+struct DesktopWash: View {
+    let scheme: ColorScheme
+
+    var body: some View {
+        LinearGradient(
+            colors: scheme == .dark
+                ? [Color(red: 0.30, green: 0.36, blue: 0.70), Color(red: 0.10, green: 0.12, blue: 0.32)]
+                : [Color(red: 0.62, green: 0.78, blue: 0.97), Color(red: 0.24, green: 0.46, blue: 0.88)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
     }
 }

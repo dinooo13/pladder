@@ -24,8 +24,6 @@ struct LiveTranscriptText: View {
     /// into a window.
     static let maximumLines = 3
 
-    /// The font the words are drawn in, and the one they are measured in.
-    static let font = Font.system(size: 13, weight: .medium, design: .rounded)
 
     /// The text of the previous pass, for the settled/unsettled split. It is
     /// only a colour, so lagging one pass behind costs nothing.
@@ -63,7 +61,7 @@ struct LiveTranscriptText: View {
 
     var body: some View {
         Text(attributed)
-            .font(Self.font)
+            .font(PillMetrics.font)
             .multilineTextAlignment(.leading)
             // A backstop only: `shown` has already been cut to fit.
             .lineLimit(hugs ? 2 : Self.maximumLines)
@@ -92,15 +90,8 @@ struct LiveTranscriptText: View {
 /// release-to-paste path.
 @MainActor
 enum LiveTranscriptMetrics {
-    /// The 13 pt rounded medium the live row draws in, as an `NSFont` so it
-    /// can be measured.
-    static let font: NSFont = {
-        let base = NSFont.systemFont(ofSize: 13, weight: .medium)
-        guard let descriptor = base.fontDescriptor.withDesign(.rounded),
-              let rounded = NSFont(descriptor: descriptor, size: 13)
-        else { return base }
-        return rounded
-    }()
+    /// The face the live row draws in, as an `NSFont` so it can be measured.
+    static var font: NSFont { PillMetrics.nsFont }
 
     /// Height of one line of that font, laid out the way `boundingRect` lays
     /// the text out below.

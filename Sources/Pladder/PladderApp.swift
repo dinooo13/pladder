@@ -119,15 +119,12 @@ private struct MenuContent: View {
         Text(model.statusLine)
 
         if model.canRetryEngine {
-            Button("Retry Model Download") { model.coordinator.reloadEngine() }
+            Button("Retry Model Download") { model.retryEngine() }
         }
 
         if let last = model.lastTranscriptSummary {
             Divider()
-            Button("Last: \(last)") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(model.coordinator.lastTranscript?.text ?? "", forType: .string)
-            }
+            Button("Last: \(last)") { model.copyLastTranscript() }
         }
 
         // A correction the user made by hand after a paste, which the

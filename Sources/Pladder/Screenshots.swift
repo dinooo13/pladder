@@ -86,13 +86,7 @@ private struct Wallpaper: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: scheme == .dark
-                    ? [Color(red: 0.30, green: 0.36, blue: 0.70), Color(red: 0.10, green: 0.12, blue: 0.32)]
-                    : [Color(red: 0.62, green: 0.78, blue: 0.97), Color(red: 0.24, green: 0.46, blue: 0.88)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            DesktopWash(scheme: scheme)
             GeometryReader { proxy in
                 let w = proxy.size.width
                 let h = proxy.size.height

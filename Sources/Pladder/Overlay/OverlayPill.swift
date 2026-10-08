@@ -136,26 +136,26 @@ struct OverlayPill: View {
     private var compactContent: some View {
         switch state {
         case .recording(let level):
-            HStack(spacing: 10) {
+            HStack(spacing: PillMetrics.rowSpacing) {
                 RecordingDot()
                 LevelBars(level: level, count: 14, maxHeight: 32, opacity: 1, seeded: isPreview)
             }
         case .transcribing:
-            HStack(spacing: 10) {
+            HStack(spacing: PillMetrics.rowSpacing) {
                 ProgressView()
                     .controlSize(.small)
                 Text("Transcribing…")
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .font(PillMetrics.font)
                     .foregroundStyle(.primary)
             }
         case .polishing:
             // Only a dictation on its way to the refiner gets here, and it
             // waits seconds rather than milliseconds, so the pill says why.
-            HStack(spacing: 10) {
+            HStack(spacing: PillMetrics.rowSpacing) {
                 ProgressView()
                     .controlSize(.small)
                 Text("Polishing…")
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .font(PillMetrics.font)
                     .foregroundStyle(.primary)
             }
         case .copied:
@@ -166,7 +166,7 @@ struct OverlayPill: View {
                 Image(systemName: "doc.on.clipboard")
                     .foregroundStyle(.secondary)
                 Text("Copied — press ⌘V")
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .font(PillMetrics.font)
                     .foregroundStyle(.primary)
             }
         case .error(let failure):
@@ -174,7 +174,7 @@ struct OverlayPill: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
                 Text(failure.text)
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .font(PillMetrics.font)
                     .foregroundStyle(.primary)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -196,9 +196,9 @@ struct OverlayPill: View {
     private var liveContent: some View {
         switch state {
         case .recording(let level):
-            HStack(spacing: 10) {
+            HStack(spacing: PillMetrics.rowSpacing) {
                 RecordingDot()
-                LevelBars(level: level, count: 8, maxHeight: 24, opacity: 1, seeded: isPreview)
+                LevelBars(level: level, count: Self.liveBarCount, maxHeight: 24, opacity: 1, seeded: isPreview)
                 LiveTranscriptText(
                     text: partial ?? "",
                     hugs: hugsContent,
@@ -219,9 +219,13 @@ struct OverlayPill: View {
     /// shadow.
     static let liveRowWidth: CGFloat = 404
 
-    /// What the dot, the eight bars and the two 10 pt gaps take of that row.
-    /// The bars are 3 pt wide with 3 pt between them.
-    private static let liveRowLead: CGFloat = 8 + 10 + (8 * 3 + 7 * 3) + 10
+    /// The live row's meter is narrower than Compact's, to leave the words
+    /// room.
+    private static let liveBarCount = 8
+
+    /// What the dot, the meter and the two gaps take of that row.
+    private static let liveRowLead: CGFloat = PillMetrics.dotSize + PillMetrics.rowSpacing
+        + PillMetrics.barsWidth(count: liveBarCount) + PillMetrics.rowSpacing
 
     /// What is left of the row for the words. The text measures itself against
     /// this to decide how much of the tail fits in three lines.

@@ -293,6 +293,24 @@ final class AppModel {
             secureKeyboardEntry: hotkeys.usesCarbonForSecureInput)
     }
 
+    /// While a recorder field records a new chord, the monitor is down so
+    /// the keys being pressed cannot fire the old one.
+    func setHotkeySuspended(_ suspended: Bool) {
+        coordinator.isHotkeySuspended = suspended
+    }
+
+    /// The menu's "Retry Model Download".
+    func retryEngine() {
+        coordinator.reloadEngine()
+    }
+
+    /// The menu's "Last: …" line puts the whole transcript on the clipboard.
+    func copyLastTranscript() {
+        guard let text = coordinator.lastTranscript?.text else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+
     var canRetryEngine: Bool {
         if case .failed = coordinator.engineStatus { return true }
         return false
