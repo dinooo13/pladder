@@ -304,7 +304,7 @@ private let keyV: UInt16 = 0x09
     @Test func readsVersionOneModifierForm() throws {
         let json = #"{"keyCode":63,"kind":"modifier","modifiers":0}"#
         let hotkey = try JSONDecoder().decode(Hotkey.self, from: Data(json.utf8))
-        #expect(hotkey == .function)
+        #expect(hotkey == Hotkey(0x3F))  // Fn
     }
 
     @Test func readsVersionOneKeyFormWithMask() throws {
@@ -788,7 +788,7 @@ private let keyV: UInt16 = 0x09
 @Suite struct CancelKeyTests {
     private let escapeKey: UInt16 = 0x35
     private let keyD: UInt16 = 0x02
-    private static let escape = [HotkeyMonitorEvent(role: .dictate, event: .escape)]
+    private static let escape = [HotkeyMonitorEvent(.escape)]
 
     private func optionSpaceSet() -> HotkeyChordSet {
         HotkeyChordSet(chords: [.dictate: .optionSpace, .toggle: Hotkey(leftControl, 0x02)])

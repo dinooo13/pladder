@@ -110,7 +110,7 @@ public struct HotkeyChordSet: Sendable, Equatable {
             Set(trackers.filter(\.isEngaged).flatMap(\.hotkey.modifierKeyCodes)))
         guard Hotkey.collapsingSides(modifiers).isSubset(of: allowed) else { return nil }
         isSwallowingCancelKey = true
-        return Outcome(events: [HotkeyMonitorEvent(role: .dictate, event: .escape)], swallow: true)
+        return Outcome(events: [HotkeyMonitorEvent(.escape)], swallow: true)
     }
 
     public mutating func flagsChanged(

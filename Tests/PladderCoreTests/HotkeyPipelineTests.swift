@@ -35,10 +35,10 @@ private struct Pipeline {
 
     private mutating func act(_ outcome: HotkeyChordSet.Outcome, at instant: ContinuousClock.Instant) -> [HotkeyGestureTracker.Action] {
         outcome.events.compactMap { tagged in
-            switch tagged.event {
-            case .pressed: gesture.pressed(tagged.role, at: instant).action
-            case .released(let submit): gesture.released(tagged.role, submit: submit, at: instant).action
-            case .cancelled: gesture.interrupted(tagged.role).action
+            switch tagged.kind {
+            case .chord(let role, .pressed): gesture.pressed(role, at: instant).action
+            case .chord(let role, .released(let submit)): gesture.released(role, submit: submit, at: instant).action
+            case .chord(let role, .cancelled): gesture.interrupted(role).action
             case .escape: nil
             }
         }

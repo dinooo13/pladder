@@ -16,40 +16,43 @@ import PladderCore
 /// main thread being free (menu tracking, model loading, ...). The callback
 /// only takes a lock and yields to the stream.
 ///
-/// Creating a keyboard tap requires Accessibility trust; until it is granted
-/// `CGEvent.tapCreate` returns nil and we simply try again every couple of
-/// seconds, so the hotkey comes alive the moment the user ticks the box.
+/// Creating a keyboard tap requires Accessibility trust. `AppModel` keeps the
+/// Carbon monitor in charge until the grant arrives and only then swaps this
+/// one in, so a refused `CGEvent.tapCreate` is rare here, a grant revoked
+/// between the poll and the start say; it is retried every couple of seconds
+/// as a backstop, since there is no notification to wait for.
 ///
 /// Several chords share the tap through `HotkeyChordSet`, which also decides
 /// when Escape is the cancel key. Under Secure Event Input the tap sees no
 /// key-downs at all, so Escape cannot cancel on the tap then; a modifier-only
-/// chord keeps the tap in that state (see `AppModel.refreshPermissions`), and
-/// its recording ends by letting go, the next press, or the cap.
+/// chord keeps the tap in that state (see `HotkeySource`), and its recording
+/// ends by letting go, the next press, or the cap.
 ///
 /// Which keys are down is `HotkeyChordSet`'s business; this class only
-/// translates events and owns the tap. It is `@unchecked Sendable`: all mutable
-/// state lives behind `lock`, and the tap is created and torn down on the tap
-/// thread, whose run loop it is attached to.
+/// translates events and owns the tap. The session bookkeeping, start, stop
+/// and a stale install, is `HotkeyMonitorLifecycle`'s. It is
+/// `@unchecked Sendable`: all mutable state lives behind the lifecycle's
+/// lock, and the tap is created and torn down on the tap thread, whose run
+/// loop it is attached to. The tap holds the monitor retained, so the monitor
+/// outlives every callback, and lives until `stop` or the end of its stream
+/// takes the tap down.
 public final class GlobalHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
-    private struct State {
-        var continuation: AsyncStream<HotkeyMonitorEvent>.Continuation?
-        var chords: HotkeyChordSet?
+    private struct TapState: Sendable {
+        var chords: HotkeyChordSet
         var modifiers = ModifierKeyState()
-        var tap: TapHandle?
-        /// Bumped by every `start`/`stop` so an install that was scheduled onto
-        /// the tap thread and then superseded quietly does nothing.
-        var generation: UInt64 = 0
     }
 
-    private let lock = NSLock()
-    private var state = State()
-    private let thread = TapThread()
+    private let thread: TapThread
+    private let lifecycle: HotkeyMonitorLifecycle<TapHandle, TapState>
 
-    /// How long to wait before trying to create the tap again when Accessibility
-    /// has not been granted yet.
-    public var retryInterval: TimeInterval = 2
+    /// How long to wait before trying to create the tap again when
+    /// Accessibility has not been granted.
+    private let retryInterval: TimeInterval = 2
 
     public init() {
+        let thread = TapThread()
+        self.thread = thread
+        lifecycle = HotkeyMonitorLifecycle(tearDown: { tap in thread.perform { tap.tearDown() } })
         thread.start()
     }
 
@@ -62,104 +65,73 @@ public final class GlobalHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
 
     public func start(chords: [HotkeyRole: Hotkey], submitKey: Hotkey) -> AsyncStream<HotkeyMonitorEvent> {
         // Starting twice replaces the previous session rather than stacking taps.
-        stop()
-
-        let (stream, continuation) = AsyncStream<HotkeyMonitorEvent>.makeStream(
-            bufferingPolicy: .unbounded)
-
-        let generation: UInt64 = lock.withLock {
-            state.generation &+= 1
-            state.continuation = continuation
-            state.chords = HotkeyChordSet(chords: chords, submitKey: submitKey)
-            state.modifiers = ModifierKeyState()
-            return state.generation
+        let (stream, generation) = lifecycle.start { _ in
+            TapState(chords: HotkeyChordSet(chords: chords, submitKey: submitKey))
         }
-
-        // If the consumer drops the stream we must still take the tap down.
-        continuation.onTermination = { [weak self] _ in
-            self?.removeTap(generation: generation)
-        }
-
         thread.perform { [weak self] in
             self?.installTap(generation: generation)
         }
-
         return stream
     }
 
     public func stop() {
-        let (continuation, tap) = lock.withLock {
-            state.generation &+= 1
-            let result = (state.continuation, state.tap)
-            state.continuation = nil
-            state.chords = nil
-            state.tap = nil
-            return result
-        }
-        // finish() may run onTermination synchronously; the lock is released and
-        // the tap is already detached from `state`, so that is a no-op.
-        continuation?.finish()
-        removeTap(tap)
+        lifecycle.stop()
     }
 
     /// A flag flip under the lock, nothing else: the tap reads it on the next
     /// key event.
     public func setCancelKeyEnabled(_ enabled: Bool) {
-        lock.withLock { state.chords?.cancelKeyEnabled = enabled }
+        lifecycle.withSession { $0.state.chords.cancelKeyEnabled = enabled }
     }
 
     // MARK: Tap
 
     /// Tap thread only.
     private func installTap(generation: UInt64) {
-        guard lock.withLock({ state.generation == generation && state.tap == nil }) else { return }
+        guard lifecycle.needsResource(generation) else { return }
 
         let mask: CGEventMask =
             (1 << CGEventType.keyDown.rawValue)
             | (1 << CGEventType.keyUp.rawValue)
             | (1 << CGEventType.flagsChanged.rawValue)
-        let refcon = Unmanaged.passUnretained(self).toOpaque()
+        // Retained for as long as the tap can call back into it: released by
+        // `TapHandle.tearDown` once the port is invalidated, or below when no
+        // tap came of it.
+        let monitor = Unmanaged.passRetained(self)
         guard let port = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
             options: .defaultTap,
             eventsOfInterest: mask,
             callback: Self.tapCallback,
-            userInfo: refcon
-        ), let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, port, 0) else {
-            // Not trusted for Accessibility yet. Poll: there is no notification.
-            DispatchQueue.global().asyncAfter(deadline: .now() + retryInterval) { [weak self] in
-                self?.thread.perform { [weak self] in
-                    self?.installTap(generation: generation)
-                }
-            }
+            userInfo: monitor.toOpaque()
+        ) else {
+            // Not trusted for Accessibility. Poll: there is no notification.
+            monitor.release()
+            retryInstall(generation: generation)
+            return
+        }
+        guard let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, port, 0) else {
+            CFMachPortInvalidate(port)
+            monitor.release()
+            retryInstall(generation: generation)
             return
         }
 
         CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
         CGEvent.tapEnable(tap: port, enable: true)
-        let tap = TapHandle(port: port, source: source)
-
-        let stale: Bool = lock.withLock {
-            guard state.generation == generation else { return true }
-            state.tap = tap
-            return false
-        }
-        if stale { tap.tearDown() }
+        let tap = TapHandle(port: port, source: source, monitor: monitor)
+        // Superseded while it was being made: down at once, on this thread,
+        // before the run loop can hand it an event.
+        if !lifecycle.adopt(tap, for: generation) { tap.tearDown() }
     }
 
-    private func removeTap(generation: UInt64) {
-        let tap: TapHandle? = lock.withLock {
-            guard state.generation == generation else { return nil }
-            defer { state.tap = nil }
-            return state.tap
+    private func retryInstall(generation: UInt64) {
+        DispatchQueue.global().asyncAfter(deadline: .now() + retryInterval) { [weak self] in
+            self?.thread.perform { [weak self] in
+                self?.installTap(generation: generation)
+            }
         }
-        removeTap(tap)
-    }
-
-    private func removeTap(_ tap: TapHandle?) {
-        guard let tap else { return }
-        thread.perform { tap.tearDown() }
     }
 
     private static let tapCallback: CGEventTapCallBack = { _, type, event, refcon in
@@ -190,30 +162,27 @@ public final class GlobalHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
         // interruption window from it.
         let now = ContinuousClock.now
 
-        let (outcome, continuation) = lock.withLock {
-            () -> (HotkeyChordSet.Outcome, AsyncStream<HotkeyMonitorEvent>.Continuation?) in
-            guard state.chords != nil else { return (.init(), nil) }
+        // The mask asks for nothing else; the disabled notices went above.
+        guard type == .keyDown || type == .keyUp || type == .flagsChanged else { return false }
+        let isRepeat = type == .keyDown && event.getIntegerValueField(.keyboardEventAutorepeat) != 0
+        let step = lifecycle.withSession { session in
             let outcome: HotkeyChordSet.Outcome
-            switch type {
-            case .keyDown:
-                let isRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
-                outcome = state.chords!.keyDown(
-                    keyCode, isRepeat: isRepeat, modifiers: state.modifiers.held(flags: flags), at: now)
-            case .keyUp:
-                outcome = state.chords!.keyUp(
-                    keyCode, modifiers: state.modifiers.held(flags: flags), at: now)
-            case .flagsChanged:
-                let modifiers = state.modifiers.update(changedKey: keyCode, flags: flags)
-                outcome = state.chords!.flagsChanged(modifiers: modifiers, at: now)
-            default:
-                return (.init(), nil)
+            if type == .flagsChanged {
+                let modifiers = session.state.modifiers.update(changedKey: keyCode, flags: flags)
+                outcome = session.state.chords.flagsChanged(modifiers: modifiers, at: now)
+            } else {
+                let modifiers = session.state.modifiers.held(flags: flags)
+                outcome = type == .keyDown
+                    ? session.state.chords.keyDown(keyCode, isRepeat: isRepeat, modifiers: modifiers, at: now)
+                    : session.state.chords.keyUp(keyCode, modifiers: modifiers, at: now)
             }
-            return (outcome, state.continuation)
+            return (outcome: outcome, continuation: session.continuation)
         }
+        guard let (outcome, continuation) = step else { return false }
 
         for var event in outcome.events {
             event.instant = now
-            continuation?.yield(event)
+            continuation.yield(event)
         }
         return outcome.swallow
     }
@@ -222,34 +191,38 @@ public final class GlobalHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
     /// with a keyboard interrupt. Turn it back on and start from a clean slate,
     /// since events were missed while it was off.
     private func reenable() {
-        let (tap, events, continuation) = lock.withLock {
-            () -> (TapHandle?, [HotkeyMonitorEvent], AsyncStream<HotkeyMonitorEvent>.Continuation?) in
-            let events = state.chords?.reset() ?? []
-            state.modifiers = ModifierKeyState()
-            return (state.tap, events, state.continuation)
+        let reset = lifecycle.withSession { session in
+            session.state.modifiers = ModifierKeyState()
+            return (tap: session.resource, events: session.state.chords.reset(), continuation: session.continuation)
         }
-        if let tap { CGEvent.tapEnable(tap: tap.port, enable: true) }
+        guard let reset else { return }
+        if let tap = reset.tap { CGEvent.tapEnable(tap: tap.port, enable: true) }
         let now = ContinuousClock.now
-        for var event in events {
+        for var event in reset.events {
             event.instant = now
-            continuation?.yield(event)
+            reset.continuation.yield(event)
         }
     }
 
     // MARK: Helpers
 
-    /// The tap and its run loop source. Neither Core Foundation type is
-    /// `Sendable`; they are only ever touched on the tap thread, so boxing them
-    /// to hop there is safe.
+    /// The tap, its run loop source and the retained monitor its callback
+    /// reads. Neither Core Foundation type is `Sendable`; they are only ever
+    /// touched on the tap thread, so boxing them to hop there is safe.
     private struct TapHandle: @unchecked Sendable {
         let port: CFMachPort
         let source: CFRunLoopSource
+        let monitor: Unmanaged<GlobalHotkeyMonitor>
 
-        /// Tap thread only.
+        /// Tap thread only, and exactly once per tap: by the lifecycle for an
+        /// adopted one, by `installTap` for one it refused.
         func tearDown() {
             CGEvent.tapEnable(tap: port, enable: false)
             CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes)
             CFMachPortInvalidate(port)
+            // Last: the callback runs on this thread, and none can follow an
+            // invalidated port.
+            monitor.release()
         }
     }
 

@@ -39,33 +39,29 @@ import os
 /// listened for. See `Hotkey.standInWithoutAccessibility`.
 ///
 /// Carbon delivers its events on the main run loop, and registration is main
-/// thread work, so everything hops there. Mutable state lives behind `lock`
-/// because the protocol is `Sendable` and callers are not all on the main
-/// actor.
+/// thread work, so everything hops there. Mutable state lives behind the
+/// lock of `HotkeyMonitorLifecycle`, which also does the session bookkeeping
+/// it shares with the tap, because the protocol is `Sendable` and callers are
+/// not all on the main actor. The event handler holds the monitor retained,
+/// so the monitor outlives every event it is handed, and lives until `stop`
+/// or the end of its stream removes the handler.
 public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
-    private struct State {
-        var continuation: AsyncStream<HotkeyMonitorEvent>.Continuation?
-        var registration: Registration?
-        /// The role behind each hot key ID of the current session.
-        var roles: [UInt32: HotkeyRole] = [:]
-        /// Carbon repeats `kEventHotKeyPressed` while the key is held on some
-        /// configurations, and a release can arrive with nothing pressed
-        /// after a `stop()`; this makes each role's events strictly
-        /// alternating.
-        var pressed: Set<HotkeyRole> = []
+    private struct SessionState: Sendable {
+        /// The session's hot key IDs and which roles are pressed.
+        var hotKeys: CarbonHotkeySession
         /// Escape, registered only while a recording is on.
         var cancelKey: CancelKey?
         /// What the coordinator last asked for. Remembered so an enable that
         /// lands before the session's registration is honoured by it.
         var cancelKeyWanted = false
-        /// Bumped by every `start`/`stop` so a registration that was scheduled
-        /// onto the main thread and then superseded quietly undoes itself, and
-        /// so events for an old hot key are ignored.
-        var generation: UInt32 = 0
     }
 
-    private let lock = NSLock()
-    private var state = State()
+    private let lifecycle = HotkeyMonitorLifecycle<Registration, SessionState>(
+        tearDown: { registration in CarbonHotkeyMonitor.onMainThread { registration.tearDown() } },
+        ended: { state in
+            guard let cancelKey = state.cancelKey else { return }
+            CarbonHotkeyMonitor.onMainThread { UnregisterEventHotKey(cancelKey.hotKey) }
+        })
 
     private static let log = Logger(subsystem: "de.dinooo13.pladder", category: "hotkey")
 
@@ -77,30 +73,15 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
     public init() {}
 
     deinit {
-        // `stop()` hands the registration to a static helper, so nothing
-        // escapes self here.
+        // Only once no handler holds the monitor; this ends the stream and
+        // takes Escape down if a recording was still on.
         stop()
     }
 
     // MARK: HotkeyMonitor
 
     public func start(chords: [HotkeyRole: Hotkey], submitKey: Hotkey) -> AsyncStream<HotkeyMonitorEvent> {
-        // Starting twice replaces the previous session rather than stacking
-        // registrations, the same rule `GlobalHotkeyMonitor` follows.
-        stop()
-
-        let (stream, continuation) = AsyncStream<HotkeyMonitorEvent>.makeStream(
-            bufferingPolicy: .unbounded)
-
-        let generation: UInt32 = lock.withLock {
-            state.generation &+= 1
-            state.continuation = continuation
-            state.pressed = []
-            state.roles = [:]
-            return state.generation
-        }
-
-        var entries: [HotKeyEntry] = []
+        var registrable: [(role: HotkeyRole, keyCode: UInt32, modifiers: UInt32)] = []
         for (role, chord) in chords.sorted(by: { $0.key < $1.key }) where !chord.isEmpty {
             guard chord.canBeRegisteredWithoutAccessibility,
                   let keyCode = chord.regularKeyCodes.first else {
@@ -117,61 +98,41 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
                 )
                 continue
             }
-            entries.append(HotKeyEntry(
-                role: role,
-                id: Self.hotKeyID(generation: generation, role: role),
-                keyCode: UInt32(keyCode),
-                modifiers: chord.carbonModifierMask))
-        }
-        lock.withLock {
-            guard state.generation == generation else { return }
-            for entry in entries { state.roles[entry.id] = entry.role }
+            registrable.append((role, UInt32(keyCode), chord.carbonModifierMask))
         }
 
-        // If the consumer drops the stream the hot keys must still go away.
-        continuation.onTermination = { [weak self] _ in
-            self?.unregister(generation: generation)
+        // Starting twice replaces the previous session rather than stacking
+        // registrations, the same rule `GlobalHotkeyMonitor` follows.
+        let (stream, generation) = lifecycle.start { generation in
+            SessionState(hotKeys: CarbonHotkeySession(generation: generation, roles: registrable.map(\.role)))
         }
-
-        guard !entries.isEmpty else { return stream }
-        onMain { [weak self, entries] in
+        guard !registrable.isEmpty else { return stream }
+        let entries = registrable.map {
+            HotKeyEntry(
+                role: $0.role,
+                id: CarbonHotkeySession.hotKeyID(generation: generation, role: $0.role),
+                keyCode: $0.keyCode,
+                modifiers: $0.modifiers)
+        }
+        Self.onMainThread { [weak self] in
             self?.register(entries, generation: generation)
         }
-
         return stream
     }
 
     public func stop() {
-        let (continuation, registration) = lock.withLock {
-            () -> (AsyncStream<HotkeyMonitorEvent>.Continuation?, Registration?) in
-            state.generation &+= 1
-            let result = (state.continuation, state.registration)
-            state.continuation = nil
-            state.registration = nil
-            state.roles = [:]
-            state.pressed = []
-            return result
-        }
-        let cancelKey: CancelKey? = lock.withLock {
-            defer { state.cancelKey = nil; state.cancelKeyWanted = false }
-            return state.cancelKey
-        }
-        // `finish()` may run `onTermination` synchronously; the lock is
-        // released and the registration is already detached, so that is a
-        // no-op.
-        continuation?.finish()
-        Self.tearDown(registration)
-        Self.tearDown(cancelKey)
+        lifecycle.stop()
     }
 
     /// Never registers or unregisters inline: the coordinator calls this on
     /// the release path, and a Carbon call there would wait on the window
     /// server. The main queue does it straight after.
     public func setCancelKeyEnabled(_ enabled: Bool) {
-        let generation: UInt32 = lock.withLock {
-            state.cancelKeyWanted = enabled
-            return state.generation
+        let generation = lifecycle.withSession { session in
+            session.state.cancelKeyWanted = enabled
+            return session.generation
         }
+        guard let generation else { return }
         DispatchQueue.main.async { [weak self] in
             self?.syncCancelKey(generation: generation)
         }
@@ -179,12 +140,24 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
 
     // MARK: Registration
 
-    /// The session's hot keys and the one event handler that feeds them all.
-    /// Neither Carbon type is `Sendable`; both are only ever created and
-    /// destroyed on the main thread, so boxing them to hop there is safe.
+    /// The session's hot keys, the one event handler that feeds them all,
+    /// and the monitor that handler reads, retained. Neither Carbon type is
+    /// `Sendable`; both are only ever created and destroyed on the main
+    /// thread, so boxing them to hop there is safe.
     private struct Registration: @unchecked Sendable {
-        var hotKeys: [EventHotKeyRef]
-        var handler: EventHandlerRef?
+        let hotKeys: [EventHotKeyRef]
+        let handler: EventHandlerRef
+        let monitor: Unmanaged<CarbonHotkeyMonitor>
+
+        /// Main thread only, and exactly once per registration: by the
+        /// lifecycle for an adopted one, by `register` for one it refused.
+        func tearDown() {
+            for hotKey in hotKeys { UnregisterEventHotKey(hotKey) }
+            RemoveEventHandler(handler)
+            // Last: events arrive on this thread, and none can follow the
+            // handler's removal.
+            monitor.release()
+        }
     }
 
     /// Escape's hot key. Only ever created and destroyed on the main thread.
@@ -201,22 +174,9 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
         var modifiers: UInt32
     }
 
-    /// The generation in the high bits and the role's index in the low three,
-    /// so one session's hot keys are told apart and an old session's ignored.
-    private static func hotKeyID(generation: UInt32, role: HotkeyRole) -> UInt32 {
-        let index = UInt32(HotkeyRole.allCases.firstIndex(of: role) ?? 0)
-        return (generation &<< 3) | index
-    }
-
-    /// The cancel key takes the last of the eight slots, clear of the roles.
-    private static func cancelKeyID(generation: UInt32) -> UInt32 {
-        (generation &<< 3) | 7
-    }
-
     /// Main thread only.
-    private func register(_ entries: [HotKeyEntry], generation: UInt32) {
-        guard lock.withLock({ state.generation == generation && state.registration == nil })
-        else { return }
+    private func register(_ entries: [HotKeyEntry], generation: UInt64) {
+        guard lifecycle.needsResource(generation) else { return }
 
         var specs = [
             EventTypeSpec(
@@ -226,12 +186,16 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
                 eventClass: OSType(kEventClassKeyboard),
                 eventKind: UInt32(kEventHotKeyReleased)),
         ]
+        // Retained for as long as the handler can call back into it:
+        // released by `Registration.tearDown` once the handler is removed, or
+        // below when no registration came of it.
+        let monitor = Unmanaged.passRetained(self)
         var handler: EventHandlerRef?
-        let refcon = Unmanaged.passUnretained(self).toOpaque()
         let installed = InstallEventHandler(
             GetApplicationEventTarget(), Self.eventHandler,
-            specs.count, &specs, refcon, &handler)
-        guard installed == noErr else {
+            specs.count, &specs, monitor.toOpaque(), &handler)
+        guard installed == noErr, let handler else {
+            monitor.release()
             Self.log.error("Could not install the hot key handler (\(installed, privacy: .public))")
             return
         }
@@ -256,16 +220,15 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
         }
         guard !hotKeys.isEmpty else {
             RemoveEventHandler(handler)
+            monitor.release()
             return
         }
 
-        let registration = Registration(hotKeys: hotKeys, handler: handler)
-        let stale: Bool = lock.withLock {
-            guard state.generation == generation else { return true }
-            state.registration = registration
-            return false
+        let registration = Registration(hotKeys: hotKeys, handler: handler, monitor: monitor)
+        guard lifecycle.adopt(registration, for: generation) else {
+            registration.tearDown()
+            return
         }
-        if stale { Self.tearDown(registration) }
         // A recording that started before the handler was in place.
         syncCancelKey(generation: generation)
     }
@@ -274,23 +237,26 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
     /// coordinator last asked for. Needs the session's handler, which only
     /// exists once a chord registered; without one no recording can start
     /// from this monitor anyway.
-    private func syncCancelKey(generation: UInt32) {
-        let (wanted, current, hasHandler) = lock.withLock { () -> (Bool, CancelKey?, Bool) in
-            guard state.generation == generation else { return (false, nil, false) }
-            return (state.cancelKeyWanted, state.cancelKey, state.registration != nil)
+    private func syncCancelKey(generation: UInt64) {
+        let snapshot = lifecycle.withSession(generation) { session in
+            (wanted: session.state.cancelKeyWanted, current: session.state.cancelKey,
+             registered: session.resource != nil, id: session.state.hotKeys.cancelKeyID)
         }
-        if !wanted, let current {
-            let taken: Bool = lock.withLock {
-                guard state.generation == generation, state.cancelKey != nil else { return false }
-                state.cancelKey = nil
+        guard let snapshot else { return }
+        if !snapshot.wanted, let current = snapshot.current {
+            // Taken under the lock, so a session ending meanwhile, whose
+            // `ended` unregisters it too, cannot unregister it twice.
+            let taken = lifecycle.withSession(generation) { session -> Bool in
+                guard session.state.cancelKey != nil else { return false }
+                session.state.cancelKey = nil
                 return true
-            }
+            } ?? false
             if taken { UnregisterEventHotKey(current.hotKey) }
             return
         }
-        guard wanted, current == nil, hasHandler else { return }
+        guard snapshot.wanted, snapshot.current == nil, snapshot.registered else { return }
         var hotKey: EventHotKeyRef?
-        let id = EventHotKeyID(signature: Self.signature, id: Self.cancelKeyID(generation: generation))
+        let id = EventHotKeyID(signature: Self.signature, id: snapshot.id)
         let registered = RegisterEventHotKey(
             UInt32(kVK_Escape), 0, id, GetApplicationEventTarget(), 0, &hotKey)
         guard registered == noErr, let hotKey else {
@@ -301,36 +267,12 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
             }
             return
         }
-        let stale: Bool = lock.withLock {
-            guard state.generation == generation, state.cancelKeyWanted, state.cancelKey == nil
-            else { return true }
-            state.cancelKey = CancelKey(hotKey: hotKey)
-            return false
-        }
-        if stale { UnregisterEventHotKey(hotKey) }
-    }
-
-    private func unregister(generation: UInt32) {
-        let registration: Registration? = lock.withLock {
-            guard state.generation == generation else { return nil }
-            defer { state.registration = nil }
-            return state.registration
-        }
-        Self.tearDown(registration)
-    }
-
-    private static func tearDown(_ cancelKey: CancelKey?) {
-        guard let cancelKey else { return }
-        onMainThread { UnregisterEventHotKey(cancelKey.hotKey) }
-    }
-
-    private static func tearDown(_ registration: Registration?) {
-        guard let registration,
-              !registration.hotKeys.isEmpty || registration.handler != nil else { return }
-        onMainThread {
-            for hotKey in registration.hotKeys { UnregisterEventHotKey(hotKey) }
-            if let handler = registration.handler { RemoveEventHandler(handler) }
-        }
+        let kept = lifecycle.withSession(generation) { session -> Bool in
+            guard session.state.cancelKeyWanted, session.state.cancelKey == nil else { return false }
+            session.state.cancelKey = CancelKey(hotKey: hotKey)
+            return true
+        } ?? false
+        if !kept { UnregisterEventHotKey(hotKey) }
     }
 
     // MARK: Events
@@ -341,6 +283,7 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
         return monitor.handle(event)
     }
 
+    /// Main thread only, as Carbon delivers it.
     private func handle(_ event: EventRef) -> OSStatus {
         var id = EventHotKeyID()
         let read = GetEventParameter(
@@ -350,45 +293,23 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
         guard read == noErr, id.signature == Self.signature else {
             return OSStatus(eventNotHandledErr)
         }
+        let kind = Int(GetEventKind(event))
+        guard kind == kEventHotKeyPressed || kind == kEventHotKeyReleased else { return noErr }
 
-        let kind = GetEventKind(event)
         let now = ContinuousClock.now
-        let (outcome, continuation) = lock.withLock {
-            () -> (HotkeyMonitorEvent?, AsyncStream<HotkeyMonitorEvent>.Continuation?) in
-            // Escape while a recording is on. Only its press matters, and
-            // one that lands after it was let go is ignored.
-            if id.id == Self.cancelKeyID(generation: state.generation) {
-                guard Int(kind) == kEventHotKeyPressed, state.cancelKey != nil else { return (nil, nil) }
-                return (HotkeyMonitorEvent(role: .dictate, event: .escape, instant: now), state.continuation)
-            }
-            // An event for a hot key we have already replaced.
-            guard id.id >> 3 == state.generation & (UInt32.max >> 3),
-                  let role = state.roles[id.id] else { return (nil, nil) }
-            switch Int(kind) {
-            case kEventHotKeyPressed:
-                guard state.pressed.insert(role).inserted else { return (nil, nil) }
-                return (HotkeyMonitorEvent(role: role, event: .pressed, instant: now), state.continuation)
-            case kEventHotKeyReleased:
-                guard state.pressed.remove(role) != nil else { return (nil, nil) }
-                // No send key here: posting the Return it asks for needs the
-                // grant this monitor exists to do without.
-                return (
-                    HotkeyMonitorEvent(role: role, event: .released(submit: false), instant: now),
-                    state.continuation)
-            default:
-                return (nil, nil)
-            }
+        let step = lifecycle.withSession { session in
+            let meaning = session.state.hotKeys.event(
+                id: id.id, isPress: kind == kEventHotKeyPressed,
+                cancelKeyRegistered: session.state.cancelKey != nil)
+            return (meaning: meaning, continuation: session.continuation)
         }
-
-        if let outcome { continuation?.yield(outcome) }
+        if let step, let meaning = step.meaning {
+            step.continuation.yield(HotkeyMonitorEvent(meaning, instant: now))
+        }
         return noErr
     }
 
     // MARK: Helpers
-
-    private func onMain(_ block: @escaping @Sendable () -> Void) {
-        Self.onMainThread(block)
-    }
 
     private static func onMainThread(_ block: @escaping @Sendable () -> Void) {
         if Thread.isMainThread {

@@ -89,13 +89,13 @@ private func event(_ role: HotkeyRole, _ event: HotkeyEvent) -> HotkeyMonitorEve
         #expect(set.keyUp(space, modifiers: [leftControl]).events == [event(.toggle, .released(submit: true))])
     }
 
-    @Test func eventsComeInRoleOrder() {
-        // Built in the other order; the events still come out dictate first.
+    @Test func endsComeBeforePressesWhicheverRoleIsBuiltFirst() {
+        // Built in the other order; the end still comes out first.
         let start = ContinuousClock.now
         var set = HotkeyChordSet(chords: [.toggle: Hotkey(rightCommand, rightOption), .dictate: .rightCommand])
         _ = set.flagsChanged(modifiers: [rightCommand], at: start)
         let handOver = set.flagsChanged(modifiers: [rightCommand, rightOption], at: start + .milliseconds(10))
-        #expect(handOver.events.map(\.role) == [.dictate, .toggle])
+        #expect(handOver.events == [event(.dictate, .cancelled), event(.toggle, .pressed)])
     }
 }
 
