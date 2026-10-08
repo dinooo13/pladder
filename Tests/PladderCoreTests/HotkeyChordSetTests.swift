@@ -98,3 +98,34 @@ private func event(_ role: HotkeyRole, _ event: HotkeyEvent) -> HotkeyMonitorEve
         #expect(handOver.events.map(\.role) == [.dictate, .toggle])
     }
 }
+
+/// The hand-over the other way round: the shorter chord is the toggle chord.
+/// Whatever the roles, a keystroke that ends one chord and engages another
+/// reports the end first, so the gesture tracker has let go of the first
+/// before it hears of the second.
+@Suite struct ReversedNestingTests {
+    private let start = ContinuousClock.now
+
+    private func reversed() -> HotkeyChordSet {
+        HotkeyChordSet(chords: [.toggle: .rightCommand, .dictate: Hotkey(rightCommand, rightOption)])
+    }
+
+    @Test func insideTheWindowTheToggleIsCancelledBeforeDictatePresses() {
+        var set = reversed()
+        #expect(set.flagsChanged(modifiers: [rightCommand], at: start) == .init(events: [event(.toggle, .pressed)]))
+        #expect(
+            set.flagsChanged(modifiers: [rightCommand, rightOption], at: start + .milliseconds(100))
+                == .init(events: [event(.toggle, .cancelled), event(.dictate, .pressed)]))
+        #expect(
+            set.flagsChanged(modifiers: [], at: start + .seconds(3))
+                == .init(events: [event(.dictate, .released(submit: false))]))
+    }
+
+    @Test func pastTheWindowTheToggleIsReleasedBeforeDictatePresses() {
+        var set = reversed()
+        _ = set.flagsChanged(modifiers: [rightCommand], at: start)
+        #expect(
+            set.flagsChanged(modifiers: [rightCommand, rightOption], at: start + .milliseconds(1500))
+                == .init(events: [event(.toggle, .released(submit: false)), event(.dictate, .pressed)]))
+    }
+}

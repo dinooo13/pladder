@@ -124,8 +124,12 @@ public struct HotkeyGestureTracker: Sendable {
             phase = .idle
             return Outcome(action: .stop(submit: false))
         case .held, .settling:
-            // A second chord while one is held: its own tracker has already
-            // released or interrupted the first, and that event is what acts.
+            // A second chord while one is held. Only nested chords get here,
+            // and `HotkeyChordSet` reports the first chord's end before the
+            // second's press, whichever role is the shorter, so that end has
+            // already acted: a cancel or a stop leaves this idle, a toggle
+            // release leaves it latched. What is left is a hand-over past the
+            // window while releases are deferred, whose stop is on its way.
             return Outcome()
         }
     }
