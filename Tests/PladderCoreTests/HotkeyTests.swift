@@ -868,11 +868,90 @@ private let keyV: UInt16 = 0x09
         #expect(set.flagsChanged(modifiers: []).events == [HotkeyMonitorEvent(role: .dictate, event: .released(submit: true))])
     }
 
+    @Test func aLostEscapeKeyUpDoesNotEatTheNextOne() {
+        var set = optionSpaceSet()
+        set.cancelKeyEnabled = true
+        _ = set.keyDown(escapeKey, modifiers: [])
+        // Its key-up is lost; the recording ends.
+        set.cancelKeyEnabled = false
+        // The next Escape is the system's, down and up.
+        #expect(set.keyDown(escapeKey, modifiers: []) == .init())
+        #expect(set.keyUp(escapeKey, modifiers: []) == .init())
+    }
+
     @Test func resetKeepsTheCancelKey() {
         var set = optionSpaceSet()
         set.cancelKeyEnabled = true
         _ = set.reset()
         #expect(set.cancelKeyEnabled)
         #expect(set.keyDown(escapeKey, modifiers: []).events == Self.escape)
+    }
+}
+
+/// A key-up that never arrives: a tap that missed it, Secure Event Input
+/// switched on between key-down and key-up. The regular key must not stay
+/// held in the tracker's books.
+@Suite struct LostKeyUpTests {
+    private let t0 = ContinuousClock.now
+    private func at(_ ms: Int) -> ContinuousClock.Instant { t0 + .milliseconds(ms) }
+
+    /// Option+Space pressed, Space's key-up lost, Option let go.
+    private func afterALostSpaceKeyUp() -> HotkeyChordTracker {
+        var t = HotkeyChordTracker(hotkey: .optionSpace)
+        _ = t.flagsChanged(modifiers: [leftOption], at: at(0))
+        _ = t.keyDown(space, modifiers: [leftOption], at: at(10))
+        _ = t.flagsChanged(modifiers: [], at: at(2_000))
+        return t
+    }
+
+    @Test func letGoOfOptionReleasesAsUsual() {
+        var t = HotkeyChordTracker(hotkey: .optionSpace)
+        _ = t.flagsChanged(modifiers: [leftOption], at: at(0))
+        #expect(t.keyDown(space, modifiers: [leftOption], at: at(10)) == .init(event: .pressed, swallow: true))
+        #expect(t.flagsChanged(modifiers: [], at: at(2_000)) == .init(event: .released(submit: false)))
+    }
+
+    @Test func aLoneOptionDoesNotPress() {
+        var t = afterALostSpaceKeyUp()
+        #expect(t.flagsChanged(modifiers: [leftOption], at: at(5_000)) == .init())
+        #expect(t.flagsChanged(modifiers: [], at: at(5_100)) == .init())
+        #expect(t.flagsChanged(modifiers: [rightOption], at: at(6_000)) == .init())
+        #expect(t.flagsChanged(modifiers: [], at: at(6_100)) == .init())
+    }
+
+    @Test func aRealOptionSpaceStillPresses() {
+        var t = afterALostSpaceKeyUp()
+        #expect(t.flagsChanged(modifiers: [leftOption], at: at(5_000)) == .init())
+        #expect(t.keyDown(space, modifiers: [leftOption], at: at(5_010)) == .init(event: .pressed, swallow: true))
+        #expect(t.keyUp(space, modifiers: [leftOption], at: at(7_000)) == .init(event: .released(submit: false), swallow: true))
+        #expect(t.flagsChanged(modifiers: [], at: at(7_100)) == .init())
+    }
+
+    @Test func theNextSpaceIsTypedNormally() {
+        // The Space still counted as swallowed would eat the next one typed.
+        var t = afterALostSpaceKeyUp()
+        #expect(t.keyDown(space, modifiers: [], at: at(5_000)) == .init())
+        #expect(t.keyUp(space, modifiers: [], at: at(5_050)) == .init())
+    }
+
+    @Test func aFreshKeyDownWhileEngagedKeepsThePress() {
+        // The key-up was lost mid-hold and the key went down again: still
+        // the chord, still swallowed, and its key-up releases it.
+        var t = HotkeyChordTracker(hotkey: .optionSpace)
+        _ = t.flagsChanged(modifiers: [leftOption], at: at(0))
+        _ = t.keyDown(space, modifiers: [leftOption], at: at(10))
+        #expect(t.keyDown(space, modifiers: [leftOption], at: at(1_500)) == .init(swallow: true))
+        #expect(t.isEngaged)
+        #expect(t.keyUp(space, modifiers: [leftOption], at: at(3_000)) == .init(event: .released(submit: false), swallow: true))
+    }
+
+    @Test func aChordWithTwoModifiersAlsoForgetsTheKey() {
+        let controlShiftSpace = Hotkey(leftControl, leftShift, space)
+        var t = HotkeyChordTracker(hotkey: controlShiftSpace)
+        _ = t.flagsChanged(modifiers: [leftControl, leftShift], at: at(0))
+        #expect(t.keyDown(space, modifiers: [leftControl, leftShift], at: at(10)) == .init(event: .pressed, swallow: true))
+        // Space's key-up lost; Shift let go, Control kept.
+        #expect(t.flagsChanged(modifiers: [leftControl], at: at(2_000)) == .init(event: .released(submit: false)))
+        #expect(t.flagsChanged(modifiers: [leftControl, leftShift], at: at(4_000)) == .init())
     }
 }
