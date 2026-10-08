@@ -25,7 +25,8 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
     public static let engineID = EngineID("parakeet-tdt-v3-incremental")
 
     public nonisolated let id = FluidAudioIncrementalEngine.engineID
-    public nonisolated let displayName = "Parakeet TDT v3 (incremental)"
+    /// The catalog's name, so the picker and the CLI's bench header agree.
+    public nonisolated var displayName: String { StandardEngines.parakeet.displayName }
     public private(set) var status: EngineStatus = .unloaded
 
     private let version: AsrModelVersion
