@@ -69,6 +69,23 @@ public final class PasteboardOutput: TextOutput {
 
     private static let log = Logger(subsystem: "de.dinooo13.pladder", category: "paste")
 
+    /// The Return the last send still owes, until it is posted.
+    private let owedReturn = Mutex<OwedReturn?>(nil)
+
+    /// Posted once, by whichever comes first: its own timer, or the next
+    /// paste, which must not go out ahead of it.
+    private final class OwedReturn: Sendable {
+        private let taken = Mutex(false)
+
+        /// True for the one caller that gets to post it.
+        func claim() -> Bool {
+            taken.withLock { taken in
+                defer { taken = true }
+                return !taken
+            }
+        }
+    }
+
     public convenience init(
         restoreFloor: Duration = .milliseconds(400),
         readSettle: Duration = .milliseconds(200),
@@ -92,7 +109,8 @@ public final class PasteboardOutput: TextOutput {
         pasteboard: NSPasteboard.Name,
         poster: any KeyPoster,
         isTrusted: @escaping @Sendable () -> Bool,
-        clock: PasteClock
+        clock: PasteClock,
+        snapshotLimit: Int = ClipboardSnapshot.maximumItemBytes
     ) {
         self.restoreFloor = restoreFloor
         self.readSettle = readSettle
@@ -104,7 +122,8 @@ public final class PasteboardOutput: TextOutput {
         self.clock = clock
         keeper = ClipboardKeeper(
             pasteboard: pasteboard, restoreFloor: restoreFloor, readSettle: readSettle,
-            restoreCap: restoreCap, propagationDelay: propagationDelay, clock: clock)
+            restoreCap: restoreCap, propagationDelay: propagationDelay, clock: clock,
+            snapshotLimit: snapshotLimit)
     }
 
     /// Called at key-down, while the user is still speaking, and safe to call
@@ -137,6 +156,12 @@ public final class PasteboardOutput: TextOutput {
         }
 
         let key = pasteKey.withLock { $0 }
+        // A send just before this one still waiting for its target to read:
+        // its Return goes now, ahead of this Cmd+V. Waited out, it could land
+        // after this paste and send both texts.
+        if let owed = owedReturn.withLock({ $0.take() }), owed.claim() {
+            postReturn()
+        }
         let paste = try await keeper.paste(text) { [poster] in
             try poster.post(key, flags: .maskCommand)
         }
@@ -151,22 +176,32 @@ public final class PasteboardOutput: TextOutput {
     /// Posts Return once the paste has landed: `submitDelay` after the target
     /// app first reads the transcript, or at `restoreFloor` after Cmd+V if it
     /// has not read it by then, so a target that never reads still gets its
-    /// Return. A fixed delay after Cmd+V sent a busy page its Return before
-    /// the paste it was meant to send (issue #40's case).
+    /// Return. An app that reads late, busy when Cmd+V arrived, gets the text
+    /// before the Return rather than after. Chromium sometimes reads once as
+    /// Cmd+V arrives, before the page pastes; that read starts the delay too,
+    /// so there the Return comes as early as it always did and relies on the
+    /// page handling its input in order.
     ///
     /// The paste has been posted, so the Return follows it whatever happens
     /// to this insert from here on: detached, so cancelling the caller
     /// cannot skip it.
     private func sendReturn(after paste: ClipboardKeeper.Paste) {
         let cap = paste.posted + restoreFloor
-        Task.detached(priority: .userInitiated) { [keeper, poster, clock, submitDelay] in
+        let owed = OwedReturn()
+        owedReturn.withLock { $0 = owed }
+        Task.detached(priority: .userInitiated) { [self, keeper, clock, submitDelay] in
             let read = await keeper.firstRead(of: paste.promise, by: cap)
             try? await clock.sleep(read.map { $0 + submitDelay } ?? cap)
-            do {
-                try poster.post(Self.virtualKeyReturn, flags: [])
-            } catch {
-                Self.log.error("Return not posted: \(String(describing: error), privacy: .public)")
-            }
+            guard owed.claim() else { return }
+            postReturn()
+        }
+    }
+
+    private func postReturn() {
+        do {
+            try poster.post(Self.virtualKeyReturn, flags: [])
+        } catch {
+            Self.log.error("Return not posted: \(String(describing: error), privacy: .public)")
         }
     }
 }
