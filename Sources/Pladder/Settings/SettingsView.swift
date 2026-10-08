@@ -84,8 +84,8 @@ private struct GeneralSettingsView: View {
                         onRecordingChanged: { model.coordinator.isHotkeySuspended = $0 },
                         // The send key is off without Accessibility anyway, so
                         // only the push-to-talk key is constrained.
-                        requiresRegularKey: model.hotkeyNeedsRegularKey,
-                        systemShortcuts: model.systemShortcuts
+                        requiresRegularKey: model.hotkeys.hotkeyNeedsRegularKey,
+                        systemShortcuts: model.hotkeys.systemShortcuts
                     )
                 }
                 if let warning = hotkeyWarning {
@@ -98,9 +98,9 @@ private struct GeneralSettingsView: View {
                     HotkeyRecorderField(
                         hotkey: $model.settings.toggleHotkey,
                         onRecordingChanged: { model.coordinator.isHotkeySuspended = $0 },
-                        requiresRegularKey: model.hotkeyNeedsRegularKey,
+                        requiresRegularKey: model.hotkeys.hotkeyNeedsRegularKey,
                         allowsEmpty: true,
-                        systemShortcuts: model.systemShortcuts
+                        systemShortcuts: model.hotkeys.systemShortcuts
                     )
                 }
                 if let warning = toggleKeyWarning {
@@ -224,14 +224,14 @@ private struct GeneralSettingsView: View {
                 PermissionRow(
                     title: "Accessibility",
                     detail: String(localized: "Needed for a modifier-only key such as Right Command, for the send key and for pasting. Without it Option+Space still works and the text is copied for you to paste with ⌘V; a standard account needs an administrator to switch it on."),
-                    granted: model.accessibilityTrusted,
-                    action: model.grantAccessibility
+                    granted: model.permissions.accessibilityTrusted,
+                    action: model.permissions.grantAccessibility
                 )
                 PermissionRow(
                     title: "Microphone",
                     detail: micDetail,
-                    granted: model.microphoneStatus == .authorized,
-                    action: model.grantMicrophone
+                    granted: model.permissions.microphoneStatus == .authorized,
+                    action: model.permissions.grantMicrophone
                 )
             }
         }
@@ -240,8 +240,7 @@ private struct GeneralSettingsView: View {
         // permission poll: this window is where they are shown, and the user
         // may have just changed them in System Settings.
         .onAppear {
-            model.refreshPermissions()
-            model.refreshSystemShortcuts()
+            model.settingsWindowOpened()
         }
     }
 
@@ -253,13 +252,13 @@ private struct GeneralSettingsView: View {
     /// become untypeable while Pladder runs.
     private var hotkeyWarning: String? {
         let hotkey = model.settings.hotkey
-        if let standIn = model.standInHotkey {
-            if let owner = model.systemShortcutConflict(for: standIn) {
+        if let standIn = model.hotkeys.standInHotkey {
+            if let owner = model.hotkeys.systemShortcutConflict(for: standIn) {
                 return conflictWarning(owner: owner, chord: standIn)
             }
             return String(localized: "Without Accessibility, \(hotkey.displayName) cannot be detected, so \(standIn.sideAgnosticDisplayName) stands in for it until Accessibility is granted. Record a combination with a regular key to choose your own.")
         }
-        if let owner = model.systemShortcutConflict(for: hotkey) {
+        if let owner = model.hotkeys.systemShortcutConflict(for: hotkey) {
             return conflictWarning(owner: owner, chord: hotkey)
         }
         guard hotkey.modifierKeyCodes.isEmpty, !hotkey.keyCodes.isEmpty else { return nil }
@@ -274,10 +273,10 @@ private struct GeneralSettingsView: View {
     private var toggleKeyWarning: String? {
         let toggle = model.settings.toggleHotkey
         guard !toggle.isEmpty, toggle.canonical != model.settings.hotkey.canonical else { return nil }
-        if !model.accessibilityTrusted && !toggle.canBeRegisteredWithoutAccessibility {
+        if !model.permissions.accessibilityTrusted && !toggle.canBeRegisteredWithoutAccessibility {
             return String(localized: "Without Accessibility, \(toggle.displayName) cannot be detected, so the toggle key is off until Accessibility is granted.")
         }
-        if let owner = model.systemShortcutConflict(for: toggle) {
+        if let owner = model.hotkeys.systemShortcutConflict(for: toggle) {
             return conflictWarning(owner: owner, chord: toggle)
         }
         return nil
@@ -295,7 +294,7 @@ private struct GeneralSettingsView: View {
     private var submitKeyWarning: String? {
         let submitKey = model.settings.submitKey
         guard !submitKey.keyCodes.isEmpty else { return nil }
-        if !model.accessibilityTrusted {
+        if !model.permissions.accessibilityTrusted {
             return String(localized: "The send key needs Accessibility.")
         }
         guard submitKey.keyCodes.isSubset(of: model.settings.hotkey.keyCodes) else { return nil }
@@ -304,13 +303,13 @@ private struct GeneralSettingsView: View {
 
     private var launchAtLogin: Binding<Bool> {
         Binding(
-            get: { LaunchAtLogin.isEnabled },
+            get: { model.launchAtLoginEnabled },
             set: { model.setLaunchAtLogin($0) }
         )
     }
 
     private var micDetail: String {
-        switch model.microphoneStatus {
+        switch model.permissions.microphoneStatus {
         case .authorized: String(localized: "Granted.")
         case .denied, .restricted: String(localized: "Denied. Enable it in System Settings.")
         default: String(localized: "Not requested yet.")
@@ -324,13 +323,11 @@ private struct ProcessingSettingsView: View {
     var body: some View {
         Form {
             Section {
-                ForEach(model.processors, id: \.id) { processor in
-                    Toggle(isOn: binding(for: processor.id)) {
+                ForEach(StandardProcessors.entries.map(\.id), id: \.self) { id in
+                    Toggle(isOn: binding(for: id)) {
                         VStack(alignment: .leading, spacing: 2) {
-                            // Core cannot import the catalog, so its
-                            // processors are looked up by their English text.
-                            Text(LocalizedStringKey(processor.displayName))
-                            Text(LocalizedStringKey(processor.detail))
+                            Text(ProcessorText.name(id))
+                            Text(ProcessorText.detail(id))
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -372,7 +369,7 @@ private struct ProcessingSettingsView: View {
     /// Apple Intelligence switched off, or an S1-mini file still to come.
     @ViewBuilder
     private var polishModelStatus: some View {
-        if let status = model.polishModelStatus {
+        if let status = model.polish.status {
             switch status {
             case .ready:
                 EmptyView()
@@ -396,10 +393,10 @@ private struct ProcessingSettingsView: View {
                         .foregroundStyle(.orange)
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer()
-                    Button("Try Again") { model.retryPolishModelDownload() }
+                    Button("Try Again") { model.polish.retryDownload() }
                 }
             }
-        } else if let warning = model.polishAvailability.polishKeyText {
+        } else if let warning = model.polish.availability.polishWarning {
             Label(warning, systemImage: "exclamationmark.triangle")
                 .font(.callout)
                 .foregroundStyle(.orange)

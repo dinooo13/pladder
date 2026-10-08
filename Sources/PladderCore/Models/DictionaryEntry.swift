@@ -18,6 +18,19 @@ public struct DictionaryEntry: Codable, Sendable, Equatable, Identifiable, Hasha
         self.matchCase = matchCase
     }
 
+    private enum CodingKeys: String, CodingKey { case id, from, to, matchCase }
+
+    /// Only `from` and `to` are required. Files people write by hand, for the
+    /// Dictionary tab's import or in the settings file, rarely carry an `id`,
+    /// and `matchCase` has a default.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        from = try c.decode(String.self, forKey: .from)
+        to = try c.decode(String.self, forKey: .to)
+        matchCase = try c.decodeIfPresent(Bool.self, forKey: .matchCase) ?? false
+    }
+
     /// `from` as rules are compared: trimmed and lowercased. Empty for a
     /// custom word, which has no `from`.
     public var normalizedFrom: String { Self.normalized(from) }

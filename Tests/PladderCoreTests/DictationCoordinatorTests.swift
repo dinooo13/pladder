@@ -12,6 +12,8 @@ actor FakeCapture: AudioCapture {
     var startCount = 0
     var stopCount = 0
     var levelContinuation: AsyncStream<Float>.Continuation?
+    /// How long `stop()` takes, to widen the window a cancel leaves open.
+    var stopDelay: Duration = .zero
 
     func start() async throws -> AsyncStream<Float> {
         startCount += 1
@@ -27,6 +29,7 @@ actor FakeCapture: AudioCapture {
     func stop() async -> CapturedAudio {
         stopCount += 1
         levelContinuation?.finish()
+        if stopDelay > .zero { try? await Task.sleep(for: stopDelay) }
         return CapturedAudio(samples: samplesToReturn)
     }
 
@@ -34,6 +37,7 @@ actor FakeCapture: AudioCapture {
 
     func setSamples(_ s: [Float]) { samplesToReturn = s }
     func setDrainSamples(_ s: [Float]) { drainSamples = s }
+    func setStopDelay(_ d: Duration) { stopDelay = d }
     func emitLevel(_ l: Float) { levelContinuation?.yield(l) }
 }
 
@@ -42,7 +46,9 @@ final class FakeOutput: TextOutput, @unchecked Sendable {
     private var _inserted: [String] = []
     private var _submitted: [Bool] = []
     private var _prepareCount = 0
+    private var _flushCount = 0
     var inserted: [String] { lock.withLock { _inserted } }
+    var flushCount: Int { lock.withLock { _flushCount } }
     var submitted: [Bool] { lock.withLock { _submitted } }
     var prepareCount: Int { lock.withLock { _prepareCount } }
     var shouldFail = false
@@ -62,6 +68,10 @@ final class FakeOutput: TextOutput, @unchecked Sendable {
 
     func prepare() async {
         lock.withLock { _prepareCount += 1 }
+    }
+
+    func flush() async {
+        lock.withLock { _flushCount += 1 }
     }
 }
 
@@ -182,40 +192,71 @@ actor CountingEngine: TranscriptionEngine {
 
 /// A streaming engine that counts everything the coordinator asks of it, so a
 /// test can tell a live loop from a warm one. `livePass` answers
-/// "partial <n>"; only `endUtterance` produces the text that gets inserted.
+/// "partial <n>"; only `endUtterance` produces the text that gets inserted,
+/// and `transcribe` answers "whole", so a test can tell the two paths apart.
+/// Every call is also logged by name, in order.
 actor FakeStreamingEngine: StreamingTranscriptionEngine {
     static let engineID = EngineID("fake-streaming")
-    nonisolated let id = FakeStreamingEngine.engineID
+    nonisolated let id: EngineID
     nonisolated let displayName = "Fake streaming"
     private(set) var status: EngineStatus = .unloaded
 
     private let counters = StreamingCounters()
     private let livePassDelay: Duration
+    private let feedDelay: Duration
+    private let beginFails: Bool
 
-    init(livePassDelay: Duration = .zero) { self.livePassDelay = livePassDelay }
+    init(
+        id: EngineID = FakeStreamingEngine.engineID,
+        livePassDelay: Duration = .zero,
+        feedDelay: Duration = .zero,
+        beginFails: Bool = false
+    ) {
+        self.id = id
+        self.livePassDelay = livePassDelay
+        self.feedDelay = feedDelay
+        self.beginFails = beginFails
+    }
 
     nonisolated var feedCounts: [Int] { counters.feedCounts }
     nonisolated var livePassCount: Int { counters.livePassCount }
     nonisolated var warmPassCount: Int { counters.warmPassCount }
     nonisolated var endCount: Int { counters.endCount }
+    nonisolated var log: [String] { counters.log }
+    /// True while a `feed` is waiting out its delay.
+    nonisolated var isFeeding: Bool { counters.isFeeding }
+
+    struct BeginFailed: Error {}
 
     func load() async throws { status = .ready }
     func unload() { status = .unloaded }
 
     func transcribe(_ samples: [Float]) async throws -> Transcript {
-        Transcript(text: "final", audioDuration: 0, processingTime: 0, engineID: id)
+        counters.record("transcribe")
+        return Transcript(text: "whole", audioDuration: 0, processingTime: 0, engineID: id)
     }
 
-    func beginUtterance() async throws {}
+    func beginUtterance() async throws {
+        counters.record("begin")
+        if beginFails { throw BeginFailed() }
+    }
 
-    func feed(_ samples: [Float]) async { counters.fed(samples.count) }
+    func feed(_ samples: [Float]) async {
+        counters.fed(samples.count)
+        if feedDelay > .zero {
+            counters.setFeeding(true)
+            try? await Task.sleep(for: feedDelay)
+            counters.setFeeding(false)
+        }
+        counters.record("fed")
+    }
 
     func endUtterance(_ tail: [Float]) async throws -> Transcript {
         counters.ended()
         return Transcript(text: "final", audioDuration: 0, processingTime: 0, engineID: id)
     }
 
-    func abandonUtterance() async {}
+    func abandonUtterance() async { counters.record("abandon") }
 
     func warmPass() async { counters.warmed() }
 
@@ -234,14 +275,20 @@ private final class StreamingCounters: @unchecked Sendable {
     private var _livePassCount = 0
     private var _warmPassCount = 0
     private var _endCount = 0
+    private var _log: [String] = []
+    private var _isFeeding = false
     var feedCounts: [Int] { lock.withLock { _feedCounts } }
     var livePassCount: Int { lock.withLock { _livePassCount } }
     var warmPassCount: Int { lock.withLock { _warmPassCount } }
     var endCount: Int { lock.withLock { _endCount } }
-    func fed(_ count: Int) { lock.withLock { _feedCounts.append(count) } }
+    var log: [String] { lock.withLock { _log } }
+    var isFeeding: Bool { lock.withLock { _isFeeding } }
+    func fed(_ count: Int) { lock.withLock { _feedCounts.append(count); _log.append("feed") } }
     func warmed() { lock.withLock { _warmPassCount += 1 } }
-    func ended() { lock.withLock { _endCount += 1 } }
-    func lived() -> Int { lock.withLock { _livePassCount += 1; return _livePassCount } }
+    func ended() { lock.withLock { _endCount += 1; _log.append("end") } }
+    func lived() -> Int { lock.withLock { _livePassCount += 1; _log.append("live"); return _livePassCount } }
+    func record(_ name: String) { lock.withLock { _log.append(name) } }
+    func setFeeding(_ feeding: Bool) { lock.withLock { _isFeeding = feeding } }
 }
 
 /// Lock-protected so `calls` can be read synchronously from test assertions.
@@ -255,14 +302,15 @@ private final class SampleRecorder: @unchecked Sendable {
 // MARK: - Helpers
 
 @MainActor
-private func makeCoordinator(
+func makeCoordinator(
     engineText: String = "hello world",
-    settings: Settings? = nil,
+    settings: DictationSettings? = nil,
     output: FakeOutput = FakeOutput(),
     capture: FakeCapture = FakeCapture(),
     hotkeyMonitor: FakeHotkey? = nil,
     outputMuter: (any OutputMuter)? = nil,
     refiner: (any TranscriptRefiner)? = nil,
+    clock: any Clock<Duration> = ContinuousClock(),
     events: EventLog? = nil
 ) -> (DictationCoordinator, FakeOutput, FakeCapture) {
     let registry = EngineRegistry([
@@ -270,7 +318,7 @@ private func makeCoordinator(
             EchoEngine(text: engineText, delay: .milliseconds(5))
         }
     ])
-    let settings = settings ?? Settings(engineID: EchoEngine.engineID)
+    let settings = settings ?? DictationSettings(engineID: EchoEngine.engineID)
     let coordinator = DictationCoordinator(
         settings: settings,
         registry: registry,
@@ -282,6 +330,7 @@ private func makeCoordinator(
         makePipeline: { s in
             ProcessorPipeline([DictionaryReplacer(entries: s.dictionary), WhitespaceNormalizer()])
         },
+        clock: clock,
         onEvent: { event in events?.append(event) }
     )
     return (coordinator, output, capture)
@@ -289,7 +338,7 @@ private func makeCoordinator(
 
 /// Builds a coordinator around a CountingEngine.
 @MainActor
-private func makeCountingCoordinator(
+func makeCountingCoordinator(
     engineDelay: Duration = .zero
 ) -> (DictationCoordinator, FakeOutput, FakeCapture, CountingEngine) {
     let output = FakeOutput()
@@ -298,7 +347,7 @@ private func makeCountingCoordinator(
     let registry = EngineRegistry([
         .init(id: CountingEngine.engineID, displayName: "Counting", detail: "") { engine }
     ])
-    var settings = Settings(engineID: CountingEngine.engineID)
+    var settings = DictationSettings(engineID: CountingEngine.engineID)
     settings.appendTrailingSpace = false
     let coordinator = DictationCoordinator(
         settings: settings,
@@ -314,31 +363,35 @@ private func makeCountingCoordinator(
 /// Builds a coordinator around a streaming engine, with the capture handing
 /// the feed loop half a second of audio per drain.
 @MainActor
-private func makeStreamingCoordinator(
+func makeStreamingCoordinator(
     style: OverlayStyle,
-    livePassDelay: Duration = .zero
+    livePassDelay: Duration = .zero,
+    engine: FakeStreamingEngine? = nil,
+    events: EventLog? = nil
 ) async -> (DictationCoordinator, FakeOutput, FakeCapture, FakeStreamingEngine) {
     let output = FakeOutput()
     let capture = FakeCapture()
     await capture.setDrainSamples(Array(repeating: 0.1, count: 8_000))
-    let engine = FakeStreamingEngine(livePassDelay: livePassDelay)
+    let engine = engine ?? FakeStreamingEngine(livePassDelay: livePassDelay)
     let registry = EngineRegistry([
         .init(id: FakeStreamingEngine.engineID, displayName: "Fake streaming", detail: "") { engine }
     ])
-    var settings = Settings(engineID: FakeStreamingEngine.engineID)
+    var settings = DictationSettings(engineID: FakeStreamingEngine.engineID)
     settings.appendTrailingSpace = false
-    settings.overlayStyle = style
+    settings.liveTranscript = style == .liveTranscript
     let coordinator = DictationCoordinator(
         settings: settings,
         registry: registry,
         capture: capture,
         output: output,
         hotkeyMonitor: FakeHotkey(),
-        makePipeline: { _ in ProcessorPipeline([]) }
+        makePipeline: { _ in ProcessorPipeline([]) },
+        onEvent: { event in events?.append(event) }
     )
-    // Both loops on a short fuse so the tests do not have to wait seconds.
+    // Every loop on a short fuse so the tests do not have to wait seconds.
     coordinator.livePassInterval = .milliseconds(10)
     coordinator.warmupInterval = .milliseconds(10)
+    coordinator.feedInterval = .milliseconds(10)
     return (coordinator, output, capture, engine)
 }
 
@@ -363,7 +416,7 @@ final class EventLog: @unchecked Sendable {
     /// The timing of the last `inserted` event, if there was one.
     var lastTiming: DictationCoordinator.CycleTiming? {
         for event in events.reversed() {
-            if case .inserted(_, let timing) = event { return timing }
+            if case .inserted(let insertion) = event { return insertion.timing }
         }
         return nil
     }
@@ -405,7 +458,7 @@ final class EventLog: @unchecked Sendable {
     }
 
     @Test func fullDictationCycleInsertsProcessedText() async {
-        var settings = Settings(engineID: EchoEngine.engineID)
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.dictionary = [DictionaryEntry(from: "hello world", to: "Hello, World!")]
         let (c, output, capture) = makeCoordinator(settings: settings)
         c.start()
@@ -425,7 +478,7 @@ final class EventLog: @unchecked Sendable {
     }
 
     @Test func noTrailingSpaceWhenDisabled() async {
-        var settings = Settings(engineID: EchoEngine.engineID)
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.appendTrailingSpace = false
         let (c, output, _) = makeCoordinator(settings: settings)
         c.start()
@@ -463,7 +516,7 @@ final class EventLog: @unchecked Sendable {
         let output = FakeOutput()
         output.result = .copied
         let (c, _, _) = makeCoordinator(output: output)
-        c.copiedDisplayDuration = .milliseconds(50)
+        c.settings.copiedHoldDuration = .milliseconds(50)
         c.start()
         #expect(await waitUntil { c.state == .idle })
         await c.hotkeyPressed()
@@ -485,7 +538,7 @@ final class EventLog: @unchecked Sendable {
             }
         ])
         let c = DictationCoordinator(
-            settings: Settings(engineID: EchoEngine.engineID),
+            settings: DictationSettings(engineID: EchoEngine.engineID),
             registry: registry,
             capture: FakeCapture(),
             output: output,
@@ -507,7 +560,7 @@ final class EventLog: @unchecked Sendable {
         output.result = .copied
         let (c, _, _) = makeCoordinator(output: output)
         // Long enough that the hint would still be up without the press.
-        c.copiedDisplayDuration = .seconds(5)
+        c.settings.copiedHoldDuration = .seconds(5)
         c.start()
         #expect(await waitUntil { c.state == .idle })
         await c.hotkeyPressed()
@@ -533,7 +586,7 @@ final class EventLog: @unchecked Sendable {
             }
         ])
         let c = DictationCoordinator(
-            settings: Settings(engineID: EchoEngine.engineID),
+            settings: DictationSettings(engineID: EchoEngine.engineID),
             registry: registry,
             capture: capture,
             output: output,
@@ -706,7 +759,7 @@ final class EventLog: @unchecked Sendable {
     }
 
     @Test func disabledProcessorIsSkipped() async {
-        var settings = Settings(engineID: EchoEngine.engineID)
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.dictionary = [DictionaryEntry(from: "hello", to: "goodbye")]
         settings.setProcessor(DictionaryReplacer.processorID, enabled: false)
         settings.appendTrailingSpace = false
@@ -752,7 +805,7 @@ final class EventLog: @unchecked Sendable {
         registry.register(.init(id: EngineID("two"), displayName: "Two", detail: "") { EchoEngine(text: "two", delay: .milliseconds(500)) })
         let output = FakeOutput()
         let capture = FakeCapture()
-        var settings = Settings(engineID: EchoEngine.engineID)
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.appendTrailingSpace = false
         let c = DictationCoordinator(
             settings: settings, registry: registry, capture: capture, output: output,
@@ -779,7 +832,7 @@ final class EventLog: @unchecked Sendable {
         registry.register(.init(id: EngineID("two"), displayName: "Two", detail: "") { EchoEngine(text: "two", delay: .milliseconds(5)) })
         let output = FakeOutput()
         let capture = FakeCapture()
-        var settings = Settings(engineID: EchoEngine.engineID)
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.appendTrailingSpace = false
         let c = DictationCoordinator(
             settings: settings, registry: registry, capture: capture, output: output,
@@ -865,7 +918,7 @@ final class EventLog: @unchecked Sendable {
                 EchoEngine(text: "hello world", delay: .milliseconds(50))
             }
         ])
-        var settings = Settings(engineID: EchoEngine.engineID)
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.appendTrailingSpace = false
         let capture = FakeCapture()
         let timed = DictationCoordinator(
@@ -877,10 +930,11 @@ final class EventLog: @unchecked Sendable {
         await timed.hotkeyPressed()
         timed.hotkeyReleased()
         await timed.inFlight?.value
-        guard case .inserted(_, let timing) = recorder.events.last else {
+        guard case .inserted(let insertion) = recorder.events.last else {
             Issue.record("expected an inserted event, got \(String(describing: recorder.events.last))")
             return
         }
+        let timing = insertion.timing
         #expect(timing.engine >= .milliseconds(50))
         #expect(timing.polish == nil)
         #expect(output.inserted == ["hello world"])
@@ -891,7 +945,7 @@ final class EventLog: @unchecked Sendable {
             .init(id: EngineID("flaky"), displayName: "Flaky", detail: "") { FlakyEngine(failures: 1) }
         ])
         let c = DictationCoordinator(
-            settings: Settings(engineID: EngineID("flaky")), registry: registry,
+            settings: DictationSettings(engineID: EngineID("flaky")), registry: registry,
             capture: FakeCapture(), output: FakeOutput(),
             hotkeyMonitor: FakeHotkey(), makePipeline: { _ in ProcessorPipeline([]) })
         c.start()
@@ -904,7 +958,7 @@ final class EventLog: @unchecked Sendable {
             .init(id: EngineID("flaky"), displayName: "Flaky", detail: "") { FlakyEngine(failures: 1) }
         ])
         let c = DictationCoordinator(
-            settings: Settings(engineID: EngineID("flaky")), registry: registry,
+            settings: DictationSettings(engineID: EngineID("flaky")), registry: registry,
             capture: FakeCapture(), output: FakeOutput(),
             hotkeyMonitor: FakeHotkey(), makePipeline: { _ in ProcessorPipeline([]) })
         c.start()
@@ -930,7 +984,7 @@ final class EventLog: @unchecked Sendable {
     }
 
     @Test func dictionaryChangeAfterStartIsUsedByTheNextDictation() async {
-        var settings = Settings(engineID: EchoEngine.engineID)
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.dictionary = []
         settings.appendTrailingSpace = false
         let (c, output, _) = makeCoordinator(settings: settings)
@@ -1097,7 +1151,7 @@ final class EventLog: @unchecked Sendable {
     // MARK: Output mute
 
     @Test func mutesAndRestoresTheOutputDeviceWhenTheSettingIsOn() async {
-        var settings = Settings(engineID: EchoEngine.engineID)
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.muteOutputWhileDictating = true
         let muter = FakeOutputMuter()
         let (c, _, _) = makeCoordinator(settings: settings, outputMuter: muter)
@@ -1126,7 +1180,7 @@ final class EventLog: @unchecked Sendable {
     }
 
     @Test func cancelRecordingRestoresTheOutputDevice() async {
-        var settings = Settings(engineID: EchoEngine.engineID)
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.muteOutputWhileDictating = true
         let muter = FakeOutputMuter()
         let (c, _, _) = makeCoordinator(settings: settings, outputMuter: muter)
@@ -1138,7 +1192,7 @@ final class EventLog: @unchecked Sendable {
     }
 
     @Test func theCancelledHotkeyEventRestoresTheOutputDevice() async {
-        var settings = Settings(engineID: EchoEngine.engineID)
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.muteOutputWhileDictating = true
         let hotkey = FakeHotkey()
         let muter = FakeOutputMuter()
@@ -1160,8 +1214,8 @@ final class EventLog: @unchecked Sendable {
     /// Long enough to clear `minimumPolishWords`.
     private static let sentence = "send it on Friday please"
 
-    private static func settings(polish: Bool = true) -> Settings {
-        var s = Settings(engineID: EchoEngine.engineID)
+    private static func settings(polish: Bool = true) -> DictationSettings {
+        var s = DictationSettings(engineID: EchoEngine.engineID)
         s.polishDictations = polish
         return s
     }
@@ -1405,14 +1459,14 @@ final class EventLog: @unchecked Sendable {
     /// Control + D: a toggle chord that is not the push-to-talk chord.
     private static let controlD = Hotkey(0x3B, 0x02)
 
-    private func hybridSettings() -> Settings {
-        var settings = Settings(engineID: EchoEngine.engineID)
+    private func hybridSettings() -> DictationSettings {
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.toggleHotkey = settings.hotkey
         return settings
     }
 
-    private func separateSettings() -> Settings {
-        var settings = Settings(engineID: EchoEngine.engineID)
+    private func separateSettings() -> DictationSettings {
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.toggleHotkey = Self.controlD
         return settings
     }
@@ -1539,7 +1593,7 @@ final class EventLog: @unchecked Sendable {
     }
 
     @Test func aHybridChordFollowsTheStandIn() async {
-        var settings = Settings(engineID: EchoEngine.engineID)
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.hotkey = .rightCommand
         settings.toggleHotkey = .rightCommand
         let hotkey = FakeHotkey()
@@ -1614,7 +1668,7 @@ final class EventLog: @unchecked Sendable {
         let registry = EngineRegistry([
             .init(id: EngineID("flaky"), displayName: "Flaky", detail: "") { FlakyEngine(failures: 1) }
         ])
-        var settings = Settings(engineID: EngineID("flaky"))
+        var settings = DictationSettings(engineID: EngineID("flaky"))
         settings.toggleHotkey = settings.hotkey
         let capture = FakeCapture()
         let c = DictationCoordinator(
@@ -1752,7 +1806,7 @@ final class EventLog: @unchecked Sendable {
     }
 
     @Test func escapeWhileLatchedDiscards() async {
-        var settings = Settings(engineID: EchoEngine.engineID)
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.toggleHotkey = settings.hotkey
         let hotkey = FakeHotkey()
         let (c, output, _) = makeCoordinator(settings: settings, hotkeyMonitor: hotkey)
@@ -1775,7 +1829,7 @@ final class EventLog: @unchecked Sendable {
     }
 
     @Test func escapePressedRestoresTheOutputDevice() async {
-        var settings = Settings(engineID: EchoEngine.engineID)
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.muteOutputWhileDictating = true
         let muter = FakeOutputMuter()
         let (c, _, _) = makeCoordinator(settings: settings, outputMuter: muter)
@@ -1811,122 +1865,5 @@ final class EventLog: @unchecked Sendable {
         #expect(await waitUntil { !c.state.isRecording })
         await c.inFlight?.value
         #expect(hotkey.cancelKeyEnabled == [true, false, true, false, true, false])
-    }
-}
-
-@Suite struct SettingsStoreTests {
-    @Test func roundTrip() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        let url = dir.appendingPathComponent("settings.json")
-        let defaults = Settings(engineID: EchoEngine.engineID)
-        let store = SettingsStore(url: url, defaults: defaults)
-        #expect(store.load() == defaults)
-
-        var changed = defaults
-        changed.hotkey = .rightOption
-        changed.submitKey = Hotkey(0x24)
-        changed.polishDictations = true
-        changed.dictionary = [DictionaryEntry(from: "a", to: "b")]
-        try store.save(changed)
-        #expect(store.load() == changed)
-        try? FileManager.default.removeItem(at: dir)
-    }
-
-    @Test func missingKeysFallBackToDefaults() throws {
-        let json = #"{"engineID":"echo","dictionary":[{"id":"6E36117C-6200-4C7E-BFB8-6FA228542578","from":"a","to":"b","matchCase":false}]}"#
-        let decoded = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
-        #expect(decoded.engineID == EchoEngine.engineID)
-        #expect(decoded.dictionary.count == 1)
-        #expect(decoded.hotkey == .optionSpace)
-        #expect(decoded.submitKey == .keyV)
-        #expect(!decoded.polishDictations)
-        #expect(decoded.polishModel == .appleIntelligence)
-        #expect(decoded.appendTrailingSpace == true)
-        #expect(decoded.appearance == .system)
-        #expect(decoded.overlayStyle == .compact)
-        #expect(decoded.overlayGlass == true)
-        #expect(decoded.overlayAnimationSpeed == .quick)
-    }
-
-    @Test func legacyPolishChordMigratesToTheToggle() throws {
-        let json = #"{"engineID":"echo","polishHotkey":{"keyCodes":[59,31]}}"#
-        let decoded = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
-        #expect(decoded.polishDictations)
-        // The toggle stays off over a legacy chord stored empty.
-        let off = try JSONDecoder().decode(Settings.self, from: Data(#"{"engineID":"echo","polishHotkey":{"keyCodes":[]}}"#.utf8))
-        #expect(!off.polishDictations)
-    }
-
-    @Test func polishModelPersists() throws {
-        var settings = Settings(engineID: EchoEngine.engineID)
-        settings.polishModel = .s1Mini8Bit
-        let decoded = try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(settings))
-        #expect(decoded.polishModel == .s1Mini8Bit)
-    }
-
-    @Test func anUnknownPolishModelFallsBackToApples() throws {
-        // Written by a newer build that knows a model this one does not.
-        let json = #"{"engineID":"echo","polishDictations":true,"polishModel":"someFutureModel"}"#
-        let decoded = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
-        #expect(decoded.polishModel == .appleIntelligence)
-        #expect(decoded.polishDictations)
-    }
-
-    @Test func appearancePersists() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        let url = dir.appendingPathComponent("settings.json")
-        let defaults = Settings(engineID: EchoEngine.engineID)
-        let store = SettingsStore(url: url, defaults: defaults)
-        var changed = defaults
-        changed.appearance = .dark
-        try store.save(changed)
-        #expect(store.load() == changed)
-        try? FileManager.default.removeItem(at: dir)
-    }
-
-    @Test func overlayStylePersists() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        let url = dir.appendingPathComponent("settings.json")
-        let defaults = Settings(engineID: EchoEngine.engineID)
-        let store = SettingsStore(url: url, defaults: defaults)
-        var changed = defaults
-        changed.overlayStyle = .minimal
-        changed.overlayGlass = false
-        try store.save(changed)
-        #expect(store.load() == changed)
-
-        changed.overlayStyle = .liveTranscript
-        try store.save(changed)
-        #expect(store.load() == changed)
-        #expect(store.load().overlayStyle == .liveTranscript)
-        try? FileManager.default.removeItem(at: dir)
-    }
-
-    @Test func overlayAnimationSpeedPersists() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        let url = dir.appendingPathComponent("settings.json")
-        let defaults = Settings(engineID: EchoEngine.engineID)
-        let store = SettingsStore(url: url, defaults: defaults)
-        var changed = defaults
-        changed.overlayAnimationSpeed = .expressive
-        try store.save(changed)
-        #expect(store.load() == changed)
-
-        changed.overlayAnimationSpeed = .instant
-        try store.save(changed)
-        #expect(store.load().overlayAnimationSpeed == .instant)
-        try? FileManager.default.removeItem(at: dir)
-    }
-
-    @Test func unreadableFileIsMovedAsideNotOverwritten() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        let url = dir.appendingPathComponent("settings.json")
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        try Data("not json".utf8).write(to: url)
-        let store = SettingsStore(url: url, defaults: Settings(engineID: EchoEngine.engineID))
-        _ = store.load()
-        #expect(!FileManager.default.fileExists(atPath: url.path))
-        #expect(FileManager.default.fileExists(atPath: url.appendingPathExtension("broken").path))
-        try? FileManager.default.removeItem(at: dir)
     }
 }

@@ -84,9 +84,13 @@ shopt -u nullglob
 # Override with CODESIGN_IDENTITY=- to force ad-hoc, or set it to a specific
 # identity name or hash.
 if [[ -z "${CODESIGN_IDENTITY:-}" ]]; then
+	# `|| true`: under pipefail a keychain without a matching certificate
+	# makes grep fail the whole assignment, and `set -e` would end the script
+	# right here, silently, instead of falling back to ad-hoc below. CI runs
+	# this path on purpose, on a runner with no certificate.
 	CODESIGN_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null \
 		| grep -E '"(Developer ID Application|Apple Development)' \
-		| head -1 | sed -E 's/^[^"]*"([^"]+)".*$/\1/')
+		| head -1 | sed -E 's/^[^"]*"([^"]+)".*$/\1/' || true)
 	CODESIGN_IDENTITY=${CODESIGN_IDENTITY:--}
 fi
 echo "Signing with: $CODESIGN_IDENTITY"
@@ -112,7 +116,17 @@ codesign --force --sign "$CODESIGN_IDENTITY" \
 echo "Built $APP"
 
 if [[ "$INSTALL" -eq 1 ]]; then
-	pkill -x Pladder 2>/dev/null || true
+	# Only the installed copy, which is the one being replaced: a bare
+	# `pkill -x Pladder` would also stop every worktree's dist copy, some of
+	# them mid-recording. SIGTERM lets it quit the normal way, so a muted
+	# output device and a borrowed clipboard are put back first.
+	INSTALLED_BIN=/Applications/Pladder.app/Contents/MacOS/Pladder
+	if pkill -f "$INSTALLED_BIN" 2>/dev/null; then
+		for _ in {1..50}; do
+			pgrep -f "$INSTALLED_BIN" >/dev/null || break
+			sleep 0.1
+		done
+	fi
 	rm -rf /Applications/Pladder.app
 	cp -R "$APP" /Applications/Pladder.app
 	APP=/Applications/Pladder.app

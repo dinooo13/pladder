@@ -14,6 +14,10 @@ import Observation
 ///
 /// Escape is the cancel key while a recording is on, and only then: the
 /// monitor is told at the start and the end of every recording.
+///
+/// Every wait goes through `clock`, so tests drive the timers instead of
+/// sleeping through them. Event instants come from the monitors and the
+/// wall clock; only the waiting is the clock's.
 @MainActor
 @Observable
 public final class DictationCoordinator {
@@ -42,7 +46,9 @@ public final class DictationCoordinator {
     /// Exposed so callers (and tests) can await completion of a cycle.
     public private(set) var inFlight: Task<Void, Never>?
 
-    public var settings: Settings {
+    /// The app hands over a new value only when it differs; see
+    /// `DictationSettings`.
+    public var settings: DictationSettings {
         didSet { settingsChanged(from: oldValue) }
     }
 
@@ -53,13 +59,10 @@ public final class DictationCoordinator {
         didSet {
             guard isHotkeySuspended != oldValue else { return }
             if isHotkeySuspended {
-                hotkeyTask?.cancel()
-                hotkeyMonitor.stop()
-                if state.isRecording {
-                    Task { await cancelRecording() }
-                }
+                stopHotkey()
+                dropRecording()
             } else {
-                startHotkey()
+                hotkeyConfigurationChanged()
             }
         }
     }
@@ -72,21 +75,12 @@ public final class DictationCoordinator {
     /// chord is left untouched and comes back the moment this is cleared,
     /// which is what happens when Accessibility is granted. Nil means "listen
     /// for the stored chord". Applies to the dictate chord only; a toggle
-    /// chord equal to the stored chord follows the
-    /// override, so a stood-in hybrid key stays hybrid.
+    /// chord equal to the stored chord follows the override, so a stood-in
+    /// hybrid key stays hybrid.
     public var hotkeyOverride: Hotkey? {
         didSet {
             guard hotkeyOverride != oldValue else { return }
-            // The old chord's release can no longer arrive, exactly as for a
-            // stored-chord change or a monitor swap.
-            if state.isRecording {
-                Task { await cancelRecording() }
-            }
-            // Before `start()` there is nothing to restart, and `start()`
-            // reads the override itself, so setting it at launch costs one
-            // registration rather than two.
-            guard hotkeyTask != nil, !isHotkeySuspended else { return }
-            startHotkey()
+            hotkeyConfigurationChanged()
         }
     }
 
@@ -113,9 +107,25 @@ public final class DictationCoordinator {
     public var deferReleases = false
     /// How long an error stays on screen before returning to idle.
     public var errorDisplayDuration: Duration = .seconds(2)
-    /// How long the "press ⌘V" hint stays on screen before returning to idle.
-    /// Nil follows the overlay animation speed; tests set it directly.
-    public var copiedDisplayDuration: Duration?
+
+    /// How long the Neural Engine is left idle between warm passes. One pass
+    /// at key-down is not enough for a long dictation: on an M1 a pass after
+    /// ten seconds of idle costs about 110 ms more than one made back to back,
+    /// and that is larger than the capture stop, the processors and the paste
+    /// together.
+    public var warmupInterval: Duration = .seconds(2)
+
+    /// How often the Live Transcript style asks the engine what it has heard
+    /// so far. A live pass costs what a warm pass costs, so this is the warm
+    /// interval with a much shorter fuse: four times a second of Neural Engine
+    /// time buys text that keeps up with the speaker, at the price of a
+    /// release being more likely to land inside a pass.
+    public var livePassInterval: Duration = .milliseconds(500)
+
+    /// How often the other styles hand captured audio to a streaming engine,
+    /// so it confirms windows before release. A second of audio is cheap to
+    /// copy and far shorter than the engine's 15 s window.
+    public var feedInterval: Duration = .seconds(1)
 
     private let loader: EngineLoader
     private let capture: any AudioCapture
@@ -127,12 +137,17 @@ public final class DictationCoordinator {
     /// the polish a no-op.
     private let refiner: (any TranscriptRefiner)?
     private var hotkeyMonitor: any HotkeyMonitor
-    private let makePipeline: @Sendable (Settings) -> ProcessorPipeline
+    private let makePipeline: @Sendable (DictationSettings) -> ProcessorPipeline
     /// Rebuilt when settings change so that no processor is constructed on the
     /// release-to-paste path; `DictionaryReplacer` compiles a regex per entry.
     private var pipeline: ProcessorPipeline
+    private let clock: any Clock<Duration>
     private let onEvent: @Sendable (Event) -> Void
 
+    /// Set by `start()`. Before it nothing listens, so a monitor swap or a
+    /// chord change made while the app is still setting up costs nothing,
+    /// and `start()` registers what is current by then, once.
+    private var isStarted = false
     private var hotkeyTask: Task<Void, Never>?
     private var levelTask: Task<Void, Never>?
     /// Returns `.error` or `.copied` to idle after its display duration.
@@ -144,6 +159,62 @@ public final class DictationCoordinator {
     private var gesture = HotkeyGestureTracker(modes: [:])
     /// Waits out the bounce window of a deferred release.
     private var settleTask: Task<Void, Never>?
+
+    /// Engines replaced by a settings change while a cycle was still running.
+    /// Unloaded when the cycle ends.
+    private var pendingUnloads: [any TranscriptionEngine] = []
+
+    /// The engine that was ready when the current recording started. Nil
+    /// between cycles.
+    private var cycleEngine: (any TranscriptionEngine)?
+    /// Whether this recording streams into `cycleEngine`. False for a batch
+    /// engine, and for a streaming one that could not begin an utterance:
+    /// that recording is transcribed whole at release instead of lost.
+    private var cycleStreams = false
+
+    /// Keeps the engine warm for as long as the key is held.
+    ///
+    /// Cancelled at release, but cancellation cannot abort a CoreML call that
+    /// has already started, so a release landing inside a warm pass waits for
+    /// it. That is bounded by one pass and shows in the log as `engine`
+    /// exceeding `engine-time`. The interval trades that risk against the cold
+    /// penalty: longer means more dictations start cold, shorter means more
+    /// land on a pass in flight. The live pass in the feed loop has exactly
+    /// the same property, at its own cadence.
+    private var warmupTask: Task<Void, Never>?
+
+    /// Streaming state for the current recording. Non-nil only while
+    /// `cycleStreams`.
+    private var feedTask: Task<Void, Never>?
+    /// Samples handed to the streaming engine so far; the tail from `stop()`
+    /// completes the utterance at release. Counted before each hand-over, so
+    /// a chunk on its way to the engine is never missing from it.
+    private var fedSampleCount = 0
+
+    /// Numbers recordings. A press that waited for the microphone or the
+    /// engine checks it is still its own recording before going on, and the
+    /// output muter matches the end of one to its start with it, whichever
+    /// order the two arrive in.
+    private var recording = 0
+    /// The tail of the last cancelled recording: the microphone stopping and
+    /// the engine dropping the utterance. A press that comes before it is
+    /// done waits for it, so the engine cannot be told to drop the new
+    /// utterance in place of the old one.
+    private var cancelCleanup: Task<Void, Never>?
+    /// The mute that was armed at key-down and the restore that undoes it,
+    /// kept so quitting can wait for the speakers to come back.
+    private var muteRestoreTask: Task<Void, Never>?
+
+    /// Half a second of silence. Transcribing it at key-down brings the
+    /// Neural Engine up from idle while the user is still speaking; every
+    /// utterance is padded to the model's full window, so this is the same
+    /// encoder pass the real call makes.
+    private static let warmupSamples = [Float](repeating: 0, count: 8_000)
+
+    /// Hotkey events the loop has finished acting on. Internal, for tests
+    /// that need to know an event was seen before they assert that it did
+    /// nothing.
+    @ObservationIgnored private(set) var handledHotkeyEvents = 0
 
     /// Wall-clock time of each stage between the hotkey release and the paste.
     public struct CycleTiming: Sendable, Equatable {
@@ -170,10 +241,29 @@ public final class DictationCoordinator {
         }
     }
 
+    /// What reached the output at the end of a cycle.
+    public struct Insertion: Sendable, Equatable {
+        /// `text` is what went out, after processing and polish, without the
+        /// trailing space.
+        public var transcript: Transcript
+        public var timing: CycleTiming
+        /// Pasted into the front app, or only left on the clipboard.
+        public var result: InsertResult
+        /// Return followed the paste, so the field was sent and emptied.
+        public var submitted: Bool
+
+        public init(transcript: Transcript, timing: CycleTiming, result: InsertResult, submitted: Bool) {
+            self.transcript = transcript
+            self.timing = timing
+            self.result = result
+            self.submitted = submitted
+        }
+    }
+
     public enum Event: Sendable {
         case recordingStarted
         case recordingStopped
-        case inserted(Transcript, CycleTiming)
+        case inserted(Insertion)
         case failed(DictationFailure)
         /// Escape ended the recording; nothing is transcribed. The app plays
         /// the stop sound so the user hears the microphone go off, unlike an
@@ -187,14 +277,15 @@ public final class DictationCoordinator {
     }
 
     public init(
-        settings: Settings,
+        settings: DictationSettings,
         registry: EngineRegistry,
         capture: any AudioCapture,
         output: any TextOutput,
         outputMuter: (any OutputMuter)? = nil,
         refiner: (any TranscriptRefiner)? = nil,
         hotkeyMonitor: any HotkeyMonitor,
-        makePipeline: @escaping @Sendable (Settings) -> ProcessorPipeline,
+        makePipeline: @escaping @Sendable (DictationSettings) -> ProcessorPipeline,
+        clock: any Clock<Duration> = ContinuousClock(),
         onEvent: @escaping @Sendable (Event) -> Void = { _ in }
     ) {
         self.settings = settings
@@ -205,6 +296,7 @@ public final class DictationCoordinator {
         self.hotkeyMonitor = hotkeyMonitor
         self.makePipeline = makePipeline
         self.pipeline = makePipeline(settings)
+        self.clock = clock
         self.onEvent = onEvent
         loader = EngineLoader(registry: registry, engineID: settings.engineID)
         loader.onStatusChange = { [weak self] in self?.setEngineStatus($0) }
@@ -214,22 +306,33 @@ public final class DictationCoordinator {
 
     /// Loads the engine, warms the mic, and starts listening for the hotkey.
     public func start() {
+        isStarted = true
         if !isHotkeySuspended { startHotkey() }
         Task { try? await capture.warmUp() }
         loader.load()
     }
 
     public func stop() {
-        hotkeyTask?.cancel()
-        hotkeyMonitor.stop()
+        isStarted = false
+        stopHotkey()
         loader.stop()
-        levelTask?.cancel()
         transientResetTask?.cancel()
-        maxDurationTask?.cancel()
-        settleTask?.cancel()
-        if state.isRecording {
-            Task { await cancelRecording() }
-        }
+        dropRecording()
+    }
+
+    /// The app is quitting. Stops listening, drops a recording in progress,
+    /// lets a dictation already on its way out finish, and gives back what
+    /// was borrowed — the speakers and the clipboard — before it returns.
+    /// The app waits for this, with a deadline of its own.
+    public func shutdown() async {
+        isStarted = false
+        stopHotkey()
+        loader.stop()
+        transientResetTask?.cancel()
+        if state.isRecording { await cancelRecording() }
+        await inFlight?.value
+        await muteRestoreTask?.value
+        await output.flush()
     }
 
     /// Re-run engine load, for example after a failed download.
@@ -238,17 +341,11 @@ public final class DictationCoordinator {
     }
 
     /// Swaps the hotkey source, for example when Accessibility is granted or
-    /// revoked and the app moves between the event tap and Carbon. The old
-    /// monitor's release would never arrive on the new stream, so a recording
-    /// in progress is dropped, exactly as for a chord change.
+    /// revoked and the app moves between the event tap and Carbon.
     public func replaceHotkeyMonitor(_ monitor: any HotkeyMonitor) {
-        hotkeyTask?.cancel()
-        hotkeyMonitor.stop()
+        stopHotkey()
         hotkeyMonitor = monitor
-        if state.isRecording {
-            Task { await cancelRecording() }
-        }
-        if !isHotkeySuspended { startHotkey() }
+        hotkeyConfigurationChanged()
     }
 
     private func setEngineStatus(_ status: EngineStatus) {
@@ -263,22 +360,18 @@ public final class DictationCoordinator {
         }
     }
 
-    private func settingsChanged(from old: Settings) {
+    private func settingsChanged(from old: DictationSettings) {
+        guard settings != old else { return }
         // Rebuilt here so that no processor is constructed on the
-        // release-to-paste path; `DictionaryReplacer` compiles a regex per
-        // entry. `AppModel.settings` ignores assignments that change nothing,
-        // so this runs only on real changes.
+        // release-to-paste path. Only dictation settings reach this, and the
+        // app assigns only real changes, so it runs a handful of times a day.
         pipeline = makePipeline(settings)
+        // The submit key counts: the restarted monitor would never deliver
+        // the pending release for the old configuration. So does the toggle
+        // key, which may also turn the key hybrid or back.
         if old.hotkey != settings.hotkey || old.submitKey != settings.submitKey
             || old.toggleHotkey != settings.toggleHotkey {
-            // The old key's release will never arrive on the new stream.
-            // The submit key counts too: the restarted monitor would never
-            // deliver the pending release for the old configuration. So does
-            // the toggle key, which may also turn the key hybrid or back.
-            if state.isRecording {
-                Task { await cancelRecording() }
-            }
-            if !isHotkeySuspended { startHotkey() }
+            hotkeyConfigurationChanged()
         }
         if old.engineID != settings.engineID, let previous = loader.select(settings.engineID) {
             // The replaced engine is unloaded only once nothing is using it:
@@ -294,138 +387,6 @@ public final class DictationCoordinator {
         }
     }
 
-    /// Engines replaced by a settings change while a cycle was still running.
-    /// Unloaded when the cycle ends.
-    private var pendingUnloads: [any TranscriptionEngine] = []
-
-    /// The engine that was ready when the current recording started. Nil
-    /// between cycles.
-    private var cycleEngine: (any TranscriptionEngine)?
-    /// The chord that started the current recording. Only its release or
-    /// cancel ends the recording. Nil between cycles.
-    private var cycleRole: HotkeyRole?
-
-    /// Half a second of silence. Transcribing it at key-down brings the
-    /// Neural Engine up from idle while the user is still speaking; every
-    /// utterance is padded to the model's full window, so this is the same
-    /// encoder pass the real call makes.
-    private static let warmupSamples = [Float](repeating: 0, count: 8_000)
-
-    /// How long the Neural Engine is left idle between warm passes. One pass
-    /// at key-down is not enough for a long dictation: on an M1 a pass after
-    /// ten seconds of idle costs about 110 ms more than one made back to back,
-    /// and that is larger than the capture stop, the processors and the paste
-    /// together. Settable so tests do not have to wait seconds.
-    public var warmupInterval: Duration = .seconds(2)
-
-    /// How often the Live Transcript style asks the engine what it has heard
-    /// so far. A live pass costs what a warm pass costs, so this is the warm
-    /// interval with a much shorter fuse: four times a second of Neural Engine
-    /// time buys text that keeps up with the speaker, at the price of a
-    /// release being more likely to land inside a pass. Settable for tests.
-    public var livePassInterval: Duration = .milliseconds(500)
-
-    /// Keeps the engine warm for as long as the key is held.
-    ///
-    /// Cancelled at release, but cancellation cannot abort a CoreML call that
-    /// has already started, so a release landing inside a warm pass waits for
-    /// it. That is bounded by one pass and shows in the log as `engine`
-    /// exceeding `engine-time`. The interval trades that risk against the cold
-    /// penalty: longer means more dictations start cold, shorter means more
-    /// land on a pass in flight. The live pass in the feed loop has exactly
-    /// the same property, at its own cadence.
-    private var warmupTask: Task<Void, Never>?
-
-    /// Streaming state for the current recording. Non-nil only when
-    /// `cycleEngine` is a `StreamingTranscriptionEngine`.
-    private var feedTask: Task<Void, Never>?
-    /// Samples handed to the streaming engine so far; the tail from `stop()`
-    /// completes the utterance at release.
-    private var fedSampleCount = 0
-
-    /// Feeds a second of captured audio at a time to the engine while the
-    /// user is still speaking, so the sliding-window engine confirms chunks
-    /// before release. Skipped chunks are not a loss: `stop()` returns only
-    /// what came after the last drain, and anything a `drain()` raced is
-    /// recovered by the tail.
-    ///
-    /// In `live` mode the same loop also asks the engine for the text so far
-    /// and publishes it, on the `livePassInterval` cadence. One loop and not
-    /// two: two would drain the same chunks against each other, and a live
-    /// pass could overlap the next one.
-    private func startStreamingFeed(_ engine: any StreamingTranscriptionEngine, live: Bool) {
-        fedSampleCount = 0
-        feedTask = Task { [weak self] in
-            while !Task.isCancelled {
-                if !live { try? await Task.sleep(for: .seconds(1)) }
-                guard let self, !Task.isCancelled, self.state.isRecording else { return }
-                let chunk = await self.capture.drain()
-                if !chunk.isEmpty {
-                    await engine.feed(chunk)
-                    self.fedSampleCount += chunk.count
-                }
-                guard live else { continue }
-                let text = await engine.livePass()
-                // A pass that finishes after the release belongs to a
-                // recording that is already on its way to the clipboard;
-                // publishing it would put stale text back on screen.
-                guard !Task.isCancelled, self.state.isRecording else { return }
-                self.partialTranscript = text
-                try? await Task.sleep(for: self.livePassInterval)
-            }
-        }
-    }
-
-    /// Warms once immediately, so a short dictation still gets the key-down
-    /// pass, then keeps warming until cancelled. Detached and at utility
-    /// priority so it never competes with the feed or the UI.
-    private func startWarmupLoop(_ warm: @escaping @Sendable () async -> Void) {
-        warmupTask?.cancel()
-        warmupTask = Task.detached(priority: .utility) { [interval = warmupInterval] in
-            while !Task.isCancelled {
-                await warm()
-                if Task.isCancelled { return }
-                try? await Task.sleep(for: interval)
-            }
-        }
-    }
-
-    private func stopWarmupLoop() {
-        warmupTask?.cancel()
-        warmupTask = nil
-    }
-
-    /// Stops the feed and tells the streaming engine the utterance was
-    /// discarded. Safe to call when nothing streaming was started.
-    private func abandonStreaming() {
-        feedTask?.cancel()
-        feedTask = nil
-        fedSampleCount = 0
-        let engine = cycleEngine
-        Task {
-            if let streaming = engine as? (any StreamingTranscriptionEngine) {
-                await streaming.abandonUtterance()
-            }
-        }
-    }
-
-    /// Wraps the two engine entry points behind one call so `finish` can
-    /// transcribe with either kind. For a streaming engine only the tail is
-    /// pushed through `endUtterance`; the rest went through `feed` while the
-    /// user was speaking. The returned Transcript carries the whole
-    /// utterance's audio duration either way.
-    private func transcribeCycle(
-        tailSamples: [Float],
-        with engine: any TranscriptionEngine
-    ) async throws -> Transcript {
-        guard let streaming = engine as? (any StreamingTranscriptionEngine) else {
-            return try await engine.transcribe(tailSamples)
-        }
-        return try await streaming.endUtterance(tailSamples)
-    }
-
-    // MARK: Hotkey
-
     private func drainPendingUnloads() {
         guard !pendingUnloads.isEmpty else { return }
         let engines = pendingUnloads
@@ -435,9 +396,32 @@ public final class DictationCoordinator {
         }
     }
 
-    private func startHotkey() {
+    // MARK: Hotkey
+
+    /// The chords, the send key or the monitor changed. A release from the
+    /// old configuration can never arrive on the new stream, so a recording
+    /// in progress is dropped, and the monitor starts over unless it is
+    /// suspended or the coordinator has not started yet.
+    private func hotkeyConfigurationChanged() {
+        dropRecording()
+        guard isStarted, !isHotkeySuspended else { return }
+        startHotkey()
+    }
+
+    private func stopHotkey() {
         hotkeyTask?.cancel()
+        hotkeyTask = nil
         hotkeyMonitor.stop()
+    }
+
+    /// Cancels a recording in progress from a synchronous context.
+    private func dropRecording() {
+        guard state.isRecording else { return }
+        Task { await cancelRecording() }
+    }
+
+    private func startHotkey() {
+        stopHotkey()
         startGesture()
         var chords: [HotkeyRole: Hotkey] = [.dictate: hotkeyOverride ?? settings.hotkey]
         if let toggle = separateToggleChord { chords[.toggle] = toggle }
@@ -445,31 +429,35 @@ public final class DictationCoordinator {
         hotkeyTask = Task { [weak self] in
             for await tagged in stream {
                 guard let self else { return }
-                // When the key moved, not when this loop got to it: a press
-                // waits here for the microphone to start.
-                let at = tagged.instant ?? .now
-                // Only the chord that started the recording may end it, and
-                // the gesture tracker is what knows which one that is: with
-                // nested chords the other tracker reports the hand-over as its
-                // own release.
-                switch tagged.event {
-                case .pressed:
-                    let wasDeferring = self.gesture.deferReleases
-                    let outcome = self.gesture.pressed(tagged.role, at: at)
-                    if self.gesture.deferReleases, !wasDeferring { self.onEvent(.keyboardBounceObserved) }
-                    await self.act(outcome)
-                case .released(let submit):
-                    await self.act(self.gesture.released(tagged.role, submit: submit, at: at))
-                // Another key went down right after the chord: the user typed
-                // Cmd+C, not a dictation. Drop the audio without transcribing,
-                // without a stop sound and without a timing line.
-                case .cancelled:
-                    await self.act(self.gesture.interrupted(tagged.role))
-                // Escape while a recording is on: drop it, and say so.
-                case .escape:
-                    await self.escapePressed()
-                }
+                await self.handle(tagged)
+                self.handledHotkeyEvents += 1
             }
+        }
+    }
+
+    private func handle(_ tagged: HotkeyMonitorEvent) async {
+        // When the key moved, not when this loop got to it: a press waits
+        // here for the microphone to start.
+        let at = tagged.instant ?? .now
+        // Only the chord that started the recording may end it, and the
+        // gesture tracker is what knows which one that is: with nested
+        // chords the other tracker reports the hand-over as its own release.
+        switch tagged.event {
+        case .pressed:
+            let wasDeferring = gesture.deferReleases
+            let outcome = gesture.pressed(tagged.role, at: at)
+            if gesture.deferReleases, !wasDeferring { onEvent(.keyboardBounceObserved) }
+            await act(outcome)
+        case .released(let submit):
+            await act(gesture.released(tagged.role, submit: submit, at: at))
+        // Another key went down right after the chord: the user typed Cmd+C,
+        // not a dictation. Drop the audio without transcribing, without a
+        // stop sound and without a timing line.
+        case .cancelled:
+            await act(gesture.interrupted(tagged.role))
+        // Escape while a recording is on: drop it, and say so.
+        case .escape:
+            await escapePressed()
         }
     }
 
@@ -507,8 +495,8 @@ public final class DictationCoordinator {
     private func act(_ outcome: HotkeyGestureTracker.Outcome) async {
         if let settle = outcome.settle { armSettle(settle) }
         switch outcome.action {
-        case .start(let role):
-            await hotkeyPressed(role: role)
+        case .start:
+            await hotkeyPressed()
             // A press the state machine refused (engine loading, a cycle in
             // flight, a microphone that failed) must not leave the tracker
             // holding or latching a recording that never began.
@@ -525,28 +513,20 @@ public final class DictationCoordinator {
 
     private func armSettle(_ settle: HotkeyGestureTracker.Settle) {
         settleTask?.cancel()
-        settleTask = Task { [weak self] in
-            try? await Task.sleep(for: settle.after)
+        settleTask = Task { [weak self, clock] in
+            try? await clock.sleep(for: settle.after)
             guard let self, !Task.isCancelled else { return }
             // A stale token, one a bounce overtook, is ignored by the tracker.
             await self.act(self.gesture.timerFired(token: settle.token))
         }
     }
 
-    /// The recording ended, however: the gesture starts over and Escape is
-    /// the system's again. Synchronous, and the monitor call only flips a
-    /// flag or queues work on the main thread, so on the release path this
-    /// costs nothing before `recordingStopped`.
-    private func endGesture() {
-        settleTask?.cancel()
-        settleTask = nil
-        gesture.reset()
-        isLatched = false
-        hotkeyMonitor.setCancelKeyEnabled(false)
-    }
+    // MARK: Recording
 
     /// Public so tests and a menu item can drive the state machine directly.
-    public func hotkeyPressed(role: HotkeyRole = .dictate) async {
+    /// Which chord pressed, and so which may end the recording, is the
+    /// gesture tracker's business, not the coordinator's.
+    public func hotkeyPressed() async {
         // `.copied` is the hint from the previous dictation, not a busy state:
         // a press replaces it rather than being dropped.
         switch state {
@@ -558,74 +538,199 @@ public final class DictationCoordinator {
         // The engine that was ready at press transcribes this cycle, even if
         // the settings switch engines mid-recording.
         cycleEngine = loader.engine
-        cycleRole = role
+        cycleStreams = false
         willPolish = settings.polishDictations
         partialTranscript = nil
         // Read once, at press: switching the style mid-recording must not
         // leave the loop half live, with nothing warming the engine.
-        let live = settings.overlayStyle == .liveTranscript
+        let live = settings.liveTranscript
         // Flip state before the await so the overlay reacts on key-down and a
         // second concurrent press cannot start capture twice.
         state = .recording(level: 0)
+        recording += 1
+        let mine = recording
         // Escape cancels from here on, and while the microphone comes up.
         hotkeyMonitor.setCancelKeyEnabled(true)
+        // Normally long finished: only a press right on the heels of a cancel
+        // waits here.
+        await cancelCleanup?.value
+        let levels: AsyncStream<Float>
         do {
-            let levels = try await capture.start()
-            guard state.isRecording else {
-                // Cancelled or superseded while the mic was starting.
-                willPolish = false
-                _ = await capture.stop()
-                abandonStreaming()
+            levels = try await capture.start()
+        } catch {
+            guard isCurrent(mine) else { return }
+            willPolish = false
+            endRecording()
+            cycleEngine = nil
+            fail(.microphone(detail: error.localizedDescription))
+            return
+        }
+        guard isCurrent(mine) else {
+            // Cancelled while the mic was starting; the cancel has already
+            // ended the recording, but the microphone came up after its stop.
+            // A newer recording, if one has started since, owns it now.
+            if !state.isRecording { _ = await capture.stop() }
+            return
+        }
+        onEvent(.recordingStarted)
+        armOutputMute()
+        startKeyDownWork()
+        await startEngineWork(live: live, recording: mine)
+        // The utterance may have been cancelled while it began.
+        guard isCurrent(mine) else { return }
+        levelTask = Task { [weak self] in
+            for await level in levels {
+                guard let self, self.state.isRecording else { return }
+                self.state = .recording(level: level)
+            }
+        }
+        maxDurationTask = Task { [weak self, clock, maximumDuration] in
+            try? await clock.sleep(for: maximumDuration)
+            guard let self, !Task.isCancelled, self.state.isRecording else { return }
+            // Lost key-up, not an intentional release: submitting would
+            // send a message unattended, so never submit here.
+            self.hotkeyReleased(submit: false)
+        }
+    }
+
+    /// Work that keeps the release-to-paste path short, all of it run while
+    /// the user is still speaking: the clipboard snapshot and the polish
+    /// model's load, about 700 ms cold.
+    private func startKeyDownWork() {
+        Task { [weak self] in await self?.output.prepare() }
+        if willPolish, let refiner {
+            Task.detached(priority: .utility) { await refiner.prepare() }
+        }
+    }
+
+    /// True while recording number `id` is the one in progress.
+    private func isCurrent(_ id: Int) -> Bool {
+        state.isRecording && recording == id
+    }
+
+    /// Starts streaming into the cycle's engine, or keeps a batch engine
+    /// warm. A streaming engine that cannot begin an utterance is used like a
+    /// batch engine for this recording: transcribed whole at release, slower
+    /// but not lost.
+    private func startEngineWork(live: Bool, recording id: Int) async {
+        if let streaming = cycleEngine as? (any StreamingTranscriptionEngine),
+           (try? await streaming.beginUtterance()) != nil {
+            guard isCurrent(id) else {
+                // Cancelled while it began. A newer recording's own
+                // `beginUtterance` replaces this one, so only drop it when
+                // there is none.
+                if !state.isRecording { await streaming.abandonUtterance() }
                 return
             }
-            onEvent(.recordingStarted)
-            // Read at press, so flipping the setting mid-recording cannot
-            // arm a mute half way through. The muter waits out its own delay
-            // before touching anything, so this is off the key-down path too.
-            if settings.muteOutputWhileDictating, let outputMuter {
-                Task { await outputMuter.recordingStarted() }
+            cycleStreams = true
+            startStreamingFeed(streaming, live: live)
+            // The live loop's pass is the warm pass, so a second loop would
+            // only compete with it for the Neural Engine.
+            if !live { startWarmupLoop { await streaming.warmPass() } }
+        } else if let engine = cycleEngine {
+            startWarmupLoop { [warmupSamples = Self.warmupSamples] in
+                _ = try? await engine.transcribe(warmupSamples)
             }
-            // Work that keeps the release-to-paste path short: the clipboard
-            // snapshot and, for batch engines, a Neural Engine warm-up (the
-            // feed below does that for streaming engines). Both run while the
-            // user is still speaking.
-            Task { [weak self] in await self?.output.prepare() }
-            // The model's load is the one cost this feature can hide: about
-            // 700 ms cold, paid while the user is still speaking.
-            if willPolish, let refiner {
-                Task.detached(priority: .utility) { await refiner.prepare() }
-            }
-            if let streaming = cycleEngine as? (any StreamingTranscriptionEngine) {
-                try? await streaming.beginUtterance()
-                startStreamingFeed(streaming, live: live)
-                // The live loop's pass is the warm pass, so a second loop
-                // would only compete with it for the Neural Engine.
-                if !live { startWarmupLoop { await streaming.warmPass() } }
-            } else if let engine = cycleEngine {
-                startWarmupLoop { [warmupSamples = Self.warmupSamples] in
-                    _ = try? await engine.transcribe(warmupSamples)
-                }
-            }
-            levelTask?.cancel()
-            levelTask = Task { [weak self] in
-                for await level in levels {
-                    guard let self, self.state.isRecording else { return }
-                    self.state = .recording(level: level)
-                }
-            }
-            maxDurationTask?.cancel()
-            maxDurationTask = Task { [weak self, maximumDuration] in
-                try? await Task.sleep(for: maximumDuration)
-                guard let self, !Task.isCancelled, self.state.isRecording else { return }
-                // Lost key-up, not an intentional release: submitting would
-                // send a message unattended, so never submit here.
-                self.hotkeyReleased(submit: false)
-            }
-        } catch {
-            willPolish = false
-            endGesture()
-            fail(.microphone(detail: error.localizedDescription))
         }
+    }
+
+    /// Hands captured audio to the engine while the user is still speaking,
+    /// so the windowed engine confirms windows before release.
+    ///
+    /// In `live` mode the same loop also asks the engine for the text so far
+    /// and publishes it, on the `livePassInterval` cadence. One loop and not
+    /// two: two would drain the same chunks against each other, and a live
+    /// pass could overlap the next one.
+    ///
+    /// At release the loop is cancelled and the release waits for it to
+    /// exit. A chunk it drained just before the release is still handed
+    /// over, so every sample reaches the engine once and in order, and
+    /// nothing new — no further drain and no live pass — starts after it.
+    private func startStreamingFeed(_ engine: any StreamingTranscriptionEngine, live: Bool) {
+        fedSampleCount = 0
+        feedTask = Task { [weak self, clock, feedInterval, livePassInterval] in
+            while !Task.isCancelled {
+                if !live { try? await clock.sleep(for: feedInterval) }
+                guard let self, !Task.isCancelled, self.state.isRecording else { return }
+                let chunk = await self.capture.drain()
+                if !chunk.isEmpty {
+                    self.fedSampleCount += chunk.count
+                    await engine.feed(chunk)
+                }
+                guard live, !Task.isCancelled else { continue }
+                let text = await engine.livePass()
+                // A pass that finishes after the release belongs to a
+                // recording that is already on its way to the clipboard;
+                // publishing it would put stale text back on screen.
+                guard !Task.isCancelled, self.state.isRecording else { return }
+                self.partialTranscript = text
+                try? await clock.sleep(for: livePassInterval)
+            }
+        }
+    }
+
+    /// Warms once immediately, so a short dictation still gets the key-down
+    /// pass, then keeps warming until cancelled. Detached and at utility
+    /// priority so it never competes with the feed or the UI.
+    private func startWarmupLoop(_ warm: @escaping @Sendable () async -> Void) {
+        warmupTask?.cancel()
+        warmupTask = Task.detached(priority: .utility) { [clock, interval = warmupInterval] in
+            while !Task.isCancelled {
+                await warm()
+                if Task.isCancelled { return }
+                try? await clock.sleep(for: interval)
+            }
+        }
+    }
+
+    /// Mutes the speakers for this recording when the setting is on. Read at
+    /// press, so flipping the setting mid-recording cannot arm a mute half
+    /// way through. The muter waits out its own delay before touching
+    /// anything, so this is off the key-down path too.
+    private func armOutputMute() {
+        guard settings.muteOutputWhileDictating, let outputMuter else { return }
+        let session = recording
+        Task { await outputMuter.recordingStarted(session: session) }
+    }
+
+    /// Puts the speakers back. Unconditional, not gated on the setting:
+    /// turning it off mid-recording must still restore the device, and with
+    /// nothing muted this is two integer reads on an actor. Detached so the
+    /// paste never waits on a CoreAudio call. The session number lets the
+    /// muter match this to its start whichever arrives first.
+    private func restoreOutputDevice() {
+        guard let outputMuter else { return }
+        let session = recording
+        let previous = muteRestoreTask
+        muteRestoreTask = Task.detached(priority: .utility) {
+            await previous?.value
+            await outputMuter.recordingEnded(session: session)
+        }
+    }
+
+    /// Everything that ends a recording, however it ends: the gesture starts
+    /// over, Escape is the system's again, the meter, cap, warm-up and feed
+    /// stop, the partial is cleared and the speakers are put back.
+    /// Synchronous, and every call in it only flips a flag, cancels a task or
+    /// spawns one, so on the release path this costs nothing before
+    /// `recordingStopped`.
+    private func endRecording() {
+        settleTask?.cancel()
+        settleTask = nil
+        gesture.reset()
+        isLatched = false
+        hotkeyMonitor.setCancelKeyEnabled(false)
+        levelTask?.cancel()
+        levelTask = nil
+        maxDurationTask?.cancel()
+        maxDurationTask = nil
+        feedTask?.cancel()
+        // Before the state flip, so no further pass is queued ahead of the
+        // real call.
+        warmupTask?.cancel()
+        warmupTask = nil
+        partialTranscript = nil
+        restoreOutputDevice()
     }
 
     /// Returns immediately; the transcription runs in `inFlight`. Presses that
@@ -635,79 +740,75 @@ public final class DictationCoordinator {
         guard state.isRecording else { return }
         // Whatever ended it — the chord, a toggle press, the cap — a latched
         // recording is over and the next press starts a new one.
-        endGesture()
-        levelTask?.cancel()
-        maxDurationTask?.cancel()
-        feedTask?.cancel()
+        let feed = feedTask
+        endRecording()
         feedTask = nil
-        // Before the state flip, so no further pass is queued ahead of the
-        // real call.
-        stopWarmupLoop()
         state = .transcribing
-        // The partial was a picture of the recording, and the recording is
-        // over. The only statement this feature adds to the release path, and
-        // it runs before `recordingStopped`, so it is not even inside the
-        // measured window.
-        partialTranscript = nil
-        // Before `recordingStopped`, so restoring the speakers is outside the
-        // release-to-paste window the app measures, and detached so the paste
-        // never waits on a CoreAudio call. Unconditional, not gated on the
-        // setting: turning it off mid-recording must still put the device
-        // back. With nothing muted this is two integer reads on an actor.
-        if let outputMuter {
-            Task.detached(priority: .utility) { await outputMuter.recordingEnded() }
-        }
+        // Anything the user copied while speaking is snapshotted now, beside
+        // the engine pass, rather than inside the paste.
+        Task { [weak self] in await self?.output.prepare() }
         onEvent(.recordingStopped)
         let engine = cycleEngine ?? loader.engine
-        let fedSamples = fedSampleCount
-        fedSampleCount = 0
+        let streams = cycleStreams
         cycleEngine = nil
-        cycleRole = nil
+        cycleStreams = false
         inFlight = Task { [weak self] in
             guard let self else { return }
+            // The feed loop finishes handing over a chunk it drained before
+            // the release, then exits; usually it is asleep and this is one
+            // hop. What it does wait for is engine work `endUtterance` would
+            // have waited for anyway, so it counts as engine time.
+            let handover = ContinuousClock.now
+            await feed?.value
+            let feedWait = ContinuousClock.now - handover
             let stopped = ContinuousClock.now
             let audio = await self.capture.stop()
             let captureStop = ContinuousClock.now - stopped
-            await self.finish(audio, fedSamples: fedSamples, with: engine, submit: submit, captureStop: captureStop)
+            await self.finish(
+                audio, fedSamples: streams ? self.fedSampleCount : 0, streams: streams, with: engine,
+                submit: submit, captureStop: captureStop, feedWait: feedWait)
         }
     }
 
     private func finish(
         _ audio: CapturedAudio,
         fedSamples: Int,
+        streams: Bool,
         with engine: any TranscriptionEngine,
         submit: Bool,
-        captureStop: Duration
+        captureStop: Duration,
+        feedWait: Duration
     ) async {
         defer {
             drainPendingUnloads()
             willPolish = false
         }
+        let streaming = streams ? engine as? (any StreamingTranscriptionEngine) : nil
         // Streaming engines were already fed `fedSamples` while recording;
         // only the tail came through `stop()`.
         let totalDuration = Double(fedSamples + audio.samples.count) / CapturedAudio.sampleRate
         guard totalDuration >= minimumDuration else {
-            if let streaming = engine as? (any StreamingTranscriptionEngine) {
-                await streaming.abandonUtterance()
-            }
+            await streaming?.abandonUtterance()
             becomeIdle()
             return
         }
         do {
             var timing = CycleTiming(captureStop: captureStop, engine: .zero, processing: .zero, insert: .zero)
             var started = ContinuousClock.now
-            var transcript = try await transcribeCycle(tailSamples: audio.samples, with: engine)
-            timing.engine = ContinuousClock.now - started
+            var transcript = if let streaming {
+                try await streaming.endUtterance(audio.samples)
+            } else {
+                try await engine.transcribe(audio.samples)
+            }
+            timing.engine = feedWait + (ContinuousClock.now - started)
             // The streaming engine only ever saw the tail; the coordinator
             // knows the whole utterance.
             if transcript.audioDuration == 0 {
                 transcript.audioDuration = totalDuration
             }
             lastTranscript = transcript
-            let settings = self.settings
             started = ContinuousClock.now
-            let processed = await pipeline
-                .run(transcript.text, disabled: settings.disabledProcessors)
+            let processed = await pipeline.run(transcript.text, disabled: settings.disabledProcessors)
             timing.processing = ContinuousClock.now - started
             guard !processed.isEmpty else {
                 becomeIdle()
@@ -734,10 +835,11 @@ public final class DictationCoordinator {
             started = ContinuousClock.now
             let result = try await output.insert(toInsert, submit: submit)
             timing.insert = ContinuousClock.now - started
-            var inserted = transcript
-            inserted.text = final
-            lastTranscript = inserted
-            onEvent(.inserted(inserted, timing))
+            transcript.text = final
+            lastTranscript = transcript
+            onEvent(.inserted(Insertion(
+                transcript: transcript, timing: timing, result: result,
+                submitted: submit && result == .pasted)))
             if result == .copied { showCopied() } else { becomeIdle() }
         } catch {
             fail(DictationFailure(error))
@@ -758,29 +860,29 @@ public final class DictationCoordinator {
         }
     }
 
-    /// Cancel an in-progress recording without transcribing.
+    /// Cancel an in-progress recording without transcribing. Covers the paths
+    /// that never transcribe: an interrupted chord, Escape, a hotkey change,
+    /// `stop()`.
     public func cancelRecording() async {
         guard state.isRecording else { return }
-        endGesture()
-        levelTask?.cancel()
-        maxDurationTask?.cancel()
-        stopWarmupLoop()
-        partialTranscript = nil
+        let feed = feedTask
+        endRecording()
+        feedTask = nil
+        fedSampleCount = 0
         willPolish = false
-        // Same restore as at release, for the paths that never transcribe:
-        // an interrupted chord, a hotkey change, `stop()`.
-        if let outputMuter {
-            Task.detached(priority: .utility) { await outputMuter.recordingEnded() }
-        }
         becomeIdle()
-        abandonStreaming()
+        let engine = cycleStreams ? cycleEngine as? (any StreamingTranscriptionEngine) : nil
         cycleEngine = nil
-        cycleRole = nil
-        let engine = loader.engine
-        _ = await capture.stop()
-        if let streaming = engine as? (any StreamingTranscriptionEngine) {
-            await streaming.abandonUtterance()
+        cycleStreams = false
+        // The microphone goes off first. The engine drops the utterance only
+        // once the feed is out of the way, so no chunk lands after it.
+        let cleanup = Task { [capture] in
+            _ = await capture.stop()
+            await feed?.value
+            await engine?.abandonUtterance()
         }
+        cancelCleanup = cleanup
+        await cleanup.value
         drainPendingUnloads()
     }
 
@@ -799,9 +901,8 @@ public final class DictationCoordinator {
     private func showCopied() {
         state = .copied
         transientResetTask?.cancel()
-        let hold = copiedDisplayDuration ?? settings.overlayAnimationSpeed.copiedHoldDuration
-        transientResetTask = Task { [weak self] in
-            try? await Task.sleep(for: hold)
+        transientResetTask = Task { [weak self, clock, hold = settings.copiedHoldDuration] in
+            try? await clock.sleep(for: hold)
             guard let self, !Task.isCancelled, case .copied = self.state else { return }
             self.becomeIdle()
         }
@@ -812,8 +913,8 @@ public final class DictationCoordinator {
         state = .error(failure)
         onEvent(.failed(failure))
         transientResetTask?.cancel()
-        transientResetTask = Task { [weak self, errorDisplayDuration] in
-            try? await Task.sleep(for: errorDisplayDuration)
+        transientResetTask = Task { [weak self, clock, errorDisplayDuration] in
+            try? await clock.sleep(for: errorDisplayDuration)
             guard let self, !Task.isCancelled, case .error = self.state else { return }
             self.becomeIdle()
         }
