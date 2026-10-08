@@ -59,8 +59,7 @@ public struct FoundationModelsCorrectionReviewer: CorrectionReviewer {
         let prompt = Self.prompt(heard: heard, corrected: corrected, sentence: sentence)
         do {
             return try await model.respond(to: prompt, generating: CorrectionVerdict.self).correctedIsNameOrTerm
-        } catch OnDeviceModelError.generation(let description)
-            where description.contains("decodingFailure") || description.contains("unsupportedGuide") {
+        } catch OnDeviceModelError.decodingFailure, OnDeviceModelError.unsupportedGuide {
             let reply = try await model.respond(
                 to: prompt + "\n\nIs CORRECTED a name, brand, product, company, place or technical term? Answer yes or no.")
             return Self.verdict(fromReply: reply) ?? false

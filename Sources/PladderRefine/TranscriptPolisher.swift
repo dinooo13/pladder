@@ -46,38 +46,21 @@ public actor TranscriptPolisher: TranscriptRefiner {
         """
 
     /// Above this the transcript is split at sentence ends into windows of
-    /// about `chunkSize` words, each its own call with its own timeout. The
-    /// context window is about 4k tokens and a minute of speech is about 175
-    /// words, so a dictation past about three and a half minutes takes this
-    /// path; one near the 10 min cap is about six calls.
+    /// about `chunkSize` words, each its own call. The context window is
+    /// about 4k tokens and a minute of speech is about 175 words, so a
+    /// dictation past about three and a half minutes takes this path; one
+    /// near the 10 min cap is about six calls, all inside the one budget.
     public static let chunkThreshold = 600
     static let chunkSize = 300
 
-    /// What one polish did, for the log and the CLI harness. `text` is the
-    /// only part the coordinator sees.
-    public struct Report: Sendable {
-        public enum Mode: String, Sendable {
-            /// The `@Generable` field.
-            case guided
-            /// Plain `respond(to:)`, after guided generation could not decode.
-            case plain
-            /// A local model completing the prompt format it was trained on
-            /// (`S1MiniPolisher`).
-            case completion
-        }
-
-        /// Nil when the model could not help; paste the input as it is.
-        public var text: String?
-        public var elapsed: Duration
-        public var wordsIn: Int
-        public var wordsOut: Int
-        public var chunks: Int
-        public var mode: Mode
-        /// Why `text` is nil, for the log. Never contains the transcript.
-        public var failure: String?
-    }
+    /// The report both polishers share; the name the CLI has always used.
+    public typealias Report = PolishReport
 
     private let model: OnDeviceLanguageModel
+    private let calls: any PolishCalls
+    /// The whole polish's budget: every chunk and any plain fallback share
+    /// it, so a long dictation is held no longer than a short one.
+    private let timeout: Duration
     /// Prewarmed by `prepare()`, taken by the next `refine`.
     private var prepared: LanguageModelSession?
     private static let log = Logger(subsystem: "de.dinooo13.pladder", category: "polish")
@@ -85,7 +68,15 @@ public actor TranscriptPolisher: TranscriptRefiner {
     /// `instructions` is for the CLI harness, which tries a prompt from a
     /// file before it is committed; the app always uses the default.
     public init(instructions: String = TranscriptPolisher.instructions, timeout: Duration = .seconds(8)) {
-        model = OnDeviceLanguageModel(instructions: instructions, timeout: timeout)
+        self.init(instructions: instructions, timeout: timeout, calls: nil)
+    }
+
+    /// `calls` stands in for Apple's model in the tests; nil is the real one.
+    init(instructions: String = TranscriptPolisher.instructions, timeout: Duration, calls: (any PolishCalls)?) {
+        let model = OnDeviceLanguageModel(instructions: instructions, timeout: timeout)
+        self.model = model
+        self.calls = calls ?? ApplePolishCalls(model: model)
+        self.timeout = timeout
     }
 
     /// Where the model can be used, why not otherwise; cheap.
@@ -104,18 +95,20 @@ public actor TranscriptPolisher: TranscriptRefiner {
     /// the transcript is the user's words and never goes in the log.
     public func polish(_ text: String) async -> Report {
         let started = ContinuousClock.now
+        let deadline = started + timeout
         // The prewarmed session belongs to this utterance only.
         let session = prepared
         prepared = nil
 
         let pieces = Self.chunks(of: text)
         var report = Report(
-            text: nil, elapsed: .zero, wordsIn: Self.wordCount(text), wordsOut: 0,
+            text: nil, elapsed: .zero, wordsIn: PolishChunking.wordCount(text), wordsOut: 0,
             chunks: pieces.count, mode: .guided, failure: nil)
         var cleaned: [String] = []
         do {
             for (index, piece) in pieces.enumerated() {
-                let (answer, mode) = try await polishOne(piece, session: index == 0 ? session : nil)
+                let (answer, mode) = try await polishOne(
+                    piece, session: index == 0 ? session : nil, deadline: deadline)
                 if mode == .plain { report.mode = .plain }
                 let filtered = PolishPostFilter.clean(answer)
                 guard !filtered.isEmpty else { throw Failure.emptyAnswer }
@@ -123,7 +116,7 @@ public actor TranscriptPolisher: TranscriptRefiner {
             }
             let joined = cleaned.joined(separator: " ")
             report.text = joined
-            report.wordsOut = Self.wordCount(joined)
+            report.wordsOut = PolishChunking.wordCount(joined)
         } catch {
             report.failure = Self.describe(error)
         }
@@ -139,18 +132,16 @@ public actor TranscriptPolisher: TranscriptRefiner {
     /// Guided first; plain text once when the guided answer could not be
     /// decoded or the guide is not supported, the fallback the issue asks
     /// for. Every other error goes up and the dictation is pasted as is.
+    /// Both calls run to the polish's one deadline, never a fresh budget.
     private func polishOne(
-        _ piece: String, session: LanguageModelSession?
+        _ piece: String, session: LanguageModelSession?, deadline: ContinuousClock.Instant
     ) async throws -> (String, Report.Mode) {
         let prompt = Self.prompt(for: piece)
         do {
-            let polished = try await model.respond(
-                to: prompt, generating: PolishedTranscript.self, session: session)
-            return (polished.cleanedText, .guided)
-        } catch OnDeviceModelError.generation(let description)
-            where description.contains("decodingFailure") || description.contains("unsupportedGuide") {
+            return (try await calls.guided(prompt, session: session, deadline: deadline), .guided)
+        } catch OnDeviceModelError.decodingFailure, OnDeviceModelError.unsupportedGuide {
             // A fresh session: the failed one holds the half answer.
-            return (try await model.respond(to: prompt), .plain)
+            return (try await calls.plain(prompt, deadline: deadline), .plain)
         }
     }
 
@@ -177,43 +168,22 @@ public actor TranscriptPolisher: TranscriptRefiner {
 
     // MARK: Chunking
 
-    /// The transcript as it is when it is short, which is most dictations;
-    /// otherwise windows of about `size` words (`chunkSize` by default),
-    /// cut after a sentence end so no window starts mid-sentence. The
-    /// S1-mini polisher passes its own, smaller numbers.
-    static func chunks(of text: String, threshold: Int = chunkThreshold, size: Int = chunkSize) -> [String] {
-        let words = text.split(whereSeparator: \.isWhitespace)
-        guard words.count > threshold else { return [text] }
-        var windows: [String] = []
-        var current: [Substring] = []
-        for word in words {
-            current.append(word)
-            let endsSentence = word.last.map { ".?!".contains($0) } ?? false
-            if current.count >= size, endsSentence {
-                windows.append(current.joined(separator: " "))
-                current = []
-            }
-        }
-        if !current.isEmpty { windows.append(current.joined(separator: " ")) }
-        return windows
-    }
-
-    static func wordCount(_ text: String) -> Int {
-        text.split(whereSeparator: \.isWhitespace).count
+    /// `PolishChunking` with this model's numbers.
+    static func chunks(of text: String) -> [String] {
+        PolishChunking.chunks(of: text, threshold: chunkThreshold, size: chunkSize)
     }
 
     // MARK: Logging
 
-    /// The error's case name only: `String(describing:)` of a framework error
-    /// carries a debug description, and nothing that might quote the
-    /// transcript goes in the log.
+    /// Names only: nothing that might quote the transcript goes in the log,
+    /// and `OnDeviceModelError` already carries no more than a case name.
     private static func describe(_ error: any Error) -> String {
         switch error {
         case OnDeviceModelError.timedOut: return "timed out"
         case OnDeviceModelError.unavailable(let why): return "unavailable (\(why))"
-        case OnDeviceModelError.generation(let description):
-            let name = description.prefix { $0 != "(" && $0 != ":" }
-            return "model error \(name)"
+        case OnDeviceModelError.decodingFailure: return "model error decodingFailure"
+        case OnDeviceModelError.unsupportedGuide: return "model error unsupportedGuide"
+        case OnDeviceModelError.generation(let name): return "model error \(name)"
         case Failure.emptyAnswer: return "empty answer"
         default: return "error \(type(of: error))"
         }
@@ -232,5 +202,30 @@ public actor TranscriptPolisher: TranscriptRefiner {
                 \(report.chunks > 1 ? ", \(report.chunks) chunks" : "", privacy: .public)
                 """)
         }
+    }
+}
+
+// MARK: - Model calls
+
+/// The two calls the polish makes, guided and plain, each bounded by the
+/// polish's deadline. A protocol so the tests can stand in for Apple's
+/// model, which needs Apple Intelligence; `ApplePolishCalls` is the real one.
+protocol PolishCalls: Sendable {
+    func guided(_ prompt: String, session: LanguageModelSession?, deadline: ContinuousClock.Instant) async throws -> String
+    func plain(_ prompt: String, deadline: ContinuousClock.Instant) async throws -> String
+}
+
+/// The polish's calls on Apple's on-device model.
+struct ApplePolishCalls: PolishCalls {
+    let model: OnDeviceLanguageModel
+
+    func guided(_ prompt: String, session: LanguageModelSession?, deadline: ContinuousClock.Instant) async throws -> String {
+        try await model.respond(
+            to: prompt, generating: PolishedTranscript.self, session: session, deadline: deadline
+        ).cleanedText
+    }
+
+    func plain(_ prompt: String, deadline: ContinuousClock.Instant) async throws -> String {
+        try await model.respond(to: prompt, deadline: deadline)
     }
 }

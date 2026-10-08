@@ -15,7 +15,13 @@ public enum OnDeviceModelAvailability: Equatable, Sendable {
 public enum OnDeviceModelError: Error, Sendable, Equatable {
     case unavailable(OnDeviceModelAvailability)
     case timedOut
-    /// `String(describing:)` of what the framework threw, for the log.
+    /// The guided answer could not be decoded into the requested type. A
+    /// plain call with the same prompt may still work.
+    case decodingFailure
+    /// The model does not support the requested guide; a plain call may.
+    case unsupportedGuide
+    /// Anything else the framework threw, by its case or type name only,
+    /// for the log (see `OnDeviceLanguageModel.modelError(from:)`).
     case generation(String)
 }
 
@@ -45,8 +51,8 @@ public struct OnDeviceLanguageModel: Sendable {
     #else
     public var options = GenerationOptions(sampling: .greedy)
     #endif
-    /// Wall-clock budget for one call. Past it the call is abandoned and
-    /// `respond` throws `.timedOut`.
+    /// Wall-clock budget for one call that names no deadline of its own.
+    /// Past it the call is abandoned and `respond` throws `.timedOut`.
     public var timeout: Duration
 
     public init(instructions: String, timeout: Duration = .seconds(8)) {
@@ -80,11 +86,14 @@ public struct OnDeviceLanguageModel: Sendable {
         return session
     }
 
-    /// A plain text reply to `prompt`.
-    public func respond(to prompt: String, session: LanguageModelSession? = nil) async throws -> String {
+    /// A plain text reply to `prompt`. `deadline` bounds the call instead of
+    /// `timeout`, for a caller whose budget covers several calls.
+    public func respond(
+        to prompt: String, session: LanguageModelSession? = nil, deadline: ContinuousClock.Instant? = nil
+    ) async throws -> String {
         let session = try ready(session)
         let options = options
-        return try await race {
+        return try await Self.race(until: deadline ?? .now + timeout) {
             try await session.respond(to: prompt, options: options).content
         }
     }
@@ -94,11 +103,12 @@ public struct OnDeviceLanguageModel: Sendable {
     public func respond<Content: Generable & Sendable>(
         to prompt: String,
         generating type: Content.Type,
-        session: LanguageModelSession? = nil
+        session: LanguageModelSession? = nil,
+        deadline: ContinuousClock.Instant? = nil
     ) async throws -> Content {
         let session = try ready(session)
         let options = options
-        return try await race {
+        return try await Self.race(until: deadline ?? .now + timeout) {
             try await session.respond(to: prompt, generating: type, options: options).content
         }
     }
@@ -112,7 +122,7 @@ public struct OnDeviceLanguageModel: Sendable {
     }
 
     /// Runs `work` against the wall clock and returns whichever finishes
-    /// first.
+    /// first. Every error comes out as an `OnDeviceModelError`.
     ///
     /// Not a task group: that waits for every child before returning, so a
     /// model call that ignores cancellation would still hold the paste. A
@@ -121,22 +131,25 @@ public struct OnDeviceLanguageModel: Sendable {
     ///
     /// The drain of an abandoned call runs inside the budget, not before it:
     /// a call that never comes back would otherwise hold every later paste
-    /// with no limit at all.
-    private func race<Value: Sendable>(
+    /// with no limit at all. A deadline already past starts nothing, so no
+    /// call is parked for the next one to drain.
+    static func race<Value: Sendable>(
+        until deadline: ContinuousClock.Instant,
         _ work: @escaping @Sendable () async throws -> Value
     ) async throws -> Value {
-        let (stream, continuation) = AsyncStream<Attempt<Value>>.makeStream()
+        guard ContinuousClock.now < deadline else { throw OnDeviceModelError.timedOut }
+        let (stream, continuation) = AsyncStream<Result<Value, OnDeviceModelError>?>.makeStream()
         let call = Task.detached(priority: .userInitiated) {
             await Self.drain()
             do {
-                continuation.yield(.value(try await work()))
+                continuation.yield(.success(try await work()))
             } catch {
-                continuation.yield(.failed(String(describing: error)))
+                continuation.yield(.failure(Self.modelError(from: error)))
             }
         }
-        let timer = Task.detached { [timeout] in
-            try? await Task.sleep(for: timeout)
-            continuation.yield(.timedOut)
+        let timer = Task.detached {
+            try? await Task.sleep(until: deadline, clock: .continuous)
+            continuation.yield(nil)
         }
         defer {
             call.cancel()
@@ -145,15 +158,47 @@ public struct OnDeviceLanguageModel: Sendable {
         }
 
         var results = stream.makeAsyncIterator()
-        switch await results.next() ?? .timedOut {
-        case .value(let value):
-            return value
-        case .failed(let description):
-            throw OnDeviceModelError.generation(description)
-        case .timedOut:
+        guard let outcome = await results.next() ?? nil else {
             Self.leftover.withLock { $0 = call }
             throw OnDeviceModelError.timedOut
         }
+        return try outcome.get()
+    }
+
+    /// What the framework threw, as the cases the callers act on. The one
+    /// place the error is matched: callers switch on `OnDeviceModelError`.
+    ///
+    /// By type, never by text. On macOS 27 `String(describing:)` of these
+    /// errors is their debug description, which names no case and can quote
+    /// the model's input or output, the user's words; `.generation` carries
+    /// the case name (or, for a struct, the type name) and nothing else, so
+    /// it is safe in a public log line. The macOS 27 SDK deprecates these
+    /// cases for new types, a parsing error and an unsupported generation
+    /// guide, so both generations are mapped.
+    static func modelError(from error: any Error) -> OnDeviceModelError {
+        if let error = error as? OnDeviceModelError { return error }
+        if let error = error as? LanguageModelSession.GenerationError {
+            switch error {
+            case .decodingFailure: return .decodingFailure
+            case .unsupportedGuide: return .unsupportedGuide
+            default: break
+            }
+        }
+        #if compiler(>=6.4)
+        if #available(macOS 27, *) {
+            if error is GeneratedContent.ParsingError { return .decodingFailure }
+            if case .unsupportedGenerationGuide = error as? LanguageModelError { return .unsupportedGuide }
+        }
+        #endif
+        return .generation(logName(of: error))
+    }
+
+    /// An enum's case name, which reflection gives without its payload, or
+    /// the type name of anything else.
+    static func logName(of error: any Error) -> String {
+        let mirror = Mirror(reflecting: error)
+        if mirror.displayStyle == .enum, let label = mirror.children.first?.label { return label }
+        return String(describing: type(of: error))
     }
 
     /// The most recent call that ran past its budget and was abandoned.
@@ -171,10 +216,3 @@ public struct OnDeviceLanguageModel: Sendable {
     }
 }
 
-/// A raced call's outcome. Not `Result<Value, any Error>`: `any Error` is not
-/// `Sendable`, and the error is only ever described anyway.
-private enum Attempt<Value: Sendable>: Sendable {
-    case value(Value)
-    case failed(String)
-    case timedOut
-}
