@@ -104,7 +104,7 @@ struct AppearanceThumbnail: View {
 
     private func desktop(_ scheme: ColorScheme) -> some View {
         DesktopThumbnail(scheme: scheme) {
-            OverlayPill(state: .recording(level: 0.55), style: .compact, glass: glass, isPreview: true)
+            OverlayPill(state: .recording, level: 0.55, style: .compact, glass: glass, isPreview: true)
                 .scaleEffect(0.5)
         }
         .overlay(alignment: .top) {
@@ -156,12 +156,12 @@ struct OverlayStyleThumbnail: View {
     private var content: some View {
         switch style {
         case .compact:
-            OverlayPill(state: .recording(level: Self.previewLevel), style: .compact, glass: glass, isPreview: true)
+            OverlayPill(state: .recording, level: Self.previewLevel, style: .compact, glass: glass, isPreview: true)
                 .scaleEffect(0.5)
         case .minimal:
             // The disc is 44 pt; at 0.75 it reads as a disc without turning
             // into a dot.
-            OverlayPill(state: .recording(level: Self.previewLevel), style: .minimal, glass: glass, isPreview: true)
+            OverlayPill(state: .recording, level: Self.previewLevel, style: .minimal, glass: glass, isPreview: true)
                 .scaleEffect(0.75)
         case .menuBar:
             // Nothing on the desktop at all: the wave in the menu bar is the
@@ -173,7 +173,8 @@ struct OverlayStyleThumbnail: View {
             // scaled to about 72 pt: the words are small but read as words,
             // which is what tells this style from Compact.
             OverlayPill(
-                state: .recording(level: Self.previewLevel),
+                state: .recording,
+                level: Self.previewLevel,
                 style: .liveTranscript,
                 glass: glass,
                 isPreview: true,
@@ -196,7 +197,7 @@ struct OverlayStyleThumbnail: View {
             .fill(.white.opacity(0.2))
             .frame(height: 9)
             .overlay(alignment: .trailing) {
-                Image(nsImage: MenuBarIcon.image(for: .recording(level: Self.previewLevel)))
+                Image(nsImage: MenuBarIcon.image(for: .recording, level: Self.previewLevel))
                     .resizable()
                     .renderingMode(.template)
                     .aspectRatio(contentMode: .fit)
@@ -215,7 +216,7 @@ struct BackgroundThumbnail: View {
 
     var body: some View {
         DesktopThumbnail {
-            OverlayPill(state: .recording(level: 0.55), style: .compact, glass: glass, isPreview: true)
+            OverlayPill(state: .recording, level: 0.55, style: .compact, glass: glass, isPreview: true)
                 .scaleEffect(0.5)
         }
     }

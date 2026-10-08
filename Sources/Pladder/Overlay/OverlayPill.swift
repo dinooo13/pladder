@@ -5,6 +5,8 @@ import PladderCore
 /// settings previews can render a live replica of each style.
 struct OverlayPill: View {
     let state: DictationState
+    /// The input level the meters follow while recording.
+    var level: Float = 0
     let style: OverlayStyle
     let glass: Bool
     /// A static replica in settings: no dot timer, no pulse, seeded bars.
@@ -135,7 +137,7 @@ struct OverlayPill: View {
     @ViewBuilder
     private var compactContent: some View {
         switch state {
-        case .recording(let level):
+        case .recording:
             HStack(spacing: PillMetrics.rowSpacing) {
                 RecordingDot()
                 LevelBars(level: level, count: 14, maxHeight: 32, opacity: 1, seeded: isPreview)
@@ -195,7 +197,7 @@ struct OverlayPill: View {
     @ViewBuilder
     private var liveContent: some View {
         switch state {
-        case .recording(let level):
+        case .recording:
             HStack(spacing: PillMetrics.rowSpacing) {
                 RecordingDot()
                 LevelBars(level: level, count: Self.liveBarCount, maxHeight: 24, opacity: 1, seeded: isPreview)
@@ -247,7 +249,7 @@ struct OverlayPill: View {
     @ViewBuilder
     private var minimalContent: some View {
         switch state {
-        case .recording(let level):
+        case .recording:
             ZStack {
                 if showsDot {
                     // The pulse is Minimal's own start-of-take cue. A row

@@ -8,6 +8,9 @@ import PladderCore
 @Observable
 final class OverlayModel {
     var state: DictationState = .idle
+    /// The input level while recording, mirrored on its own so a level tick
+    /// redraws the meter and nothing else.
+    var level: Float = 0
     /// Appearance forced by the Appearance setting; `.system` means follow.
     /// AppKit's window propagation reaches a borderless panel inconsistently,
     /// so the color scheme is set in SwiftUI directly.

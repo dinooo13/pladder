@@ -21,12 +21,12 @@ enum MenuBarIcon {
 
         static let levelSteps = 6
 
-        init(state: DictationState) {
+        init(state: DictationState, level: Float) {
             switch state {
             // The clipboard hint is not a failure and not work in progress;
             // the glyph reads as ready while the overlay carries the message.
             case .idle, .copied: self = .idle
-            case .recording(let level):
+            case .recording:
                 // Quantise the same shared amplitude curve the overlay's
                 // meter uses, so glyph and overlay wave agree on what the
                 // input level means.
@@ -51,8 +51,8 @@ enum MenuBarIcon {
     @MainActor private static var cache: [Variant: NSImage] = [:]
 
     @MainActor
-    static func image(for state: DictationState) -> NSImage {
-        image(for: Variant(state: state))
+    static func image(for state: DictationState, level: Float = 0) -> NSImage {
+        image(for: Variant(state: state, level: level))
     }
 
     @MainActor
