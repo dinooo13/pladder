@@ -442,19 +442,19 @@ public final class DictationCoordinator {
         // Only the chord that started the recording may end it, and the
         // gesture tracker is what knows which one that is: with nested
         // chords the other tracker reports the hand-over as its own release.
-        switch tagged.event {
-        case .pressed:
+        switch tagged.kind {
+        case .chord(let role, .pressed):
             let wasDeferring = gesture.deferReleases
-            let outcome = gesture.pressed(tagged.role, at: at)
+            let outcome = gesture.pressed(role, at: at)
             if gesture.deferReleases, !wasDeferring { onEvent(.keyboardBounceObserved) }
             await act(outcome)
-        case .released(let submit):
-            await act(gesture.released(tagged.role, submit: submit, at: at))
+        case .chord(let role, .released(let submit)):
+            await act(gesture.released(role, submit: submit, at: at))
         // Another key went down right after the chord: the user typed Cmd+C,
         // not a dictation. Drop the audio without transcribing, without a
         // stop sound and without a timing line.
-        case .cancelled:
-            await act(gesture.interrupted(tagged.role))
+        case .chord(let role, .cancelled):
+            await act(gesture.interrupted(role))
         // Escape while a recording is on: drop it, and say so.
         case .escape:
             await escapePressed()

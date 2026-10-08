@@ -104,7 +104,7 @@ final class FakeHotkey: HotkeyMonitor, @unchecked Sendable {
     /// Every `setCancelKeyEnabled` call, in order.
     private(set) var cancelKeyEnabled: [Bool] = []
     func setCancelKeyEnabled(_ enabled: Bool) { cancelKeyEnabled.append(enabled) }
-    func escape() { continuation?.yield(HotkeyMonitorEvent(role: .dictate, event: .escape)) }
+    func escape() { continuation?.yield(HotkeyMonitorEvent(.escape)) }
 }
 
 /// Stands in for the on-device model: records what it was asked, answers
