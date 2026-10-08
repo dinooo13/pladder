@@ -28,11 +28,15 @@ now() { perl -MTime::HiRes=time -e 'printf "%.3f", time'; }
 
 screencapture -x -v "$OUT/demo.mov" &
 RECORDER=$!
+# A demo that fails would otherwise leave screencapture recording in the
+# background, since `set -e` ends the script before the stop below.
+trap 'kill -INT "$RECORDER" 2>/dev/null || true' EXIT
 .build/debug/Pladder --overlay-demo "$@" > "$OUT/demo.log"
 # Stopped by hand rather than with -V: the stop time less the movie's length
 # is when the first frame was taken, which lines the frames up with the log.
 STOPPED=$(now)
 kill -INT "$RECORDER"
 wait "$RECORDER"
+trap - EXIT
 
 swift "$ROOT/scripts/overlay-sheets.swift" "$OUT" "$STOPPED"

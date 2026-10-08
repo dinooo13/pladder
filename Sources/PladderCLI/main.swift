@@ -203,8 +203,8 @@ func transcribeFile(_ path: String, process: Bool, verbose: Bool) async {
         let transcript = try await engine.transcribe(samples)
         var text = transcript.text
         if process {
-            let settings = appSettings()
-            let pipeline = ProcessorPipeline(StandardProcessors.factories.map { $0(settings) }, onFailure: { id, error in
+            let settings = DictationSettings(appSettings())
+            let pipeline = StandardProcessors.pipeline(for: settings, onFailure: { id, error in
                 FileHandle.standardError.write(Data("pladder-cli: processor \(id) failed: \(error)\n".utf8))
             })
             text = await pipeline.run(text, disabled: settings.disabledProcessors)

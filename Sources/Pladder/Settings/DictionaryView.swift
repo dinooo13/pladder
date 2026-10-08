@@ -192,8 +192,7 @@ struct DictionaryView: View {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             let data = try Data(contentsOf: url)
-            let imported = try JSONDecoder().decode([ImportedEntry].self, from: data)
-            merge(imported.map(\.entry))
+            merge(try JSONDecoder().decode([DictionaryEntry].self, from: data))
         } catch {
             errorMessage = String(localized: "Could not read that file. It should be a JSON array of { from, to, matchCase }.")
         }
@@ -217,19 +216,6 @@ struct DictionaryView: View {
     /// of creating a duplicate (see `DictionaryEntry.mergeKey`).
     private func merge(_ incoming: [DictionaryEntry]) {
         model.settings.dictionary.merge(incoming)
-    }
-}
-
-/// `DictionaryEntry`'s synthesised decoder requires every key. Files people write
-/// by hand rarely carry an `id`, so import goes through this looser shape.
-private struct ImportedEntry: Decodable {
-    var id: UUID?
-    var from: String
-    var to: String
-    var matchCase: Bool?
-
-    var entry: DictionaryEntry {
-        DictionaryEntry(id: id ?? UUID(), from: from, to: to, matchCase: matchCase ?? false)
     }
 }
 

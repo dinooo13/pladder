@@ -12,11 +12,34 @@ import PladderCore
 /// that needs settings builds itself from them; nothing here knows which
 /// processor that is.
 public enum StandardProcessors {
-    public static let factories: [@Sendable (Settings) -> any TextProcessor] = [
-        { _ in FillerRemover(languageHint: { TranscriptLanguage.hint(for: $0) }) },
-        { DictionaryReplacer(entries: $0.dictionary) },
-        { CustomWordCorrector(entries: $0.dictionary) },
-        { _ in WhitespaceNormalizer() },
-        { _ in SpokenPunctuation(languageHint: { TranscriptLanguage.hint(for: $0) }) },
+    public struct Entry: Sendable {
+        /// The processor's own `id`, known without building it: the settings
+        /// list shows every processor and building one compiles regexes.
+        public let id: String
+        public let make: @Sendable (DictationSettings) -> any TextProcessor
+    }
+
+    public static let entries: [Entry] = [
+        Entry(id: FillerRemover.processorID) { _ in
+            FillerRemover(languageHint: { TranscriptLanguage.hint(for: $0) })
+        },
+        Entry(id: DictionaryReplacer.processorID) { DictionaryReplacer(entries: $0.dictionary) },
+        Entry(id: CustomWordCorrector.processorID) { CustomWordCorrector(entries: $0.dictionary) },
+        Entry(id: WhitespaceNormalizer.processorID) { _ in WhitespaceNormalizer() },
+        Entry(id: SpokenPunctuation.processorID) { _ in
+            SpokenPunctuation(languageHint: { TranscriptLanguage.hint(for: $0) })
+        },
     ]
+
+    public static var factories: [@Sendable (DictationSettings) -> any TextProcessor] {
+        entries.map(\.make)
+    }
+
+    /// The pipeline the app and the CLI run.
+    public static func pipeline(
+        for settings: DictationSettings,
+        onFailure: (@Sendable (String, any Error) -> Void)? = nil
+    ) -> ProcessorPipeline {
+        ProcessorPipeline(entries.map { $0.make(settings) }, onFailure: onFailure)
+    }
 }

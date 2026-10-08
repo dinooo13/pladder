@@ -57,14 +57,13 @@ enum OverlayDemo {
         settings.polishDictations = scenario.polish
         settings.overlayStyle = style
         settings.overlayAnimationSpeed = speed
-        settings.playSounds = false
         let registry = EngineRegistry([
             .init(id: EchoEngine.engineID, displayName: "Echo", detail: "") {
                 EchoEngine(text: scenario.text, delay: scenario.engineDelay)
             }
         ])
         let coordinator = DictationCoordinator(
-            settings: settings,
+            settings: DictationSettings(settings),
             registry: registry,
             capture: DemoCapture(),
             output: DemoOutput(result: scenario.result),
@@ -138,7 +137,7 @@ private actor DemoCapture: AudioCapture {
         levels = continuation
         Task {
             var tick = 0.0
-            while await self.isRunning {
+            while self.isRunning {
                 continuation.yield(Float(0.2 + 0.4 * abs(sin(tick / 3))))
                 tick += 1
                 try? await Task.sleep(for: .milliseconds(50))

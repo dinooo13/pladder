@@ -34,8 +34,13 @@ public protocol TextOutput: Sendable {
     /// clipboard, while the user is still speaking. Called at key-down; not
     /// on the release-to-paste path.
     func prepare() async
+
+    /// Completes anything the output still owes the user right now instead
+    /// of on its timer: the clipboard restore. Called when the app quits.
+    func flush() async
 }
 
 extension TextOutput {
     public func prepare() async {}
+    public func flush() async {}
 }
