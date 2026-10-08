@@ -13,7 +13,8 @@ import os
 ///
 /// Threading: the tap block runs on a realtime audio thread. It must never touch
 /// actor state, allocate unpredictably, or `await` anything. Everything it needs
-/// lives in `TapProcessor`, a lock-protected class it owns outright, plus the
+/// lives in `TapProcessor`, which it owns outright, the recording's
+/// `SampleAccumulator`, which is behind a lock, and the
 /// `AsyncStream.Continuation` for the level meter, which is safe to yield from any
 /// thread. Sample-rate conversion happens inside the tap block, which is the normal
 /// arrangement: `AVAudioConverter` is fast, deterministic, and doing it there avoids
@@ -45,13 +46,12 @@ public actor AVAudioEngineCapture: AudioCapture {
     }
 
     private let engine = AVAudioEngine()
-    private var processor: TapProcessor?
+    /// The current recording's samples. A device change mid-recording installs a
+    /// new tap in front of the same accumulator, so the switch loses nothing.
+    private var accumulator: SampleAccumulator?
     private var levelContinuation: AsyncStream<Float>.Continuation?
     private var isRecording = false
     private var configurationObserver: NotificationObserver?
-    /// Samples salvaged from a previous `TapProcessor` when the audio device changed
-    /// mid-recording, so a device switch does not lose what was said before it.
-    private var carriedSamples: [Float] = []
 
     public init() {}
 
@@ -77,16 +77,17 @@ public actor AVAudioEngineCapture: AudioCapture {
         // warmUp() may have failed (no permission at launch); retry here.
         try startEngineIfNeeded()
 
-        carriedSamples.removeAll(keepingCapacity: false)
         let (stream, continuation) = AsyncStream<Float>.makeStream(bufferingPolicy: .bufferingNewest(1))
         levelContinuation = continuation
+        let accumulator = SampleAccumulator()
         do {
-            try installTap(continuation: continuation)
+            try installTap(into: accumulator, continuation: continuation)
         } catch {
             continuation.finish()
             levelContinuation = nil
             throw error
         }
+        self.accumulator = accumulator
         isRecording = true
         Self.startMarker()
         return stream
@@ -96,18 +97,12 @@ public actor AVAudioEngineCapture: AudioCapture {
         log.log("capture started")
     }
 
-    /// Takes everything captured so far — carried samples from device changes
-    /// plus what the tap accumulated — and keeps recording. Only the samples
+    /// Takes everything captured so far and keeps recording. Only the samples
     /// since the last `drain()` or `start()` are returned; `stop()` then sees
     /// just the tail.
     public func drain() async -> [Float] {
-        guard isRecording else { return [] }
-        var samples = carriedSamples
-        carriedSamples.removeAll(keepingCapacity: false)
-        if let processor {
-            samples.append(contentsOf: processor.drain())
-        }
-        return samples
+        guard isRecording, let accumulator else { return [] }
+        return accumulator.drain()
     }
 
     public func stop() async -> CapturedAudio {
@@ -118,12 +113,8 @@ public actor AVAudioEngineCapture: AudioCapture {
         engine.inputNode.removeTap(onBus: 0)
         // removeTap(onBus:) returns only once the tap block is no longer running, so
         // draining afterwards picks up every buffer the hardware delivered.
-        var samples = carriedSamples
-        carriedSamples.removeAll(keepingCapacity: false)
-        if let processor {
-            samples.append(contentsOf: processor.drain())
-        }
-        processor = nil
+        let samples = accumulator?.drain() ?? []
+        accumulator = nil
 
         levelContinuation?.finish()
         levelContinuation = nil
@@ -170,7 +161,10 @@ public actor AVAudioEngineCapture: AudioCapture {
         }
     }
 
-    private func installTap(continuation: AsyncStream<Float>.Continuation) throws {
+    private func installTap(
+        into accumulator: SampleAccumulator,
+        continuation: AsyncStream<Float>.Continuation
+    ) throws {
         let input = engine.inputNode
         let inputFormat = input.inputFormat(forBus: 0)
         guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0 else {
@@ -181,8 +175,7 @@ public actor AVAudioEngineCapture: AudioCapture {
         // One converter per recording keeps the resampler's filter state continuous
         // across tap buffers.
         let converter = try AudioResampler.makeConverter(from: inputFormat, to: targetFormat)
-        let processor = TapProcessor(converter: converter, targetFormat: targetFormat)
-        self.processor = processor
+        let processor = TapProcessor(converter: converter, targetFormat: targetFormat, accumulator: accumulator)
 
         input.removeTap(onBus: 0)
         input.installTap(onBus: 0, bufferSize: Self.tapBufferSize, format: inputFormat) { buffer, _ in
@@ -208,27 +201,22 @@ public actor AVAudioEngineCapture: AudioCapture {
     }
 
     /// The default input or output device changed. AVAudioEngine tears down its graph
-    /// and stops, so restart it and — if a recording is in flight — reinstall the tap
-    /// against the new input format, keeping what has been captured so far.
+    /// and stops. With a recording in flight, restart it and reinstall the tap against
+    /// the new input format, in front of the same accumulator so what has been
+    /// captured so far is kept; otherwise the next `start()` restarts it.
     private func handleConfigurationChange() {
-        let wasRecording = isRecording
-        if wasRecording, let processor {
-            carriedSamples.append(contentsOf: processor.drain())
-            engine.inputNode.removeTap(onBus: 0)
-            self.processor = nil
-        }
-
-        guard wasRecording, isRecording, let continuation = levelContinuation else { return }
+        guard isRecording, let accumulator, let continuation = levelContinuation else { return }
+        engine.inputNode.removeTap(onBus: 0)
+        // Either failure leaves the recording without a tap until stop(), which
+        // still returns whatever was captured before the change; the new device
+        // may simply not be usable.
         do {
             try startEngineIfNeeded()
+            try installTap(into: accumulator, continuation: continuation)
         } catch {
-            // Nothing to do: the new device may not be usable. stop() still returns
-            // whatever was captured before the change.
-            return
+            Self.log.error("device change: capture did not resume: \(String(describing: error), privacy: .public)")
         }
-        try? installTap(continuation: continuation)
     }
-
 }
 
 /// Unregisters a block-based notification observer when the owner goes away.
@@ -247,24 +235,22 @@ private final class NotificationObserver: @unchecked Sendable {
     }
 }
 
-/// Everything the realtime tap block touches, behind one lock.
+/// The converter one tap block runs its buffers through, in front of the
+/// recording's accumulator.
 ///
-/// `@unchecked Sendable` because `AVAudioConverter` and `AVAudioPCMBuffer` are not
-/// `Sendable`: the lock is what actually makes this safe. Taps are serialised by
-/// CoreAudio, so in practice only the audio thread calls `process(_:)` and only the
-/// actor calls `drain()`; the lock protects that hand-off.
+/// `@unchecked Sendable` because `AVAudioConverter` is not `Sendable`. Only the tap
+/// block calls `process(_:)`, and CoreAudio serialises tap blocks, so the converter
+/// is never used from two threads; the samples it produces go into the
+/// accumulator, which has a lock of its own.
 private final class TapProcessor: @unchecked Sendable {
-    private let lock = NSLock()
     private let converter: AVAudioConverter
     private let targetFormat: AVAudioFormat
-    private var samples: [Float] = []
+    private let accumulator: SampleAccumulator
 
-    init(converter: AVAudioConverter, targetFormat: AVAudioFormat) {
+    init(converter: AVAudioConverter, targetFormat: AVAudioFormat, accumulator: SampleAccumulator) {
         self.converter = converter
         self.targetFormat = targetFormat
-        // A recording is usually a few seconds; reserve 10 s of 16 kHz mono up front so
-        // the audio thread rarely has to grow the array.
-        samples.reserveCapacity(160_000)
+        self.accumulator = accumulator
     }
 
     /// Called on the realtime audio thread. Converts to 16 kHz mono, accumulates, and
@@ -278,19 +264,7 @@ private final class TapProcessor: @unchecked Sendable {
         }
         guard !converted.isEmpty else { return 0 }
         let level = AudioResampler.rmsLevel(converted)
-        lock.lock()
-        samples.append(contentsOf: converted)
-        lock.unlock()
+        accumulator.append(converted)
         return level
-    }
-
-    /// Takes everything captured so far and resets the accumulator.
-    func drain() -> [Float] {
-        lock.lock()
-        defer {
-            samples.removeAll(keepingCapacity: false)
-            lock.unlock()
-        }
-        return samples
     }
 }
