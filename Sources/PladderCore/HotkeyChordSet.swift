@@ -1,8 +1,8 @@
 import Foundation
 
 /// One `HotkeyChordTracker` per role, fed the same keyboard transitions.
-/// `GlobalHotkeyMonitor` owns one behind its lock; tests drive it directly.
-/// Pure value type, no I/O.
+/// `GlobalHotkeyMonitor` keeps one per session behind its lock; tests drive
+/// it directly. Pure value type, no I/O.
 ///
 /// Every tracker sees every event and decides on its own, exactly as a lone
 /// tracker does; an event is swallowed when any tracker swallows it.
