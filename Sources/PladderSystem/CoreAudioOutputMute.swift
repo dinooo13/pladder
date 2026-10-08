@@ -13,9 +13,10 @@ import PladderCore
 ///
 /// The element is the wrinkle. Most devices carry a master mute on
 /// `kAudioObjectPropertyElementMain`; some aggregate and USB devices carry one
-/// per channel instead, on elements 1 and 2. Both are handled, and a device
-/// with no mute control at all (plenty of them, including some HDMI outputs)
-/// reports nil so the controller leaves it alone.
+/// per channel instead, on elements 1 and 2. Both are handled, each element
+/// read and written on its own, and a device with no mute control at all
+/// (plenty of them, including some HDMI outputs) reports nil so the
+/// controller leaves it alone.
 public struct CoreAudioOutputMute: OutputMuteControl {
     public init() {}
 
@@ -52,15 +53,14 @@ public struct CoreAudioOutputMute: OutputMuteControl {
         return device
     }
 
-    /// Muted only when every element that has a mute is muted: a device with
-    /// one channel muted is not what the user would call muted, and unmuting
-    /// it at the end would be a change they did not ask for.
-    public func isMuted(_ device: UInt32) -> Bool? {
-        let elements = Self.muteElements(device)
-        guard !elements.isEmpty else { return nil }
-        var sawOne = false
-        var allMuted = true
-        for element in elements {
+    /// Each element on its own, never one answer for the device: a stereo
+    /// device with one channel muted by the user reads as partly muted, the
+    /// controller mutes only the other channel, and the end turns only that
+    /// one back off, so the user's channel stays as they left it. An element
+    /// that cannot be read is left out, so it is never written either.
+    public func muteState(of device: UInt32) -> MuteState? {
+        var elements: [UInt32: Bool] = [:]
+        for element in Self.muteElements(device) {
             var address = AudioObjectPropertyAddress(
                 mSelector: kAudioDevicePropertyMute,
                 mScope: kAudioObjectPropertyScopeOutput,
@@ -69,48 +69,51 @@ public struct CoreAudioOutputMute: OutputMuteControl {
             var size = UInt32(MemoryLayout<UInt32>.size)
             let status = AudioObjectGetPropertyData(device, &address, 0, nil, &size, &value)
             guard status == noErr else { continue }
-            sawOne = true
-            if value == 0 { allMuted = false }
+            elements[element] = value != 0
         }
-        guard sawOne else { return nil }
-        return allMuted
+        return elements.isEmpty ? nil : MuteState(elements)
     }
 
-    public func setMuted(_ muted: Bool, on device: UInt32) throws {
-        let elements = Self.muteElements(device)
-        guard !elements.isEmpty else {
-            throw MuteError.noMuteControl(device: device)
+    public func apply(_ state: MuteState, to device: UInt32) throws {
+        var firstFailure: MuteError?
+        // In element order, so a log of a half-applied state reads the same
+        // every time.
+        for (element, muted) in state.elements.sorted(by: { $0.key < $1.key }) {
+            do {
+                try Self.set(muted, element: element, on: device)
+            } catch {
+                firstFailure = firstFailure ?? error
+            }
         }
-        for element in elements {
-            var address = AudioObjectPropertyAddress(
-                mSelector: kAudioDevicePropertyMute,
-                mScope: kAudioObjectPropertyScopeOutput,
-                mElement: element)
-            var settable: DarwinBoolean = false
-            let check = AudioObjectIsPropertySettable(device, &address, &settable)
-            guard check == noErr, settable.boolValue else {
-                throw MuteError.notSettable(device: device, element: element, status: check)
-            }
-            var value: UInt32 = muted ? 1 : 0
-            let status = AudioObjectSetPropertyData(
-                device, &address, 0, nil, UInt32(MemoryLayout<UInt32>.size), &value)
-            guard status == noErr else {
-                throw MuteError.setFailed(device: device, element: element, status: status)
-            }
+        if let firstFailure { throw firstFailure }
+    }
+
+    private static func set(_ muted: Bool, element: AudioObjectPropertyElement, on device: AudioObjectID) throws(MuteError) {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyMute,
+            mScope: kAudioObjectPropertyScopeOutput,
+            mElement: element)
+        var settable: DarwinBoolean = false
+        let check = AudioObjectIsPropertySettable(device, &address, &settable)
+        guard check == noErr, settable.boolValue else {
+            throw .notSettable(device: device, element: element, status: check)
+        }
+        var value: UInt32 = muted ? 1 : 0
+        let status = AudioObjectSetPropertyData(
+            device, &address, 0, nil, UInt32(MemoryLayout<UInt32>.size), &value)
+        guard status == noErr else {
+            throw .setFailed(device: device, element: element, status: status)
         }
     }
 
     /// Named rather than bare OSStatus: these end up in the log, and the
     /// whole point of logging them is diagnosing a stuck mute.
     public enum MuteError: LocalizedError {
-        case noMuteControl(device: UInt32)
         case notSettable(device: UInt32, element: UInt32, status: OSStatus)
         case setFailed(device: UInt32, element: UInt32, status: OSStatus)
 
         public var errorDescription: String? {
             switch self {
-            case .noMuteControl(let device):
-                return "output device \(device) has no mute control"
             case .notSettable(let device, let element, let status):
                 return "mute on output device \(device) element \(element) is read-only (status \(status))"
             case .setFailed(let device, let element, let status):
