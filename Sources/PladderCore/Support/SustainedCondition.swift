@@ -9,7 +9,9 @@ import Foundation
 /// own — the caller passes the instant — so the behaviour is unit-testable.
 public struct SustainedCondition: Sendable, Equatable {
     /// How long the condition has to hold before `observe` starts returning
-    /// true. With a two-second poll this means two consecutive positives.
+    /// true, timed from the first positive. With the default three seconds
+    /// and a two-second poll that is three positives in a row, about four
+    /// seconds in: the second comes at two, short of the threshold.
     public let threshold: Duration
     /// When the current run of true observations started, if any.
     private var trueSince: ContinuousClock.Instant?

@@ -46,10 +46,10 @@ public protocol HotkeyMonitor: Sendable {
     /// role of the chord it belongs to. Each chord is matched on its own; a
     /// chord in the set that is empty is ignored. A keystroke that ends one
     /// chord and engages another reports the end first (see
-    /// `HotkeyChordSet`). `submitKey` is the chord
-    /// that, pressed while any of them is held, asks for Return after the
-    /// paste; an empty chord turns that off. Cancelling the consuming task or
-    /// calling `stop()` ends monitoring.
+    /// `HotkeyChordSet`). `submitKey` is the chord that, pressed while any of
+    /// them is held, asks for Return after the paste; an empty chord turns
+    /// that off. Cancelling the consuming task or calling `stop()` ends
+    /// monitoring.
     func start(chords: [HotkeyRole: Hotkey], submitKey: Hotkey) -> AsyncStream<HotkeyMonitorEvent>
     func stop()
     /// While true a plain Escape is the cancel key: reported as `.escape` and

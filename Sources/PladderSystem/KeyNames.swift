@@ -5,7 +5,9 @@ import PladderCore
 public extension Hotkey {
     /// "Right Option", "Option + Space", "Fn + F5". Sides are named only for a
     /// modifier-only chord, the only kind matched by side. Character keys are
-    /// named after what they type in the current keyboard layout.
+    /// named after what they type in the current keyboard layout, which is
+    /// why this is main actor bound (see `KeyboardLayout`).
+    @MainActor
     var displayName: String { KeyNames.name(for: self, collapsingSides: !isModifierOnly) }
 
     /// The same name without the sides: "Control + Shift + Space".
@@ -14,11 +16,14 @@ public extension Hotkey {
     /// missing, a macOS shortcut — where the modifier mask genuinely cannot
     /// tell Left from Right, so naming a side would promise a precision the
     /// matching does not have.
+    @MainActor
     var sideAgnosticDisplayName: String { KeyNames.name(for: self, collapsingSides: true) }
 }
 
-/// Human-readable names for virtual key codes.
+/// Human-readable names for virtual key codes. Main actor bound wherever a
+/// name can come from the keyboard layout; every caller is UI code.
 public enum KeyNames {
+    @MainActor
     public static func name(for hotkey: Hotkey, collapsingSides: Bool = false) -> String {
         guard !hotkey.keyCodes.isEmpty else { return localized("None") }
         return hotkey.keyCodes
@@ -27,12 +32,13 @@ public enum KeyNames {
             .joined(separator: " + ")
     }
 
+    @MainActor
     public static func name(forKeyCode code: UInt16, collapsingSides: Bool = false) -> String {
         if collapsingSides, let sideless = sidelessNames[code] { return localized(sideless) }
         if let fixed = fixedNames[code] { return localized(fixed) }
         // What the key types in the current layout, which is already the
         // user's own language by definition.
-        if let character = layoutCharacter(for: code) { return character }
+        if let character = KeyboardLayout.displayCharacter(for: code) { return character }
         return String(localized: "Key \(Int(code))", table: "KeyNames")
     }
 
@@ -106,33 +112,4 @@ public enum KeyNames {
         ]
         return Dictionary(uniqueKeysWithValues: entries.map { (UInt16($0.0), $0.1) })
     }()
-
-    /// The character `code` produces, unmodified, in the current keyboard
-    /// layout, upper-cased for display. Nil for keys that type nothing visible.
-    private static func layoutCharacter(for code: UInt16) -> String? {
-        guard let source = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue(),
-              let pointer = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData)
-        else { return nil }
-        let data = Unmanaged<CFData>.fromOpaque(pointer).takeUnretainedValue() as Data
-
-        return data.withUnsafeBytes { buffer -> String? in
-            guard let layout = buffer.baseAddress?.assumingMemoryBound(to: UCKeyboardLayout.self) else {
-                return nil
-            }
-            var deadKeyState: UInt32 = 0
-            var length = 0
-            var characters = [UniChar](repeating: 0, count: 4)
-            let status = UCKeyTranslate(
-                layout, code, UInt16(kUCKeyActionDisplay), 0, UInt32(LMGetKbdType()),
-                OptionBits(kUCKeyTranslateNoDeadKeysMask), &deadKeyState,
-                characters.count, &length, &characters)
-            guard status == noErr, length > 0 else { return nil }
-            let text = String(utf16CodeUnits: characters, count: length)
-            guard let scalar = text.unicodeScalars.first,
-                  !CharacterSet.whitespacesAndNewlines.contains(scalar),
-                  !CharacterSet.controlCharacters.contains(scalar)
-            else { return nil }
-            return text.uppercased()
-        }
-    }
 }

@@ -36,6 +36,29 @@ import Testing
         #expect(key == nil)
     }
 
+    // MARK: Naming a key after what it types
+
+    @Test func aLetterIsNamedUpperCased() throws {
+        let us = try #require(KeyboardLayout.layoutData(inputSourceID: "com.apple.keylayout.US"))
+        #expect(KeyboardLayout.displayCharacter(for: 0x00, in: us, keyboardType: Self.keyboardType) == "A")
+        #expect(KeyboardLayout.displayCharacter(for: 0x2C, in: us, keyboardType: Self.keyboardType) == "/")
+    }
+
+    @Test func theNameFollowsTheLayout() throws {
+        // kVK_ANSI_S types "o" on Dvorak.
+        let us = try #require(KeyboardLayout.layoutData(inputSourceID: "com.apple.keylayout.US"))
+        let dvorak = try #require(KeyboardLayout.layoutData(inputSourceID: "com.apple.keylayout.Dvorak"))
+        #expect(KeyboardLayout.displayCharacter(for: 0x01, in: us, keyboardType: Self.keyboardType) == "S")
+        #expect(KeyboardLayout.displayCharacter(for: 0x01, in: dvorak, keyboardType: Self.keyboardType) == "O")
+    }
+
+    @Test func aKeyThatTypesNothingVisibleHasNoCharacter() throws {
+        let us = try #require(KeyboardLayout.layoutData(inputSourceID: "com.apple.keylayout.US"))
+        #expect(KeyboardLayout.displayCharacter(for: 0x31, in: us, keyboardType: Self.keyboardType) == nil)  // Space
+        #expect(KeyboardLayout.displayCharacter(for: 0x24, in: us, keyboardType: Self.keyboardType) == nil)  // Return
+        #expect(KeyboardLayout.displayCharacter(for: 0x35, in: us, keyboardType: Self.keyboardType) == nil)  // Escape
+    }
+
     @Test func currentLayoutResolvesSomething() {
         // Nil is legitimate under a Chinese or Japanese input method, which
         // carries no `uchr` table; the machine running the tests uses a layout.
