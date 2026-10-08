@@ -61,6 +61,8 @@ actor ClipboardKeeper {
 
     private let pasteboard: NSPasteboard
     private let clock: PasteClock
+    /// The largest item a snapshot keeps; the tests make it small.
+    private let snapshotLimit: Int
 
     /// A restore that has been scheduled but has not run yet.
     private struct Pending {
@@ -85,6 +87,14 @@ actor ClipboardKeeper {
     }
 
     private var pending: Pending?
+
+    /// A transcript a restore had to leave on the pasteboard, because every
+    /// item of the user's clipboard was too large to keep. Held so its promise
+    /// can still be served, and so the next snapshot does not read our own
+    /// text back as the user's: until the user copies something, the
+    /// clipboard is still this, and its snapshot is the one that restores
+    /// nothing.
+    private var left: (snapshot: ClipboardSnapshot, changeCount: Int, promise: TranscriptPromise)?
 
     /// The clipboard as it was when `prepare()` last looked, ready for
     /// `paste` to carry forward. Nil when already used. Reading every
@@ -116,7 +126,8 @@ actor ClipboardKeeper {
         readSettle: Duration,
         restoreCap: Duration,
         propagationDelay: Duration,
-        clock: PasteClock = .continuous
+        clock: PasteClock = .continuous,
+        snapshotLimit: Int = ClipboardSnapshot.maximumItemBytes
     ) {
         // By name rather than the object: `NSPasteboard` is not `Sendable`,
         // and the one made here never leaves the actor.
@@ -126,6 +137,7 @@ actor ClipboardKeeper {
         self.restoreCap = restoreCap
         self.propagationDelay = propagationDelay
         self.clock = clock
+        self.snapshotLimit = snapshotLimit
     }
 
     /// What `paste` hands back: enough to wait for the transcript's read.
@@ -150,13 +162,17 @@ actor ClipboardKeeper {
             prepared = nil
             return
         }
+        if let left, left.changeCount == now {
+            prepared = nil
+            return
+        }
         if let prepared, prepared.changeCount == now { return }
         prepared = (takeSnapshot(), now)
     }
 
     private func takeSnapshot() -> ClipboardSnapshot {
         snapshotsTaken += 1
-        return ClipboardSnapshot.capture(from: pasteboard)
+        return ClipboardSnapshot.capture(from: pasteboard, maximumItemBytes: snapshotLimit)
     }
 
     /// The user's clipboard to put back after the paste about to happen, and
@@ -165,6 +181,9 @@ actor ClipboardKeeper {
         let prep = prepared
         prepared = nil
         let now = pasteboard.changeCount
+        let leftOver = left
+        left = nil
+        if let leftOver, leftOver.changeCount == now { return leftOver.snapshot }
         if let carried = pending {
             endPending()
             // Our previous transcript is still on the pasteboard: the user's
@@ -225,6 +244,7 @@ actor ClipboardKeeper {
     func copy(_ text: String) {
         endPending()
         prepared = nil
+        left = nil
         _ = ClipboardSnapshot.write(text, to: pasteboard)
     }
 
@@ -234,7 +254,7 @@ actor ClipboardKeeper {
     func flush() {
         guard let current = pending else { return }
         endPending()
-        current.snapshot.restore(ifChangeCountIs: current.changeCount, on: pasteboard)
+        restore(current)
     }
 
     // MARK: After the paste
@@ -266,7 +286,11 @@ actor ClipboardKeeper {
     /// The target app read the transcript. Called from the main thread, where
     /// AppKit serves promises, by way of a task.
     func transcriptRead(_ promise: TranscriptPromise, at instant: ContinuousClock.Instant) {
-        guard let current = pending, current.promise === promise, let posted = current.posted else { return }
+        // A read before Cmd+V was posted is not the paste: the actor finishes
+        // `paste` before this runs, so `posted` is set by now either way, and
+        // only the instant tells them apart.
+        guard let current = pending, current.promise === promise, let posted = current.posted,
+              instant >= posted else { return }
         if current.firstRead == nil {
             let seconds = (instant - posted).timeInterval
             Self.log.notice("clipboard read \(seconds, format: .fixed(precision: 3)) s after Cmd+V")
@@ -297,7 +321,16 @@ actor ClipboardKeeper {
         if pending.lastRead == nil {
             Self.log.notice("clipboard not read within \(self.restoreCap.components.seconds) s of Cmd+V; restoring")
         }
-        pending.snapshot.restore(ifChangeCountIs: pending.changeCount, on: pasteboard)
+        restore(pending)
+    }
+
+    /// Puts the snapshot back, and keeps the transcript's promise alive when
+    /// the snapshot could not replace it.
+    private func restore(_ done: Pending) {
+        done.snapshot.restore(ifChangeCountIs: done.changeCount, on: pasteboard)
+        if pasteboard.changeCount == done.changeCount {
+            left = (done.snapshot, done.changeCount, done.promise)
+        }
     }
 
     /// Ends the pending restore without restoring: its timer stops and anyone
@@ -346,6 +379,7 @@ actor ClipboardKeeper {
 
     var pendingRestore: Task<Void, Never>? { pending?.task }
     var pendingPromise: TranscriptPromise? { pending?.promise }
+    var leftPromise: TranscriptPromise? { left?.promise }
 }
 
 /// The time the paste waits on: the continuous clock in the app, a manual

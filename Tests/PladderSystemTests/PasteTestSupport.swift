@@ -143,14 +143,14 @@ struct PasteHarness {
     let poster: RecordingKeyPoster
     let output: PasteboardOutput
 
-    init(submitDelay: Duration = .milliseconds(50)) {
+    init(submitDelay: Duration = .milliseconds(50), snapshotLimit: Int = ClipboardSnapshot.maximumItemBytes) {
         let poster = RecordingKeyPoster(clock: clock)
         self.poster = poster
         let grant = Grant()
         self.grant = grant
         output = PasteboardOutput(
             submitDelay: submitDelay, pasteboard: name, poster: poster,
-            isTrusted: { grant.value }, clock: clock.pasteClock)
+            isTrusted: { grant.value }, clock: clock.pasteClock, snapshotLimit: snapshotLimit)
     }
 
     /// The grant, shared with the output's `isTrusted`.
