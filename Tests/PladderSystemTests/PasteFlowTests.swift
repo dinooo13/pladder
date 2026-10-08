@@ -181,19 +181,62 @@ import Testing
 
     // MARK: Flush
 
-    @Test func flushRestoresAtOnce() async throws {
+    @Test func flushRestoresOnceTheTargetHasRead() async throws {
         let h = PasteHarness()
         defer { h.release() }
         h.userCopies("original")
 
         try await h.output.insert("transcript", submit: false)
         let restore = try #require(await h.output.keeper.pendingRestore)
-        await h.output.flush()
+        h.clock.advance(to: .milliseconds(10))
+        await h.targetReads()
+        let flush = Task { await h.output.flush() }
+        // Not before the floor, as the timer would not: Chromium may read
+        // again for the real paste.
+        #expect(await h.clock.waitForSleeper(at: .milliseconds(400)))
+        #expect(h.holdsTranscript)
+        h.clock.advance(to: .milliseconds(400))
+        await flush.value
 
         #expect(h.clipboard == "original")
         // The timer is gone too, so it cannot restore a second time later.
         await restore.value
         #expect(await h.output.keeper.pendingRestore == nil)
+    }
+
+    @Test func flushRightAfterCmdVWaitsForTheReadBeforeRestoring() async throws {
+        // A dictation pasted on the way out: restoring at once would hand the
+        // target app the old clipboard instead of the transcript.
+        let h = PasteHarness()
+        defer { h.release() }
+        h.userCopies("original")
+
+        try await h.output.insert("transcript", submit: false)
+        let flush = Task { await h.output.flush() }
+        #expect(await h.clock.waitForSleeper(at: .milliseconds(400)))
+        h.clock.advance(to: .milliseconds(300))
+        #expect(h.holdsTranscript)
+        await h.targetReads()
+        // Read at 300 ms: back 200 ms later, not at the floor.
+        #expect(await h.clock.waitForSleeper(at: .milliseconds(500)))
+        #expect(h.holdsTranscript)
+        h.clock.advance(to: .milliseconds(500))
+        await flush.value
+        #expect(h.clipboard == "original")
+    }
+
+    @Test func flushGivesUpOnATargetThatHasNotReadByTheFloor() async throws {
+        let h = PasteHarness()
+        defer { h.release() }
+        h.userCopies("original")
+
+        try await h.output.insert("transcript", submit: false)
+        let flush = Task { await h.output.flush() }
+        #expect(await h.clock.waitForSleeper(at: .milliseconds(400)))
+        h.clock.advance(to: .milliseconds(400))
+        await flush.value
+        // Not the eight-second cap: a quit cannot wait that long.
+        #expect(h.clipboard == "original")
     }
 
     @Test func flushLeavesTheUsersNewCopyAlone() async throws {

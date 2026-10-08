@@ -71,11 +71,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         signal(SIGTERM, SIG_IGN)
-        let source = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
-        source.setEventHandler { NSApp.terminate(nil) }
+        // Off the main queue, so a main thread that is stuck still hears the
+        // signal: the quit is asked for, and if it has not happened past its
+        // own deadline the process ends anyway, as an uncaught SIGTERM would
+        // have ended it at once.
+        let source = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .global(qos: .userInitiated))
+        source.setEventHandler {
+            Task { @MainActor in NSApp.terminate(nil) }
+            DispatchQueue.global().asyncAfter(deadline: .now() + Self.signalExitDeadline) { exit(0) }
+        }
         source.resume()
         terminationSignal = source
     }
+
+    /// Longer than `shutdownDeadline`, so a quit that can proceed always
+    /// finishes first.
+    private nonisolated static let signalExitDeadline: DispatchTimeInterval = .seconds(5)
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard let shutdown = Self.shutdown else { return .terminateNow }
