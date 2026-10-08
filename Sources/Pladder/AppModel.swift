@@ -379,8 +379,7 @@ final class AppModel {
 
     private func handle(_ event: DictationCoordinator.Event, at instant: ContinuousClock.Instant) {
         func fmt(_ duration: Duration) -> String {
-            let d = Self.seconds(duration)
-            return String(format: "%.3f", d)
+            String(format: "%.3f", duration.timeInterval)
         }
         switch event {
         case .recordingStarted:
@@ -398,7 +397,7 @@ final class AppModel {
             }
             guard let released = releaseInstant else { return }
             releaseInstant = nil
-            let total = Self.seconds(instant - released)
+            let total = (instant - released).timeInterval
             // A polish cycle gets its own line, so the plain one stays the
             // number the benchmark rule watches; one predicate finds both.
             let polish = timing.polish.map { "polish \(fmt($0)) (\(settings.polishModel.rawValue)), " } ?? ""
@@ -431,7 +430,7 @@ final class AppModel {
     private func propose(_ proposal: CorrectionProposal) {
         let key = proposal.pair.key
         guard !proposals.contains(where: { $0.pair.key == key }),
-              !Self.dictionary(settings.dictionary, has: proposal.pair.heard) else { return }
+              !settings.dictionary.hasRule(for: proposal.pair.heard) else { return }
         proposals = Array(([proposal] + proposals).prefix(Self.maximumProposals))
     }
 
@@ -440,18 +439,7 @@ final class AppModel {
     /// settings setter, so it is saved and the next dictation uses it.
     func acceptProposal(_ proposal: CorrectionProposal) {
         proposals.removeAll { $0.id == proposal.id }
-        let from = proposal.pair.heard.lowercased()
-        var dictionary = settings.dictionary
-        let entry = DictionaryEntry(from: proposal.pair.heard, to: proposal.pair.corrected)
-        if let index = dictionary.firstIndex(where: {
-            $0.from.trimmingCharacters(in: .whitespaces).lowercased() == from
-        }) {
-            dictionary[index].to = entry.to
-            dictionary[index].matchCase = false
-        } else {
-            dictionary.append(entry)
-        }
-        settings.dictionary = dictionary
+        settings.dictionary.merge([DictionaryEntry(from: proposal.pair.heard, to: proposal.pair.corrected)])
     }
 
     /// Drops the line and remembers the pair so it is never proposed again.
@@ -459,16 +447,6 @@ final class AppModel {
         proposals.removeAll { $0.id == proposal.id }
         let dismissed = dismissedCorrections
         Task { await dismissed.dismiss(proposal.pair) }
-    }
-
-    private static func dictionary(_ entries: [DictionaryEntry], has heard: String) -> Bool {
-        let key = heard.lowercased()
-        return entries.contains { $0.from.trimmingCharacters(in: .whitespaces).lowercased() == key }
-    }
-
-    private static func seconds(_ duration: Duration) -> Double {
-        let parts = duration.components
-        return Double(parts.seconds) + Double(parts.attoseconds) / 1e18
     }
 
     // MARK: Permissions

@@ -220,8 +220,7 @@ public actor TranscriptPolisher: TranscriptRefiner {
     }
 
     private static func log(_ report: Report) {
-        let secs = String(format: "%.3f", Double(report.elapsed.components.seconds)
-            + Double(report.elapsed.components.attoseconds) / 1e18)
+        let secs = String(format: "%.3f", report.elapsed.timeInterval)
         if let failure = report.failure {
             log.notice(
                 "polish failed after \(secs, privacy: .public) s, \(report.wordsIn, privacy: .public) words in: \(failure, privacy: .public)")

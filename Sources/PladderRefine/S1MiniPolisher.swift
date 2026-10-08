@@ -153,8 +153,7 @@ public actor S1MiniPolisher: TranscriptRefiner {
     }
 
     private static func log(_ report: TranscriptPolisher.Report, file: ModelFile) {
-        let secs = String(format: "%.3f", Double(report.elapsed.components.seconds)
-            + Double(report.elapsed.components.attoseconds) / 1e18)
+        let secs = String(format: "%.3f", report.elapsed.timeInterval)
         if let failure = report.failure {
             log.notice(
                 "polish (\(file.fileName, privacy: .public)) failed after \(secs, privacy: .public) s, \(report.wordsIn, privacy: .public) words in: \(failure, privacy: .public)")

@@ -18,6 +18,27 @@ public struct DictionaryEntry: Codable, Sendable, Equatable, Identifiable, Hasha
         self.matchCase = matchCase
     }
 
+    /// `from` as rules are compared: trimmed and lowercased. Empty for a
+    /// custom word, which has no `from`.
+    public var normalizedFrom: String { Self.normalized(from) }
+
+    /// The form two spellings of a heard phrase are compared in.
+    public static func normalized(_ text: String) -> String {
+        text.trimmingCharacters(in: .whitespaces).lowercased()
+    }
+
+    /// What two entries collide on when one is added over the other:
+    /// `from:` for a replacement rule, `to:` for a custom word (an empty
+    /// `from`, which is how `CustomWordCorrector` reads its terms), nil for
+    /// a row with neither, which is nothing at all.
+    public var mergeKey: String? {
+        let from = normalizedFrom
+        if !from.isEmpty { return "from:" + from }
+        let to = Self.normalized(self.to)
+        if !to.isEmpty { return "to:" + to }
+        return nil
+    }
+
     /// The ids of every entry that sits on a replacement cycle.
     ///
     /// An edge runs from rule A to a different rule B when A's `to` contains
@@ -77,5 +98,37 @@ public struct DictionaryEntry: Codable, Sendable, Equatable, Identifiable, Hasha
             stack.append(contentsOf: adjacency[next] ?? [])
         }
         return false
+    }
+}
+
+extension Array where Element == DictionaryEntry {
+    /// True when a rule already replaces `heard`, whatever its case or
+    /// surrounding spaces.
+    public func hasRule(for heard: String) -> Bool {
+        let key = DictionaryEntry.normalized(heard)
+        return !key.isEmpty && contains { $0.normalizedFrom == key }
+    }
+
+    /// Adds `incoming`, overwriting an existing row with the same
+    /// `mergeKey` rather than creating a duplicate. The overwritten row keeps
+    /// its `id`, so selection and focus in the Dictionary tab survive. Rows
+    /// without a key are skipped. The one way entries are added: the
+    /// Dictionary tab's import and an accepted learned correction both come
+    /// through here.
+    public mutating func merge(_ incoming: [DictionaryEntry]) {
+        var indexByKey: [String: Int] = [:]
+        for (index, entry) in enumerated() {
+            if let key = entry.mergeKey { indexByKey[key] = index }
+        }
+        for var entry in incoming {
+            guard let key = entry.mergeKey else { continue }
+            if let index = indexByKey[key] {
+                entry.id = self[index].id
+                self[index] = entry
+            } else {
+                indexByKey[key] = count
+                append(entry)
+            }
+        }
     }
 }
