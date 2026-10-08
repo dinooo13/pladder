@@ -303,7 +303,7 @@ What each stage contains:
 
 - `stop` is `AudioCapture.stop()`: removing the tap and collecting the
   captured samples.
-- `engine` is `TranscriptionEngine.transcribe`.
+- `engine` is the engine's call: `endUtterance` for a streaming engine, `transcribe` otherwise. It includes, when a release lands while the feed loop is handing the engine a chunk, the wait for that hand-over, which the call would have waited for anyway.
 - `process` is the processor pipeline run.
 - `paste` is `TextOutput.insert`.
 
