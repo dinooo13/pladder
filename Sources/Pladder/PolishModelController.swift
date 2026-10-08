@@ -52,6 +52,12 @@ final class PolishModelController {
     }
 
     func apply(model: PolishModel, polishing: Bool) {
+        // A download nobody will use any more stops: the user picked another
+        // model, or turned polish off before it finished.
+        if let previous = chosenFile, previous != ModelFile(for: model) || !polishing {
+            let files = self.files
+            Task { await files.cancel(previous) }
+        }
         guard let file = ModelFile(for: model) else {
             chosenFile = nil
             releaseS1Mini()
