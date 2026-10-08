@@ -248,13 +248,37 @@ actor ClipboardKeeper {
         _ = ClipboardSnapshot.write(text, to: pasteboard)
     }
 
-    /// Puts the user's clipboard back now instead of on the timer, if our
-    /// transcript is still on it. For quitting: a restore pending on a
-    /// detached task would die with the process.
-    func flush() {
+    /// Puts the user's clipboard back as soon as that is safe instead of on
+    /// the timer, if our transcript is still on it. For quitting: a restore
+    /// pending on a detached task would die with the process.
+    ///
+    /// Safe is not "now". A dictation can be pasted on the way out, and the
+    /// target app reads the transcript some time after Cmd+V; restoring
+    /// before that hands it the user's old clipboard instead. So this waits
+    /// as the timer would — for the read, and `readSettle` after it, no
+    /// sooner than `restoreFloor` after Cmd+V — except that it gives up on
+    /// an app that has not read by the floor, since a quit cannot wait out
+    /// the cap. At most `restoreFloor` plus `readSettle`.
+    func flush() async {
         guard let current = pending else { return }
+        // The user copied something since: theirs stays, so there is nothing
+        // to put back and nothing to wait for.
+        guard pasteboard.changeCount == current.changeCount else {
+            endPending()
+            return
+        }
+        if let posted = current.posted {
+            let floor = posted + restoreFloor
+            if current.firstRead == nil { _ = await firstRead(of: current.promise, by: floor) }
+            // The timer, or a newer paste, may have got there while this
+            // waited.
+            guard let latest = pending, latest.promise === current.promise else { return }
+            let due = latest.lastRead.map { min(max(floor, $0 + readSettle), floor + readSettle) } ?? floor
+            if due > clock.now() { try? await clock.sleep(due) }
+        }
+        guard let latest = pending, latest.promise === current.promise else { return }
         endPending()
-        restore(current)
+        restore(latest)
     }
 
     // MARK: After the paste
