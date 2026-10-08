@@ -15,8 +15,13 @@ enum WholeWordPattern {
     /// Unicode categories that make up a word (`\p{L}\p{M}\p{N}`). ICU's
     /// `\b` already treats umlauts and accented letters as word characters;
     /// spelling the class out makes the rule explicit and keeps it the same
-    /// in the cycle check. If `word` starts or ends with punctuation, that
-    /// falls back to a lookaround on whitespace.
+    /// in the cycle check.
+    ///
+    /// An edge of `word` that is punctuation or a symbol ("c++", ".net") has
+    /// a rule of its own: the neighbour must be whitespace, punctuation or
+    /// nothing, so "c++," and "(c++)" match. A letter, digit or symbol beside
+    /// it carries the word on, so "c++" stays out of "c+++" and "c++x", and
+    /// ".net" out of "asp.net".
     static func regex(for word: String, caseInsensitive: Bool = true) -> NSRegularExpression? {
         let trimmed = word.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return nil }
@@ -34,10 +39,11 @@ enum WholeWordPattern {
             trailing = ""
         } else {
             let wordEdge = "[\\p{L}\\p{M}\\p{N}]"
+            let punctuationEdge = "[^\\s\\p{P}]"
             leading = trimmed.first!.isLetter || trimmed.first!.isNumber
-                ? "(?<!\(wordEdge))" : "(?<!\\S)"
+                ? "(?<!\(wordEdge))" : "(?<!\(punctuationEdge))"
             trailing = trimmed.last!.isLetter || trimmed.last!.isNumber
-                ? "(?!\(wordEdge))" : "(?!\\S)"
+                ? "(?!\(wordEdge))" : "(?!\(punctuationEdge))"
         }
 
         var options: NSRegularExpression.Options = []

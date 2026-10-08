@@ -11,7 +11,7 @@ public struct WhitespaceNormalizer: TextProcessor {
     public init() {}
 
     public func process(_ text: String) async throws -> String {
-        text.split(whereSeparator: { $0.isWhitespace || $0.isNewline })
+        text.split(whereSeparator: { $0.isWhitespace })
             .joined(separator: " ")
     }
 }

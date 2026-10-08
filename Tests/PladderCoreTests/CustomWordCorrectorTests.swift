@@ -173,6 +173,54 @@ import Testing
         #expect(c.apply(to: "charge b") == "ChargeBee")
     }
 
+    // MARK: Ordinary words
+
+    @Test func anOrdinaryWordIsNotRewrittenIntoATerm() {
+        // Every pair here shares its Soundex code, and the bonus used to let
+        // all four through: the speaker said these words.
+        let c = corrector(["Claude", "Swift", "Rust"])
+        #expect(c.apply(to: "to the cloud") == "to the cloud")
+        #expect(c.apply(to: "press shift") == "press shift")
+        #expect(c.apply(to: "take a rest") == "take a rest")
+        #expect(c.apply(to: "the roast") == "the roast")
+    }
+
+    @Test func soundexExcusesOneEditAtMostOnAShortKey() {
+        // No lexicon, so this is the distance rule on its own: "roast" is
+        // two edits from "rust", "rost" one.
+        let c = CustomWordCorrector(entries: [DictionaryEntry(from: "", to: "Rust")], isOrdinaryWord: { _ in false })
+        #expect(c.apply(to: "the roast") == "the roast")
+        #expect(c.apply(to: "the rost") == "the Rust")
+    }
+
+    @Test func theLexiconIsWhatKeepsALongerOrdinaryWord() {
+        // "cloud" clears the distance rule, so only the lexicon stops it.
+        let terms = [DictionaryEntry(from: "", to: "Claude")]
+        let open = CustomWordCorrector(entries: terms, isOrdinaryWord: { _ in false })
+        #expect(open.apply(to: "to the cloud") == "to the Claude")
+        let strict = CustomWordCorrector(entries: terms, isOrdinaryWord: { $0 == "clawed" })
+        #expect(strict.apply(to: "clawed's opinion") == "clawed's opinion")
+        #expect(strict.apply(to: "to the cloud") == "to the Claude")
+    }
+
+    @Test func aNearMissThatIsNoWordIsStillRepaired() {
+        let c = corrector(["Kafka", "Claude"])
+        #expect(c.apply(to: "send it to kafca") == "send it to Kafka")
+        #expect(c.apply(to: "ask clawed") == "ask Claude")
+    }
+
+    @Test func anOrdinaryWordStillTakesTheTermOnAnExactKey() {
+        let c = corrector(["Swift"])
+        #expect(c.apply(to: "write it in swift") == "write it in Swift")
+    }
+
+    @Test func aSpelledOutTermMadeOfOrdinaryWordsIsStillRepaired() {
+        // The lexicon judges single words: two of them run together are what
+        // the corrector exists for.
+        let c = corrector(["Claude Code"])
+        #expect(c.apply(to: "open cloud code") == "open Claude Code")
+    }
+
     // MARK: Cost
 
     /// Not an assertion — the release-to-paste path's price tag, printed so a

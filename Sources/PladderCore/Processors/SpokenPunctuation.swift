@@ -17,6 +17,17 @@ import Foundation
 /// evidence the filler remover uses. Between two digits "Komma" and "coma"
 /// are the decimal comma: "3 Komma 5" becomes "3,5".
 ///
+/// A phrase right after an article is the noun, not a dictated mark: "add a
+/// semicolon", "un punto y coma", "a new paragraph". So is one after an
+/// article and an adjective that describes a mark ("the Oxford comma", "ein
+/// großes Fragezeichen"). Only such adjectives count, because any other word
+/// there is usually a noun the clause ends on: "to the end comma and then"
+/// is dictated. "this", "that" and the German definite articles count only
+/// with such an adjective, since on their own they end a clause as often as
+/// they start a noun phrase: "What is that question mark", "Was ist das
+/// Fragezeichen". Punctuation between the words ends the noun phrase, so the
+/// speech model's own "book. Full stop." is always a mark.
+///
 /// Runs after the whitespace step, which would otherwise fold the line
 /// breaks of "new paragraph" back into spaces.
 public struct SpokenPunctuation: TextProcessor {
@@ -65,6 +76,31 @@ public struct SpokenPunctuation: TextProcessor {
     /// Needs the language evidence; see the type's comment.
     private static let spanishComma = "coma"
 
+    /// Words that never end a clause, so a phrase after one is a noun. "a" is
+    /// the letter when it is a capital in mid-sentence ("plan A comma").
+    private static let articles: Set<String> = [
+        "a", "an", "the",
+        "ein", "eine", "einen", "einem",
+        "un", "una", "el", "la", "los", "las",
+    ]
+
+    /// Determiners that are pronouns as well, so they count only with one of
+    /// `markAdjectives` after them.
+    private static let demonstratives: Set<String> = ["this", "that", "der", "die", "das", "dem", "den"]
+
+    /// Adjectives that describe a punctuation mark. A closed list, because an
+    /// open guess would take the noun in "the end comma" for one. German
+    /// entries are stems: an inflected form ("großes", "kleinen") matches with
+    /// its ending taken off.
+    private static let markAdjectives: Set<String> = [
+        "oxford", "serial", "decimal", "extra", "missing", "stray", "trailing", "inverted",
+        "misplaced", "unnecessary", "superfluous", "big", "huge", "giant", "little", "small",
+        "tiny", "double", "single", "wrong",
+        "groß", "klein", "fehlend", "zusätzlich", "überflüssig", "doppelt", "einzeln", "falsch",
+        "riesig", "dick",
+        "gran", "pequeño", "pequeña", "simple",
+    ]
+    private static let germanEndings = ["e", "em", "en", "er", "es"]
 
     private let universal: [(regex: NSRegularExpression, mark: Mark)]
     private let spanish: NSRegularExpression
@@ -114,7 +150,11 @@ public struct SpokenPunctuation: TextProcessor {
         var out = ""
         var cursor = 0
         var capitalizeNext = false
+        var converted = false
         for match in matches {
+            // Left in the text: the next segment copies it with its neighbours.
+            if namesTheMark(ns, at: match.range.location) { continue }
+            converted = true
             // The speech model's own punctuation around the phrase, and the
             // spaces on either side: "verschieben? Fragezeichen." is one mark.
             var start = match.range.location
@@ -155,10 +195,53 @@ public struct SpokenPunctuation: TextProcessor {
             }
             capitalizeNext = mark.endsSentence
         }
+        guard converted else { return text }
         var tail = ns.substring(from: cursor)
         if capitalizeNext { tail = capitalized(tail) }
         out += tail
         return out.trimmingCharacters(in: .whitespaces)
+    }
+
+    /// Whether the phrase at `location` is the name of the mark rather than
+    /// the mark: it follows an article, or an article or demonstrative and
+    /// one of `markAdjectives`. See the type's comment.
+    private static func namesTheMark(_ ns: NSString, at location: Int) -> Bool {
+        guard let previous = word(in: ns, endingAt: location) else { return false }
+        let text = ns.substring(with: previous)
+        if isArticle(text, in: ns, at: previous.location) { return true }
+        guard isMarkAdjective(text.lowercased()), let first = word(in: ns, endingAt: previous.location) else {
+            return false
+        }
+        let determiner = ns.substring(with: first)
+        return isArticle(determiner, in: ns, at: first.location) || demonstratives.contains(determiner.lowercased())
+    }
+
+    private static func isArticle(_ word: String, in ns: NSString, at location: Int) -> Bool {
+        guard articles.contains(word.lowercased()) else { return false }
+        guard word == "A" else { return true }
+        // A capital "A" is the article only where a sentence starts.
+        var index = location
+        while index > 0, isSpace(ns.character(at: index - 1)) { index -= 1 }
+        return index == 0 || ".!?\n\r".utf16.contains(ns.character(at: index - 1))
+    }
+
+    private static func isMarkAdjective(_ word: String) -> Bool {
+        if markAdjectives.contains(word) { return true }
+        return germanEndings.contains { word.hasSuffix($0) && markAdjectives.contains(String(word.dropLast($0.count))) }
+    }
+
+    /// The word just before `location` with only spaces in between, or nil
+    /// when punctuation or a line break comes first.
+    private static func word(in ns: NSString, endingAt location: Int) -> NSRange? {
+        var end = location
+        while end > 0, isSpace(ns.character(at: end - 1)) { end -= 1 }
+        var start = end
+        while start > 0, isLetter(ns.character(at: start - 1)) { start -= 1 }
+        return start < end ? NSRange(location: start, length: end - start) : nil
+    }
+
+    private static func isLetter(_ c: unichar) -> Bool {
+        Unicode.Scalar(c).map(CharacterSet.letters.contains) ?? false
     }
 
     private static func isSpace(_ c: unichar) -> Bool { c == 0x20 || c == 0x09 || c == 0xA0 }
