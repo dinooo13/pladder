@@ -28,23 +28,12 @@ import os
 /// managers that honour them keep dictations out of their history — the whole
 /// point of an app whose text never leaves the Mac.
 public final class PasteboardOutput: TextOutput {
-    /// See `ClipboardKeeper.restoreFloor`. Also the latest a send's Return
-    /// waits for the target app's read.
-    public let restoreFloor: Duration
-    /// See `ClipboardKeeper.readSettle`.
-    public let readSettle: Duration
-    /// See `ClipboardKeeper.restoreCap`.
-    public let restoreCap: Duration
-
     /// How long after the target app's first read of the transcript the
     /// Return of a send is posted. The read is the paste arriving, but the
     /// app still has to insert the text on its run loop, and some Electron
     /// apps do that a turn later, so Return waits a little more. Off the
     /// critical path: `insert` has already returned by then.
     public let submitDelay: Duration
-
-    /// See `ClipboardKeeper.propagationDelay`.
-    public let propagationDelay: Duration
 
     /// kVK_ANSI_V, the fallback for when the current input source cannot be
     /// asked which key types "v" — a Chinese or Japanese input method carries
@@ -74,56 +63,26 @@ public final class PasteboardOutput: TextOutput {
 
     /// Posted once, by whichever comes first: its own timer, or the next
     /// paste, which must not go out ahead of it.
-    private final class OwedReturn: Sendable {
-        private let taken = Mutex(false)
+    private final class OwedReturn: Sendable {}
 
-        /// True for the one caller that gets to post it.
-        func claim() -> Bool {
-            taken.withLock { taken in
-                defer { taken = true }
-                return !taken
-            }
-        }
-    }
-
-    public convenience init(
-        restoreFloor: Duration = .milliseconds(400),
-        readSettle: Duration = .milliseconds(200),
-        restoreCap: Duration = .seconds(8),
-        submitDelay: Duration = .milliseconds(50),
-        propagationDelay: Duration = .zero
-    ) {
-        self.init(
-            restoreFloor: restoreFloor, readSettle: readSettle, restoreCap: restoreCap,
-            submitDelay: submitDelay, propagationDelay: propagationDelay,
-            pasteboard: .general, poster: HIDKeyPoster(), isTrusted: { AXIsProcessTrusted() }, clock: .continuous)
+    public convenience init() {
+        self.init(pasteboard: .general, poster: HIDKeyPoster(), isTrusted: { AXIsProcessTrusted() }, clock: .continuous)
     }
 
     /// Everything injected, for the tests.
     init(
-        restoreFloor: Duration = .milliseconds(400),
-        readSettle: Duration = .milliseconds(200),
-        restoreCap: Duration = .seconds(8),
         submitDelay: Duration = .milliseconds(50),
-        propagationDelay: Duration = .zero,
         pasteboard: NSPasteboard.Name,
         poster: any KeyPoster,
         isTrusted: @escaping @Sendable () -> Bool,
         clock: PasteClock,
         snapshotLimit: Int = ClipboardSnapshot.maximumItemBytes
     ) {
-        self.restoreFloor = restoreFloor
-        self.readSettle = readSettle
-        self.restoreCap = restoreCap
         self.submitDelay = submitDelay
-        self.propagationDelay = propagationDelay
         self.poster = poster
         self.isTrusted = isTrusted
         self.clock = clock
-        keeper = ClipboardKeeper(
-            pasteboard: pasteboard, restoreFloor: restoreFloor, readSettle: readSettle,
-            restoreCap: restoreCap, propagationDelay: propagationDelay, clock: clock,
-            snapshotLimit: snapshotLimit)
+        keeper = ClipboardKeeper(pasteboard: pasteboard, clock: clock, snapshotLimit: snapshotLimit)
     }
 
     /// Called at key-down, while the user is still speaking, and safe to call
@@ -159,7 +118,7 @@ public final class PasteboardOutput: TextOutput {
         // A send just before this one still waiting for its target to read:
         // its Return goes now, ahead of this Cmd+V. Waited out, it could land
         // after this paste and send both texts.
-        if let owed = owedReturn.withLock({ $0.take() }), owed.claim() {
+        if owedReturn.withLock({ $0.take() }) != nil {
             postReturn()
         }
         let paste = try await keeper.paste(text) { [poster] in
@@ -186,13 +145,18 @@ public final class PasteboardOutput: TextOutput {
     /// to this insert from here on: detached, so cancelling the caller
     /// cannot skip it.
     private func sendReturn(after paste: ClipboardKeeper.Paste) {
-        let cap = paste.posted + restoreFloor
+        let cap = paste.posted + keeper.restoreFloor
         let owed = OwedReturn()
         owedReturn.withLock { $0 = owed }
         Task.detached(priority: .userInitiated) { [self, keeper, clock, submitDelay] in
             let read = await keeper.firstRead(of: paste.promise, by: cap)
             try? await clock.sleep(read.map { $0 + submitDelay } ?? cap)
-            guard owed.claim() else { return }
+            let mine = owedReturn.withLock { slot in
+                guard slot === owed else { return false }
+                slot = nil
+                return true
+            }
+            guard mine else { return }
             postReturn()
         }
     }

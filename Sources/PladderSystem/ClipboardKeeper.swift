@@ -38,26 +38,17 @@ actor ClipboardKeeper {
     /// reaches us. Nothing says which read is which, so a read never brings
     /// the clipboard back sooner than this. 400 ms is the fixed delay this
     /// replaced, which is enough for every app that is not busy.
-    nonisolated let restoreFloor: Duration
+    nonisolated let restoreFloor = Duration.milliseconds(400)
 
     /// How long after the target app's last read the previous clipboard comes
     /// back, when that is later than `restoreFloor`: a busy app that read late.
-    nonisolated let readSettle: Duration
+    nonisolated let readSettle = Duration.milliseconds(200)
 
     /// How long after Cmd+V the previous clipboard comes back when nothing has
     /// read the transcript: a paste into something that takes no text, or an
     /// app that never got the key event. The transcript stays on the clipboard
     /// until then, which is the safe way to be wrong.
-    nonisolated let restoreCap: Duration
-
-    /// Time between writing the pasteboard and posting Cmd+V. The write is a
-    /// synchronous call to the pasteboard server, so it has landed when the
-    /// call returns, and the key event still has to travel through the window
-    /// server afterwards; zero is therefore the default and adds no sleep to
-    /// the release-to-paste path. If an app with an unusual pasteboard user
-    /// ever pastes stale content, raise this in the app's wiring (keep the
-    /// smallest value that never fails).
-    nonisolated let propagationDelay: Duration
+    nonisolated let restoreCap = Duration.seconds(8)
 
     private let pasteboard: NSPasteboard
     private let clock: PasteClock
@@ -122,20 +113,12 @@ actor ClipboardKeeper {
 
     init(
         pasteboard name: NSPasteboard.Name = .general,
-        restoreFloor: Duration,
-        readSettle: Duration,
-        restoreCap: Duration,
-        propagationDelay: Duration,
         clock: PasteClock = .continuous,
         snapshotLimit: Int = ClipboardSnapshot.maximumItemBytes
     ) {
         // By name rather than the object: `NSPasteboard` is not `Sendable`,
         // and the one made here never leaves the actor.
         pasteboard = NSPasteboard(name: name)
-        self.restoreFloor = restoreFloor
-        self.readSettle = readSettle
-        self.restoreCap = restoreCap
-        self.propagationDelay = propagationDelay
         self.clock = clock
         self.snapshotLimit = snapshotLimit
     }
@@ -207,7 +190,7 @@ actor ClipboardKeeper {
     /// schedules the restore. Returns as soon as `post` has returned; the
     /// restore runs on a detached task afterwards. If `post` throws, the
     /// clipboard is put back at once and the error rethrown.
-    func paste(_ text: String, post: @Sendable () throws -> Void) async throws -> Paste {
+    func paste(_ text: String, post: @Sendable () throws -> Void) throws -> Paste {
         let snapshot = clipboardToRestore()
 
         let promise = TranscriptPromise(text, now: clock.now) { [weak self] promise, instant in
@@ -217,9 +200,6 @@ actor ClipboardKeeper {
         pending = Pending(snapshot: snapshot, changeCount: ourChangeCount, promise: promise)
 
         do {
-            if propagationDelay > .zero {
-                try await clock.sleep(clock.now() + propagationDelay)
-            }
             try post()
         } catch {
             // Never leave the user's clipboard holding our transcript.
@@ -228,13 +208,8 @@ actor ClipboardKeeper {
             throw error
         }
         let posted = clock.now()
-
-        // A concurrent paste may have superseded us across the sleep above; it
-        // owns the snapshot now and will schedule its own restore.
-        if pending?.promise === promise {
-            pending?.posted = posted
-            scheduleRestore()
-        }
+        pending?.posted = posted
+        scheduleRestore()
         return Paste(promise: promise, posted: posted)
     }
 
