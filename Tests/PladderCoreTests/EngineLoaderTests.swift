@@ -3,7 +3,7 @@ import Testing
 @testable import PladderCore
 
 @MainActor
-@Suite struct EngineLoaderTests {
+@Suite(.timeLimit(.minutes(1))) struct EngineLoaderTests {
     private func makeLoader(failures: Int = 0, id: EngineID = EngineID("flaky")) -> EngineLoader {
         EngineLoader(
             registry: EngineRegistry([

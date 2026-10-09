@@ -6,7 +6,7 @@ import Testing
 
 /// The capture's sample hand-off, without a microphone: these append what a
 /// tap block would and drain the way the capture actor does.
-@Suite("SampleAccumulator")
+@Suite("SampleAccumulator", .timeLimit(.minutes(1)))
 struct SampleAccumulatorTests {
     private func ramp(_ range: Range<Int>) -> [Float] {
         range.map(Float.init)

@@ -6,7 +6,7 @@ import Testing
 // Nothing here loads a model or touches the network: the polisher is asked
 // about a file that is not there, or given a stand-in for llama.cpp.
 
-@Suite struct S1MiniPromptTests {
+@Suite(.timeLimit(.minutes(1))) struct S1MiniPromptTests {
     @Test func thePromptIsQwensChatFormatWithAnEmptyThinkBlock() {
         // What S1-mini's own chat template renders with enable_thinking=False,
         // taken from its tokenizer: the model was trained on exactly this.
@@ -73,7 +73,7 @@ private struct StandInModel: PromptCompleter {
     }
 }
 
-@Suite struct S1MiniLoadTests {
+@Suite(.timeLimit(.minutes(1))) struct S1MiniLoadTests {
     /// A polisher over a file that is there, loaded by `load`.
     private func polisher(
         timeout: Duration, load: @escaping S1MiniPolisher.Loader
@@ -152,7 +152,7 @@ private struct StandInModel: PromptCompleter {
     }
 }
 
-@Suite struct LlamaGenerationTests {
+@Suite(.timeLimit(.minutes(1))) struct LlamaGenerationTests {
     private let later = ContinuousClock.now + .seconds(60)
 
     /// Hands out `pieces` one per step, then `.end` when `ends`, and more

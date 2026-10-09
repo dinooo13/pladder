@@ -471,7 +471,7 @@ final class EventLog: @unchecked Sendable {
 // MARK: - Tests
 
 @MainActor
-@Suite struct DictationCoordinatorTests {
+@Suite(.timeLimit(.minutes(1))) struct DictationCoordinatorTests {
     @Test func startsUnavailableThenIdleWhenEngineReady() async {
         let (c, _, _) = makeCoordinator()
         #expect(c.state == .unavailable(.starting))
@@ -1151,7 +1151,7 @@ final class EventLog: @unchecked Sendable {
 // MARK: - Polish toggle
 
 @MainActor
-@Suite struct PolishToggleTests {
+@Suite(.timeLimit(.minutes(1))) struct PolishToggleTests {
     /// Long enough to clear `minimumPolishWords`.
     private static let sentence = "send it on Friday please"
 
@@ -1396,7 +1396,7 @@ final class EventLog: @unchecked Sendable {
 // MARK: - Toggle key
 
 @MainActor
-@Suite struct ToggleHotkeyTests {
+@Suite(.timeLimit(.minutes(1))) struct ToggleHotkeyTests {
     /// Control + D: a toggle chord that is not the push-to-talk chord.
     private static let controlD = Hotkey(0x3B, 0x02)
 
@@ -1656,7 +1656,7 @@ final class EventLog: @unchecked Sendable {
 // MARK: - Escape
 
 @MainActor
-@Suite struct EscapeTests {
+@Suite(.timeLimit(.minutes(1))) struct EscapeTests {
     @Test func escapeDiscardsWithoutPastingAndAnnouncesIt() async {
         let hotkey = FakeHotkey()
         let events = EventLog()

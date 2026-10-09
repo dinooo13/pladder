@@ -7,7 +7,7 @@ import Testing
 /// recording key poster and a manual clock. Nothing here types a key or
 /// touches the general pasteboard: the developer dictates with a running
 /// Pladder while these run.
-@Suite struct PasteFlowTests {
+@Suite(.timeLimit(.minutes(1))) struct PasteFlowTests {
     // MARK: Whose clipboard comes back
 
     @Test func theClipboardComesBackAfterAPaste() async throws {

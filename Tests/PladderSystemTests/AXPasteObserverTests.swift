@@ -5,7 +5,7 @@ import Testing
 /// Nothing here reads the live focused element: the developer dictates with a
 /// running Pladder while these run, and a test harness launched from a
 /// trusted terminal would be trusted too. The grant is stubbed instead.
-@Suite struct AXPasteObserverTests {
+@Suite(.timeLimit(.minutes(1))) struct AXPasteObserverTests {
     @Test func returnsNilPromptlyWithoutAccessibility() async {
         let observer = AXPasteObserver(isTrusted: { false })
         let started = ContinuousClock.now

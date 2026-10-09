@@ -1,7 +1,7 @@
 import Testing
 @testable import PladderCore
 
-@Suite struct FillerRemoverTests {
+@Suite(.timeLimit(.minutes(1))) struct FillerRemoverTests {
     private func run(
         _ text: String,
         hint: (@Sendable (String) -> String?)? = nil

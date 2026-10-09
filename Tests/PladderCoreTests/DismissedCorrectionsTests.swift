@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import PladderCore
 
-@Suite struct DismissedCorrectionsTests {
+@Suite(.timeLimit(.minutes(1))) struct DismissedCorrectionsTests {
     private static func temporaryURL() -> URL {
         FileManager.default.temporaryDirectory
             .appending(path: "pladder-tests-\(UUID().uuidString)/dismissed-corrections.json")
