@@ -172,7 +172,8 @@ public struct HotkeyChordTracker: Sendable, Equatable {
         let chordModifiers = matching(hotkey.modifierKeyCodes)
         let hadChordModifiers = chordModifiers.isSubset(of: matching(heldModifiers))
         heldModifiers = modifiers
-        if hadChordModifiers, !chordModifiers.isSubset(of: matching(heldModifiers)) {
+        let hasChordModifiers = chordModifiers.isSubset(of: matching(modifiers))
+        if hadChordModifiers, !hasChordModifiers {
             // The lost key-up rule: from here on the regular key counts only
             // once it goes down again. Still swallowed until its key-up, if
             // that ever comes. A modifier-less chord never gets here, and so
@@ -184,7 +185,7 @@ public struct HotkeyChordTracker: Sendable, Equatable {
             // rest is folded: the other side of it is a foreign modifier like
             // any other.
             let foreign = pressed.subtracting(submitKey.modifierKeyCodes)
-            if !chordModifiers.isSubset(of: matching(heldModifiers)) {
+            if !hasChordModifiers {
                 // A chord modifier is no longer held: an ordinary release,
                 // whenever it came. Asked of what is still down rather than of
                 // what went up, so letting go of a redundant Left Option while
