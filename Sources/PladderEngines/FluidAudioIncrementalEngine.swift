@@ -2,45 +2,22 @@ import FluidAudio
 import Foundation
 import PladderCore
 
-/// FluidAudio's batch windows, run while the user is still speaking.
-///
-/// FluidAudio's batch path, `AsrManager.transcribe`, lays a recording out in
-/// ~15 s windows and decodes them all in one call, so a long dictation
-/// transcribed at release would wait for several encoder passes. Those
-/// windows do not depend on each other — each starts from a fresh decoder
-/// state, and a window's start is chosen from audio that ends before the
-/// previous window does — so every window but the last can run while the
-/// recording is still going. `IncrementalChunkProcessor` in the FluidAudio
-/// fork does exactly that; at release only the final window and the merge
-/// remain, which is one pass at any length.
-///
-/// The text is the batch path's text, not an approximation of it: the same
-/// windows, in the same order, through the same merge. Below 15 s there are no
-/// windows to merge, and `IncrementalChunkProcessor.finish()` makes the same
-/// single padded pass over the buffer that `transcribe(_:)` makes, so the two
-/// agree there too. That short path lives in the fork rather than here: a
-/// single window over short audio decodes differently from the whole-buffer
-/// pass, so the identity has to hold inside the processor, not around it.
+// FluidAudio's ~15 s windows do not depend on each other, so all but the last run
+// while the user speaks, and the text is the batch path's: the same windows, order and
+// merge. See docs/ARCHITECTURE.md, "Engine".
 public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
     public static let engineID = EngineID("parakeet-tdt-v3-incremental")
 
     public nonisolated let id = FluidAudioIncrementalEngine.engineID
-    /// The catalog's name, so the picker and the CLI's bench header agree.
     public nonisolated var displayName: String { StandardEngines.parakeet.displayName }
     public private(set) var status: EngineStatus = .unloaded
 
     private let version: AsrModelVersion
-    /// One resident manager: the incremental processor borrows it window by
-    /// window, and the warm pass, the live pass and `transcribe` use it
-    /// directly.
     private var manager: AsrManager?
     private var session: IncrementalChunkProcessor?
-    /// Samples fed this utterance, for the transcript's audio duration only.
     private var fedSampleCount = 0
-    /// The samples themselves, kept only so `livePass` has something to
-    /// transcribe; the session holds its own copy for the real windows. At the
-    /// coordinator's 10 min cap this is 38 MB, and it is dropped the moment
-    /// the utterance ends, one way or the other.
+    // Kept only for `livePass`; the session holds its own copy. 38 MB at the 10 min cap,
+    // dropped when the utterance ends.
     private var liveAudio: [Float] = []
     private var loadTask: Task<Void, Error>?
 
@@ -61,17 +38,13 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
         status = .downloading(progress: nil)
         do {
             await resumePartialDownload()
-            // The progress handler is invoked off-actor; hop back to update status.
             let models = try await AsrModels.downloadAndLoad(version: version) { [weak self] progress in
                 guard let self else { return }
                 Task { await self.report(progress) }
             }
             status = .loading
-            // Seam-gap repair off: FluidAudio's post-merge probe for words
-            // dropped at window seams runs on every recording longer than one
-            // window and costs time at release. The session's merge and
-            // `transcribe` both read the setting from this manager, so the
-            // two paths stay identical.
+            // Seam-gap repair off: its probe for words dropped at window seams costs time at
+            // release. The session's merge and `transcribe` both read it from this manager.
             let manager = AsrManager(config: ASRConfig(seamGapRepair: false))
             try await manager.loadModels(models)
             self.manager = manager
@@ -82,28 +55,9 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
         }
     }
 
-    /// Finishes a half-written model cache before the loader decides it is
-    /// complete.
-    ///
-    /// FluidAudio resumes an interrupted file: it streams into
-    /// `<file>.partial` with an ETag validator beside it and a new process
-    /// continues it with a `Range` request, and it refuses any body whose
-    /// size differs from the one Hugging Face listed, so a truncated file is
-    /// never moved into place. What it does not do is notice a partial once
-    /// the cache *looks* whole: `AsrModels.download` skips the fetch when
-    /// every model directory and the vocabulary exist
-    /// (`AsrModels.modelsExist`), which a kill during the last few small
-    /// files can leave true while one bundle still holds only a
-    /// `weights/weight.bin.partial`. The load then fails on that bundle and
-    /// FluidAudio's recovery deletes the whole ~460 MB repo and fetches it
-    /// again.
-    ///
-    /// `ModelHub.download` is the layer below that decision: it skips files
-    /// already in place and resumes the partial, so running it first turns
-    /// the purge into the few megabytes that were actually missing. When
-    /// there is no partial — every launch after the first — this is one
-    /// `FileManager` walk of a ten-entry tree. It runs at launch, nowhere
-    /// near the release-to-paste path.
+    // A kill during the last small files can leave the cache looking whole with one
+    // `weight.bin.partial` in it; the load then fails and FluidAudio deletes and refetches
+    // the whole ~460 MB repo. `ModelHub.download` resumes just the partial instead.
     private func resumePartialDownload() async {
         let cacheDirectory = AsrModels.defaultCacheDirectory(for: version)
         guard Self.hasPartialDownload(under: cacheDirectory) else { return }
@@ -118,17 +72,11 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
                 }
             )
         } catch {
-            // Fail open. Whatever stopped the resume stops the download below
-            // as well, and that one reports the failure to the menu; a
-            // pre-pass that throws on its own would only replace a resumable
-            // state with an error message.
+            // Fail open: the download below meets the same problem and reports it.
         }
     }
 
-    /// Whether any file under the cache is still being downloaded.
-    /// `FileDownloader` writes `<file>.partial` and moves it into place only
-    /// after the size check, so a `.partial` anywhere means an interrupted
-    /// run, whatever the directory listing suggests.
+    // `FileDownloader` moves `<file>.partial` into place only after its size check.
     private static func hasPartialDownload(under directory: URL) -> Bool {
         guard
             let walk = FileManager.default.enumerator(
@@ -143,8 +91,7 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
         return false
     }
 
-    /// The same mapping `AsrModelVersion.repo` makes inside FluidAudio, which
-    /// is not public; `Repo` and its cases are.
+    // `AsrModelVersion.repo` makes the same mapping but is not public.
     private static func repository(for version: AsrModelVersion) -> Repo {
         switch version {
         case .v2: return .parakeetV2
@@ -154,9 +101,8 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
         }
     }
 
-    /// `AsrModels.download` passes the encoder precision as the repo variant
-    /// for v3 only, and its default precision is `.int8`; the pre-pass has to
-    /// ask for the same files or it would fetch a second encoder.
+    // `AsrModels.download` passes the encoder precision as the variant for v3 only,
+    // `.int8` by default; asking for anything else would fetch a second encoder.
     private static func encoderVariant(for version: AsrModelVersion) -> String? {
         switch version {
         case .v3: return ParakeetEncoderPrecision.int8.rawValue
@@ -188,21 +134,17 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
         guard !samples.isEmpty, let session else { return }
         fedSampleCount += samples.count
         liveAudio.append(contentsOf: samples)
-        // A window failing mid-recording must not take the dictation down:
-        // `finish()` still runs the last window and merges what did succeed,
-        // and it reports the failure itself if it cannot.
+        // A window failing mid-recording must not take the dictation down: `finish()` still
+        // runs the last window and merges what succeeded.
         try? await session.append(samples)
     }
 
-    /// Feeds the tail and returns the transcript for the whole utterance.
-    /// The timed part is `finish()` alone: the final window plus the merge,
-    /// which is all that is left on the release-to-paste path.
+    // Times `finish()` alone, the last window and the merge: all that is left at release.
     public func endUtterance(_ tail: [Float]) async throws -> Transcript {
         guard status.isReady else { throw TranscriptionError.notLoaded }
         guard let session else { throw TranscriptionError.notLoaded }
-        // The utterance is over whether `finish()` returns or throws. The
-        // actor is reentrant across the awaits below, so a `beginUtterance`
-        // may already have installed the next session; that one is left be.
+        // The actor is reentrant across the awaits below, so a `beginUtterance` may already
+        // have installed the next session; that one is left be.
         defer {
             if self.session === session {
                 self.session = nil
@@ -235,25 +177,11 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
 
     public func warmPass() async {
         guard let manager, status.isReady else { return }
-        // The same encoder pass the last window will make: every utterance is
-        // padded to the model's fixed window, so half a second of silence
-        // costs what the real call costs and brings the Neural Engine up while
-        // the user is still speaking.
         _ = try? await Self.transcribeWholeBuffer(Self.warmupSamples, using: manager)
     }
 
-    /// The warm pass with the real audio in it.
-    ///
-    /// The window is padded to the model's fixed size either way, so a pass
-    /// over what has been said so far costs what the pass over half a second
-    /// of silence costs; this warms the Neural Engine exactly as `warmPass`
-    /// does and returns text as well. Nothing here touches the session: the
-    /// windows the release will merge are untouched by it, which the paced
-    /// benchmark's identity gate checks with `--live`.
-    ///
-    /// Before anything has been fed there is nothing to transcribe, so the
-    /// first pass of a recording is the plain warm pass; the key-down warm-up
-    /// is not lost by going live.
+    // Never touches the session, so the windows the release merges are unchanged, which
+    // `bench --paced --live` checks. With nothing fed yet it is the plain warm pass.
     public func livePass() async -> String? {
         guard let manager, status.isReady else { return nil }
         let window = liveWindow()
@@ -266,12 +194,8 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
         return text.isEmpty ? nil : text
     }
 
-    /// The tail of the recording that fits the model's window, cut on a fixed
-    /// grid. A window wider than the model's is decoded in pieces, which
-    /// costs more than one pass and is not what a live view is worth; cutting
-    /// on a 5 s grid instead of at "the last 15 s" keeps the left edge still
-    /// between passes, so the text a reader is following does not shift under
-    /// them four times a second.
+    // A window wider than the model's is decoded in pieces. A 5 s grid keeps the left
+    // edge still between passes, so the text does not shift under the reader.
     private func liveWindow() -> [Float] {
         guard liveAudio.count > Self.maxWindowSamples else { return liveAudio }
         let overflow = liveAudio.count - Self.maxWindowSamples
@@ -281,9 +205,7 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
 
     // MARK: TranscriptionEngine
 
-    /// One padded pass over the whole buffer, so the CLI and tests can call a
-    /// single method. This is the batch path, not the incremental one; the
-    /// incremental path needs audio delivered over time to show anything.
+    // The batch path: one padded pass over the whole buffer, for the CLI and the tests.
     public func transcribe(_ samples: [Float]) async throws -> Transcript {
         guard let manager, status.isReady else { throw TranscriptionError.notLoaded }
         let result = try await Self.transcribeWholeBuffer(samples, using: manager)
@@ -306,41 +228,20 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
         _ samples: [Float],
         using manager: AsrManager
     ) async throws -> ASRResult {
-        // FluidAudio rejects audio shorter than 0.3 s. Pad with silence rather
-        // than fail; the coordinator already drops accidental taps.
+        // FluidAudio rejects audio shorter than 0.3 s.
         let minimum = ASRConstants.minimumRequiredSamples(forSampleRate: Int(CapturedAudio.sampleRate))
         let padded = samples.count < minimum
             ? samples + [Float](repeating: 0, count: minimum - samples.count)
             : samples
-        // A fresh decoder state per utterance: each dictation is independent.
         var state = try TdtDecoderState(decoderLayers: await manager.decoderLayerCount)
         return try await manager.transcribe(padded, decoderState: &state)
     }
 
-    /// Half a second of silence for the warm pass. Matches the coordinator's
-    /// warm-up so both paths pay for the same encoder pass.
     private static let warmupSamples = [Float](repeating: 0, count: 8_000)
-
-    /// The model's encoder window, 15 s at 16 kHz, taken from FluidAudio so
-    /// the two cannot drift. Audio longer than this is decoded in several
-    /// passes, which a live view has no business paying for, so it transcribes
-    /// the tail that fits.
     private static let maxWindowSamples = ASRConstants.maxModelSamples
-    /// The grid the live window's left edge moves on, 5 s: long enough that
-    /// the window still holds 10 s of context at its narrowest.
+    // Leaves at least 10 s of context in the live window.
     private static let windowHopSamples = 80_000
 
-    /// What the menu says under `Model failed:` when the load throws.
-    ///
-    /// The distinction worth a user's attention is whether the network or the
-    /// files are at fault: a download that stopped continues from where it
-    /// stopped when they choose Retry, missing or damaged files are fetched
-    /// again, and only what is left is an engine problem. The raw
-    /// `errorDescription` said none of that — a lost connection during the
-    /// first-launch download read as an engine bug, which is what the issue
-    /// was opened about.
-    ///
-    /// A value, not a sentence: the app owns the wording and the catalog.
     private static func describe(_ error: Error) -> EngineFailure {
         switch error {
         case let error as DownloadError:
@@ -399,8 +300,7 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
         }
     }
 
-    /// The engine's own free text is shown verbatim after a translated
-    /// prefix, so it is kept to a line.
+    // Shown verbatim after a translated prefix, so kept to a line.
     private static func cut(_ detail: String) -> String {
         detail.count > 160 ? String(detail.prefix(160)) + "…" : detail
     }
