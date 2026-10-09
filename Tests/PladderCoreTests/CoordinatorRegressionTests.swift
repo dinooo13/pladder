@@ -210,8 +210,7 @@ import Testing
         clock.advance(by: c.maximumDuration - .seconds(1))
         #expect(c.state.isRecording)
         clock.advance(by: .seconds(1))
-        #expect(await waitUntil { c.inFlight != nil })
-        await c.inFlight?.value
+        await c.cycleFinished()
         #expect(output.inserted.count == 1)
         #expect(output.submitted == [false])
     }
@@ -302,8 +301,7 @@ import Testing
         #expect(await waitUntil { clock.sleeperCount == 3 })
         #expect(c.state.isRecording)
         clock.advance(by: c.bounceWindow)
-        #expect(await waitUntil { c.inFlight != nil })
-        await c.inFlight?.value
+        await c.cycleFinished()
         #expect(output.inserted.count == 1)
     }
 
@@ -329,8 +327,7 @@ import Testing
         #expect(await waitUntil { c.handledHotkeyEvents == 4 })
         #expect(await waitUntil { clock.sleeperCount == 3 })
         clock.advance(by: c.bounceWindow)
-        #expect(await waitUntil { c.inFlight != nil })
-        await c.inFlight?.value
+        await c.cycleFinished()
         #expect(output.inserted.count == 1)
     }
 }
