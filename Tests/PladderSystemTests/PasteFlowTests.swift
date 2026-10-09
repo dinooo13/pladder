@@ -12,7 +12,6 @@ import Testing
 
     @Test func theClipboardComesBackAfterAPaste() async throws {
         let h = PasteHarness()
-        defer { h.release() }
         h.userCopies("original")
 
         let result = try await h.output.insert("transcript", submit: false)
@@ -30,7 +29,6 @@ import Testing
     /// read our own transcript.
     @Test func backToBackPastesRestoreTheOriginalClipboard() async throws {
         let h = PasteHarness()
-        defer { h.release() }
         h.userCopies("original")
 
         try await h.output.insert("first", submit: false)
@@ -45,7 +43,6 @@ import Testing
     /// seconds. Their new copy is the clipboard now, not the older one.
     @Test func aCopyBetweenTwoPastesIsWhatComesBack() async throws {
         let h = PasteHarness()
-        defer { h.release() }
         h.userCopies("original")
 
         try await h.output.insert("first", submit: false)
@@ -60,7 +57,6 @@ import Testing
     /// runs in.
     @Test func aCopyBeforeTheNextKeyDownIsWhatComesBack() async throws {
         let h = PasteHarness()
-        defer { h.release() }
         h.userCopies("original")
 
         try await h.output.insert("first", submit: false)
@@ -76,7 +72,6 @@ import Testing
 
     @Test func aNewerPasteTakesOverThePendingRestore() async throws {
         let h = PasteHarness()
-        defer { h.release() }
         h.userCopies("original")
 
         try await h.output.insert("first", submit: false)
@@ -96,7 +91,6 @@ import Testing
 
     @Test func aReadMovesTheRestoreDeadline() async throws {
         let h = PasteHarness()
-        defer { h.release() }
         h.userCopies("original")
 
         try await h.output.insert("transcript", submit: false)
@@ -117,7 +111,6 @@ import Testing
 
     @Test func aPromptReadRestoresAtTheFloor() async throws {
         let h = PasteHarness()
-        defer { h.release() }
         h.userCopies("original")
 
         try await h.output.insert("transcript", submit: false)
@@ -135,7 +128,6 @@ import Testing
     /// the main thread, which hops to the keeper on a task of its own.
     @MainActor @Test func aRealReadOfThePromiseIsReported() async throws {
         let h = PasteHarness()
-        defer { h.release() }
         h.userCopies("original")
 
         try await h.output.insert("transcript", submit: false)
@@ -149,7 +141,6 @@ import Testing
 
     @Test func withoutAccessibilityThePendingRestoreIsDropped() async throws {
         let h = PasteHarness()
-        defer { h.release() }
         h.userCopies("original")
 
         try await h.output.insert("first", submit: false)
@@ -168,7 +159,6 @@ import Testing
 
     @Test func aFailedCmdVPutsTheClipboardBackAtOnce() async {
         let h = PasteHarness()
-        defer { h.release() }
         h.userCopies("original")
         h.poster.refuse(PasteHarness.keyV)
 
@@ -183,7 +173,6 @@ import Testing
 
     @Test func flushRestoresOnceTheTargetHasRead() async throws {
         let h = PasteHarness()
-        defer { h.release() }
         h.userCopies("original")
 
         try await h.output.insert("transcript", submit: false)
@@ -208,7 +197,6 @@ import Testing
         // A dictation pasted on the way out: restoring at once would hand the
         // target app the old clipboard instead of the transcript.
         let h = PasteHarness()
-        defer { h.release() }
         h.userCopies("original")
 
         try await h.output.insert("transcript", submit: false)
@@ -227,7 +215,6 @@ import Testing
 
     @Test func flushGivesUpOnATargetThatHasNotReadByTheFloor() async throws {
         let h = PasteHarness()
-        defer { h.release() }
         h.userCopies("original")
 
         try await h.output.insert("transcript", submit: false)
@@ -241,7 +228,6 @@ import Testing
 
     @Test func flushLeavesTheUsersNewCopyAlone() async throws {
         let h = PasteHarness()
-        defer { h.release() }
         h.userCopies("original")
 
         try await h.output.insert("transcript", submit: false)
@@ -253,7 +239,6 @@ import Testing
 
     @Test func flushWithNothingPendingDoesNothing() async {
         let h = PasteHarness()
-        defer { h.release() }
         h.userCopies("original")
         let before = h.pasteboard.changeCount
 
@@ -266,7 +251,6 @@ import Testing
 
     @Test func prepareTwiceWithNothingChangedReadsTheClipboardOnce() async {
         let h = PasteHarness()
-        defer { h.release() }
         h.userCopies("original")
 
         await h.output.keeper.prepare()
@@ -282,7 +266,6 @@ import Testing
     /// reads nothing itself and restores the newer copy.
     @Test func aPrepareAtReleaseKeepsTheCaptureOffThePaste() async throws {
         let h = PasteHarness()
-        defer { h.release() }
         h.userCopies("original")
         await h.output.keeper.prepare()
         h.userCopies("copied while speaking")
@@ -297,7 +280,6 @@ import Testing
 
     @Test func aPasteWithoutPrepareStillSnapshots() async throws {
         let h = PasteHarness()
-        defer { h.release() }
         h.userCopies("original")
 
         try await h.output.insert("transcript", submit: false)
@@ -309,7 +291,6 @@ import Testing
 
     @Test func returnWaitsForTheReadPlusTheSubmitDelay() async throws {
         let h = PasteHarness()
-        defer { h.release() }
         h.userCopies("original")
 
         try await h.output.insert("send this", submit: true)
@@ -332,7 +313,6 @@ import Testing
 
     @Test func returnWithoutAReadComesAtTheFloor() async throws {
         let h = PasteHarness()
-        defer { h.release() }
         h.userCopies("original")
 
         try await h.output.insert("send this", submit: true)
@@ -350,7 +330,6 @@ import Testing
 
     @Test func noReturnWithoutSubmit() async throws {
         let h = PasteHarness()
-        defer { h.release() }
         h.userCopies("original")
 
         try await h.output.insert("transcript", submit: false)
@@ -363,7 +342,6 @@ import Testing
 
     @Test func aSendStillWaitingPostsItsReturnBeforeTheNextPaste() async throws {
         let h = PasteHarness()
-        defer { h.release() }
         h.userCopies("original")
 
         try await h.output.insert("first", submit: true)
@@ -383,7 +361,6 @@ import Testing
 
     @Test func aReadBeforeCmdVIsNotThePaste() async throws {
         let h = PasteHarness()
-        defer { h.release() }
         h.userCopies("original")
         h.clock.advance(to: .milliseconds(10))
 
@@ -408,7 +385,6 @@ import Testing
         // Every item of the user's clipboard is over the limit, so the
         // restore leaves the transcript where it is.
         let h = PasteHarness(snapshotLimit: 4)
-        defer { h.release() }
         h.userCopies("far too long to keep")
 
         try await h.output.insert("transcript", submit: false)

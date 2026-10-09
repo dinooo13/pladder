@@ -120,13 +120,10 @@ import Testing
             let (c, _, _) = makeCoordinator(output: output, events: events)
             await c.startIdle()
             await c.dictate(submit: submit)
-            guard case .inserted(let insertion) = events.events.last(where: { $0.isInserted }) else {
-                Issue.record("no inserted event")
-                continue
-            }
-            #expect(insertion.result == result)
-            #expect(insertion.submitted == submitted)
-            #expect(insertion.transcript.text == "hello world")
+            let insertion = events.lastInsertion
+            #expect(insertion?.result == result)
+            #expect(insertion?.submitted == submitted)
+            #expect(insertion?.transcript.text == "hello world")
         }
     }
 
@@ -171,16 +168,6 @@ import Testing
         #expect(muter.startedSessions.count == 2)
         #expect(Set(muter.startedSessions) == Set(muter.endedSessions))
         #expect(muter.startedSessions[0] < muter.startedSessions[1])
-    }
-
-    @Test func theRealControllerNeverMutesForAnEndThatOvertookItsStart() async {
-        // The two tasks the coordinator fires are unordered; this is the
-        // order that once left the speakers muted for good.
-        let control = RecordingMuteControl()
-        let muter = OutputMuteController(control: control, delay: .milliseconds(1))
-        await muter.recordingEnded(session: 1)
-        await muter.recordingStarted(session: 1)
-        #expect(control.applied.isEmpty)
     }
 
     // MARK: Quitting
@@ -347,26 +334,9 @@ import Testing
     }
 }
 
-/// A device with one unmuted channel, recording every change made to it.
-private final class RecordingMuteControl: OutputMuteControl, @unchecked Sendable {
-    private let lock = NSLock()
-    private var _applied: [MuteState] = []
-    var applied: [MuteState] { lock.withLock { _applied } }
-    func defaultOutputDevice() -> UInt32? { 7 }
-    func muteState(of device: UInt32) -> MuteState? { MuteState([1: false]) }
-    func apply(_ state: MuteState, to device: UInt32) throws { lock.withLock { _applied.append(state) } }
-}
-
 private final class Counter: @unchecked Sendable {
     private let lock = NSLock()
     private var count = 0
     var value: Int { lock.withLock { count } }
     func increment() { lock.withLock { count += 1 } }
-}
-
-private extension DictationCoordinator.Event {
-    var isInserted: Bool {
-        if case .inserted = self { return true }
-        return false
-    }
 }

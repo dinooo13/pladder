@@ -438,10 +438,10 @@ final class EventLog: @unchecked Sendable {
     var names: [String] { lock.withLock { _names } }
     var events: [DictationCoordinator.Event] { lock.withLock { _events } }
 
-    /// The timing of the last `inserted` event, if there was one.
-    var lastTiming: DictationCoordinator.CycleTiming? {
+    /// The last `inserted` event, if there was one.
+    var lastInsertion: DictationCoordinator.Insertion? {
         for event in events.reversed() {
-            if case .inserted(let insertion) = event { return insertion.timing }
+            if case .inserted(let insertion) = event { return insertion }
         }
         return nil
     }
@@ -770,7 +770,7 @@ final class EventLog: @unchecked Sendable {
             settings: settings, events: events)
         await c.startIdle()
         await c.dictate()
-        let timing = try #require(events.lastTiming)
+        let timing = try #require(events.lastInsertion?.timing)
         #expect(timing.engine >= .milliseconds(50))
         #expect(timing.polish == nil)
         #expect(output.inserted == ["hello world"])
@@ -1010,7 +1010,7 @@ final class EventLog: @unchecked Sendable {
         #expect(output.inserted == ["polished "])
         #expect(refiner.calls == [Self.sentence])
         #expect(c.lastTranscript?.text == "polished")
-        #expect(events.lastTiming?.polish != nil)
+        #expect(events.lastInsertion?.timing.polish != nil)
     }
 
     @Test func normalHotkeyNeverCallsTheRefiner() async {
@@ -1030,8 +1030,8 @@ final class EventLog: @unchecked Sendable {
         #expect(output.inserted == [Self.sentence + " "])
         #expect(refiner.calls.isEmpty)
         #expect(refiner.prepareCount == 0)
-        #expect(events.lastTiming != nil)
-        #expect(events.lastTiming?.polish == nil)
+        #expect(events.lastInsertion != nil)
+        #expect(events.lastInsertion?.timing.polish == nil)
     }
 
     @Test func blankTranscriptSkipsTheRefiner() async {
@@ -1053,7 +1053,7 @@ final class EventLog: @unchecked Sendable {
         await c.dictate()
         #expect(output.inserted == ["one two three "])
         #expect(refiner.calls.isEmpty)
-        #expect(events.lastTiming?.polish == .zero)
+        #expect(events.lastInsertion?.timing.polish == .zero)
     }
 
     @Test func fourWordsAreRefined() async {

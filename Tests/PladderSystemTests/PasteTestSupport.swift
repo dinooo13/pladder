@@ -134,7 +134,7 @@ final class RecordingKeyPoster: KeyPoster {
 /// One `PasteboardOutput` wired to a private named pasteboard, a recording
 /// poster, a manual clock and a switchable grant. Never `.general`: the
 /// developer dictates with a running Pladder while these run.
-struct PasteHarness {
+final class PasteHarness: Sendable {
     static let keyV: CGKeyCode = 0x09
     static let transient = NSPasteboard.PasteboardType("org.nspasteboard.TransientType")
 
@@ -196,5 +196,5 @@ struct PasteHarness {
         await output.keeper.transcriptRead(promise, at: clock.now)
     }
 
-    func release() { pasteboard.releaseGlobally() }
+    deinit { NSPasteboard(name: name).releaseGlobally() }
 }
