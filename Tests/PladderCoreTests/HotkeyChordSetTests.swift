@@ -2,13 +2,6 @@ import Foundation
 import Testing
 @testable import PladderCore
 
-private let rightOption: UInt16 = 0x3D
-private let leftOption: UInt16 = 0x3A
-private let leftControl: UInt16 = 0x3B
-private let rightCommand: UInt16 = 0x36
-private let space: UInt16 = 0x31
-private let returnKey: UInt16 = 0x24
-
 private func event(_ role: HotkeyRole, _ event: HotkeyEvent) -> HotkeyMonitorEvent {
     HotkeyMonitorEvent(role: role, event: event)
 }

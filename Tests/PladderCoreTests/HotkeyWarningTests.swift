@@ -2,10 +2,6 @@ import Testing
 @testable import PladderCore
 
 @Suite struct HotkeyWarningTests {
-    private let space: UInt16 = 0x31
-    private let leftCommand: UInt16 = 0x37
-    private let leftControl: UInt16 = 0x3B
-
     @Test func theStandInIsNamedUnlessMacOSOwnsIt() {
         let stored = Hotkey.rightCommand
         #expect(HotkeyWarning.forKey(stored, standIn: .optionSpace, systemShortcuts: [])

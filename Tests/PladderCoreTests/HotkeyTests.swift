@@ -2,16 +2,24 @@ import Foundation
 import Testing
 @testable import PladderCore
 
-private let rightOption: UInt16 = 0x3D
-private let leftOption: UInt16 = 0x3A
-private let leftControl: UInt16 = 0x3B
-private let rightCommand: UInt16 = 0x36
-private let leftCommand: UInt16 = 0x37
-private let leftShift: UInt16 = 0x38
-private let space: UInt16 = 0x31
-private let keyA: UInt16 = 0x00
-private let keyC: UInt16 = 0x08
-private let keyV: UInt16 = 0x09
+let rightOption: UInt16 = 0x3D
+let leftOption: UInt16 = 0x3A
+let leftControl: UInt16 = 0x3B
+let rightControl: UInt16 = 0x3E
+let rightCommand: UInt16 = 0x36
+let leftCommand: UInt16 = 0x37
+let leftShift: UInt16 = 0x38
+let rightShift: UInt16 = 0x3C
+let fn: UInt16 = 0x3F
+let space: UInt16 = 0x31
+let returnKey: UInt16 = 0x24
+let escapeKey: UInt16 = 0x35
+let f5: UInt16 = 0x60
+let keyA: UInt16 = 0x00
+let keyS: UInt16 = 0x01
+let keyD: UInt16 = 0x02
+let keyC: UInt16 = 0x08
+let keyV: UInt16 = 0x09
 
 @Suite struct HotkeyChordTrackerTests {
     @Test func loneModifierPressesAndReleases() {
@@ -124,7 +132,6 @@ private let keyV: UInt16 = 0x09
 }
 
 @Suite struct SubmitKeyTests {
-    private let returnKey: UInt16 = 0x24
 
     @Test func submitModifierPressedWhileHeldArmsTheRelease() {
         var t = HotkeyChordTracker(hotkey: .rightCommand, submitKey: .rightOption)
@@ -362,10 +369,6 @@ private let keyV: UInt16 = 0x09
 }
 
 @Suite struct SystemWideRegistrationTests {
-    private let rightShift: UInt16 = 0x3C
-    private let fn: UInt16 = 0x3F
-    private let f5: UInt16 = 0x60
-    private let keyS: UInt16 = 0x01
 
     @Test func chordWithOneRegularKeyCanBeRegistered() {
         #expect(Hotkey(leftControl, space).canBeRegisteredWithoutAccessibility)
@@ -392,12 +395,6 @@ private let keyV: UInt16 = 0x09
 /// The one chord that stands in while Accessibility is missing, and the rule
 /// that decides which chords macOS has already taken.
 @Suite struct StandInRuleTests {
-    private let rightControl: UInt16 = 0x3E
-    private let rightShift: UInt16 = 0x3C
-    private let leftCommand: UInt16 = 0x37
-    private let keyD: UInt16 = 0x02
-    private let fn: UInt16 = 0x3F
-    private let f5: UInt16 = 0x60
 
     private var controlShiftSpace: Hotkey { Hotkey(leftControl, leftShift, space) }
 
@@ -818,8 +815,6 @@ private let keyV: UInt16 = 0x09
 
 /// The Escape rule of `HotkeyChordSet`.
 @Suite struct CancelKeyTests {
-    private let escapeKey: UInt16 = 0x35
-    private let keyD: UInt16 = 0x02
     private static let escape = [HotkeyMonitorEvent(.escape)]
 
     private func optionSpaceSet() -> HotkeyChordSet {
