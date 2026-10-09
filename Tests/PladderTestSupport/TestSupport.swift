@@ -10,10 +10,15 @@ public actor Gate {
     private var isOpen = false
     private var waiters: [UUID: CheckedContinuation<Void, Never>] = [:]
     private var timers: [Task<Void, Never>] = []
+    private var watchers: [CheckedContinuation<Void, Never>] = []
+    public private(set) var arrivals = 0
 
     public init() {}
 
     public func wait(atMost limit: Duration = .seconds(2)) async {
+        arrivals += 1
+        for watcher in watchers { watcher.resume() }
+        watchers = []
         if isOpen { return }
         let id = UUID()
         timers.append(Task {
@@ -29,6 +34,12 @@ public actor Gate {
         waiters = [:]
         for timer in timers { timer.cancel() }
         timers = []
+    }
+
+    /// Returns once somebody has arrived at the gate.
+    public func untilSomeoneWaits() async {
+        guard arrivals == 0 else { return }
+        await withCheckedContinuation { watchers.append($0) }
     }
 
     private func release(_ id: UUID) {
