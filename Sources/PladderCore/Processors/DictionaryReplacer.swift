@@ -1,19 +1,6 @@
 import Foundation
 
-/// Applies user dictionary entries as whole-word replacements.
-///
-/// Rules:
-/// - Matching is case-insensitive unless the entry sets `matchCase`.
-/// - Only whole words match: "cat" does not match "concatenate".
-/// - Multi-word `from` values are supported ("claude code").
-/// - Longer `from` values win when entries overlap, so "claude code" is applied
-///   before "claude".
-/// - If the matched text started with a capital letter and the replacement is
-///   all lowercase, the replacement's first letter is capitalised. Replacements
-///   containing their own capitals (brand names) are left exactly as written.
-/// - Entries on a replacement cycle (see `DictionaryEntry.cyclicIDs`) are
-///   dropped, since running each rule once in order makes a cycle silently
-///   revert an earlier rule rather than loop.
+// Longer `from` first, so "claude code" applies before "claude".
 public struct DictionaryReplacer: TextProcessor {
     public static let processorID = "dictionary"
 

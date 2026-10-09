@@ -1,55 +1,19 @@
 import Foundation
 
-/// Finds the words the user corrected by hand in a pasted dictation.
-///
-/// Pure and off the release-to-paste path: it runs up to a minute after the
-/// paste, on the learner's background task.
-///
-/// How a pair is found:
-///
-/// - Text is cut into tokens. A *word* is a run of letters and digits, with
-///   an apostrophe or hyphen inside it ("don't", "e-mail") kept as part of
-///   it; every other visible character is a *punctuation* token of its own;
-///   whitespace only separates. So a correction never crosses a comma or a
-///   full stop.
-/// - The window as it was when the paste was found (margin, paste, margin) is
-///   aligned against a later reading of the same window with a
-///   longest-common-subsequence over tokens, case-sensitively. What is left
-///   over at each point of the alignment is a *hunk*.
-/// - The reading used is the last one that still holds most of the window
-///   (`anchorCoverage`). An emptied field (a chat message sent), a cleared
-///   one, or a terminal that scrolled fails that and the reading before it is
-///   used instead.
-/// - A hunk is a candidate only when both sides are one or two words, it
-///   lies wholly inside the pasted text, it holds no punctuation, each side
-///   is at most `maximumPairLength` characters, and it is more than a change
-///   of case (those are the issue's rule: a capital is a matter of the
-///   sentence, not of the word). A control character is not a word
-///   character, so it is a punctuation token and fails the punctuation rule,
-///   and so is a comma: neither can reach a pair.
-/// - Insertions and deletions are ignored: adding or dropping a word is
-///   editing, not correcting a misheard one.
-/// - More than `maximumHunks` changes inside the paste, or more than half its
-///   tokens changed, is a rewrite and yields nothing at all rather than the
-///   first few.
+// The rules a correction has to pass: docs/ARCHITECTURE.md, "Learned corrections".
 public enum CorrectionDiff {
     static let maximumWordsPerSide = 2
     static let maximumPairLength = 256
     static let maximumHunks = 3
-    /// A reading must still hold this share of the window's words to count.
+    // A reading must still hold this share of the window's words to count.
     static let anchorCoverage = 0.6
-    /// Past this share of changed tokens the paste was rewritten.
     static let rewriteFraction = 0.5
-    /// Up to this many changed tokens never count as a rewrite, so a one- or
-    /// two-word paste can still be corrected.
+    // So a one- or two-word paste can still be corrected.
     static let rewriteAllowance = 2
-    /// The alignment table's bound; past it the reading is skipped rather
-    /// than a quadratic table built. A dictation of a few minutes is far
-    /// below it; one near the 10 min cap can pass it, and then nothing is
-    /// learned from that paste.
+    // Past this the reading is skipped rather than a quadratic table built; a
+    // dictation near the 10 min cap can pass it, and then nothing is learned.
     static let maximumCells = 4_000_000
 
-    /// Pairs in text order, empty when there is nothing to learn.
     public static func candidates(in observation: PasteObservation) -> [CorrectionPair] {
         let original = tagged(observation)
         let words = original.tokens.filter(\.isWord).count
@@ -58,8 +22,7 @@ public enum CorrectionDiff {
 
         for reading in observation.readings.reversed() {
             let target = tokens(reading)
-            // An empty field is never the last word: it is a sent message or a
-            // cleared field, and the reading before it is the one to diff.
+            // An empty field is a sent message or a cleared one: the reading before it counts.
             guard target.contains(where: \.isWord),
                   let matches = alignment(original.tokens, target) else { continue }
             let matchedWords = matches.filter { original.tokens[$0.0].isWord }.count
@@ -69,7 +32,6 @@ public enum CorrectionDiff {
         return []
     }
 
-    /// A paste with no margin and one reading; what most tests call.
     public static func candidates(pasted: String, final: String) -> [CorrectionPair] {
         candidates(in: PasteObservation(pasted: pasted, readings: [final]))
     }
@@ -81,7 +43,6 @@ public enum CorrectionDiff {
         var isWord: Bool
     }
 
-    /// Characters that stay inside a word when a word character follows.
     private static let joiners: Set<Character> = ["'", "\u{2019}", "-"]
 
     private static func isWordCharacter(_ character: Character) -> Bool {
@@ -118,9 +79,8 @@ public enum CorrectionDiff {
         return out
     }
 
-    /// The anchor-time window as tokens, each marked with whether it belongs
-    /// to the pasted text. The three parts are tokenised on their own, so a
-    /// paste glued to a word ("fooClaud") keeps its border.
+    // The three parts are tokenised on their own, so a paste glued to a word
+    // ("fooClaud") keeps its border.
     private static func tagged(_ observation: PasteObservation) -> (tokens: [Token], pasted: [Bool]) {
         let before = tokens(observation.before)
         let pasted = tokens(observation.pasted)
@@ -135,9 +95,6 @@ public enum CorrectionDiff {
 
     // MARK: Alignment
 
-    /// Index pairs of matched tokens, increasing on both sides; nil when the
-    /// table would be too large. The common head and tail are matched
-    /// directly, so the table only covers the stretch that changed.
     static func alignment(_ a: [Token], _ b: [Token]) -> [(Int, Int)]? {
         var head = 0
         while head < a.count, head < b.count, a[head] == b[head] { head += 1 }
@@ -206,8 +163,7 @@ public enum CorrectionDiff {
             changedPastedTokens += a.filter { original.pasted[$0] }.count
             // Insertions and deletions are editing, not correcting.
             guard !a.isEmpty, !b.isEmpty else { continue }
-            // Wholly inside the paste: a change that reaches into the margin
-            // is the user editing their own text, or noise at the border.
+            // A change reaching into the margin is the user editing their own text.
             guard a.allSatisfy({ original.pasted[$0] }) else { continue }
             substitutions += 1
             if let pair = pair(Array(source[a]), Array(target[b])) { out.append(pair) }
@@ -218,16 +174,13 @@ public enum CorrectionDiff {
         return out
     }
 
-    /// The rules a single substitution has to pass.
     private static func pair(_ heard: [Token], _ corrected: [Token]) -> CorrectionPair? {
-        // A pair never crosses punctuation, and a hunk that also moved a
-        // comma is ambiguous.
+        // A pair never crosses punctuation, and a hunk that also moved a comma is ambiguous.
         guard heard.allSatisfy(\.isWord), corrected.allSatisfy(\.isWord) else { return nil }
         guard (1...maximumWordsPerSide).contains(heard.count),
               (1...maximumWordsPerSide).contains(corrected.count) else { return nil }
         let from = heard.map(\.text).joined(separator: " ")
         let to = corrected.map(\.text).joined(separator: " ")
-        // Differing only in case covers differing not at all.
         guard from.count <= maximumPairLength, to.count <= maximumPairLength,
               from.lowercased() != to.lowercased() else { return nil }
         return CorrectionPair(heard: from, corrected: to)
