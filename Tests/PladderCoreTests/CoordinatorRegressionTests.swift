@@ -12,8 +12,7 @@ import Testing
     @Test func aChunkInFlightAtTheReleaseReachesTheEngineBeforeTheEnd() async {
         let engine = FakeStreamingEngine(feedDelay: .milliseconds(150))
         let (c, output, _, _) = await makeStreamingCoordinator(style: .compact, engine: engine)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         await c.hotkeyPressed()
         #expect(await waitUntil { engine.isFeeding })
         c.hotkeyReleased()
@@ -34,8 +33,7 @@ import Testing
         // recording past it, so a chunk missing from the count drops it.
         await capture.setSamples([])
         c.minimumDuration = 0.4
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         await c.hotkeyPressed()
         #expect(await waitUntil { engine.isFeeding })
         c.hotkeyReleased()
@@ -48,8 +46,7 @@ import Testing
     @Test func noLivePassStartsAfterTheRelease() async {
         let engine = FakeStreamingEngine(feedDelay: .milliseconds(150))
         let (c, output, _, _) = await makeStreamingCoordinator(style: .liveTranscript, engine: engine)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         await c.hotkeyPressed()
         #expect(await waitUntil { engine.isFeeding })
         let passesAtRelease = engine.livePassCount
@@ -67,8 +64,7 @@ import Testing
         let (c, output, capture, _) = await makeStreamingCoordinator(style: .compact, engine: engine)
         // A slow stop holds the cancel open while the next press comes.
         await capture.setStopDelay(.milliseconds(150))
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         await c.hotkeyPressed()
         let cancel = Task { await c.cancelRecording() }
         #expect(await waitUntil { c.state == .idle })
@@ -87,17 +83,9 @@ import Testing
     @Test func cancelAbandonsTheEngineThatRecordedAndOnlyOnce() async {
         let first = FakeStreamingEngine(id: EngineID("first"))
         let second = FakeStreamingEngine(id: EngineID("second"))
-        let registry = EngineRegistry([
-            .init(id: first.id, displayName: "First", detail: "") { first },
-            .init(id: second.id, displayName: "Second", detail: "") { second },
-        ])
-        let c = DictationCoordinator(
-            settings: DictationSettings(engineID: first.id), registry: registry,
-            capture: FakeCapture(), output: FakeOutput(), hotkeyMonitor: FakeHotkey(),
-            makePipeline: { _ in ProcessorPipeline([]) })
+        let (c, _, _) = makeCoordinator(engines: [.serving(first), .serving(second)])
         c.feedInterval = .milliseconds(10)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         await c.hotkeyPressed()
         c.settings.engineID = second.id
         await c.cancelRecording()
@@ -111,8 +99,7 @@ import Testing
         let engine = FakeStreamingEngine(beginFails: true)
         let events = EventLog()
         let (c, output, _, _) = await makeStreamingCoordinator(style: .compact, engine: engine, events: events)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         await c.hotkeyPressed()
         #expect(c.state.isRecording)
         c.hotkeyReleased()
@@ -131,11 +118,8 @@ import Testing
             output.result = result
             let events = EventLog()
             let (c, _, _) = makeCoordinator(output: output, events: events)
-            c.start()
-            #expect(await waitUntil { c.state == .idle })
-            await c.hotkeyPressed()
-            c.hotkeyReleased(submit: submit)
-            await c.inFlight?.value
+            await c.startIdle()
+            await c.dictate(submit: submit)
             guard case .inserted(let insertion) = events.events.last(where: { $0.isInserted }) else {
                 Issue.record("no inserted event")
                 continue
@@ -150,11 +134,7 @@ import Testing
 
     @Test func onlyARealChangeRebuildsTheProcessors() async {
         let builds = Counter()
-        let c = DictationCoordinator(
-            settings: DictationSettings(engineID: EchoEngine.engineID),
-            registry: EngineRegistry([.init(id: EchoEngine.engineID, displayName: "Echo", detail: "") { EchoEngine() }]),
-            capture: FakeCapture(), output: FakeOutput(), hotkeyMonitor: FakeHotkey(),
-            makePipeline: { _ in builds.increment(); return ProcessorPipeline([]) })
+        let (c, _, _) = makeCoordinator(makePipeline: { _ in builds.increment(); return ProcessorPipeline([]) })
         #expect(builds.value == 1)
         c.settings = c.settings
         #expect(builds.value == 1)
@@ -183,11 +163,8 @@ import Testing
         var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.muteOutputWhileDictating = true
         let (c, _, _) = makeCoordinator(settings: settings, outputMuter: muter)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
-        c.hotkeyReleased()
-        await c.inFlight?.value
+        await c.startIdle()
+        await c.dictate()
         await c.hotkeyPressed()
         await c.cancelRecording()
         #expect(await waitUntil { muter.endedCount == 2 })
@@ -213,8 +190,7 @@ import Testing
         var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.muteOutputWhileDictating = true
         let (c, output, capture) = makeCoordinator(settings: settings, outputMuter: muter)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         await c.hotkeyPressed()
         await c.shutdown()
         #expect(await capture.stopCount == 1)
@@ -225,8 +201,7 @@ import Testing
 
     @Test func shutdownLetsADictationOnItsWayOutFinish() async {
         let (c, output, _) = makeCoordinator()
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         await c.hotkeyPressed()
         c.hotkeyReleased()
         await c.shutdown()
@@ -240,8 +215,7 @@ import Testing
     @Test func theCapFiresOnTheClockAndNotBefore() async {
         let clock = ManualClock()
         let (c, output, _) = makeCoordinator(clock: clock)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         await c.hotkeyPressed()
         // The cap and the warm loop are both waiting.
         #expect(await waitUntil { clock.sleeperCount >= 2 })
@@ -260,11 +234,8 @@ import Testing
         output.result = .copied
         let (c, _, _) = makeCoordinator(output: output, clock: clock)
         c.settings.copiedHoldDuration = .seconds(1)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
-        c.hotkeyReleased()
-        await c.inFlight?.value
+        await c.startIdle()
+        await c.dictate()
         #expect(c.state == .copied)
         #expect(await waitUntil { clock.sleeperCount == 1 })
         clock.advance(by: .milliseconds(999))
@@ -278,11 +249,8 @@ import Testing
         let output = FakeOutput()
         output.result = .copied
         let (c, _, _) = makeCoordinator(output: output, clock: clock)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
-        c.hotkeyReleased()
-        await c.inFlight?.value
+        await c.startIdle()
+        await c.dictate()
         await c.hotkeyPressed()
         #expect(c.state.isRecording)
         // Far past the hold: the hint's timer is gone, not just late.
@@ -297,11 +265,8 @@ import Testing
         let output = FakeOutput()
         output.shouldFail = true
         let (c, _, _) = makeCoordinator(output: output, clock: clock)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
-        c.hotkeyReleased()
-        await c.inFlight?.value
+        await c.startIdle()
+        await c.dictate()
         #expect(c.state == .error(.other(detail: "paste failed")))
         #expect(c.lastError == .other(detail: "paste failed"))
         #expect(await waitUntil { clock.sleeperCount == 1 })
@@ -313,15 +278,9 @@ import Testing
 
     @Test func theWarmLoopRunsOnTheClockAndStopsAtRelease() async {
         let clock = ManualClock()
-        let engine = CountingEngine()
-        let c = DictationCoordinator(
-            settings: DictationSettings(engineID: CountingEngine.engineID),
-            registry: EngineRegistry([.init(id: CountingEngine.engineID, displayName: "Counting", detail: "") { engine }]),
-            capture: FakeCapture(), output: FakeOutput(), hotkeyMonitor: FakeHotkey(),
-            makePipeline: { _ in ProcessorPipeline([]) }, clock: clock)
+        let (c, _, _, engine) = makeCountingCoordinator(clock: clock)
         let warmPasses = { engine.calls.filter { $0 == 8_000 }.count }
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         await c.hotkeyPressed()
         // One pass at key-down, then one per interval for as long as the key
         // is held.
@@ -344,8 +303,7 @@ import Testing
         let hotkey = FakeHotkey()
         let (c, output, _) = makeCoordinator(hotkeyMonitor: hotkey, clock: clock)
         c.deferReleases = true
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         let pressed = ContinuousClock.now
         hotkey.send(HotkeyMonitorEvent(role: .dictate, event: .pressed, instant: pressed))
         #expect(await waitUntil { c.state.isRecording })
@@ -366,8 +324,7 @@ import Testing
         let hotkey = FakeHotkey()
         let (c, output, _) = makeCoordinator(hotkeyMonitor: hotkey, clock: clock)
         c.deferReleases = true
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         let pressed = ContinuousClock.now
         hotkey.send(HotkeyMonitorEvent(role: .dictate, event: .pressed, instant: pressed))
         #expect(await waitUntil { c.state.isRecording })
