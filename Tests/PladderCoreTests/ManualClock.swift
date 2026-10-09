@@ -65,9 +65,9 @@ final class ManualClock: Clock, @unchecked Sendable {
     func advance(by duration: Duration) {
         let due: [Sleeper] = lock.withLock {
             current = current.advanced(by: duration)
-            let due = sleepers.filter { $0.deadline <= current }
+            let woken = sleepers.filter { $0.deadline <= current }
             sleepers.removeAll { $0.deadline <= current }
-            return due
+            return woken
         }
         for sleeper in due { sleeper.continuation.resume() }
     }
