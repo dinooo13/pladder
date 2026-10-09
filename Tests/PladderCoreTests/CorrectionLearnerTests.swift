@@ -214,7 +214,7 @@ typealias ProposalLog = Recorder<CorrectionPair>
         let reviewer = FakeCorrectionReviewer()
         let proposals = ProposalLog()
         let task = Self.learner(
-            observer: observer, reviewer: reviewer, waitUntilQuiet: { await gate.pass() }, proposals: proposals)
+            observer: observer, reviewer: reviewer, waitUntilQuiet: { await gate.wait() }, proposals: proposals)
             .pasted("I tried Claud today")
 
         await gate.untilSomeoneWaits()
@@ -231,7 +231,7 @@ typealias ProposalLog = Recorder<CorrectionPair>
         let gate = Gate()
         let observer = FakePasteObserver([Self.observation("see you on Friday then", "see you on Monday then")])
         await Self.learner(
-            observer: observer, reviewer: FakeCorrectionReviewer(), waitUntilQuiet: { await gate.pass() },
+            observer: observer, reviewer: FakeCorrectionReviewer(), waitUntilQuiet: { await gate.wait() },
             proposals: ProposalLog())
             .pasted("see you on Friday then").value
         #expect(await gate.arrivals == 0)
@@ -265,33 +265,5 @@ typealias ProposalLog = Recorder<CorrectionPair>
         let sentence = CorrectionLearner.sentence(around: "Claud", in: pasted)
         #expect(sentence.count == CorrectionLearner.sentenceLimit)
         #expect(sentence.contains("Claud"))
-    }
-}
-
-/// Holds everyone who passes until it is opened, and counts them.
-private actor Gate {
-    private var isOpen = false
-    private var waiting: [CheckedContinuation<Void, Never>] = []
-    private var watchers: [CheckedContinuation<Void, Never>] = []
-    private(set) var arrivals = 0
-
-    func pass() async {
-        arrivals += 1
-        for watcher in watchers { watcher.resume() }
-        watchers = []
-        guard !isOpen else { return }
-        await withCheckedContinuation { waiting.append($0) }
-    }
-
-    func open() {
-        isOpen = true
-        for waiter in waiting { waiter.resume() }
-        waiting = []
-    }
-
-    /// Returns once somebody has arrived at the gate.
-    func untilSomeoneWaits() async {
-        guard arrivals == 0 else { return }
-        await withCheckedContinuation { watchers.append($0) }
     }
 }
