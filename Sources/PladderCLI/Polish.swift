@@ -45,7 +45,7 @@ func runPolish(_ path: String, model: PolishModel, options: PolishOptions) async
     print("input (\(transcript.split(whereSeparator: \.isWhitespace).count) words):")
     print(transcript)
 
-    func show(_ label: String, _ report: TranscriptPolisher.Report) {
+    func show(_ label: String, _ report: PolishReport) {
         print("")
         let timing = String(format: "%.3f", report.elapsed.timeInterval)
         if let polished = report.text {
@@ -64,12 +64,6 @@ func runPolish(_ path: String, model: PolishModel, options: PolishOptions) async
     show("warm", await polisher.polish(transcript))
 }
 
-/// Either polisher behind one face, for the CLI: both report the same way.
-struct CLIPolisher {
-    let polish: @Sendable (String) async -> TranscriptPolisher.Report
-    let prepare: @Sendable () async -> Void
-}
-
 /// What the command line changes about a polisher; nil is the app's own.
 struct PolishOptions {
     var instructionsPath: String?
@@ -80,48 +74,41 @@ struct PolishOptions {
 /// The polisher the app would use for `model`, downloading an S1-mini file
 /// into the app's own model directory first if it is not there yet. With
 /// `--gguf`, an S1-mini polisher over that file instead.
-func makePolisher(_ model: PolishModel, options: PolishOptions = PolishOptions()) async throws -> CLIPolisher {
+func makePolisher(_ model: PolishModel, options: PolishOptions = PolishOptions()) async throws -> any ReportingRefiner {
     let instructionsPath = options.instructionsPath
+    let file: ModelFile
+    let location: URL
     if let gguf = options.gguf {
         if instructionsPath != nil { usage() }
-        let url = URL(fileURLWithPath: gguf)
-        let file = ModelFile(fileName: url.lastPathComponent, url: url, sha256: "", byteCount: 0)
-        let polisher = S1MiniPolisher(file: file, location: url, control: options.control ?? S1MiniPolisher.controlLine)
-        print("model: \(gguf)")
-        if let control = options.control { print("control: \(control)") }
-        return CLIPolisher(polish: { await polisher.polish($0) }, prepare: { await polisher.prepare() })
-    }
-    guard let file = ModelFile(for: model) else {
+        location = URL(fileURLWithPath: gguf)
+        file = ModelFile(fileName: location.lastPathComponent, url: location, sha256: "", byteCount: 0)
+    } else if let pinned = ModelFile(for: model) {
+        if instructionsPath != nil { usage() }
+        let files = ModelFiles(directory: ModelFiles.defaultDirectory) { _, status in
+            if case .downloading(let fraction) = status {
+                eprint(String(format: "\rdownloading %3.0f%%", fraction * 100), terminator: "")
+            } else if status == .verifying {
+                eprint("\rverifying          ")
+            }
+        }
+        await files.ensure(pinned)
+        let status = await files.finished(pinned)
+        guard status == .ready else {
+            eprint("\(pinned.fileName): \(status)")
+            exit(1)
+        }
+        file = pinned
+        location = files.location(of: pinned)
+    } else {
         if options.control != nil { usage() }
-        let polisher: TranscriptPolisher
-        if let instructionsPath {
-            let instructions = try String(contentsOf: URL(fileURLWithPath: instructionsPath), encoding: .utf8)
-            polisher = TranscriptPolisher(instructions: instructions)
-            print("instructions: \(instructionsPath)")
-        } else {
-            polisher = TranscriptPolisher()
-        }
-        return CLIPolisher(polish: { await polisher.polish($0) }, prepare: { await polisher.prepare() })
+        guard let instructionsPath else { return TranscriptPolisher() }
+        let instructions = try String(contentsOf: URL(fileURLWithPath: instructionsPath), encoding: .utf8)
+        print("instructions: \(instructionsPath)")
+        return TranscriptPolisher(instructions: instructions)
     }
-    if instructionsPath != nil { usage() }
-    let files = ModelFiles(directory: ModelFiles.defaultDirectory) { _, status in
-        if case .downloading(let fraction) = status {
-            eprint(String(format: "\rdownloading %3.0f%%", fraction * 100), terminator: "")
-        } else if status == .verifying {
-            eprint("\rverifying          ")
-        }
-    }
-    await files.ensure(file)
-    let status = await files.finished(file)
-    guard status == .ready else {
-        eprint("\(file.fileName): \(status)")
-        exit(1)
-    }
-    let polisher = S1MiniPolisher(
-        file: file, location: files.location(of: file), control: options.control ?? S1MiniPolisher.controlLine)
-    print("model: \(file.fileName)")
+    print("model: \(options.gguf ?? file.fileName)")
     if let control = options.control { print("control: \(control)") }
-    return CLIPolisher(polish: { await polisher.polish($0) }, prepare: { await polisher.prepare() })
+    return S1MiniPolisher(file: file, location: location, control: options.control ?? S1MiniPolisher.controlLine)
 }
 
 /// One case of a polish test set: what the speech model heard and what

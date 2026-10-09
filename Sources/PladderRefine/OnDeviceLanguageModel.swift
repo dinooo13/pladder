@@ -124,11 +124,6 @@ public struct OnDeviceLanguageModel: Sendable {
     /// Runs `work` against the wall clock and returns whichever finishes
     /// first. Every error comes out as an `OnDeviceModelError`.
     ///
-    /// Not a task group: that waits for every child before returning, so a
-    /// model call that ignores cancellation would still hold the paste. A
-    /// one-shot `AsyncStream` lets the loser be abandoned. Both tasks are
-    /// detached so neither inherits the caller's actor.
-    ///
     /// The drain of an abandoned call runs inside the budget, not before it:
     /// a call that never comes back would otherwise hold every later paste
     /// with no limit at all. A deadline already past starts nothing, so no
@@ -138,27 +133,15 @@ public struct OnDeviceLanguageModel: Sendable {
         _ work: @escaping @Sendable () async throws -> Value
     ) async throws -> Value {
         guard ContinuousClock.now < deadline else { throw OnDeviceModelError.timedOut }
-        let (stream, continuation) = AsyncStream<Result<Value, OnDeviceModelError>?>.makeStream()
-        let call = Task.detached(priority: .userInitiated) {
+        let (outcome, call) = await firstOf(until: deadline, priority: .userInitiated) {
             await Self.drain()
             do {
-                continuation.yield(.success(try await work()))
+                return Result<Value, OnDeviceModelError>.success(try await work())
             } catch {
-                continuation.yield(.failure(Self.modelError(from: error)))
+                return .failure(Self.modelError(from: error))
             }
         }
-        let timer = Task.detached {
-            try? await Task.sleep(until: deadline, clock: .continuous)
-            continuation.yield(nil)
-        }
-        defer {
-            call.cancel()
-            timer.cancel()
-            continuation.finish()
-        }
-
-        var results = stream.makeAsyncIterator()
-        guard let outcome = await results.next() ?? nil else {
+        guard let outcome else {
             Self.leftover.withLock { $0 = call }
             throw OnDeviceModelError.timedOut
         }
