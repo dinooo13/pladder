@@ -44,7 +44,7 @@ public final class AXPasteObserver: PastedTextObserver, @unchecked Sendable {
     public let messagingTimeout: Float
     private let isTrusted: @Sendable () -> Bool
 
-    private let thread = AXThread()
+    private let thread = RunLoopThread(name: "Pladder.CorrectionObserver", qualityOfService: .utility)
     /// AX thread only.
     private var current: Session?
     /// Apps `AXManualAccessibility` was already set on. AX thread only.
@@ -469,51 +469,5 @@ private enum Reader {
         let ns = whole as NSString
         guard ns.length <= wholeValueLimit, range.location + range.length <= ns.length else { return nil }
         return ns.substring(with: NSRange(location: range.location, length: range.length))
-    }
-}
-
-/// A thread that only runs a run loop, for the AX observer and its timer.
-/// Work arrives as blocks. The same shape as the hotkey tap's thread.
-private final class AXThread: Thread, @unchecked Sendable {
-    private let condition = NSCondition()
-    private var loop: CFRunLoop?
-
-    override init() {
-        super.init()
-        name = "Pladder.CorrectionObserver"
-        qualityOfService = .utility
-    }
-
-    override func main() {
-        condition.lock()
-        loop = CFRunLoopGetCurrent()
-        condition.broadcast()
-        condition.unlock()
-        // Nothing to watch between dictations; the port keeps the loop alive.
-        RunLoop.current.add(NSMachPort(), forMode: .common)
-        while !isCancelled {
-            RunLoop.current.run(mode: .default, before: .distantFuture)
-        }
-    }
-
-    func perform(_ block: @escaping @Sendable () -> Void) {
-        condition.lock()
-        while loop == nil { condition.wait() }
-        let loop = loop!
-        condition.unlock()
-        CFRunLoopPerformBlock(loop, CFRunLoopMode.commonModes.rawValue, block)
-        CFRunLoopWakeUp(loop)
-    }
-
-    /// Does not wait for the loop the way `perform` does: a thread cancelled
-    /// before it got going never runs `main`, and would never publish one.
-    func finish() {
-        cancel()
-        condition.lock()
-        let loop = loop
-        condition.unlock()
-        guard let loop else { return }
-        CFRunLoopPerformBlock(loop, CFRunLoopMode.commonModes.rawValue) { CFRunLoopStop(CFRunLoopGetCurrent()) }
-        CFRunLoopWakeUp(loop)
     }
 }
