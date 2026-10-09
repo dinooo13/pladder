@@ -81,7 +81,7 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
     // MARK: HotkeyMonitor
 
     public func start(chords: [HotkeyRole: Hotkey], submitKey: Hotkey) -> AsyncStream<HotkeyMonitorEvent> {
-        var registrable: [(role: HotkeyRole, keyCode: UInt32, modifiers: UInt32)] = []
+        var registrable: [HotKeyEntry] = []
         for (role, chord) in chords.sorted(by: { $0.key < $1.key }) where !chord.isEmpty {
             guard chord.canBeRegisteredWithoutAccessibility,
                   let keyCode = chord.regularKeyCodes.first else {
@@ -98,7 +98,7 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
                 )
                 continue
             }
-            registrable.append((role, UInt32(keyCode), chord.carbonModifierMask))
+            registrable.append(HotKeyEntry(role: role, keyCode: UInt32(keyCode), modifiers: chord.carbonModifierMask))
         }
 
         // Starting twice replaces the previous session rather than stacking
@@ -107,15 +107,8 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
             SessionState(hotKeys: CarbonHotkeySession(generation: generation, roles: registrable.map(\.role)))
         }
         guard !registrable.isEmpty else { return stream }
-        let entries = registrable.map {
-            HotKeyEntry(
-                role: $0.role,
-                id: CarbonHotkeySession.hotKeyID(generation: generation, role: $0.role),
-                keyCode: $0.keyCode,
-                modifiers: $0.modifiers)
-        }
-        Self.onMainThread { [weak self] in
-            self?.register(entries, generation: generation)
+        Self.onMainThread { [weak self, registrable] in
+            self?.register(registrable, generation: generation)
         }
         return stream
     }
@@ -165,11 +158,9 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
         var hotKey: EventHotKeyRef
     }
 
-    /// One chord to register: which role it is, the ID its events carry, and
-    /// Carbon's spelling of it.
+    /// One chord to register: which role it is, and Carbon's spelling of it.
     private struct HotKeyEntry: Sendable {
         var role: HotkeyRole
-        var id: UInt32
         var keyCode: UInt32
         var modifiers: UInt32
     }
@@ -203,7 +194,8 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
         var hotKeys: [EventHotKeyRef] = []
         for entry in entries {
             var hotKey: EventHotKeyRef?
-            let id = EventHotKeyID(signature: Self.signature, id: entry.id)
+            let id = EventHotKeyID(
+                signature: Self.signature, id: CarbonHotkeySession.hotKeyID(generation: generation, role: entry.role))
             let registered = RegisterEventHotKey(
                 entry.keyCode, entry.modifiers, id, GetApplicationEventTarget(), 0, &hotKey)
             guard registered == noErr, let hotKey else {
@@ -239,19 +231,16 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
     /// from this monitor anyway.
     private func syncCancelKey(generation: UInt64) {
         let snapshot = lifecycle.withSession(generation) { session in
-            (wanted: session.state.cancelKeyWanted, current: session.state.cancelKey,
-             registered: session.resource != nil, id: session.state.hotKeys.cancelKeyID)
-        }
-        guard let snapshot else { return }
-        if !snapshot.wanted, let current = snapshot.current {
             // Taken under the lock, so a session ending meanwhile, whose
             // `ended` unregisters it too, cannot unregister it twice.
-            let taken = lifecycle.withSession(generation) { session -> Bool in
-                guard session.state.cancelKey != nil else { return false }
-                session.state.cancelKey = nil
-                return true
-            } ?? false
-            if taken { UnregisterEventHotKey(current.hotKey) }
+            let taken = session.state.cancelKeyWanted ? nil : session.state.cancelKey
+            if taken != nil { session.state.cancelKey = nil }
+            return (wanted: session.state.cancelKeyWanted, current: session.state.cancelKey, taken: taken,
+                    registered: session.resource != nil, id: session.state.hotKeys.cancelKeyID)
+        }
+        guard let snapshot else { return }
+        if let taken = snapshot.taken {
+            UnregisterEventHotKey(taken.hotKey)
             return
         }
         guard snapshot.wanted, snapshot.current == nil, snapshot.registered else { return }

@@ -24,7 +24,6 @@ final class PermissionMonitor {
     @ObservationIgnored var onRefresh: () -> Void = {}
 
     @ObservationIgnored private var pollTask: Task<Void, Never>?
-    @ObservationIgnored private var didRequestAccessibility = false
 
     var needsAccessibility: Bool { !accessibilityTrusted }
     var needsMicrophone: Bool { microphoneStatus != .authorized }
@@ -33,12 +32,8 @@ final class PermissionMonitor {
     /// Prompts for Accessibility once per launch when it is missing, and
     /// starts polling.
     func start() {
-        refresh()
-        if !accessibilityTrusted && !didRequestAccessibility {
-            didRequestAccessibility = true
-            Permissions.requestAccessibility()
-        }
         startPolling()
+        if !accessibilityTrusted { Permissions.requestAccessibility() }
     }
 
     func stop() {
