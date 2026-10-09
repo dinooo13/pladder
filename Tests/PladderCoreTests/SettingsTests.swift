@@ -29,17 +29,10 @@ import Testing
     @Test func missingKeysFallBackToDefaults() throws {
         let json = #"{"engineID":"echo","dictionary":[{"id":"6E36117C-6200-4C7E-BFB8-6FA228542578","from":"a","to":"b","matchCase":false}]}"#
         let decoded = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
-        #expect(decoded.engineID == EchoEngine.engineID)
+        var expected = Self.defaults
+        expected.dictionary = decoded.dictionary
         #expect(decoded.dictionary.count == 1)
-        #expect(decoded.hotkey == .optionSpace)
-        #expect(decoded.submitKey == .keyV)
-        #expect(!decoded.polishDictations)
-        #expect(decoded.polishModel == .appleIntelligence)
-        #expect(decoded.appendTrailingSpace == true)
-        #expect(decoded.appearance == .system)
-        #expect(decoded.overlayStyle == .compact)
-        #expect(decoded.overlayGlass == true)
-        #expect(decoded.overlayAnimationSpeed == .quick)
+        #expect(decoded == expected)
     }
 
     @Test func legacyPolishChordMigratesToTheToggle() throws {
@@ -49,14 +42,6 @@ import Testing
         // The toggle stays off over a legacy chord stored empty.
         let off = try JSONDecoder().decode(Settings.self, from: Data(#"{"engineID":"echo","polishHotkey":{"keyCodes":[]}}"#.utf8))
         #expect(!off.polishDictations)
-    }
-
-    @Test func anUnknownPolishModelFallsBackToApples() throws {
-        // Written by a newer build that knows a model this one does not.
-        let json = #"{"engineID":"echo","polishDictations":true,"polishModel":"someFutureModel"}"#
-        let decoded = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
-        #expect(decoded.polishModel == .appleIntelligence)
-        #expect(decoded.polishDictations)
     }
 
     @Test func unreadableFileIsMovedAsideNotOverwritten() throws {
@@ -73,9 +58,10 @@ import Testing
 
     @Test(arguments: ["appearance", "overlayStyle", "overlayAnimationSpeed", "polishModel"])
     func anUnknownCaseKeepsItsDefaultAndTheRest(key: String) throws {
-        let json = #"{"engineID":"echo","\#(key)":"someFutureCase","dictionary":[\#(Self.entryJSON)]}"#
+        let json = #"{"engineID":"echo","polishDictations":true,"\#(key)":"someFutureCase","dictionary":[\#(Self.entryJSON)]}"#
         let decoded = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
-        let defaults = Settings(engineID: EchoEngine.engineID)
+        let defaults = Self.defaults
+        #expect(decoded.polishDictations)
         #expect(decoded.appearance == defaults.appearance)
         #expect(decoded.overlayStyle == defaults.overlayStyle)
         #expect(decoded.overlayAnimationSpeed == defaults.overlayAnimationSpeed)
