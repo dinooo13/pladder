@@ -65,8 +65,6 @@ public struct CustomWordCorrector: TextProcessor {
     public static let processorID = "customWords"
 
     public let id = CustomWordCorrector.processorID
-    public let displayName = "Custom words"
-    public let detail = "Repairs near misses of the words you list in the Dictionary tab with an empty Heard as."
 
     /// Accept below this normalised distance.
     private static let threshold = 0.18
@@ -147,7 +145,7 @@ public struct CustomWordCorrector: TextProcessor {
         CommonWords.contains(word)
     }
 
-    public func process(_ text: String) async throws -> String {
+    public func process(_ text: String) -> String {
         apply(to: text)
     }
 

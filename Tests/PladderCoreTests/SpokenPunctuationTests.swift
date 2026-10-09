@@ -3,7 +3,7 @@ import Testing
 
 @Suite struct SpokenPunctuationTests {
     private func run(_ text: String, hint: (@Sendable (String) -> String?)? = nil) async throws -> String {
-        try await SpokenPunctuation(languageHint: hint).process(text)
+        SpokenPunctuation(languageHint: hint).process(text)
     }
 
     // MARK: What the speech model leaves behind

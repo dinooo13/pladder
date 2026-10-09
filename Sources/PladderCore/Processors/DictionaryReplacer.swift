@@ -18,8 +18,6 @@ public struct DictionaryReplacer: TextProcessor {
     public static let processorID = "dictionary"
 
     public let id = DictionaryReplacer.processorID
-    public let displayName = "Dictionary"
-    public let detail = "Applies your replacement rules. Edit them in the Dictionary tab."
 
     private let rules: [Rule]
 
@@ -43,7 +41,7 @@ public struct DictionaryReplacer: TextProcessor {
             }
     }
 
-    public func process(_ text: String) async throws -> String {
+    public func process(_ text: String) -> String {
         apply(to: text)
     }
 

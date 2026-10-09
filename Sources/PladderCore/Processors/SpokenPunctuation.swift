@@ -34,8 +34,6 @@ public struct SpokenPunctuation: TextProcessor {
     public static let processorID = "spoken-punctuation"
 
     public let id = SpokenPunctuation.processorID
-    public let displayName = "Spoken punctuation"
-    public let detail = "Turns spoken marks such as “comma”, “question mark” and “new paragraph” into the marks themselves, in English, German and Spanish."
 
     private enum Mark {
         case comma, fullStop, question, exclamation, colon, semicolon, paragraph
@@ -127,7 +125,7 @@ public struct SpokenPunctuation: TextProcessor {
         "\\b(?:\(phrase))\\b"
     }
 
-    public func process(_ text: String) async throws -> String {
+    public func process(_ text: String) -> String {
         guard candidate.firstMatch(in: text, range: NSRange(location: 0, length: (text as NSString).length)) != nil
         else { return text }
         var result = text

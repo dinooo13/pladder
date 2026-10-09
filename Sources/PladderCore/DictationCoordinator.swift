@@ -808,7 +808,7 @@ public final class DictationCoordinator {
             }
             lastTranscript = transcript
             started = ContinuousClock.now
-            let processed = await pipeline.run(transcript.text, disabled: settings.disabledProcessors)
+            let processed = pipeline.run(transcript.text, disabled: settings.disabledProcessors)
             timing.processing = ContinuousClock.now - started
             guard !processed.isEmpty else {
                 becomeIdle()

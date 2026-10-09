@@ -145,7 +145,7 @@ func runPolishSet(_ path: String, model: PolishModel, options: PolishOptions) as
     }
     // The processors `--process` runs, with a fresh install's settings: no
     // dictionary, so the set means the same on every machine.
-    let pipeline = StandardProcessors.pipeline(for: DictationSettings(Settings(engineID: StandardEngines.defaultEntry.id)))
+    let pipeline = StandardProcessors.pipeline(for: DictationSettings(engineID: StandardEngines.defaultEntry.id))
     let polisher = try await makePolisher(model, options: options)
     await polisher.prepare()
     // The first call pays for whatever prepare() could not warm.
@@ -155,7 +155,7 @@ func runPolishSet(_ path: String, model: PolishModel, options: PolishOptions) as
     var exact = 0
     var times: [Double] = []
     for item in cases {
-        let processed = await pipeline.run(item.input)
+        let processed = pipeline.run(item.input)
         let report = await polisher.polish(processed)
         let output = report.text ?? processed
         times.append(report.elapsed.timeInterval)
