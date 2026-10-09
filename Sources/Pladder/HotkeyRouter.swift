@@ -64,8 +64,8 @@ final class HotkeyRouter {
         if trusted != accessibilityTrusted { accessibilityTrusted = trusted }
         let sustained = secureInput.observe(secureInputEnabled)
         if sustained != secureInputSustained { secureInputSustained = sustained }
-        let wantsTap = Self.wantsTap(
-            accessibilityTrusted: trusted, secureInputSustained: sustained, hotkey: hotkey)
+        let wantsTap = HotkeySource.choose(
+            accessibilityTrusted: trusted, secureInputSustained: sustained, hotkey: hotkey) == .tap
         let flipped = wantsTap != usesTap
         if flipped {
             usesTap = wantsTap
@@ -90,12 +90,6 @@ final class HotkeyRouter {
         guard hotkey != self.hotkey else { return }
         self.hotkey = hotkey
         applyStandIn()
-    }
-
-    /// The tap, unless Accessibility is missing, or secure input has the tap
-    /// deaf and Carbon can take the chord over.
-    static func wantsTap(accessibilityTrusted: Bool, secureInputSustained: Bool, hotkey: Hotkey) -> Bool {
-        accessibilityTrusted && !(secureInputSustained && hotkey.canBeRegisteredWithoutAccessibility)
     }
 
     /// The default chord, standing in for a stored chord Carbon cannot
