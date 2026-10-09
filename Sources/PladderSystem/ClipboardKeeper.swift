@@ -141,11 +141,7 @@ actor ClipboardKeeper {
         // clipboard is the pending snapshot, which `paste` carries forward.
         // Capturing would only read our own promise, from off the main
         // thread, which AppKit warns against.
-        if let pending, pending.changeCount == now {
-            prepared = nil
-            return
-        }
-        if let left, left.changeCount == now {
+        if pending?.changeCount == now || left?.changeCount == now {
             prepared = nil
             return
         }

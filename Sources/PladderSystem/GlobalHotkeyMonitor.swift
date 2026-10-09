@@ -42,7 +42,7 @@ public final class GlobalHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
         var modifiers = ModifierKeyState()
     }
 
-    private let thread: TapThread
+    private let thread: RunLoopThread
     private let lifecycle: HotkeyMonitorLifecycle<TapHandle, TapState>
 
     /// How long to wait before trying to create the tap again when
@@ -50,7 +50,7 @@ public final class GlobalHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
     private let retryInterval: TimeInterval = 2
 
     public init() {
-        let thread = TapThread()
+        let thread = RunLoopThread(name: "Pladder.HotkeyTap", qualityOfService: .userInteractive)
         self.thread = thread
         lifecycle = HotkeyMonitorLifecycle(tearDown: { tap in thread.perform { tap.tearDown() } })
         thread.start()
@@ -223,47 +223,6 @@ public final class GlobalHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
             // Last: the callback runs on this thread, and none can follow an
             // invalidated port.
             monitor.release()
-        }
-    }
-
-    /// A thread that does nothing but run a run loop for the tap. Work is
-    /// handed to it as blocks, which is how the tap gets installed and removed
-    /// on the same thread whose run loop it lives on.
-    private final class TapThread: Thread, @unchecked Sendable {
-        private let condition = NSCondition()
-        private var loop: CFRunLoop?
-
-        override init() {
-            super.init()
-            name = "Pladder.HotkeyTap"
-            qualityOfService = .userInteractive
-        }
-
-        override func main() {
-            condition.lock()
-            loop = CFRunLoopGetCurrent()
-            condition.broadcast()
-            condition.unlock()
-            // A run loop with nothing to watch returns straight away; the tap's
-            // source only arrives later, so keep a port on it until told to stop.
-            RunLoop.current.add(NSMachPort(), forMode: .common)
-            while !isCancelled {
-                RunLoop.current.run(mode: .default, before: .distantFuture)
-            }
-        }
-
-        func perform(_ block: @escaping @Sendable () -> Void) {
-            condition.lock()
-            while loop == nil { condition.wait() }
-            let loop = loop!
-            condition.unlock()
-            CFRunLoopPerformBlock(loop, CFRunLoopMode.commonModes.rawValue, block)
-            CFRunLoopWakeUp(loop)
-        }
-
-        func finish() {
-            cancel()
-            perform { CFRunLoopStop(CFRunLoopGetCurrent()) }
         }
     }
 }
