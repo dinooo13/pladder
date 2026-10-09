@@ -936,23 +936,13 @@ private let keyV: UInt16 = 0x09
         return t
     }
 
-    @Test func letGoOfOptionReleasesAsUsual() {
+    @Test func letGoOfOptionReleasesAndOnlyARealOptionSpacePressesAgain() {
         var t = HotkeyChordTracker(hotkey: .optionSpace)
         _ = t.flagsChanged(modifiers: [leftOption], at: at(0))
         #expect(t.keyDown(space, modifiers: [leftOption], at: at(10)) == .init(event: .pressed, swallow: true))
         #expect(t.flagsChanged(modifiers: [], at: at(2_000)) == .init(event: .released(submit: false)))
-    }
-
-    @Test func aLoneOptionDoesNotPress() {
-        var t = afterALostSpaceKeyUp()
-        #expect(t.flagsChanged(modifiers: [leftOption], at: at(5_000)) == .init())
-        #expect(t.flagsChanged(modifiers: [], at: at(5_100)) == .init())
-        #expect(t.flagsChanged(modifiers: [rightOption], at: at(6_000)) == .init())
-        #expect(t.flagsChanged(modifiers: [], at: at(6_100)) == .init())
-    }
-
-    @Test func aRealOptionSpaceStillPresses() {
-        var t = afterALostSpaceKeyUp()
+        #expect(t.flagsChanged(modifiers: [rightOption], at: at(4_000)) == .init())
+        #expect(t.flagsChanged(modifiers: [], at: at(4_100)) == .init())
         #expect(t.flagsChanged(modifiers: [leftOption], at: at(5_000)) == .init())
         #expect(t.keyDown(space, modifiers: [leftOption], at: at(5_010)) == .init(event: .pressed, swallow: true))
         #expect(t.keyUp(space, modifiers: [leftOption], at: at(7_000)) == .init(event: .released(submit: false), swallow: true))
