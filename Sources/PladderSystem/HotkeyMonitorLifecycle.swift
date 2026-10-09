@@ -59,16 +59,17 @@ final class HotkeyMonitorLifecycle<Resource: Sendable, State: Sendable>: @unchec
         stop()
         let (stream, continuation) = AsyncStream<HotkeyMonitorEvent>.makeStream(
             bufferingPolicy: .unbounded)
-        let generation: UInt64 = lock.withLock {
-            generation &+= 1
+        let mine: UInt64 = lock.withLock {
+            self.generation &+= 1
+            let mine = self.generation
             session = Session(
-                generation: generation, continuation: continuation,
-                resource: nil, state: makeState(generation))
-            return generation
+                generation: mine, continuation: continuation,
+                resource: nil, state: makeState(mine))
+            return mine
         }
         // If the consumer drops the stream the resource must still go.
-        continuation.onTermination = { [weak self] _ in self?.end(generation) }
-        return (stream, generation)
+        continuation.onTermination = { [weak self] _ in self?.end(mine) }
+        return (stream, mine)
     }
 
     func stop() { end(nil) }

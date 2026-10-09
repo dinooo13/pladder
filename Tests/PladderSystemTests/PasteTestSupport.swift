@@ -44,9 +44,9 @@ final class ManualClock: Sendable {
         let due = state.withLock { state -> [Sleeper] in
             state.now += duration
             let now = state.now
-            let due = state.sleepers.filter { $0.deadline <= now }
+            let woken = state.sleepers.filter { $0.deadline <= now }
             state.sleepers.removeAll { $0.deadline <= now }
-            return due
+            return woken
         }
         for sleeper in due { sleeper.continuation.resume() }
     }
