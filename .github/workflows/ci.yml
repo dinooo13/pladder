@@ -50,7 +50,8 @@ jobs:
         # The developer dictates with a running copy while scripts run; a
         # bare kill by name would stop it mid-recording (see CLAUDE.md).
         run: |
-          if grep -rnE 'pkill -x Pladder|killall Pladder' scripts; then exit 1; fi
+          # Commands only: a comment may name what not to do.
+          if grep -rnE '^[^#]*(pkill -x Pladder|killall Pladder)' scripts; then exit 1; fi
       - name: Bundle
         # No CODESIGN_IDENTITY on purpose: the runner has no certificate, so
         # this runs the auto-detection and its ad-hoc fallback, which once
