@@ -26,7 +26,7 @@ private actor StandInTransport: ModelFileTransport {
     }
 }
 
-@Suite struct ModelFilesTests {
+@Suite(.timeLimit(.minutes(1))) struct ModelFilesTests {
     private func source(in dir: URL, contents: String) throws -> URL {
         let url = dir.appending(path: "source.bin")
         try Data(contents.utf8).write(to: url)

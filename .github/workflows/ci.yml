@@ -26,6 +26,7 @@ jobs:
   build-and-test:
     # Pladder targets macOS 26 and needs Xcode 26.
     runs-on: macos-26
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - name: Select Xcode 26
@@ -45,7 +46,29 @@ jobs:
           swift build 2>&1 | tee build.log
           if grep -E "^$PWD/Sources/.*warning:" build.log; then exit 1; fi
       - name: Test
-        run: swift test
+        # The suite takes seconds. If it stalls, the stack of every thread of
+        # the test process goes into the log before it is stopped, so a hang
+        # says where it is instead of holding the runner for an hour.
+        timeout-minutes: 15
+        run: |
+          set +e
+          swift build --build-tests || exit 1
+          swift test --skip-build &
+          TEST=$!
+          for _ in $(seq 1 300); do
+            kill -0 "$TEST" 2>/dev/null || break
+            sleep 1
+          done
+          if kill -0 "$TEST" 2>/dev/null; then
+            echo "::error::swift test still running after 5 minutes; sampling its threads"
+            for pid in $(pgrep -f 'swiftpm-testing-helper|PladderPackageTests'); do
+              sample "$pid" 3 -mayDie -file "sample-$pid.txt"
+              cat "sample-$pid.txt"
+            done
+            pkill -P "$TEST"; kill "$TEST"
+            exit 1
+          fi
+          wait "$TEST"
       - name: Scripts never stop every Pladder
         # The developer dictates with a running copy while scripts run; a
         # bare kill by name would stop it mid-recording (see CLAUDE.md).

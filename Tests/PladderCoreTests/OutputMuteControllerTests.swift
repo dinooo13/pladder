@@ -91,7 +91,7 @@ private func pastTheDelay() async {
     try? await Task.sleep(for: testDelay * 4)
 }
 
-@Suite struct OutputMuteControllerTests {
+@Suite(.timeLimit(.minutes(1))) struct OutputMuteControllerTests {
     @Test func tapAndReleaseBeforeTheDelayNeverMutes() async {
         let control = FakeMuteControl()
         let muter = makeController(control)

@@ -1,7 +1,7 @@
 import Testing
 @testable import PladderCore
 
-@Suite struct SpokenPunctuationTests {
+@Suite(.timeLimit(.minutes(1))) struct SpokenPunctuationTests {
     private func run(_ text: String, hint: (@Sendable (String) -> String?)? = nil) async throws -> String {
         SpokenPunctuation(languageHint: hint).process(text)
     }

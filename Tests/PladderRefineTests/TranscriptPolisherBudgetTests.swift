@@ -44,7 +44,7 @@ private func slowCall(
 /// 700 words in sentences of seven: three chunks for Apple's model.
 private let longTranscript = Array(repeating: "one two three four five six seven.", count: 100).joined(separator: " ")
 
-@Suite struct TranscriptPolisherBudgetTests {
+@Suite(.timeLimit(.minutes(1))) struct TranscriptPolisherBudgetTests {
     // Before: every chunk got eight seconds of its own, so a dictation near
     // the 10 min cap could hold the paste for most of a minute.
     @Test func oneBudgetCoversEveryChunk() async {
@@ -106,7 +106,7 @@ private let longTranscript = Array(repeating: "one two three four five six seven
     }
 }
 
-@Suite struct OnDeviceModelErrorTests {
+@Suite(.timeLimit(.minutes(1))) struct OnDeviceModelErrorTests {
     private typealias GenerationError = LanguageModelSession.GenerationError
 
     @Test func theTwoGuidedFailuresAreTypedCases() {

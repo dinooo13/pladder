@@ -6,7 +6,7 @@ import Testing
 /// misplaced a dictation, and its timers driven by `ManualClock`, so a test
 /// can prove a timer did not fire without waiting for it.
 @MainActor
-@Suite struct CoordinatorHandOverTests {
+@Suite(.timeLimit(.minutes(1))) struct CoordinatorHandOverTests {
     // MARK: The release and the feed
 
     @Test func aChunkInFlightAtTheReleaseReachesTheEngineBeforeTheEnd() async {
@@ -236,7 +236,7 @@ import Testing
 }
 
 @MainActor
-@Suite struct CoordinatorClockTests {
+@Suite(.timeLimit(.minutes(1))) struct CoordinatorClockTests {
     @Test func theCapFiresOnTheClockAndNotBefore() async {
         let clock = ManualClock()
         let (c, output, _) = makeCoordinator(clock: clock)

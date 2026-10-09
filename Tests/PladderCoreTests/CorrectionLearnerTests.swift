@@ -59,7 +59,7 @@ final class ProposalLog: @unchecked Sendable {
     func append(_ proposal: CorrectionProposal) { lock.withLock { _pairs.append(proposal.pair) } }
 }
 
-@Suite struct CorrectionLearnerTests {
+@Suite(.timeLimit(.minutes(1))) struct CorrectionLearnerTests {
     private static func temporaryDismissed() -> DismissedCorrections {
         DismissedCorrections(url: FileManager.default.temporaryDirectory
             .appending(path: "pladder-tests-\(UUID().uuidString)/dismissed-corrections.json"))
