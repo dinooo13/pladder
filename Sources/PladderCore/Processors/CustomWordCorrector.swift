@@ -142,7 +142,7 @@ public struct CustomWordCorrector: TextProcessor {
     /// The built-in lexicon: a short list of the most common English, German
     /// and Spanish words. See `CommonWords` for what is on it and why.
     public static func isCommonWord(_ word: String) -> Bool {
-        CommonWords.contains(word)
+        CommonWords.all.contains(word)
     }
 
     public func process(_ text: String) -> String {

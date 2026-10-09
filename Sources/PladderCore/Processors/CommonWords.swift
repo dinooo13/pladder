@@ -18,10 +18,6 @@ import Foundation
 /// Contractions are spelled as the corrector keys them, without the
 /// apostrophe ("dont").
 enum CommonWords {
-    static func contains(_ word: String) -> Bool {
-        all.contains(word)
-    }
-
     /// Builds the set, if it is not built yet. `CustomWordCorrector` calls
     /// this from `init`, which runs when settings change, so the first
     /// dictation that needs the lexicon does not pay for building it.
