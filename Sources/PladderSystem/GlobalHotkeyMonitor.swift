@@ -2,10 +2,9 @@ import CoreGraphics
 import Foundation
 import PladderCore
 
-// An active tap, because only it can drop the chord's regular key (the Space of
-// Control+Space). On its own thread: every keystroke waits on it, and macOS disables
-// a tap that takes about a second, so it must never wait for our main thread.
-// `@unchecked Sendable`: mutable state is behind the lifecycle's lock.
+// An active tap, because only it can drop the chord's Space. Its own thread: every
+// keystroke waits on it, and macOS disables a tap that takes about a second, so it
+// never waits for our main thread. `@unchecked`: state is behind the lifecycle's lock.
 public final class GlobalHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
     private struct TapState: Sendable {
         var chords: HotkeyChordSet
