@@ -6,12 +6,14 @@ import Synchronization
 /// `limit`, so a regression that waits on the stand-in fails its
 /// expectations instead of hanging the run: a time limit cannot end a test
 /// stuck on a continuation. Passing tests open the gate long before.
-actor Gate {
+public actor Gate {
     private var isOpen = false
     private var waiters: [UUID: CheckedContinuation<Void, Never>] = [:]
     private var timers: [Task<Void, Never>] = []
 
-    func wait(atMost limit: Duration = .seconds(2)) async {
+    public init() {}
+
+    public func wait(atMost limit: Duration = .seconds(2)) async {
         if isOpen { return }
         let id = UUID()
         timers.append(Task {
@@ -21,7 +23,7 @@ actor Gate {
         await withCheckedContinuation { waiters[id] = $0 }
     }
 
-    func open() {
+    public func open() {
         isOpen = true
         for waiter in waiters.values { waiter.resume() }
         waiters = [:]
@@ -35,19 +37,21 @@ actor Gate {
 }
 
 /// Collects values from stand-ins on any thread.
-final class Recorder<Value: Sendable>: Sendable {
+public final class Recorder<Value: Sendable>: Sendable {
     private let values = Mutex<[Value]>([])
 
-    func append(_ value: Value) {
+    public init() {}
+
+    public func append(_ value: Value) {
         values.withLock { $0.append(value) }
     }
 
-    var all: [Value] {
+    public var all: [Value] {
         values.withLock { $0 }
     }
 }
 
-func scratchDirectory(_ name: String) throws -> URL {
+public func scratchDirectory(_ name: String) throws -> URL {
     let dir = FileManager.default.temporaryDirectory.appending(path: "\(name)-" + UUID().uuidString)
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     return dir

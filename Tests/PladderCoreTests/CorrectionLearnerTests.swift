@@ -1,5 +1,5 @@
 import Foundation
-import Synchronization
+import PladderTestSupport
 import Testing
 @testable import PladderCore
 
@@ -52,12 +52,7 @@ final class FakeCorrectionReviewer: CorrectionReviewer, @unchecked Sendable {
     }
 }
 
-final class ProposalLog: @unchecked Sendable {
-    private let lock = NSLock()
-    private var _pairs: [CorrectionPair] = []
-    var pairs: [CorrectionPair] { lock.withLock { _pairs } }
-    func append(_ proposal: CorrectionProposal) { lock.withLock { _pairs.append(proposal.pair) } }
-}
+typealias ProposalLog = Recorder<CorrectionPair>
 
 @Suite(.timeLimit(.minutes(1))) struct CorrectionLearnerTests {
     private static func temporaryDismissed() -> DismissedCorrections {
@@ -83,7 +78,7 @@ final class ProposalLog: @unchecked Sendable {
             dictionary: { dictionary },
             log: log,
             waitUntilQuiet: waitUntilQuiet,
-            onProposal: { proposals.append($0) })
+            onProposal: { proposals.append($0.pair) })
     }
 
     private let claud = CorrectionPair(heard: "Claud", corrected: "Claude")
@@ -94,7 +89,7 @@ final class ProposalLog: @unchecked Sendable {
         await Self.learner(observer: observer, reviewer: FakeCorrectionReviewer(), proposals: proposals)
             .pasted("I tried Claud today").value
         #expect(observer.pasted == ["I tried Claud today"])
-        #expect(proposals.pairs == [claud])
+        #expect(proposals.all == [claud])
     }
 
     @Test func dropsAPairTheReviewerRejects() async {
@@ -104,7 +99,7 @@ final class ProposalLog: @unchecked Sendable {
         await Self.learner(observer: observer, reviewer: reviewer, proposals: proposals)
             .pasted("I tried Claud today").value
         #expect(reviewer.calls.count == 1)
-        #expect(proposals.pairs.isEmpty)
+        #expect(proposals.all.isEmpty)
     }
 
     @Test func theGateRunsBeforeTheReviewer() async {
@@ -114,7 +109,7 @@ final class ProposalLog: @unchecked Sendable {
         await Self.learner(observer: observer, reviewer: reviewer, proposals: proposals)
             .pasted("see you on Friday then").value
         #expect(reviewer.calls.isEmpty)
-        #expect(proposals.pairs.isEmpty)
+        #expect(proposals.all.isEmpty)
     }
 
     @Test func aDismissedPairIsNotProposedAgain() async {
@@ -126,7 +121,7 @@ final class ProposalLog: @unchecked Sendable {
         await Self.learner(observer: observer, reviewer: reviewer, dismissed: dismissed, proposals: proposals)
             .pasted("I tried Claud today").value
         #expect(reviewer.calls.isEmpty)
-        #expect(proposals.pairs.isEmpty)
+        #expect(proposals.all.isEmpty)
     }
 
     @Test func aPairAlreadyInTheDictionaryIsNotProposed() async {
@@ -138,7 +133,7 @@ final class ProposalLog: @unchecked Sendable {
             dictionary: [DictionaryEntry(from: "claud ", to: "Claudia")], proposals: proposals)
             .pasted("I tried Claud today").value
         #expect(reviewer.calls.isEmpty)
-        #expect(proposals.pairs.isEmpty)
+        #expect(proposals.all.isEmpty)
     }
 
     @Test func nothingHappensWhenTheObserverReturnsNil() async {
@@ -149,7 +144,7 @@ final class ProposalLog: @unchecked Sendable {
             .pasted("I tried Claud today").value
         #expect(observer.pasted.count == 1)
         #expect(reviewer.calls.isEmpty)
-        #expect(proposals.pairs.isEmpty)
+        #expect(proposals.all.isEmpty)
     }
 
     @Test func nothingHappensWhenTheModelIsUnavailable() async {
@@ -160,7 +155,7 @@ final class ProposalLog: @unchecked Sendable {
             .pasted("I tried Claud today").value
         #expect(observer.pasted.isEmpty)
         #expect(reviewer.calls.isEmpty)
-        #expect(proposals.pairs.isEmpty)
+        #expect(proposals.all.isEmpty)
     }
 
     @Test func aReviewerErrorDropsOnlyThatCandidate() async {
@@ -171,7 +166,7 @@ final class ProposalLog: @unchecked Sendable {
         await Self.learner(observer: observer, reviewer: reviewer, proposals: proposals)
             .pasted("Claud and get hub and the rest of it stays").value
         #expect(reviewer.calls.count == 2)
-        #expect(proposals.pairs == [CorrectionPair(heard: "get hub", corrected: "GitHub")])
+        #expect(proposals.all == [CorrectionPair(heard: "get hub", corrected: "GitHub")])
     }
 
     @Test func twoPastesAreObservedAndReviewedIndependently() async {
@@ -186,7 +181,7 @@ final class ProposalLog: @unchecked Sendable {
         await first.value
         await second.value
         #expect(observer.pasted.count == 2)
-        #expect(Set(proposals.pairs) == [claud, CorrectionPair(heard: "get hub", corrected: "GitHub")])
+        #expect(Set(proposals.all) == [claud, CorrectionPair(heard: "get hub", corrected: "GitHub")])
     }
 
     @Test func atMostThreeProposalsPerPaste() async {
@@ -198,7 +193,7 @@ final class ProposalLog: @unchecked Sendable {
         let reviewer = FakeCorrectionReviewer()
         let proposals = ProposalLog()
         await Self.learner(observer: observer, reviewer: reviewer, proposals: proposals).pasted(pasted).value
-        #expect(proposals.pairs.count == CorrectionLearner.maximumProposalsPerPaste)
+        #expect(proposals.all.count == CorrectionLearner.maximumProposalsPerPaste)
     }
 
     @Test func theReviewerSeesTheSentence() async {
@@ -224,12 +219,12 @@ final class ProposalLog: @unchecked Sendable {
 
         await gate.untilSomeoneWaits()
         #expect(reviewer.calls.isEmpty)
-        #expect(proposals.pairs.isEmpty)
+        #expect(proposals.all.isEmpty)
 
         await gate.open()
         await task.value
         #expect(reviewer.calls.count == 1)
-        #expect(proposals.pairs == [claud])
+        #expect(proposals.all == [claud])
     }
 
     @Test func theGateIsNotAskedWhenNothingIsReviewed() async {
@@ -248,7 +243,7 @@ final class ProposalLog: @unchecked Sendable {
         let observer = FakePasteObserver([Self.observation("I tried Claud today", "I tried Claude today")])
         let reviewer = FakeCorrectionReviewer(
             failing: ["Claud"], failure: ModelError.generation("HEARD: Claud SENTENCE: I tried Claud today"))
-        let lines = LogLines()
+        let lines = Recorder<String>()
         await Self.learner(observer: observer, reviewer: reviewer, log: { lines.append($0) }, proposals: ProposalLog())
             .pasted("I tried Claud today").value
         let failed = lines.all.first { $0.hasPrefix("review failed") }
@@ -299,10 +294,4 @@ private actor Gate {
         guard arrivals == 0 else { return }
         await withCheckedContinuation { watchers.append($0) }
     }
-}
-
-private final class LogLines: Sendable {
-    private let lines = Mutex<[String]>([])
-    var all: [String] { lines.withLock { $0 } }
-    func append(_ line: String) { lines.withLock { $0.append(line) } }
 }

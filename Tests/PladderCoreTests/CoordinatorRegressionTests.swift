@@ -1,4 +1,5 @@
 import Foundation
+import PladderTestSupport
 import Testing
 @testable import PladderCore
 
@@ -130,13 +131,13 @@ import Testing
     // MARK: Settings and the monitor
 
     @Test func onlyARealChangeRebuildsTheProcessors() async {
-        let builds = Counter()
-        let (c, _, _) = makeCoordinator(makePipeline: { _ in builds.increment(); return ProcessorPipeline([]) })
-        #expect(builds.value == 1)
+        let builds = Recorder<DictationSettings>()
+        let (c, _, _) = makeCoordinator(makePipeline: { builds.append($0); return ProcessorPipeline([]) })
+        #expect(builds.all.count == 1)
         c.settings = c.settings
-        #expect(builds.value == 1)
+        #expect(builds.all.count == 1)
         c.settings.dictionary = [DictionaryEntry(from: "a", to: "b")]
-        #expect(builds.value == 2)
+        #expect(builds.all.count == 2)
     }
 
     @Test func changesBeforeStartRegisterOnceAtStart() async {
@@ -332,11 +333,4 @@ import Testing
         await c.inFlight?.value
         #expect(output.inserted.count == 1)
     }
-}
-
-private final class Counter: @unchecked Sendable {
-    private let lock = NSLock()
-    private var count = 0
-    var value: Int { lock.withLock { count } }
-    func increment() { lock.withLock { count += 1 } }
 }

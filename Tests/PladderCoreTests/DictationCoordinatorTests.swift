@@ -1,4 +1,5 @@
 import Foundation
+import PladderTestSupport
 import Testing
 @testable import PladderCore
 
@@ -205,11 +206,11 @@ actor CountingEngine: TranscriptionEngine {
     nonisolated let id = CountingEngine.engineID
     nonisolated let displayName = "Counting"
     private(set) var status: EngineStatus = .unloaded
-    private let recorder = SampleRecorder()
+    private let recorder = Recorder<Int>()
     private let delay: Duration
 
     init(delay: Duration = .zero) { self.delay = delay }
-    nonisolated var calls: [Int] { recorder.callCounts }
+    nonisolated var calls: [Int] { recorder.all }
 
     func load() async throws { status = .ready }
     func transcribe(_ samples: [Float]) async throws -> Transcript {
@@ -319,14 +320,6 @@ private final class StreamingCounters: @unchecked Sendable {
     func lived() -> Int { lock.withLock { _livePassCount += 1; _log.append("live"); return _livePassCount } }
     func record(_ name: String) { lock.withLock { _log.append(name) } }
     func setFeeding(_ feeding: Bool) { lock.withLock { _isFeeding = feeding } }
-}
-
-/// Lock-protected so `calls` can be read synchronously from test assertions.
-private final class SampleRecorder: @unchecked Sendable {
-    private let lock = NSLock()
-    private var _callCounts: [Int] = []
-    var callCounts: [Int] { lock.withLock { _callCounts } }
-    func append(_ count: Int) { lock.withLock { _callCounts.append(count) } }
 }
 
 // MARK: - Helpers

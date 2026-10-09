@@ -1,104 +1,13 @@
 import AppKit
 import Foundation
+import PladderTestSupport
 import Synchronization
 @testable import PladderSystem
 
-/// A clock that moves only when the test says so. Every restore and Return
-/// deadline in `PasteboardOutput` is a sleep on this, so an eight-second cap
-/// passes in a microsecond and nothing depends on the machine's load.
-final class ManualClock: Sendable {
-    private struct Sleeper {
-        let id: Int
-        let deadline: ContinuousClock.Instant
-        let continuation: CheckedContinuation<Void, any Error>
-    }
-
-    private struct State {
-        var now: ContinuousClock.Instant
-        var nextID = 0
-        var sleepers: [Sleeper] = []
-        /// Sleeps cancelled before they got as far as waiting.
-        var cancelled: Set<Int> = []
-    }
-
-    private let state: Mutex<State>
-    let start: ContinuousClock.Instant
-
-    init() {
-        let start = ContinuousClock.now
-        self.start = start
-        state = Mutex(State(now: start))
-    }
-
-    var now: ContinuousClock.Instant { state.withLock { $0.now } }
-
-    /// Deadlines somebody is asleep until right now.
-    var deadlines: [ContinuousClock.Instant] { state.withLock { $0.sleepers.map(\.deadline) } }
-
+extension ManualClock {
     var pasteClock: PasteClock {
         PasteClock(now: { self.now }, sleep: { try await self.sleep(until: $0) })
     }
-
-    /// Moves time on and wakes everyone whose deadline it reached.
-    func advance(by duration: Duration) {
-        let due = state.withLock { state -> [Sleeper] in
-            state.now += duration
-            let now = state.now
-            let woken = state.sleepers.filter { $0.deadline <= now }
-            state.sleepers.removeAll { $0.deadline <= now }
-            return woken
-        }
-        for sleeper in due { sleeper.continuation.resume() }
-    }
-
-    /// Advances to `start + offset`.
-    func advance(to offset: Duration) {
-        advance(by: start + offset - now)
-    }
-
-    func sleep(until deadline: ContinuousClock.Instant) async throws {
-        let id = state.withLock { state -> Int in
-            defer { state.nextID += 1 }
-            return state.nextID
-        }
-        try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
-                let early = state.withLock { state -> Result<Void, any Error>? in
-                    if state.cancelled.remove(id) != nil { return .failure(CancellationError()) }
-                    if deadline <= state.now { return .success(()) }
-                    state.sleepers.append(Sleeper(id: id, deadline: deadline, continuation: continuation))
-                    return nil
-                }
-                if let early { continuation.resume(with: early) }
-            }
-        } onCancel: {
-            let sleeper = state.withLock { state -> Sleeper? in
-                if let index = state.sleepers.firstIndex(where: { $0.id == id }) {
-                    return state.sleepers.remove(at: index)
-                }
-                state.cancelled.insert(id)
-                return nil
-            }
-            sleeper?.continuation.resume(throwing: CancellationError())
-        }
-    }
-
-    /// Waits, in real time but briefly, until somebody sleeps until
-    /// `start + offset`: a detached task has reached its wait.
-    func waitForSleeper(at offset: Duration) async -> Bool {
-        let deadline = start + offset
-        return await eventually { self.deadlines.contains(deadline) }
-    }
-}
-
-/// Polls `condition` for up to about two seconds of real time, a millisecond
-/// at a time, for what a detached task does on its own schedule.
-func eventually(_ condition: @Sendable () async -> Bool) async -> Bool {
-    for _ in 0..<2_000 {
-        if await condition() { return true }
-        try? await Task.sleep(for: .milliseconds(1))
-    }
-    return await condition()
 }
 
 /// Records every key instead of typing it, stamped with the manual clock.
