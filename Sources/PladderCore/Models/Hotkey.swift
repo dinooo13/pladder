@@ -70,33 +70,25 @@ public struct Hotkey: Codable, Sendable, Hashable {
     /// The same folding for a loose set of key codes, which is how the tracker
     /// compares held modifiers against a chord with a regular key.
     public static func collapsingSides(_ codes: Set<UInt16>) -> Set<UInt16> {
-        Set(codes.map { code in
-            switch code {
-            case 0x36: 0x37 // Right Command -> Command
-            case 0x3C: 0x38 // Right Shift -> Shift
-            case 0x3D: 0x3A // Right Option -> Option
-            case 0x3E: 0x3B // Right Control -> Control
-            default: code
-            }
-        })
+        Set(codes.map { code in carbonModifiers.first { $0.right == code }?.left ?? code })
     }
+
+    private static let carbonModifiers: [(left: UInt16, right: UInt16, bit: UInt32)] = [
+        (0x37, 0x36, 0x0100), // Command, cmdKey
+        (0x38, 0x3C, 0x0200), // Shift, shiftKey
+        (0x3A, 0x3D, 0x0800), // Option, optionKey
+        (0x3B, 0x3E, 0x1000), // Control, controlKey
+    ]
 
     /// Carbon's modifier mask for this chord, as `RegisterEventHotKey` and the
     /// symbolic hot key list both spell it. The four constants are written out
     /// rather than imported so `PladderCore` stays Foundation-only, and so the
     /// conversion is unit-testable without Carbon.
     public var carbonModifierMask: UInt32 {
-        var mask: UInt32 = 0
-        for code in modifierKeyCodes {
-            switch code {
-            case 0x37, 0x36: mask |= 0x0100 // cmdKey
-            case 0x38, 0x3C: mask |= 0x0200 // shiftKey
-            case 0x3A, 0x3D: mask |= 0x0800 // optionKey
-            case 0x3B, 0x3E: mask |= 0x1000 // controlKey
-            default: break
-            }
+        let collapsed = collapsedModifierKeyCodes
+        return Self.carbonModifiers.reduce(0) { mask, modifier in
+            collapsed.contains(modifier.left) ? mask | modifier.bit : mask
         }
-        return mask
     }
 
     /// The chord a Carbon key code and modifier mask stand for. A mask cannot
@@ -110,10 +102,7 @@ public struct Hotkey: Codable, Sendable, Hashable {
     public init?(keyCode: UInt16, carbonModifierMask mask: UInt32) {
         guard keyCode != 0xFFFF else { return nil }
         var codes: Set<UInt16> = [keyCode]
-        if mask & 0x0100 != 0 { codes.insert(0x37) }
-        if mask & 0x0200 != 0 { codes.insert(0x38) }
-        if mask & 0x0800 != 0 { codes.insert(0x3A) }
-        if mask & 0x1000 != 0 { codes.insert(0x3B) }
+        for modifier in Self.carbonModifiers where mask & modifier.bit != 0 { codes.insert(modifier.left) }
         self.init(keyCodes: codes)
     }
 
