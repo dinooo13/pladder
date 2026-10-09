@@ -62,10 +62,7 @@ public actor AVAudioEngineCapture: AudioCapture {
     /// not been granted yet; `start()` retries, so a throw here is not fatal.
     public func warmUp() async throws {
         observeConfigurationChanges()
-        let format = engine.inputNode.inputFormat(forBus: 0)
-        guard format.sampleRate > 0, format.channelCount > 0 else {
-            throw CaptureError.noInputDevice
-        }
+        _ = try usableInputFormat()
         engine.prepare()
     }
 
@@ -147,12 +144,7 @@ public actor AVAudioEngineCapture: AudioCapture {
 
     private func startEngineIfNeeded() throws {
         guard !engine.isRunning else { return }
-        // Touching inputNode attaches it and makes the engine adopt the current input
-        // device's format. With no permission or no device this reports 0 Hz / 0 channels.
-        let format = engine.inputNode.inputFormat(forBus: 0)
-        guard format.sampleRate > 0, format.channelCount > 0 else {
-            throw CaptureError.noInputDevice
-        }
+        _ = try usableInputFormat()
         engine.prepare()
         do {
             try engine.start()
@@ -161,15 +153,22 @@ public actor AVAudioEngineCapture: AudioCapture {
         }
     }
 
+    private func usableInputFormat() throws -> AVAudioFormat {
+        // Touching inputNode attaches it and makes the engine adopt the current input
+        // device's format. With no permission or no device this reports 0 Hz / 0 channels.
+        let format = engine.inputNode.inputFormat(forBus: 0)
+        guard format.sampleRate > 0, format.channelCount > 0 else {
+            throw CaptureError.noInputDevice
+        }
+        return format
+    }
+
     private func installTap(
         into accumulator: SampleAccumulator,
         continuation: AsyncStream<Float>.Continuation
     ) throws {
         let input = engine.inputNode
-        let inputFormat = input.inputFormat(forBus: 0)
-        guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0 else {
-            throw CaptureError.noInputDevice
-        }
+        let inputFormat = try usableInputFormat()
 
         let targetFormat = try AudioResampler.monoFloat32Format(sampleRate: Self.targetSampleRate)
         // One converter per recording keeps the resampler's filter state continuous
