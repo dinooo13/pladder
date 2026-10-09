@@ -23,21 +23,20 @@ public struct CoreAudioOutputMute: OutputMuteControl {
     /// Which elements of a device carry a mute control. Empty means the
     /// device has none.
     private static func muteElements(_ device: AudioObjectID) -> [AudioObjectPropertyElement] {
-        var address = AudioObjectPropertyAddress(
-            mSelector: kAudioDevicePropertyMute,
-            mScope: kAudioObjectPropertyScopeOutput,
-            mElement: kAudioObjectPropertyElementMain)
+        var address = muteAddress(kAudioObjectPropertyElementMain)
         if AudioObjectHasProperty(device, &address) {
             return [kAudioObjectPropertyElementMain]
         }
         // Per-channel mute: stereo devices without a master control.
         return [1, 2].filter { element in
-            var perChannel = AudioObjectPropertyAddress(
-                mSelector: kAudioDevicePropertyMute,
-                mScope: kAudioObjectPropertyScopeOutput,
-                mElement: element)
+            var perChannel = muteAddress(element)
             return AudioObjectHasProperty(device, &perChannel)
         }
+    }
+
+    private static func muteAddress(_ element: AudioObjectPropertyElement) -> AudioObjectPropertyAddress {
+        AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyMute, mScope: kAudioObjectPropertyScopeOutput, mElement: element)
     }
 
     public func defaultOutputDevice() -> UInt32? {
@@ -61,10 +60,7 @@ public struct CoreAudioOutputMute: OutputMuteControl {
     public func muteState(of device: UInt32) -> MuteState? {
         var elements: [UInt32: Bool] = [:]
         for element in Self.muteElements(device) {
-            var address = AudioObjectPropertyAddress(
-                mSelector: kAudioDevicePropertyMute,
-                mScope: kAudioObjectPropertyScopeOutput,
-                mElement: element)
+            var address = Self.muteAddress(element)
             var value: UInt32 = 0
             var size = UInt32(MemoryLayout<UInt32>.size)
             let status = AudioObjectGetPropertyData(device, &address, 0, nil, &size, &value)
@@ -89,10 +85,7 @@ public struct CoreAudioOutputMute: OutputMuteControl {
     }
 
     private static func set(_ muted: Bool, element: AudioObjectPropertyElement, on device: AudioObjectID) throws(MuteError) {
-        var address = AudioObjectPropertyAddress(
-            mSelector: kAudioDevicePropertyMute,
-            mScope: kAudioObjectPropertyScopeOutput,
-            mElement: element)
+        var address = muteAddress(element)
         var settable: DarwinBoolean = false
         let check = AudioObjectIsPropertySettable(device, &address, &settable)
         guard check == noErr, settable.boolValue else {
