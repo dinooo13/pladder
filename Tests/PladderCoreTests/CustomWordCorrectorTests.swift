@@ -3,13 +3,9 @@ import Testing
 @testable import PladderCore
 
 @Suite struct CustomWordCorrectorTests {
-    /// Terms are dictionary entries with an empty `from`, exactly as the
-    /// Dictionary tab stores them.
     private func corrector(_ terms: [String]) -> CustomWordCorrector {
         CustomWordCorrector(entries: terms.map { DictionaryEntry(from: "", to: $0) })
     }
-
-    // MARK: The three examples from the issue
 
     @Test func spelledOutAcronym() {
         let c = corrector(["ChatGPT"])
@@ -29,13 +25,10 @@ import Testing
         #expect(c.apply(to: "the r and d budget") == "the R&D budget")
     }
 
-    // MARK: False positives
-
     @Test func shortWordsOnlyMatchExactly() {
         let c = corrector(["Tee", "TS"])
         #expect(c.apply(to: "the") == "the")
         #expect(c.apply(to: "the cat sat on the mat") == "the cat sat on the mat")
-        // The exact key still matches, so the terms are not dead weight.
         #expect(c.apply(to: "a tee shirt") == "a Tee shirt")
     }
 
@@ -44,8 +37,6 @@ import Testing
         #expect(c.apply(to: "the number of times") == "the number of times")
         #expect(c.apply(to: "kubernetties is hard") == "Kubernetes is hard")
     }
-
-    // MARK: Punctuation
 
     @Test func trailingPunctuationIsPreserved() {
         let c = corrector(["ChatGPT"])
@@ -71,8 +62,6 @@ import Testing
         #expect(c.apply(to: "  chat g p t  ") == "  ChatGPT  ")
     }
 
-    // MARK: Case
-
     @Test func aLowercaseTermMirrorsTheMatchedCase() {
         let c = corrector(["dotnet"])
         #expect(c.apply(to: "dot net") == "dotnet")
@@ -87,12 +76,9 @@ import Testing
     }
 
     @Test func aSingleUppercaseLetterIsNotAllCaps() {
-        // One letter is ambiguous, so it counts as capitalised, not as caps.
         let c = corrector(["dotnet"])
         #expect(c.apply(to: "D ot net") == "Dotnet")
     }
-
-    // MARK: Nothing to do
 
     @Test func anAlreadyCorrectWordIsUnchanged() {
         let c = corrector(["ChatGPT", "ChargeBee"])
@@ -112,7 +98,6 @@ import Testing
     }
 
     @Test func entriesWithAHeardAsValueAreNotTerms() {
-        // Those belong to DictionaryReplacer; this processor must ignore them.
         let c = CustomWordCorrector(entries: [DictionaryEntry(from: "chat gpt", to: "ChatGPT")])
         #expect(c.apply(to: "Chat G P T") == "Chat G P T")
     }
@@ -125,8 +110,6 @@ import Testing
         #expect(c.apply(to: "chat g p t") == "chat g p t")
     }
 
-    // MARK: Non-ASCII
-
     @Test func aNonASCIITermIsSkipped() {
         let c = corrector(["Müller", "Grüße"])
         #expect(c.apply(to: "muller said hello") == "muller said hello")
@@ -138,8 +121,6 @@ import Testing
         #expect(c.apply(to: "grüße aus München") == "grüße aus München")
         #expect(c.apply(to: "chat g p t, grüße") == "ChatGPT, grüße")
     }
-
-    // MARK: Possessives
 
     @Test func aPossessiveSuffixIsNotSwallowed() {
         let c = corrector(["Claude", "ChatGPT"])
@@ -164,20 +145,14 @@ import Testing
         #expect(c.apply(to: "mcdonald's fries") == "McDonald's fries")
     }
 
-    // MARK: Soundex
-
     @Test func soundexRescuesAHomophoneTheDistanceAloneWouldReject() {
         let c = corrector(["ChargeBee"])
-        // "chargeb" is two edits from "chargebee": 2/9 = 0.22, over the
-        // threshold until the matching Soundex code scales it down.
+        // "chargeb" is two edits from "chargebee": 2/9 = 0.22, over the threshold until the
+        // matching Soundex code scales it down.
         #expect(c.apply(to: "charge b") == "ChargeBee")
     }
 
-    // MARK: Ordinary words
-
     @Test func anOrdinaryWordIsNotRewrittenIntoATerm() {
-        // Every pair here shares its Soundex code, and the bonus used to let
-        // all four through: the speaker said these words.
         let c = corrector(["Claude", "Swift", "Rust"])
         #expect(c.apply(to: "to the cloud") == "to the cloud")
         #expect(c.apply(to: "press shift") == "press shift")
@@ -186,15 +161,12 @@ import Testing
     }
 
     @Test func soundexExcusesOneEditAtMostOnAShortKey() {
-        // No lexicon, so this is the distance rule on its own: "roast" is
-        // two edits from "rust", "rost" one.
         let c = CustomWordCorrector(entries: [DictionaryEntry(from: "", to: "Rust")], isOrdinaryWord: { _ in false })
         #expect(c.apply(to: "the roast") == "the roast")
         #expect(c.apply(to: "the rost") == "the Rust")
     }
 
     @Test func theLexiconIsWhatKeepsALongerOrdinaryWord() {
-        // "cloud" clears the distance rule, so only the lexicon stops it.
         let terms = [DictionaryEntry(from: "", to: "Claude")]
         let open = CustomWordCorrector(entries: terms, isOrdinaryWord: { _ in false })
         #expect(open.apply(to: "to the cloud") == "to the Claude")
@@ -215,19 +187,12 @@ import Testing
     }
 
     @Test func aSpelledOutTermMadeOfOrdinaryWordsIsStillRepaired() {
-        // The lexicon judges single words: two of them run together are what
-        // the corrector exists for.
         let c = corrector(["Claude Code"])
         #expect(c.apply(to: "open cloud code") == "open Claude Code")
     }
 
-    // MARK: Cost
-
-    /// Not an assertion — the release-to-paste path's price tag, printed so a
-    /// change that makes this processor expensive is visible in the test log.
-    /// Run with `swift test -c release` for the number that matters; a debug
-    /// build is two orders of magnitude slower and takes a short sample so the
-    /// suite still finishes in well under a second.
+    // Not an assertion: the release path's price tag, printed so a change that makes this
+    // processor expensive shows in the test log. `swift test -c release` for the real number.
     @Test func costOfOneHundredWordsAgainstFiftyTerms() {
         let c = corrector(Self.fiftyTerms)
         let transcript = Self.hundredWordTranscript

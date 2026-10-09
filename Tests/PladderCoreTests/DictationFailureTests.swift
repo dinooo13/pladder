@@ -2,8 +2,6 @@ import Foundation
 import Testing
 @testable import PladderCore
 
-/// The classification that lets the app phrase a failure itself. Values, never
-/// sentences: the text lives in the app, next to the String Catalog.
 @Suite struct DictationFailureTests {
     @Test func engineNotLoadedIsRecognised() {
         #expect(DictationFailure(TranscriptionError.notLoaded) == .engineNotLoaded)

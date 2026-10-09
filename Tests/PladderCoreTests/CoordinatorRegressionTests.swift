@@ -3,13 +3,8 @@ import PladderTestSupport
 import Testing
 @testable import PladderCore
 
-/// The coordinator's hand-overs between tasks, each of which once lost or
-/// misplaced a dictation, and its timers driven by `ManualClock`, so a test
-/// can prove a timer did not fire without waiting for it.
 @MainActor
 @Suite(.timeLimit(.minutes(1))) struct CoordinatorHandOverTests {
-    // MARK: The release and the feed
-
     @Test func aChunkInFlightAtTheReleaseReachesTheEngineBeforeTheEnd() async {
         let engine = FakeStreamingEngine(feedDelay: .milliseconds(150))
         let (c, output, _, _) = await makeStreamingCoordinator(style: .compact, engine: engine)
@@ -19,8 +14,6 @@ import Testing
         c.hotkeyReleased()
         await c.inFlight?.value
         #expect(output.inserted == ["final"])
-        // Every chunk was handed over before the utterance was closed; the
-        // engine never saw the end overtake a feed.
         let log = engine.log.filter { $0 == "fed" || $0 == "end" }
         #expect(log.last == "end")
         #expect(log.filter { $0 == "end" }.count == 1)
@@ -30,8 +23,8 @@ import Testing
     @Test func theFedCountIncludesTheChunkInFlightAtTheRelease() async {
         let engine = FakeStreamingEngine(feedDelay: .milliseconds(150))
         let (c, _, capture, _) = await makeStreamingCoordinator(style: .compact, engine: engine)
-        // A tail under the minimum: only the fed audio can carry the
-        // recording past it, so a chunk missing from the count drops it.
+        // A tail under the minimum: only the fed audio carries the recording past it, so a
+        // chunk missing from the count drops it.
         await capture.setSamples([])
         c.minimumDuration = 0.4
         await c.startIdle()
@@ -53,17 +46,13 @@ import Testing
         let passesAtRelease = engine.livePassCount
         c.hotkeyReleased()
         await c.inFlight?.value
-        // The release waited for the feed loop to exit, so this is final.
         #expect(engine.livePassCount == passesAtRelease)
         #expect(output.inserted == ["final"])
     }
 
-    // MARK: Cancel
-
     @Test func aPressRightAfterACancelKeepsItsUtterance() async {
         let engine = FakeStreamingEngine()
         let (c, output, capture, _) = await makeStreamingCoordinator(style: .compact, engine: engine)
-        // A slow stop holds the cancel open while the next press comes.
         await capture.setStopDelay(.milliseconds(150))
         await c.startIdle()
         await c.hotkeyPressed()
@@ -75,8 +64,6 @@ import Testing
         c.hotkeyReleased()
         await c.inFlight?.value
         #expect(output.inserted == ["final"])
-        // The cancelled utterance was dropped before the next one began, and
-        // nothing dropped the next one.
         let lifecycle = engine.log.filter { ["begin", "abandon", "end"].contains($0) }
         #expect(lifecycle == ["begin", "abandon", "begin", "end"])
     }
@@ -94,8 +81,6 @@ import Testing
         #expect(!second.log.contains("abandon"))
     }
 
-    // MARK: Engines that cannot stream this time
-
     @Test func aStreamingEngineThatCannotBeginIsTranscribedWhole() async {
         let engine = FakeStreamingEngine(beginFails: true)
         let events = EventLog()
@@ -111,8 +96,6 @@ import Testing
         #expect(!events.names.contains("failed"))
     }
 
-    // MARK: The inserted event
-
     @Test func theInsertedEventSaysHowTheTextLanded() async {
         for (result, submit, submitted) in [(InsertResult.pasted, true, true), (.copied, true, false), (.pasted, false, false)] {
             let output = FakeOutput()
@@ -127,8 +110,6 @@ import Testing
             #expect(insertion?.transcript.text == "hello world")
         }
     }
-
-    // MARK: Settings and the monitor
 
     @Test func onlyARealChangeRebuildsTheProcessors() async {
         let builds = Recorder<DictationSettings>()
@@ -154,8 +135,6 @@ import Testing
         #expect(second.lastHotkey == .rightOption)
     }
 
-    // MARK: The output muter
-
     @Test func eachRecordingsEndNamesItsOwnStart() async {
         let muter = FakeOutputMuter()
         var settings = DictationSettings(engineID: EchoEngine.engineID)
@@ -170,8 +149,6 @@ import Testing
         #expect(Set(muter.startedSessions) == Set(muter.endedSessions))
         #expect(muter.startedSessions[0] < muter.startedSessions[1])
     }
-
-    // MARK: Quitting
 
     @Test func shutdownWhileRecordingGivesBackTheSpeakersAndTheClipboard() async {
         let muter = FakeOutputMuter()
@@ -205,7 +182,6 @@ import Testing
         let (c, output, _) = makeCoordinator(clock: clock)
         await c.startIdle()
         await c.hotkeyPressed()
-        // The cap and the warm loop are both waiting.
         #expect(await waitUntil { clock.sleeperCount >= 2 })
         clock.advance(by: c.maximumDuration - .seconds(1))
         #expect(c.state.isRecording)
@@ -240,7 +216,6 @@ import Testing
         await c.dictate()
         await c.hotkeyPressed()
         #expect(c.state.isRecording)
-        // Far past the hold: the hint's timer is gone, not just late.
         clock.advance(by: .seconds(30))
         await Task.yield()
         #expect(c.state.isRecording)
@@ -269,8 +244,6 @@ import Testing
         let warmPasses = { engine.calls.filter { $0 == 8_000 }.count }
         await c.startIdle()
         await c.hotkeyPressed()
-        // One pass at key-down, then one per interval for as long as the key
-        // is held.
         #expect(await waitUntil { warmPasses() == 1 })
         for expected in 2...4 {
             #expect(await waitUntil { clock.sleeperCount >= 2 })
@@ -296,8 +269,6 @@ import Testing
         #expect(await waitUntil { c.state.isRecording })
         hotkey.send(HotkeyMonitorEvent(role: .dictate, event: .released(submit: false), instant: pressed + .seconds(1)))
         #expect(await waitUntil { c.handledHotkeyEvents == 2 })
-        // Held for the bounce window, on the clock: the cap, the warm loop
-        // and the settle are waiting.
         #expect(await waitUntil { clock.sleeperCount == 3 })
         #expect(c.state.isRecording)
         clock.advance(by: c.bounceWindow)
@@ -322,7 +293,6 @@ import Testing
         await Task.yield()
         #expect(c.state.isRecording)
         #expect(output.inserted.isEmpty)
-        // The real release after the bounce still stops, a window later.
         hotkey.send(HotkeyMonitorEvent(role: .dictate, event: .released(submit: false), instant: released + .seconds(2)))
         #expect(await waitUntil { c.handledHotkeyEvents == 4 })
         #expect(await waitUntil { clock.sleeperCount == 3 })

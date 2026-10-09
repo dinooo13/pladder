@@ -7,7 +7,6 @@ import Testing
 
     @Test func firstObservationNeverSustains() {
         var c = SustainedCondition()
-        // Nothing is known about how long it has been true, so the answer is no.
         #expect(c.observe(true, at: t0) == false)
         #expect(c.observe(false, at: t0) == false)
     }
@@ -17,7 +16,6 @@ import Testing
         #expect(c.observe(true, at: t0) == false)
         #expect(c.observe(true, at: t0 + .seconds(2)) == false)
         #expect(c.observe(true, at: t0 + .seconds(4)) == true)
-        // And stays sustained while it keeps being true.
         #expect(c.observe(true, at: t0 + .seconds(6)) == true)
     }
 
@@ -25,7 +23,6 @@ import Testing
         var c = SustainedCondition()
         #expect(c.observe(true, at: t0) == false)
         #expect(c.observe(true, at: t0 + .seconds(4)) == true)
-        // One negative observation drops it at once and restarts the clock.
         #expect(c.observe(false, at: t0 + .seconds(6)) == false)
         #expect(c.observe(true, at: t0 + .seconds(8)) == false)
         #expect(c.observe(true, at: t0 + .seconds(10)) == false)

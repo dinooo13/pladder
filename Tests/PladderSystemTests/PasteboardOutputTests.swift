@@ -4,9 +4,9 @@ import PladderTestSupport
 import Testing
 @testable import PladderSystem
 
+// A private named pasteboard, never `.general`: the developer dictates while these run.
+
 extension PasteboardTests {
-    /// Every test writes to a private named pasteboard, never `.general`: the
-    /// developer dictates with a running Pladder while these run.
     @Suite struct PasteboardOutputTests {
         private static func namedPasteboard() -> NSPasteboard {
             NSPasteboard(name: .init("de.dinooo13.pladder.tests.\(UUID().uuidString)"))
@@ -79,8 +79,6 @@ extension PasteboardTests {
             #expect(pasteboard.string(forType: .string) == "something the user copied")
         }
 
-        // MARK: Items too large to keep
-
         @Test func aSnapshotOfOnlyOversizedItemsLeavesTheTranscript() {
             let pasteboard = Self.namedPasteboard()
             defer { pasteboard.releaseGlobally() }
@@ -93,7 +91,6 @@ extension PasteboardTests {
             let ourChangeCount = ClipboardSnapshot.write("transcript", to: pasteboard)
             snapshot.restore(ifChangeCountIs: ourChangeCount, on: pasteboard)
 
-            // Not wiped: the transcript is the lesser loss.
             #expect(pasteboard.string(forType: .string) == "transcript")
         }
 
@@ -131,10 +128,7 @@ extension PasteboardTests {
             #expect(pasteboard.string(forType: .string) == nil)
         }
 
-        // MARK: The transcript as a promise
-
-        /// Main actor: AppKit serves an in-process promise read synchronously and
-        /// warns when that happens off the main thread.
+        // AppKit serves an in-process promise read synchronously and warns off the main thread.
         @MainActor @Test func publishedTranscriptIsServedMarkedAndReportsTheRead() throws {
             let pasteboard = Self.namedPasteboard()
             defer { pasteboard.releaseGlobally() }
@@ -166,8 +160,6 @@ extension PasteboardTests {
             #expect(pasteboard.string(forType: .string) == "user text")
         }
 
-        // MARK: When the old clipboard comes back
-
         private static let posted = ContinuousClock.now
         private static func due(read: Duration?) -> Duration {
             ClipboardKeeper.restoreDue(
@@ -184,8 +176,6 @@ extension PasteboardTests {
         }
 
         @Test func aLateReadIsWaitedFor() {
-            // A busy page reads a second after Cmd+V; the old 400 ms delay alone
-            // had already put the user's clipboard back by then.
             #expect(Self.due(read: .milliseconds(1_006)) == .milliseconds(1_206))
         }
 

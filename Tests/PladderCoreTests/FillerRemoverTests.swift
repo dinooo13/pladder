@@ -10,29 +10,17 @@ import Testing
         FillerRemover(languageHint: hint).process(text)
     }
 
-    // MARK: Real words that must survive without language evidence
-
     @Test func preservesGermanUmAndSpanishEhAndUnitMillimetres() async throws {
-        // "um" is a German preposition ("at eight o'clock"), "eh" is a
-        // German colloquialism ("doesn't matter anyway"), and "mm" is the
-        // unit millimetre. None of the three is a filler here, and none has
-        // language evidence attached, so the fail-closed universal tier
-        // must leave all of them alone.
         #expect(try await run("um acht Uhr sind wir da") == "um acht Uhr sind wir da")
         #expect(try await run("das ist eh egal") == "das ist eh egal")
         #expect(try await run("5 mm lang") == "5 mm lang")
     }
 
     @Test func aGermanHintStillLeavesGermanUmAndEhAlone() async throws {
-        // The German gated tier adds nothing on top of the universal one:
-        // bare "um" and "eh" are real German words, not fillers, regardless
-        // of the language hint.
         #expect(try await run("um acht Uhr sind wir da", hint: { _ in "de" }) == "um acht Uhr sind wir da")
         #expect(try await run("das ist eh egal", hint: { _ in "de" }) == "das ist eh egal")
         #expect(try await run("5 mm lang", hint: { _ in "de" }) == "5 mm lang")
     }
-
-    // MARK: Universal tier — always removed, no hint needed
 
     @Test func removesUniversalFillers() async throws {
         let result = try await run(
@@ -118,8 +106,6 @@ import Testing
         #expect(try await run("clean already") == "clean already")
     }
 
-    // MARK: Gated tier — only removed with matching language evidence
-
     @Test func gatedEnglishFillerNeedsAnEnglishHint() async throws {
         #expect(try await run("um the meeting is at three", hint: { _ in "en" }) == "The meeting is at three")
         #expect(try await run("um the meeting is at three") == "um the meeting is at three")
@@ -135,8 +121,6 @@ import Testing
     }
 
     @Test func doesNotTreatGermanPronounErAsAnEnglishFiller() async throws {
-        // "er" is deliberately excluded from the English gated tier: it is
-        // the German pronoun "he", and a language guess is never proof.
         #expect(try await run("er said he would come", hint: { _ in "en" }) == "er said he would come")
     }
 

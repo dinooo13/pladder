@@ -2,8 +2,6 @@ import Foundation
 import Testing
 @testable import PladderCore
 
-/// Which monitor drives the coordinator, for every grant and secure input
-/// state and both kinds of chord.
 @Suite struct HotkeySourceTests {
     private let registrable = Hotkey.optionSpace
     private let modifierOnly = Hotkey.rightCommand
@@ -28,8 +26,6 @@ import Testing
     }
 
     @Test func sustainedSecureInputLeavesAChordCarbonCannotTakeOnTheTap() {
-        // Secure input does not stop a modifier-only chord on the tap, and
-        // Carbon could not register it anyway.
         #expect(HotkeySource.choose(accessibilityTrusted: true, secureInputSustained: true, hotkey: modifierOnly) == .tap)
         #expect(HotkeySource.choose(accessibilityTrusted: true, secureInputSustained: true, hotkey: withFn) == .tap)
     }

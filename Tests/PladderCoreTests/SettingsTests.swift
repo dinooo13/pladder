@@ -39,7 +39,6 @@ import Testing
         let json = #"{"engineID":"echo","polishHotkey":{"keyCodes":[59,31]}}"#
         let decoded = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
         #expect(decoded.polishDictations)
-        // The toggle stays off over a legacy chord stored empty.
         let off = try JSONDecoder().decode(Settings.self, from: Data(#"{"engineID":"echo","polishHotkey":{"keyCodes":[]}}"#.utf8))
         #expect(!off.polishDictations)
     }
@@ -51,8 +50,6 @@ import Testing
             #expect(Self.backups(beside: url).count == 1)
         }
     }
-
-    // MARK: Lenient decoding (a throw moves the file aside and empties the dictionary)
 
     private static let entryJSON = #"{"id":"6E36117C-6200-4C7E-BFB8-6FA228542578","from":"a","to":"b","matchCase":false}"#
 
@@ -102,8 +99,6 @@ import Testing
         let json = #"{"engineID":"echo","appearance":"someFutureCase","dictionary":[\#(Self.entryJSON)]}"#
         try withStore(file: json) { store, url in
             #expect(store.load().dictionary.count == 1)
-            // The original stays where it is; the copy is the safety net for the
-            // next save, which writes the default over the dropped value.
             #expect(FileManager.default.fileExists(atPath: url.path))
             #expect(Self.backups(beside: url).count == 1)
         }
@@ -127,8 +122,6 @@ import Testing
         }
     }
 
-    // MARK: Keys this build does not know
-
     @Test func savingKeepsKeysANewerBuildWrote() throws {
         try withStore(file: #"{"engineID":"echo","someFutureSetting":{"on":true},"playSounds":false}"#) { store, url in
             var settings = store.load()
@@ -149,7 +142,6 @@ import Testing
             let object = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
             #expect(object["launchAtLogin"] == nil)
             #expect(object["polishHotkey"] == nil)
-            // The migration's result is what is stored now.
             #expect(object["polishDictations"] as? Bool == true)
         }
     }

@@ -3,11 +3,8 @@ import PladderTestSupport
 import Testing
 @testable import PladderRefine
 
-// No network: the first three download a local file through the real
-// URLSession transport, the rest use a stand-in for it.
+// No network: a local file through the real URLSession transport, or a stand-in.
 
-/// Stands in for URLSession: every fetch runs `behaviour` with its number
-/// (from 1) and the resume data it was given, which are kept.
 private actor StandInTransport: ModelFileTransport {
     typealias Behaviour = @Sendable (_ call: Int, _ resume: Data?, _ staging: URL) async throws -> Void
 
@@ -34,7 +31,6 @@ private actor StandInTransport: ModelFileTransport {
         return url
     }
 
-    /// "weights", pinned: its SHA-256 and its seven bytes.
     private func weights(in dir: URL) -> ModelFile {
         ModelFile(
             fileName: "model.gguf", url: dir.appending(path: "source.bin"),
@@ -84,8 +80,6 @@ private actor StandInTransport: ModelFileTransport {
         #expect(await files.finished(file) == .failed(.download))
     }
 
-    // Before: any file at the path was ready, a truncated one included,
-    // and was handed to llama.cpp.
     @Test func aFileOfTheWrongSizeIsNotReady() async throws {
         let dir = try scratchDirectory("ModelFilesTests")
         defer { try? FileManager.default.removeItem(at: dir) }
@@ -125,8 +119,6 @@ private actor StandInTransport: ModelFileTransport {
         let started = Gate()
         let transport = StandInTransport { call, _, staging in
             if call == 1 {
-                // Part of the file, then a wait a cancel ends at once; a
-                // cancel that stops nothing sits it out.
                 try Data("wei".utf8).write(to: staging)
                 await started.open()
                 try await Task.sleep(for: .seconds(3))
@@ -146,7 +138,6 @@ private actor StandInTransport: ModelFileTransport {
         #expect(!FileManager.default.fileExists(atPath: files.location(of: file).path))
         #expect(try contents(of: models).isEmpty)
 
-        // The next ensure starts over.
         await files.ensure(file)
         #expect(await files.finished(file) == .ready)
         #expect(await transport.resumes == [nil, nil])
@@ -186,7 +177,6 @@ private actor StandInTransport: ModelFileTransport {
         #expect(try contents(of: models).isEmpty)
     }
 
-    // The resume data points at a signed CDN link that has expired.
     @Test func aResumeTheServerRefusesStartsOverOnce() async throws {
         let dir = try scratchDirectory("ModelFilesTests")
         defer { try? FileManager.default.removeItem(at: dir) }

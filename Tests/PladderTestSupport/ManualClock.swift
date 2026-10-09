@@ -1,11 +1,6 @@
 import Foundation
 import Synchronization
 
-/// A clock that only moves when a test says so. Sleepers wake when
-/// `advance(by:)` carries `now` past their deadline, and at once when their
-/// task is cancelled, so a timer can be fired, or proven not to fire, without
-/// the test waiting for it. Its instants are `ContinuousClock`'s, so code that
-/// stores them, as the paste does, takes this clock in place of the real one.
 public final class ManualClock: Clock, Sendable {
     public typealias Instant = ContinuousClock.Instant
 
@@ -19,7 +14,6 @@ public final class ManualClock: Clock, Sendable {
         var now: Instant
         var nextID = 0
         var sleepers: [Sleeper] = []
-        /// Sleeps cancelled before they got as far as waiting.
         var cancelled: Set<Int> = []
     }
 
@@ -34,15 +28,9 @@ public final class ManualClock: Clock, Sendable {
 
     public var now: Instant { state.withLock { $0.now } }
     public var minimumResolution: Duration { .zero }
-
-    /// Deadlines somebody is asleep until right now.
     public var deadlines: [Instant] { state.withLock { $0.sleepers.map(\.deadline) } }
-
-    /// How many sleeps are waiting, so a test can know a timer is armed
-    /// before it advances past it.
     public var sleeperCount: Int { state.withLock { $0.sleepers.count } }
 
-    /// Moves time on and wakes everyone whose deadline it reached.
     public func advance(by duration: Duration) {
         let due = state.withLock { state -> [Sleeper] in
             state.now += duration
@@ -54,7 +42,6 @@ public final class ManualClock: Clock, Sendable {
         for sleeper in due { sleeper.continuation.resume() }
     }
 
-    /// Advances to `start + offset`.
     public func advance(to offset: Duration) {
         advance(by: start + offset - now)
     }
@@ -86,16 +73,12 @@ public final class ManualClock: Clock, Sendable {
         }
     }
 
-    /// Waits, in real time but briefly, until somebody sleeps until
-    /// `start + offset`: a detached task has reached its wait.
     public func waitForSleeper(at offset: Duration) async -> Bool {
         let deadline = start + offset
         return await eventually { self.deadlines.contains(deadline) }
     }
 }
 
-/// Polls `condition` for up to about two seconds of real time, a millisecond
-/// at a time, for what a detached task does on its own schedule.
 public func eventually(_ condition: @Sendable () async -> Bool) async -> Bool {
     for _ in 0..<2_000 {
         if await condition() { return true }

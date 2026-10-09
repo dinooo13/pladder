@@ -2,9 +2,8 @@ import Foundation
 import Testing
 @testable import PladderSystem
 
-/// Nothing here reads the live focused element: the developer dictates with a
-/// running Pladder while these run, and a test harness launched from a
-/// trusted terminal would be trusted too. The grant is stubbed instead.
+// Never reads the live focused element: the developer dictates while these run, and
+// a harness launched from a trusted terminal is trusted too. The grant is stubbed.
 @Suite(.timeLimit(.minutes(1))) struct AXPasteObserverTests {
     @Test func returnsNilPromptlyWithoutAccessibility() async {
         let observer = AXPasteObserver(isTrusted: { false })
@@ -14,9 +13,6 @@ import Testing
         #expect(ContinuousClock.now - started < .milliseconds(100))
     }
 
-    /// Chromium's tree is asked for only where it is missing: no focus at
-    /// all, or a bare web area. An app that already exposes a focus of its
-    /// own (Finder, a terminal, a button) is left as it is.
     @Test func manualAccessibilityOnlyWhereTheTreeIsMissing() {
         #expect(AXPasteObserver.wantsManualAccessibility(hasFocus: false, focusedRole: nil))
         #expect(AXPasteObserver.wantsManualAccessibility(hasFocus: true, focusedRole: "AXWebArea"))
@@ -24,7 +20,6 @@ import Testing
         #expect(!AXPasteObserver.wantsManualAccessibility(hasFocus: true, focusedRole: "AXOutline"))
         #expect(!AXPasteObserver.wantsManualAccessibility(hasFocus: true, focusedRole: "AXButton"))
         #expect(!AXPasteObserver.wantsManualAccessibility(hasFocus: true, focusedRole: nil))
-        // A secure field is a text field's role with a subrole: never asked.
         #expect(!AXPasteObserver.wantsManualAccessibility(hasFocus: true, focusedRole: "AXTextField"))
     }
 
@@ -32,7 +27,6 @@ import Testing
         let window = PasteWindow(start: 1_000, length: 20, characterCount: 5_000)
         #expect(window.windowStart == 1_000 - 64)
         #expect(window.windowEnd == 1_020 + 64)
-        // A long paste gets a quarter of its length either side.
         let long = PasteWindow(start: 1_000, length: 800, characterCount: 5_000)
         #expect(long.windowStart == 800)
         #expect(long.windowEnd == 2_000)
@@ -46,13 +40,9 @@ import Testing
 
     @Test func theWindowFollowsTheFieldsLength() {
         let window = PasteWindow(start: 100, length: 20, characterCount: 184)
-        // One character added by the correction.
         #expect(window.readRange(characterCount: 185).length == window.anchorRange.length + 1)
-        // Two removed.
         #expect(window.readRange(characterCount: 182).length == window.anchorRange.length - 2)
-        // The field emptied: nothing to read, not a negative range.
         #expect(window.readRange(characterCount: 0).length == 0)
-        // Typing on after the paste grows the read, but only so far.
         let size = window.anchorRange.length
         #expect(window.readRange(characterCount: 1_000_000).length == 2 * size + 1_024)
     }

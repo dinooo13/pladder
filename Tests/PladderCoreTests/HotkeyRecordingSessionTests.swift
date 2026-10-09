@@ -2,7 +2,6 @@ import Foundation
 import Testing
 @testable import PladderCore
 
-/// One chord recorder at a time, and the hotkey back only when none records.
 @Suite struct HotkeyRecordingSessionTests {
     typealias Session = HotkeyRecordingSession<String>
 
@@ -19,8 +18,6 @@ import Testing
         _ = s.begin("A")
         #expect(s.begin("B") == .init(displaced: "A", suspends: false))
         #expect(s.isSuspended)
-        // The displaced recorder's own end, which its cancel triggers, is
-        // not the one that resumes.
         #expect(s.end("A") == false)
         #expect(s.isSuspended)
         #expect(s.end("B") == true)
@@ -36,8 +33,6 @@ import Testing
     }
 
     @Test func anEndWithNothingRecordingIsANoOp() {
-        // A field that disappears cancels its recorder whether or not it was
-        // recording.
         var s = Session()
         #expect(s.end("A") == false)
         #expect(!s.isSuspended)

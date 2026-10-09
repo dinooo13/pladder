@@ -16,8 +16,6 @@ import Testing
     }
 
     @Test func selfReferenceIsNotACycle() {
-        // Each rule runs once, so a replacement that contains its own
-        // trigger is applied once and never revisited.
         let expand = DictionaryEntry(from: "claude", to: "Claude Code")
         let recase = DictionaryEntry(from: "iphone", to: "iPhone")
         #expect(DictionaryEntry.cyclicIDs(in: [expand, recase]).isEmpty)
@@ -39,8 +37,6 @@ import Testing
     }
 
     @Test func matchingIsWholeWordAndCaseInsensitive() {
-        // "cab" contains "a" and "b" as substrings but not as whole words,
-        // so it must not create a spurious edge.
         let a = DictionaryEntry(from: "a", to: "cab")
         let b = DictionaryEntry(from: "b", to: "A")
         #expect(DictionaryEntry.cyclicIDs(in: [a, b]).isEmpty)
@@ -51,7 +47,6 @@ import Testing
         let b = DictionaryEntry(from: "b", to: "a")
         let unrelated = DictionaryEntry(from: "claude code", to: "Claude Code")
         let replacer = DictionaryReplacer(entries: [a, b, unrelated])
-        // The cyclic pair is dropped entirely; the unrelated rule still runs.
         #expect(replacer.apply(to: "a b claude code") == "a b Claude Code")
     }
 }
