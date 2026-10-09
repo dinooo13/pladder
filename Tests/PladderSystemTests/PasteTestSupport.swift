@@ -2,7 +2,13 @@ import AppKit
 import Foundation
 import PladderTestSupport
 import Synchronization
+import Testing
 @testable import PladderSystem
+
+/// Every test that touches a real pasteboard runs here, one at a time. Each
+/// pasteboard call is a synchronous XPC round trip to pboard, and dozens at once
+/// wedged pboard on the CI runner: every test thread waited for a reply forever.
+@Suite(.serialized, .timeLimit(.minutes(1))) enum PasteboardTests {}
 
 extension ManualClock {
     var pasteClock: PasteClock {
