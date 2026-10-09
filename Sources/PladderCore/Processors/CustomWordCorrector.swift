@@ -30,7 +30,7 @@ public struct CustomWordCorrector: TextProcessor {
     private struct Key: Sendable {
         let bytes: [UInt8]
         let soundex: [UInt8]
-        let term: Int
+        let termIndex: Int
     }
 
     public init(
@@ -46,13 +46,13 @@ public struct CustomWordCorrector: TextProcessor {
             guard !text.isEmpty else { continue }
             guard let primary = Self.key(for: text), !primary.isEmpty else { continue }
 
-            let term = built.count
+            let termIndex = built.count
             built.append(Term(text: text, isLowercase: text == text.lowercased()))
-            keys.append(Key(bytes: primary, soundex: Self.soundex(primary), term: term))
+            keys.append(Key(bytes: primary, soundex: Self.soundex(primary), termIndex: termIndex))
             if text.contains("&") {
                 let spelled = text.replacingOccurrences(of: "&", with: "and")
                 if let expanded = Self.key(for: spelled), !expanded.isEmpty, expanded != primary {
-                    keys.append(Key(bytes: expanded, soundex: Self.soundex(expanded), term: term))
+                    keys.append(Key(bytes: expanded, soundex: Self.soundex(expanded), termIndex: termIndex))
                 }
             }
         }
@@ -145,7 +145,7 @@ public struct CustomWordCorrector: TextProcessor {
         guard lower <= upper else { return nil }
 
         var bestScore = Self.threshold
-        var bestTerm: Int?
+        var bestTermIndex: Int?
         let candidateSoundex = Self.soundex(candidate)
 
         for bucket in lower...upper {
@@ -156,14 +156,14 @@ public struct CustomWordCorrector: TextProcessor {
                     key: key,
                     rows: &rows
                 ) else { continue }
-                if score < bestScore || (bestTerm != nil && score == bestScore && key.term < bestTerm!) {
+                if score < bestScore || (bestTermIndex != nil && score == bestScore && key.termIndex < bestTermIndex!) {
                     bestScore = score
-                    bestTerm = key.term
+                    bestTermIndex = key.termIndex
                 }
             }
         }
-        guard let bestTerm else { return nil }
-        return (bestScore, terms[bestTerm])
+        guard let bestTermIndex else { return nil }
+        return (bestScore, terms[bestTermIndex])
     }
 
     private static func score(

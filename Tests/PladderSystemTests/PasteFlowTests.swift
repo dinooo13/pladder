@@ -326,14 +326,14 @@ extension PasteboardTests {
             try await h.output.insert("transcript", submit: false)
             await h.restoreFallsDue()
             #expect(h.holdsTranscript)
-            #expect(await h.output.keeper.leftPromise != nil)
+            #expect(await h.output.keeper.leftBehindPromise != nil)
             let before = await h.output.keeper.snapshotsTaken
             await h.output.prepare()
             #expect(await h.output.keeper.snapshotsTaken == before)
 
             h.userCopies("new")
             try await h.output.insert("again", submit: false)
-            #expect(await h.output.keeper.leftPromise == nil)
+            #expect(await h.output.keeper.leftBehindPromise == nil)
         }
     }
 }

@@ -36,7 +36,7 @@ actor ClipboardKeeper {
     // A transcript a restore had to leave, because every item of the user's clipboard
     // was too large to keep: its promise must still be served, and the next snapshot
     // must not read it back as the user's.
-    private var left: (snapshot: ClipboardSnapshot, changeCount: Int, promise: TranscriptPromise)?
+    private var leftBehind: (snapshot: ClipboardSnapshot, changeCount: Int, promise: TranscriptPromise)?
 
     // Reading every representation can take tens of milliseconds, so it happens here,
     // while the user is still speaking.
@@ -76,7 +76,7 @@ actor ClipboardKeeper {
         let now = pasteboard.changeCount
         // While our transcript is still on the pasteboard, the user's clipboard is the
         // pending snapshot. Capturing would only read our own promise, off the main thread.
-        if pending?.changeCount == now || left?.changeCount == now {
+        if pending?.changeCount == now || leftBehind?.changeCount == now {
             prepared = nil
             return
         }
@@ -94,8 +94,8 @@ actor ClipboardKeeper {
         let prep = prepared
         prepared = nil
         let now = pasteboard.changeCount
-        let leftOver = left
-        left = nil
+        let leftOver = leftBehind
+        leftBehind = nil
         if let leftOver, leftOver.changeCount == now { return leftOver.snapshot }
         if let carried = pending {
             endPending()
@@ -138,7 +138,7 @@ actor ClipboardKeeper {
     func copy(_ text: String) {
         endPending()
         prepared = nil
-        left = nil
+        leftBehind = nil
         _ = ClipboardSnapshot.write(text, to: pasteboard)
     }
 
@@ -225,7 +225,7 @@ actor ClipboardKeeper {
     private func restore(_ done: Pending) {
         done.snapshot.restore(ifChangeCountIs: done.changeCount, on: pasteboard)
         if pasteboard.changeCount == done.changeCount {
-            left = (done.snapshot, done.changeCount, done.promise)
+            leftBehind = (done.snapshot, done.changeCount, done.promise)
         }
     }
 
@@ -270,7 +270,7 @@ actor ClipboardKeeper {
 
     var pendingRestore: Task<Void, Never>? { pending?.task }
     var pendingPromise: TranscriptPromise? { pending?.promise }
-    var leftPromise: TranscriptPromise? { left?.promise }
+    var leftBehindPromise: TranscriptPromise? { leftBehind?.promise }
 }
 
 struct PasteClock: Sendable {

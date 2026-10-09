@@ -170,7 +170,7 @@ public final class AXPasteObserver: PastedTextObserver, @unchecked Sendable {
                 else { continue }
                 return Anchor(
                     pasted: variant,
-                    window: PasteWindow(start: start, length: length, characterCount: count))
+                    window: PasteWindow(pasteStart: start, pasteLength: length, fieldLength: count))
             }
         }
         return nil
@@ -267,7 +267,7 @@ public final class AXPasteObserver: PastedTextObserver, @unchecked Sendable {
 
         private func read() {
             guard let count = Reader.characterCount(element),
-                  let text = Reader.string(element, in: window.readRange(characterCount: count)),
+                  let text = Reader.string(element, in: window.readRange(fieldLength: count)),
                   text != readings.last else { return }
             readings.append(text)
             if readings.count > Self.maximumReadings { readings.removeFirst() }
@@ -306,22 +306,23 @@ public final class AXPasteObserver: PastedTextObserver, @unchecked Sendable {
 
 // In UTF-16 units, which AX ranges count in.
 struct PasteWindow: Equatable {
-    let start: Int
-    let length: Int
-    let characterCount: Int
+    let pasteStart: Int
+    let pasteLength: Int
+    let fieldLengthAtPaste: Int
     let windowStart: Int
     let windowEnd: Int
+
     static let minimumMargin = 64
     static let marginDivisor = 4
     static let growthAllowance = 1_024
 
-    init(start: Int, length: Int, characterCount: Int) {
-        self.start = start
-        self.length = length
-        self.characterCount = characterCount
-        let margin = max(Self.minimumMargin, length / Self.marginDivisor)
-        windowStart = max(0, start - margin)
-        windowEnd = min(characterCount, start + length + margin)
+    init(pasteStart: Int, pasteLength: Int, fieldLength: Int) {
+        self.pasteStart = pasteStart
+        self.pasteLength = pasteLength
+        fieldLengthAtPaste = fieldLength
+        let margin = max(Self.minimumMargin, pasteLength / Self.marginDivisor)
+        windowStart = max(0, pasteStart - margin)
+        windowEnd = min(fieldLength, pasteStart + pasteLength + margin)
     }
 
     var anchorRange: CFRange {
@@ -330,9 +331,9 @@ struct PasteWindow: Equatable {
 
     // The end follows the field's length, taking edits to be corrections inside the
     // window, up to twice its size plus `growthAllowance`: never a whole document.
-    func readRange(characterCount count: Int) -> CFRange {
+    func readRange(fieldLength: Int) -> CFRange {
         let size = windowEnd - windowStart
-        let end = min(count, windowEnd + (count - characterCount), windowStart + 2 * size + Self.growthAllowance)
+        let end = min(fieldLength, windowEnd + (fieldLength - fieldLengthAtPaste), windowStart + 2 * size + Self.growthAllowance)
         return CFRange(location: windowStart, length: max(0, end - windowStart))
     }
 
@@ -344,12 +345,12 @@ struct PasteWindow: Equatable {
 
     func split(_ text: String) -> Split? {
         let ns = text as NSString
-        let head = start - windowStart
-        guard ns.length == windowEnd - windowStart, head >= 0, head + length <= ns.length else { return nil }
+        let head = pasteStart - windowStart
+        guard ns.length == windowEnd - windowStart, head >= 0, head + pasteLength <= ns.length else { return nil }
         return Split(
             before: ns.substring(to: head),
-            pasted: ns.substring(with: NSRange(location: head, length: length)),
-            after: ns.substring(from: head + length))
+            pasted: ns.substring(with: NSRange(location: head, length: pasteLength)),
+            after: ns.substring(from: head + pasteLength))
     }
 }
 

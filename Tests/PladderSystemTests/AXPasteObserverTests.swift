@@ -24,35 +24,35 @@ import Testing
     }
 
     @Test func theWindowIsThePastePlusAMargin() {
-        let window = PasteWindow(start: 1_000, length: 20, characterCount: 5_000)
+        let window = PasteWindow(pasteStart: 1_000, pasteLength: 20, fieldLength: 5_000)
         #expect(window.windowStart == 1_000 - 64)
         #expect(window.windowEnd == 1_020 + 64)
-        let long = PasteWindow(start: 1_000, length: 800, characterCount: 5_000)
+        let long = PasteWindow(pasteStart: 1_000, pasteLength: 800, fieldLength: 5_000)
         #expect(long.windowStart == 800)
         #expect(long.windowEnd == 2_000)
     }
 
     @Test func theWindowIsClampedToTheField() {
-        let window = PasteWindow(start: 3, length: 10, characterCount: 13)
+        let window = PasteWindow(pasteStart: 3, pasteLength: 10, fieldLength: 13)
         #expect(window.anchorRange.location == 0)
         #expect(window.anchorRange.length == 13)
     }
 
     @Test func theWindowFollowsTheFieldsLength() {
-        let window = PasteWindow(start: 100, length: 20, characterCount: 184)
-        #expect(window.readRange(characterCount: 185).length == window.anchorRange.length + 1)
-        #expect(window.readRange(characterCount: 182).length == window.anchorRange.length - 2)
-        #expect(window.readRange(characterCount: 0).length == 0)
+        let window = PasteWindow(pasteStart: 100, pasteLength: 20, fieldLength: 184)
+        #expect(window.readRange(fieldLength: 185).length == window.anchorRange.length + 1)
+        #expect(window.readRange(fieldLength: 182).length == window.anchorRange.length - 2)
+        #expect(window.readRange(fieldLength: 0).length == 0)
         let size = window.anchorRange.length
-        #expect(window.readRange(characterCount: 1_000_000).length == 2 * size + 1_024)
+        #expect(window.readRange(fieldLength: 1_000_000).length == 2 * size + 1_024)
     }
 
     @Test func theAnchorWindowSplitsIntoMarginPasteMargin() throws {
         let text = "Dear Bob, I tried Claud today Best"
         let start = ("Dear Bob, " as NSString).length
         let window = PasteWindow(
-            start: start, length: ("I tried Claud today " as NSString).length,
-            characterCount: (text as NSString).length)
+            pasteStart: start, pasteLength: ("I tried Claud today " as NSString).length,
+            fieldLength: (text as NSString).length)
         let split = try #require(window.split(text))
         #expect(split.before == "Dear Bob, ")
         #expect(split.pasted == "I tried Claud today ")
