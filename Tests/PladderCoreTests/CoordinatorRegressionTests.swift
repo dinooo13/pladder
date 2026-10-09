@@ -176,6 +176,36 @@ import Testing
         #expect(second.lastHotkey == .rightOption)
     }
 
+    // MARK: The output muter
+
+    @Test func eachRecordingsEndNamesItsOwnStart() async {
+        let muter = FakeOutputMuter()
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
+        settings.muteOutputWhileDictating = true
+        let (c, _, _) = makeCoordinator(settings: settings, outputMuter: muter)
+        c.start()
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed()
+        c.hotkeyReleased()
+        await c.inFlight?.value
+        await c.hotkeyPressed()
+        await c.cancelRecording()
+        #expect(await waitUntil { muter.endedCount == 2 })
+        #expect(muter.startedSessions.count == 2)
+        #expect(Set(muter.startedSessions) == Set(muter.endedSessions))
+        #expect(muter.startedSessions[0] < muter.startedSessions[1])
+    }
+
+    @Test func theRealControllerNeverMutesForAnEndThatOvertookItsStart() async {
+        // The two tasks the coordinator fires are unordered; this is the
+        // order that once left the speakers muted for good.
+        let control = RecordingMuteControl()
+        let muter = OutputMuteController(control: control, delay: .milliseconds(1))
+        await muter.recordingEnded(session: 1)
+        await muter.recordingStarted(session: 1)
+        #expect(control.applied.isEmpty)
+    }
+
     // MARK: Quitting
 
     @Test func shutdownWhileRecordingGivesBackTheSpeakersAndTheClipboard() async {
@@ -358,6 +388,16 @@ import Testing
         await c.inFlight?.value
         #expect(output.inserted.count == 1)
     }
+}
+
+/// A device with one unmuted channel, recording every change made to it.
+private final class RecordingMuteControl: OutputMuteControl, @unchecked Sendable {
+    private let lock = NSLock()
+    private var _applied: [MuteState] = []
+    var applied: [MuteState] { lock.withLock { _applied } }
+    func defaultOutputDevice() -> UInt32? { 7 }
+    func muteState(of device: UInt32) -> MuteState? { MuteState([1: false]) }
+    func apply(_ state: MuteState, to device: UInt32) throws { lock.withLock { _applied.append(state) } }
 }
 
 private final class Counter: @unchecked Sendable {

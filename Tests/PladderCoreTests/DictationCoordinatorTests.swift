@@ -159,18 +159,21 @@ final class FakeRefiner: TranscriptRefiner, @unchecked Sendable {
     }
 }
 
-/// Counts the two calls the coordinator makes. The real controller's timing
-/// is tested on its own; what matters here is that both ends are called, from
-/// every path that ends a recording.
+/// Records the two calls the coordinator makes and the session each names.
+/// The real controller's ordering rules are tested on their own; what
+/// matters here is that both ends are called, from every path that ends a
+/// recording, and that an end names the session its start named.
 final class FakeOutputMuter: OutputMuter, @unchecked Sendable {
     private let lock = NSLock()
-    private var _startedCount = 0
-    private var _endedCount = 0
-    var startedCount: Int { lock.withLock { _startedCount } }
-    var endedCount: Int { lock.withLock { _endedCount } }
+    private var _started: [Int] = []
+    private var _ended: [Int] = []
+    var startedSessions: [Int] { lock.withLock { _started } }
+    var endedSessions: [Int] { lock.withLock { _ended } }
+    var startedCount: Int { startedSessions.count }
+    var endedCount: Int { endedSessions.count }
 
-    func recordingStarted() async { lock.withLock { _startedCount += 1 } }
-    func recordingEnded() async { lock.withLock { _endedCount += 1 } }
+    func recordingStarted(session: Int) async { lock.withLock { _started.append(session) } }
+    func recordingEnded(session: Int) async { lock.withLock { _ended.append(session) } }
 }
 
 /// Fails `load()` a set number of times, then succeeds.

@@ -24,23 +24,6 @@ public protocol OutputMuter: Sendable {
     /// the newest seen does nothing.
     func recordingEnded(session: Int) async
 
-    /// Transitional, for the coordinator until it numbers its recordings:
-    /// the session-less pair, a start opening the next session and an end
-    /// closing the newest. Remove with the defaults below once nothing calls
-    /// it.
-    func recordingStarted() async
-    /// Transitional; see `recordingStarted()`.
-    func recordingEnded() async
-}
-
-/// Transitional defaults, so a conformer written against either pair still
-/// conforms. The session pair forwards to the session-less one, which does
-/// nothing by default, so neither can recurse into the other.
-extension OutputMuter {
-    public func recordingStarted(session: Int) async { await recordingStarted() }
-    public func recordingEnded(session: Int) async { await recordingEnded() }
-    public func recordingStarted() async {}
-    public func recordingEnded() async {}
 }
 
 /// The mute switches of one output device, element → muted. Element 0 is the
