@@ -2,11 +2,6 @@ import Foundation
 import Testing
 @testable import PladderCore
 
-private let rightOption: UInt16 = 0x3D
-private let leftOption: UInt16 = 0x3A
-private let rightCommand: UInt16 = 0x36
-private let space: UInt16 = 0x31
-
 /// The coordinator's hotkey loop without the coordinator: keyboard
 /// transitions go into a `HotkeyChordSet`, every event it reports goes
 /// through a `HotkeyGestureTracker` in the order reported, and what comes out
