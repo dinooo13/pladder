@@ -421,6 +421,16 @@ extension DictationCoordinator {
         hotkeyReleased(submit: submit)
         await inFlight?.value
     }
+
+    func press(_ hotkey: FakeHotkey, sourceLocation: SourceLocation = #_sourceLocation) async {
+        hotkey.press()
+        #expect(await waitUntil { self.state.isRecording }, sourceLocation: sourceLocation)
+    }
+
+    func cycleFinished(sourceLocation: SourceLocation = #_sourceLocation) async {
+        #expect(await waitUntil { self.inFlight != nil }, sourceLocation: sourceLocation)
+        await inFlight?.value
+    }
 }
 
 /// Records the coordinator's events by name, for assertions about order.
@@ -526,8 +536,7 @@ final class EventLog: @unchecked Sendable {
         let events = EventLog()
         let (c, output, capture) = makeCoordinator(hotkeyMonitor: hotkey, events: events)
         await c.startIdle()
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
         hotkey.cancel()
         #expect(await waitUntil { c.state == .idle })
         #expect(await capture.stopCount == 1)
@@ -543,8 +552,7 @@ final class EventLog: @unchecked Sendable {
         let b = FakeHotkey()
         let (c, output, capture) = makeCoordinator(hotkeyMonitor: a)
         await c.startIdle()
-        a.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(a)
         c.replaceHotkeyMonitor(b)
         #expect(await waitUntil { c.state == .idle })
         #expect(await capture.stopCount == 1)
@@ -554,8 +562,7 @@ final class EventLog: @unchecked Sendable {
         // The old monitor is stopped, so its stream is over; only the new one
         // drives the machine.
         #expect(a.stopCount >= 1)
-        b.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(b)
         await c.cancelRecording()
     }
 
@@ -569,8 +576,7 @@ final class EventLog: @unchecked Sendable {
         #expect(b.startCount == 0)
         c.isHotkeySuspended = false
         #expect(b.startCount == 1)
-        b.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(b)
         await c.cancelRecording()
     }
 
@@ -596,8 +602,7 @@ final class EventLog: @unchecked Sendable {
         let fake = FakeHotkey()
         let (c, output, capture) = makeCoordinator(hotkeyMonitor: fake)
         await c.startIdle()
-        fake.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(fake)
         c.hotkeyOverride = Self.standIn
         #expect(await waitUntil { c.state == .idle })
         #expect(await capture.stopCount == 1)
@@ -615,8 +620,7 @@ final class EventLog: @unchecked Sendable {
         c.hotkeyOverride = nil
         #expect(fake.startCount == 2)
         #expect(fake.lastHotkey == c.settings.hotkey)
-        fake.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(fake)
         await c.cancelRecording()
     }
 
@@ -752,11 +756,9 @@ final class EventLog: @unchecked Sendable {
         let hotkey = FakeHotkey()
         let (c, output, _) = makeCoordinator(hotkeyMonitor: hotkey)
         await c.startIdle()
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
         hotkey.release(submit: true)
-        #expect(await waitUntil { c.inFlight != nil })
-        await c.inFlight?.value
+        await c.cycleFinished()
         #expect(output.submitted == [true])
         #expect(output.inserted.count == 1)
     }
@@ -796,8 +798,7 @@ final class EventLog: @unchecked Sendable {
         #expect(await capture.stopCount == 1)
         #expect(output.inserted.isEmpty)
         c.isHotkeySuspended = false
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
     }
 
     @Test func dictionaryChangeAfterStartIsUsedByTheNextDictation() async {
@@ -957,8 +958,7 @@ final class EventLog: @unchecked Sendable {
             let muter = FakeOutputMuter()
             let (c, _, _) = makeCoordinator(settings: settings, hotkeyMonitor: hotkey, outputMuter: muter)
             await c.startIdle()
-            hotkey.press()
-            #expect(await waitUntil { c.state.isRecording })
+            await c.press(hotkey)
             await discard(c, hotkey)
             #expect(await waitUntil { muter.endedCount == 1 })
         }
@@ -987,11 +987,9 @@ final class EventLog: @unchecked Sendable {
             engineText: Self.sentence, settings: Self.settings(),
             hotkeyMonitor: hotkey, refiner: refiner, events: events)
         await c.startIdle()
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
         hotkey.release()
-        #expect(await waitUntil { c.inFlight != nil })
-        await c.inFlight?.value
+        await c.cycleFinished()
         #expect(output.inserted == ["polished "])
         #expect(refiner.calls == [Self.sentence])
         #expect(c.lastTranscript?.text == "polished")
@@ -1006,12 +1004,10 @@ final class EventLog: @unchecked Sendable {
             engineText: Self.sentence, settings: Self.settings(polish: false),
             hotkeyMonitor: hotkey, refiner: refiner, events: events)
         await c.startIdle()
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
         #expect(!c.willPolish)
         hotkey.release()
-        #expect(await waitUntil { c.inFlight != nil })
-        await c.inFlight?.value
+        await c.cycleFinished()
         #expect(output.inserted == [Self.sentence + " "])
         #expect(refiner.calls.isEmpty)
         #expect(refiner.prepareCount == 0)
@@ -1139,8 +1135,7 @@ final class EventLog: @unchecked Sendable {
         #expect(await waitUntil { c.handledHotkeyEvents == 3 })
         #expect(c.state.isRecording)
         hotkey.release(.dictate)
-        #expect(await waitUntil { c.inFlight != nil })
-        await c.inFlight?.value
+        await c.cycleFinished()
         #expect(output.inserted == [Self.sentence + " "])
         #expect(refiner.calls.isEmpty)
     }
@@ -1151,8 +1146,7 @@ final class EventLog: @unchecked Sendable {
         let (c, output, capture) = makeCoordinator(
             engineText: Self.sentence, settings: Self.settings(), hotkeyMonitor: hotkey, refiner: refiner)
         await c.startIdle()
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
         hotkey.cancel()
         #expect(await waitUntil { c.state == .idle })
         #expect(await capture.stopCount == 1)
@@ -1166,11 +1160,9 @@ final class EventLog: @unchecked Sendable {
         let (c, output, _) = makeCoordinator(
             engineText: Self.sentence, settings: Self.settings(), hotkeyMonitor: hotkey, refiner: FakeRefiner())
         await c.startIdle()
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
         hotkey.release(submit: true)
-        #expect(await waitUntil { c.inFlight != nil })
-        await c.inFlight?.value
+        await c.cycleFinished()
         #expect(output.inserted == ["polished "])
         #expect(output.submitted == [true])
     }
@@ -1211,15 +1203,13 @@ final class EventLog: @unchecked Sendable {
         c.holdThreshold = .seconds(2)
         await c.startIdle()
         #expect(hotkey.lastChords == [.dictate: .optionSpace])
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
         hotkey.release()
         #expect(await waitUntil { c.isLatched })
         #expect(c.state.isRecording)
         // A step past the release, well outside the bounce window.
         hotkey.press()
-        #expect(await waitUntil { c.inFlight != nil })
-        await c.inFlight?.value
+        await c.cycleFinished()
         #expect(output.inserted.count == 1)
         #expect(!c.isLatched)
         // The closing press's release arrives in idle and does nothing.
@@ -1233,12 +1223,10 @@ final class EventLog: @unchecked Sendable {
         let (c, output, _) = makeCoordinator(settings: hybridSettings(), hotkeyMonitor: hotkey)
         c.holdThreshold = .milliseconds(20)
         await c.startIdle()
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
         // A step (100 ms) is longer than the threshold: a hold.
         hotkey.release()
-        #expect(await waitUntil { c.inFlight != nil })
-        await c.inFlight?.value
+        await c.cycleFinished()
         #expect(output.inserted.count == 1)
         #expect(!c.isLatched)
     }
@@ -1273,8 +1261,7 @@ final class EventLog: @unchecked Sendable {
         #expect(await waitUntil { c.isLatched })
         #expect(c.state.isRecording)
         hotkey.press(.toggle)
-        #expect(await waitUntil { c.inFlight != nil })
-        await c.inFlight?.value
+        await c.cycleFinished()
         #expect(output.inserted.count == 1)
     }
 
@@ -1282,8 +1269,7 @@ final class EventLog: @unchecked Sendable {
         let hotkey = FakeHotkey()
         let (c, output, _) = makeCoordinator(settings: separateSettings(), hotkeyMonitor: hotkey)
         await c.startIdle()
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
         hotkey.release()
         #expect(await waitUntil { c.inFlight != nil })
         #expect(!c.isLatched)
@@ -1300,8 +1286,7 @@ final class EventLog: @unchecked Sendable {
         hotkey.release(.toggle)
         #expect(await waitUntil { c.isLatched })
         hotkey.press()
-        #expect(await waitUntil { c.inFlight != nil })
-        await c.inFlight?.value
+        await c.cycleFinished()
         #expect(output.inserted.count == 1)
     }
 
@@ -1330,8 +1315,7 @@ final class EventLog: @unchecked Sendable {
         await c.startIdle()
         // Not a second chord Carbon could not register: the stand-in is hybrid.
         #expect(hotkey.lastChords == [.dictate: .optionSpace])
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
         hotkey.release()
         #expect(await waitUntil { c.isLatched })
         await c.cancelRecording()
@@ -1343,21 +1327,18 @@ final class EventLog: @unchecked Sendable {
         let (c, output, _) = makeCoordinator(settings: hybridSettings(), hotkeyMonitor: hotkey, clock: clock)
         c.holdThreshold = .seconds(2)
         await c.startIdle()
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
         hotkey.release()
         #expect(await waitUntil { c.isLatched })
         #expect(await waitUntil { clock.sleeperCount >= 2 })
         clock.advance(by: c.maximumDuration)
-        #expect(await waitUntil { c.inFlight != nil })
-        await c.inFlight?.value
+        await c.cycleFinished()
         #expect(output.inserted.count == 1)
         #expect(output.submitted == [false])
         #expect(!c.isLatched)
         // The latch went with the recording: the next press starts afresh
         // rather than ending a recording that is no longer there.
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
         await c.cancelRecording()
     }
 
@@ -1367,8 +1348,7 @@ final class EventLog: @unchecked Sendable {
         let (c, output, capture) = makeCoordinator(
             settings: hybridSettings(), hotkeyMonitor: hotkey, events: events)
         await c.startIdle()
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
         hotkey.cancel()
         #expect(await waitUntil { c.state == .idle })
         #expect(!c.isLatched)
@@ -1392,8 +1372,7 @@ final class EventLog: @unchecked Sendable {
         #expect(!c.isLatched)
         c.reloadEngine()
         #expect(await waitUntil { c.state == .idle })
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
         await c.cancelRecording()
     }
 
@@ -1404,8 +1383,7 @@ final class EventLog: @unchecked Sendable {
         let events = EventLog()
         let (c, _, _) = makeCoordinator(hotkeyMonitor: hotkey, events: events)
         await c.startIdle()
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
         let released = hotkey.time + .seconds(1)
         hotkey.send(HotkeyMonitorEvent(role: .dictate, event: .released(submit: false), instant: released))
         hotkey.send(HotkeyMonitorEvent(role: .dictate, event: .pressed, instant: released + .milliseconds(10)))
@@ -1427,8 +1405,7 @@ final class EventLog: @unchecked Sendable {
         let events = EventLog()
         let (c, output, capture) = makeCoordinator(hotkeyMonitor: hotkey, events: events)
         await c.startIdle()
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
         hotkey.escape()
         // Handled means the cancel has run to its end, microphone included.
         #expect(await waitUntil { c.handledHotkeyEvents == 2 })
@@ -1445,8 +1422,7 @@ final class EventLog: @unchecked Sendable {
         let hotkey = FakeHotkey()
         let (c, output, capture) = makeCoordinator(hotkeyMonitor: hotkey)
         await c.startIdle()
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
         hotkey.escape()
         hotkey.release()
         #expect(await waitUntil { c.handledHotkeyEvents == 3 })
@@ -1476,8 +1452,7 @@ final class EventLog: @unchecked Sendable {
         let (c, output, _) = makeCoordinator(settings: settings, hotkeyMonitor: hotkey)
         c.holdThreshold = .seconds(2)
         await c.startIdle()
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
         hotkey.release()
         #expect(await waitUntil { c.isLatched })
         hotkey.escape()
@@ -1485,8 +1460,7 @@ final class EventLog: @unchecked Sendable {
         #expect(!c.isLatched)
         #expect(output.inserted.isEmpty)
         // Not latched any more: the next press starts a recording.
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
         await c.cancelRecording()
     }
 
@@ -1496,15 +1470,12 @@ final class EventLog: @unchecked Sendable {
         let (c, _, _) = makeCoordinator(hotkeyMonitor: hotkey, clock: clock)
         await c.startIdle()
         // A dictation.
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
         hotkey.release()
-        #expect(await waitUntil { c.inFlight != nil })
-        await c.inFlight?.value
+        await c.cycleFinished()
         #expect(hotkey.cancelKeyEnabled == [true, false])
         // An interrupted press, a step past that release.
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
         hotkey.cancel()
         #expect(await waitUntil { c.state == .idle })
         #expect(hotkey.cancelKeyEnabled == [true, false, true, false])
