@@ -9,8 +9,8 @@ public struct ProcessorPipeline: Sendable {
     }
 
     public func run(_ text: String, disabled: Set<String> = []) -> String {
-        processors
-            .filter { !disabled.contains($0.id) }
-            .reduce(text) { current, processor in processor.process(current) }
+        processors.reduce(text) { current, processor in
+            disabled.contains(processor.id) ? current : processor.process(current)
+        }
     }
 }

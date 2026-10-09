@@ -114,7 +114,7 @@ case "bench":
     }
 case "bench-process":
     arguments.removeFirst()
-    await ProcessorBench.run(arguments: arguments)
+    ProcessorBench.run(arguments: arguments)
 case "polish", "polish-set":
     let command = arguments.removeFirst()
     var options = PolishOptions()

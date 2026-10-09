@@ -279,10 +279,8 @@ func runPacedBench(dir: String, runs: Int, pause: Double, includeShort: Bool, li
             let started = clock.now
             let transcript = try await engine.endUtterance(tail)
             let elapsed = (clock.now - started).timeInterval
-            var final = transcript
-            final.audioDuration = fixture.duration
-            lastText = final.text
-            let wer = WordErrorRate.compute(reference: fixture.reference, hypothesis: final.text)
+            lastText = transcript.text
+            let wer = WordErrorRate.compute(reference: fixture.reference, hypothesis: transcript.text)
             let note = thermal.note(forRun: run)
             let runPasses = passes.times
             let liveNote = live
