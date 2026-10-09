@@ -26,9 +26,6 @@ final class HotkeyRouter {
     /// Which of the two the coordinator is currently driven by.
     private(set) var usesTap: Bool
     private(set) var accessibilityTrusted: Bool
-    /// Only a *sustained* reading counts, so the password field the user
-    /// tabs through does not swap the monitor twice in four seconds.
-    private(set) var secureInputSustained = false
     /// The keyboard shortcuts macOS itself handles. Read on explicit
     /// triggers only — launch, a permission flip, the settings window
     /// opening — because `CopySymbolicHotKeys` is main-thread work linear in
@@ -40,6 +37,8 @@ final class HotkeyRouter {
 
     @ObservationIgnored private let tap = GlobalHotkeyMonitor()
     @ObservationIgnored private let carbon = CarbonHotkeyMonitor()
+    /// Only a *sustained* reading counts, so the password field the user
+    /// tabs through does not swap the monitor twice in four seconds.
     @ObservationIgnored private var secureInput = SustainedCondition()
     @ObservationIgnored private weak var coordinator: DictationCoordinator?
     /// So the first `update` applies the stand-in even though nothing
@@ -63,7 +62,6 @@ final class HotkeyRouter {
     func update(accessibilityTrusted trusted: Bool, secureInputEnabled: Bool) {
         if trusted != accessibilityTrusted { accessibilityTrusted = trusted }
         let sustained = secureInput.observe(secureInputEnabled)
-        if sustained != secureInputSustained { secureInputSustained = sustained }
         let wantsTap = HotkeySource.choose(
             accessibilityTrusted: trusted, secureInputSustained: sustained, hotkey: hotkey) == .tap
         let flipped = wantsTap != usesTap
@@ -117,13 +115,6 @@ final class HotkeyRouter {
     func refreshSystemShortcuts() {
         let shortcuts = SystemShortcuts.enabled()
         if shortcuts != systemShortcuts { systemShortcuts = shortcuts }
-    }
-
-    /// The enabled macOS shortcut that swallows `chord`, if any. Shown as a
-    /// warning in both modes: the tap sees such a chord, but the system
-    /// shortcut fires as well.
-    func systemShortcutConflict(for chord: Hotkey) -> Hotkey? {
-        chord.systemShortcutConflict(in: systemShortcuts)
     }
 
     private func applyStandIn() {

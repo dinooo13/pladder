@@ -102,10 +102,13 @@ public struct Settings: Codable, Sendable, Equatable {
         overlayAnimationSpeed = .quick
     }
 
-    private enum CodingKeys: String, CodingKey, CaseIterable {
+    private enum CodingKeys: String, CodingKey {
         case engineID, hotkey, submitKey, polishDictations, polishModel, toggleHotkey
         case disabledProcessors, dictionary, appendTrailingSpace, playSounds
         case muteOutputWhileDictating, appearance, overlayStyle, overlayGlass, overlayAnimationSpeed
+    }
+
+    private enum LegacyKeys: String, CodingKey {
         // Read once for the migration, never written.
         case polishHotkey
     }
@@ -115,7 +118,7 @@ public struct Settings: Codable, Sendable, Equatable {
     /// older build saving; these it drops, since nothing will read them again.
     /// `launchAtLogin` mirrored the login item, which is its own source of
     /// truth and was never read back.
-    static let retiredKeys = [CodingKeys.polishHotkey.rawValue, "launchAtLogin"]
+    static let retiredKeys = [LegacyKeys.polishHotkey.rawValue, "launchAtLogin"]
 
     /// Starts from the defaults and takes every value the file has that this
     /// build can read, one key at a time. A value it cannot read — a case a
@@ -126,16 +129,18 @@ public struct Settings: Codable, Sendable, Equatable {
     /// reported through `SettingsDecodingReport`, so the store can keep a copy.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        let legacy = try decoder.container(keyedBy: LegacyKeys.self)
         let report = decoder.userInfo[SettingsDecodingReport.key] as? SettingsDecodingReport
-        func read<T: Decodable>(_ type: T.Type, _ key: CodingKeys) -> T? {
+        func read<T: Decodable, Key>(_ type: T.Type, _ key: Key, in c: KeyedDecodingContainer<Key>) -> T? {
             guard c.contains(key) else { return nil }
             do {
                 return try c.decodeIfPresent(type, forKey: key)
             } catch {
-                report?.dropped(key.rawValue)
+                report?.dropped(key.stringValue)
                 return nil
             }
         }
+        func read<T: Decodable>(_ type: T.Type, _ key: CodingKeys) -> T? { read(type, key, in: c) }
 
         // A missing or unreadable engine is repaired by the app, which knows
         // the registry; an empty ID is never registered.
@@ -151,8 +156,8 @@ public struct Settings: Codable, Sendable, Equatable {
         // for turns on with the update; nothing is written under the old key.
         if let polish = read(Bool.self, .polishDictations) {
             polishDictations = polish
-        } else if let legacy = read(Hotkey.self, .polishHotkey) {
-            polishDictations = !legacy.isEmpty
+        } else if let chord = read(Hotkey.self, .polishHotkey, in: legacy) {
+            polishDictations = !chord.isEmpty
         }
         if let polishModel = read(PolishModel.self, .polishModel) { self.polishModel = polishModel }
         if let disabled = read([String].self, .disabledProcessors) { disabledProcessors = Set(disabled) }
@@ -167,31 +172,6 @@ public struct Settings: Codable, Sendable, Equatable {
         if let value = read(OverlayStyle.self, .overlayStyle) { overlayStyle = value }
         if let value = read(Bool.self, .overlayGlass) { overlayGlass = value }
         if let value = read(OverlayAnimationSpeed.self, .overlayAnimationSpeed) { overlayAnimationSpeed = value }
-    }
-
-    // Encoding mirrors the synthesized one, minus the legacy `polishHotkey`
-    // key that only the decoder above reads.
-    public func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(engineID, forKey: .engineID)
-        try c.encode(hotkey, forKey: .hotkey)
-        try c.encode(submitKey, forKey: .submitKey)
-        try c.encode(polishDictations, forKey: .polishDictations)
-        try c.encode(polishModel, forKey: .polishModel)
-        try c.encode(toggleHotkey, forKey: .toggleHotkey)
-        try c.encode(disabledProcessors, forKey: .disabledProcessors)
-        try c.encode(dictionary, forKey: .dictionary)
-        try c.encode(appendTrailingSpace, forKey: .appendTrailingSpace)
-        try c.encode(playSounds, forKey: .playSounds)
-        try c.encode(muteOutputWhileDictating, forKey: .muteOutputWhileDictating)
-        try c.encode(appearance, forKey: .appearance)
-        try c.encode(overlayStyle, forKey: .overlayStyle)
-        try c.encode(overlayGlass, forKey: .overlayGlass)
-        try c.encode(overlayAnimationSpeed, forKey: .overlayAnimationSpeed)
-    }
-
-    public func isProcessorEnabled(_ id: String) -> Bool {
-        !disabledProcessors.contains(id)
     }
 
     public mutating func setProcessor(_ id: String, enabled: Bool) {
