@@ -2,13 +2,11 @@ import AppKit
 import SwiftUI
 import PladderCore
 
-/// The pill's type and meter geometry, in one place: every row draws with
-/// these, and the live row measures its words and works out its width from
-/// them, so the measurement can never drift from what is drawn.
+// The live row measures its words with these, so the measurement never drifts from
+// what is drawn.
 enum PillMetrics {
     static let fontSize: CGFloat = 13
     static let font = Font.system(size: fontSize, weight: .medium, design: .rounded)
-    /// The same face as an `NSFont`, for measuring.
     @MainActor static let nsFont: NSFont = {
         let base = NSFont.systemFont(ofSize: fontSize, weight: .medium)
         guard let descriptor = base.fontDescriptor.withDesign(.rounded),
@@ -16,7 +14,6 @@ enum PillMetrics {
         else { return base }
         return rounded
     }()
-    /// Between the dot, the meter and the words or label of a row.
     static let rowSpacing: CGFloat = 10
     static let dotSize: CGFloat = 8
     static let barWidth: CGFloat = 3
@@ -27,7 +24,6 @@ enum PillMetrics {
     }
 }
 
-/// The red "live" dot, shared by Compact, Minimal and the settings replicas.
 struct RecordingDot: View {
     var size: CGFloat = PillMetrics.dotSize
 
@@ -39,21 +35,12 @@ struct RecordingDot: View {
     }
 }
 
-/// What sits behind the pill: Liquid Glass, or a flat window-background
-/// capsule with a hairline border for people who want the desktop to stay
-/// still. The shadow is added by whoever hosts the pill.
 struct PillBackground: ViewModifier {
     let glass: Bool
-    /// Only the live overlay morphs between states, so the glass identity is
-    /// optional; the settings replicas pass nothing.
     var namespace: Namespace.ID?
 
-    /// One shape for the rows and the Minimal disc: a capsule in a square is
-    /// a circle, so the disc↔row morph is purely the animated size. A
-    /// separate `Circle` would snap — `Circle()` in a row-sized frame draws a
-    /// disc in the middle of the row at once, and `AnyShape` cannot
-    /// interpolate between two shape types, so the collapse would be over
-    /// before it started.
+    // One shape for row and disc: a capsule in a square is a circle, so the morph is only
+    // the size. `AnyShape` cannot interpolate between two shape types; a `Circle` would snap.
     private var shape: Capsule { Capsule() }
 
     @ViewBuilder
@@ -75,9 +62,6 @@ struct PillBackground: ViewModifier {
     }
 }
 
-/// Bars whose heights follow the input level. The shaping (amplitude curve,
-/// bell envelope, wobble, rise/fall blend) lives in the shared
-/// `WaveformMeter`, so this wave matches the menu bar glyph exactly.
 struct LevelBars: View {
     let level: Float
     let count: Int
@@ -89,9 +73,7 @@ struct LevelBars: View {
     @State private var meter: WaveformMeter
     @State private var heights: [CGFloat]
 
-    /// `seeded` pre-rolls the meter so a static replica (the settings cards,
-    /// which never see a level change) shows a wave rather than a row of
-    /// stubs.
+    // `seeded` pre-rolls the meter, so a replica that never sees a level shows a wave.
     init(level: Float, count: Int, maxHeight: CGFloat, opacity: Double, seeded: Bool = false) {
         self.level = level
         self.count = count

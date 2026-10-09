@@ -9,14 +9,7 @@ import PladderAudio
 import PladderEngines
 import PladderRefine
 
-/// Composition root. Builds the engine registry, the settings store, the
-/// coordinator and the parts around it, owns the settings, and turns the
-/// coordinator's events into sounds, log lines and learning.
-///
-/// What each part does lives with it: `HotkeyRouter` picks the hotkey
-/// source, `PermissionMonitor` polls the grants, `PolishModelController`
-/// owns the polish model, `CorrectionInbox` the learned corrections, and the
-/// menu's wording is in `StatusText.swift`.
+// The composition root. The parts split off it: docs/ARCHITECTURE.md, "The app".
 @MainActor
 @Observable
 final class AppModel {
@@ -26,40 +19,23 @@ final class AppModel {
     let hotkeys: HotkeyRouter
     let polish: PolishModelController
     let corrections: CorrectionInbox
-
-    /// Set when `setLaunchAtLogin` fails, so settings can show the reason
-    /// under the toggle.
     private(set) var launchAtLoginError: String?
-    /// The login item's state, which can be changed behind the app's back in
-    /// System Settings: re-read when the settings window opens.
+    // Can change behind the app's back in System Settings: re-read when settings open.
     private(set) var launchAtLoginEnabled = LaunchAtLogin.isEnabled
 
     @ObservationIgnored private let store: SettingsStore
     @ObservationIgnored private let overlay: OverlayController
     @ObservationIgnored private let events = MainActorRelay<(DictationCoordinator.Event, ContinuousClock.Instant)>()
-
-    /// When the hotkey was released, for the release-to-paste measurement.
     @ObservationIgnored private var releaseInstant: ContinuousClock.Instant?
-
-    /// Release-to-paste time per dictation, the number the user feels. Read
-    /// it with: log show --last 1h --predicate 'subsystem == "de.dinooo13.pladder"'
     private static let timingLog = Logger(subsystem: "de.dinooo13.pladder", category: "timing")
-    /// Every mute and unmute of the output device. A mute that gets stuck —
-    /// the app quitting mid-recording, a device vanishing — is silent and
-    /// baffling otherwise, so both ends of it are logged `.public`.
+    // A stuck mute is silent and baffling otherwise, so both ends are logged `.public`.
     private nonisolated static let muteLog = Logger(subsystem: "de.dinooo13.pladder", category: "mute")
-    /// Hotkey behaviour worth knowing about after the fact, such as a
-    /// keyboard that bounces.
     private static let hotkeyLog = Logger(subsystem: "de.dinooo13.pladder", category: "hotkey")
     private static let settingsLog = Logger(subsystem: "de.dinooo13.pladder", category: "settings")
 
-    /// The settings, persisted on every real change. Assignments that change
-    /// nothing are ignored, and each side effect runs only when its own keys
-    /// changed. Re-assigning `NSApp.appearance` is not free: with a forced
-    /// Light or Dark it makes AppKit re-theme every window, so doing it on
-    /// every click of a settings card made the card rows lag behind the
-    /// click. The coordinator sees only `DictationSettings`, and only when
-    /// that part changed.
+    // Each side effect runs only when its own keys changed: re-assigning `NSApp.appearance`
+    // with a forced Light or Dark re-themes every window, and on every click of a
+    // settings card it made the rows lag behind the click.
     var settings: Settings {
         get { storedSettings }
         set {
@@ -72,9 +48,7 @@ final class AppModel {
     private var storedSettings: Settings
 
     init(location: SettingsLocation) {
-        // Engines, in the order the settings picker shows them. The first
-        // entry is the default for new installs. The catalog's detail is the
-        // English catalog key; it is worded here, where the catalog is.
+        // The catalog's detail is an English catalog key, worded here, where the catalog is.
         var registry = EngineRegistry()
         for var entry in StandardEngines.entries {
             entry.detail = String(localized: String.LocalizationValue(entry.detail))
@@ -94,13 +68,10 @@ final class AppModel {
 
         location.migrateLegacySettingsIfNeeded()
         store = SettingsStore(url: location.settingsURL, defaults: Settings(engineID: StandardEngines.defaultEntry.id))
-        // One read: the store moves an undecodable file aside on load, so a
-        // second read could see different settings than the first.
+        // One read: the store moves an undecodable file aside on load, so a second read
+        // could see different settings.
         var initial = store.load()
-        // An engine that was removed in an update leaves a stale ID behind.
-        // `EngineRegistry.make` already falls back to the first entry, so the
-        // app works either way; rewriting the ID keeps the settings picker
-        // showing what is actually running.
+        // A removed engine's ID would still work, but the picker should show what runs.
         if registry.entry(for: initial.engineID) == nil, let fallback = registry.available.first {
             initial.engineID = fallback.id
         }
@@ -125,9 +96,8 @@ final class AppModel {
             refiner: polish.refiner,
             hotkeyMonitor: hotkeys.initialMonitor,
             makePipeline: { StandardProcessors.pipeline(for: $0) },
-            // Stamped when the coordinator emits it, not when the main actor
-            // gets to it, so the release-to-paste measurement does not
-            // include scheduling delay.
+            // Stamped when emitted, not when the main actor gets to it, so the release-to-paste
+            // measurement leaves out scheduling delay.
             onEvent: { event in events.send((event, .now)) }
         )
         self.coordinator = coordinator
@@ -154,8 +124,6 @@ final class AppModel {
         polish.apply(model: settings.polishModel, polishing: settings.polishDictations)
     }
 
-    /// The app is quitting: everything the coordinator borrowed is given
-    /// back first. The app delegate waits for this, with a deadline.
     func shutdown() async {
         permissions.stop()
         overlay.stop()
@@ -169,8 +137,6 @@ final class AppModel {
         polish.refreshAvailability()
     }
 
-    /// Re-reads what can change behind the app's back and is about to be
-    /// shown: the grants, the shortcuts macOS owns, the login item.
     func settingsWindowOpened() {
         permissions.refresh()
         hotkeys.refreshSystemShortcuts()
@@ -205,8 +171,6 @@ final class AppModel {
         }
     }
 
-    /// Applying the appearance to `NSApp` covers every window and menu at
-    /// once, so no view has to care; the overlay's panel is told on its own.
     private func applyAppearance(_ appearance: Appearance) {
         NSApp.appearance = appearance.nsAppearance
         overlay.applyAppearance(appearance)
@@ -232,10 +196,8 @@ final class AppModel {
             releaseInstant = instant
             if settings.playSounds { SoundPlayer.playStop() }
         case .inserted(let insertion):
-            // Strictly after the paste and off the measured window, which
-            // ended when the coordinator emitted this event. Only a paste
-            // that stayed in its field can be corrected: a copy was never
-            // pasted, and a send emptied the field.
+            // After the paste, outside the measured window. Only a paste that stayed in its
+            // field can be corrected: a copy was never pasted, and a send emptied the field.
             defer {
                 if insertion.result == .pasted, !insertion.submitted {
                     corrections.pasted(insertion.transcript.text)
@@ -248,13 +210,11 @@ final class AppModel {
         case .failed:
             releaseInstant = nil
         case .recordingDiscarded:
-            // Escape: no paste follows, so no timing line either, but the
-            // microphone did go off and the user should hear it.
+            // No paste, so no timing line, but the microphone went off and the user should hear it.
             releaseInstant = nil
             if settings.playSounds { SoundPlayer.playStop() }
         case .keyboardBounceObserved:
-            // That wait comes before `recordingStopped`, so the timing line
-            // cannot show it; this line is what explains a felt delay.
+            // That wait comes before `recordingStopped`, so the timing line cannot show it.
             let window = coordinator.bounceWindow.timeInterval * 1000
             Self.hotkeyLog.notice("keyboard bounce observed: releases now settle for \(window, format: .fixed(precision: 0)) ms before stopping")
         }
@@ -262,12 +222,10 @@ final class AppModel {
 
     // MARK: Menu
 
-    /// The app icon's waveform glyph, varied by state (see `MenuBarIcon`).
     var menuBarImage: NSImage {
         MenuBarIcon.image(for: coordinator.state, level: coordinator.inputLevel)
     }
 
-    /// One line describing what the app is doing right now.
     var statusLine: String {
         MenuStatus.line(
             state: coordinator.state,
@@ -276,11 +234,8 @@ final class AppModel {
             chords: menuChords)
     }
 
-    /// The chords the menu names. Without Accessibility the stored chord may
-    /// be listening for nothing, so the stand-in is named instead; "hold
-    /// Right Command" would be a lie. Any chord ends a latched recording;
-    /// the line names the one that latched it: the toggle key when it is a
-    /// chord of its own, otherwise the key, or what stands in for it.
+    // Without Accessibility the stored chord may listen for nothing, so the stand-in is
+    // named: "hold Right Command" would be a lie.
     private var menuChords: MenuStatus.Chords {
         let standIn = hotkeys.standInHotkey?.sideAgnosticDisplayName
         let hold = standIn ?? hotkeys.displayName(of: settings.hotkey)
@@ -293,18 +248,14 @@ final class AppModel {
             secureKeyboardEntry: hotkeys.usesCarbonForSecureInput)
     }
 
-    /// While a recorder field records a new chord, the monitor is down so
-    /// the keys being pressed cannot fire the old one.
     func setHotkeySuspended(_ suspended: Bool) {
         coordinator.isHotkeySuspended = suspended
     }
 
-    /// The menu's "Retry Model Download".
     func retryEngine() {
         coordinator.reloadEngine()
     }
 
-    /// The menu's "Last: …" line puts the whole transcript on the clipboard.
     func copyLastTranscript() {
         guard let text = coordinator.lastTranscript?.text else { return }
         NSPasteboard.general.clearContents()
@@ -322,7 +273,6 @@ final class AppModel {
 }
 
 extension Appearance {
-    /// `nil` follows the system.
     var nsAppearance: NSAppearance? {
         switch self {
         case .system: nil

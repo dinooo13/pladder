@@ -1,8 +1,6 @@
 import SwiftUI
 import PladderCore
 
-/// The General tab: one section per concern, each reading only what it
-/// shows.
 struct GeneralSettingsView: View {
     @Bindable var model: AppModel
 
@@ -16,9 +14,8 @@ struct GeneralSettingsView: View {
             PermissionsSection(permissions: model.permissions)
         }
         .formStyle(.grouped)
-        // What can change behind the app's back is re-read here rather than
-        // on the permission poll: this window is where it is shown, and the
-        // user may have just changed it in System Settings.
+        // Re-read here rather than on the poll: the user may have just changed it in System
+        // Settings, and this window is where it shows.
         .onAppear {
             model.settingsWindowOpened()
         }
@@ -53,8 +50,7 @@ private struct PushToTalkSection: View {
                 HotkeyRecorderField(
                     hotkey: $model.settings.hotkey,
                     setHotkeySuspended: model.setHotkeySuspended,
-                    // The send key is off without Accessibility anyway, so
-                    // only the push-to-talk key is constrained.
+                    // The send key is off without Accessibility anyway.
                     requiresRegularKey: model.hotkeys.hotkeyNeedsRegularKey,
                     systemShortcuts: model.hotkeys.systemShortcuts
                 )
@@ -83,7 +79,6 @@ private struct PushToTalkSection: View {
                 HotkeyRecorderField(
                     hotkey: $model.settings.submitKey,
                     setHotkeySuspended: model.setHotkeySuspended,
-                    // Empty has always meant off; now the field can say so.
                     allowsEmpty: true
                 )
             }
@@ -95,8 +90,7 @@ private struct PushToTalkSection: View {
         } header: {
             Text("Push to Talk")
         } footer: {
-            // Separate literals, so each translation stays whole and
-            // another key can add its own line.
+            // Separate literals, so each translation stays whole.
             VStack(alignment: .leading, spacing: 4) {
                 FootnoteText("Hold to record, release to insert. Press the send key while recording and Return is pressed after the text. Click a field and press any key combination to assign it.")
                 FootnoteText("Tap the toggle key to start recording and tap it again to insert. Set it to the same combination as the key and a short tap toggles while a hold still works as before. Escape discards a recording. Delete clears a field.")
@@ -130,8 +124,7 @@ private struct AppearanceSection: View {
 private struct OverlaySection: View {
     @Bindable var model: AppModel
 
-    /// Menu never flies a pill in, so the background and the speed have
-    /// nothing to act on there.
+    // Menu never flies a pill in, so the background and the speed have nothing to act on.
     private var hasPill: Bool { model.settings.overlayStyle != .menuBar }
 
     var body: some View {

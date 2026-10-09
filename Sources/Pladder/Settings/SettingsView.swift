@@ -15,17 +15,13 @@ struct SettingsView: View {
             ProcessingSettingsView(model: model)
                 .tabItem { Label("Processing", systemImage: "wand.and.sparkles") }
         }
-        // Deliberately no material or glass on the window itself: Apple's own
-        // settings windows are plain, and Liquid Glass belongs on the controls
-        // and the overlay pill. The fixed width keeps switching tabs from
-        // resizing the window sideways; height follows the tallest content.
+        // No material or glass on the window: Apple's own settings windows are plain. The
+        // fixed width keeps switching tabs from resizing the window sideways.
         .frame(width: 540)
         .frame(minHeight: 540)
     }
 }
 
-/// An orange line under a control that says why it may not do what the user
-/// expects. Already in the user's language.
 struct WarningLabel: View {
     let text: String
 
@@ -41,8 +37,6 @@ struct WarningLabel: View {
 
 struct PermissionRow: View {
     let title: LocalizedStringKey
-    /// Already in the user's language: the callers build it with
-    /// `String(localized:)` because it depends on the permission's state.
     let detail: String
     let granted: Bool
     let action: @MainActor () -> Void
@@ -69,15 +63,10 @@ struct PermissionRow: View {
     }
 }
 
-/// Section footer styling, the native macOS pattern: secondary colour, callout
-/// size, wrapping instead of truncating.
 struct FootnoteText: View {
     private let text: Text
 
-    /// A literal, which the String Catalog translates.
     init(_ key: LocalizedStringKey) { text = Text(key) }
-    /// Text that is already in the user's language, or has no translation to
-    /// give it: an engine's detail line, an error from the system.
     init(verbatim text: String) { self.text = Text(text) }
 
     var body: some View {

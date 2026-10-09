@@ -3,35 +3,18 @@ import Observation
 import PladderCore
 import PladderRefine
 
-/// Points the coordinator's refiner at the polish model the settings name,
-/// and owns that model's file and memory.
-///
-/// An S1-mini file is downloaded only while polish is on and that model is
-/// chosen, the one network use besides the speech model's; it is loaded at
-/// the first key-down, not here, and freed when polish goes off or another
-/// model is picked. Only one S1-mini polisher is ever held, so switching
-/// frees the other's memory.
 @MainActor
 @Observable
 final class PolishModelController {
-    /// Whether Apple Intelligence can polish right now, for the polish
-    /// toggle's row. Refreshed with the permissions: it can be switched on
-    /// or off in System Settings while the app runs, and the read is cheap.
-    /// The coordinator never asks; an unavailable model makes the toggle a
-    /// no-op that pastes as dictated.
+    // Apple Intelligence can be switched in System Settings while the app runs.
     private(set) var availability: OnDeviceModelAvailability = TranscriptPolisher.availability
-    /// Where the chosen model's file stands; nil for Apple's, which has none.
-    /// Shown under the model picker.
     private(set) var status: ModelFileStatus?
-
-    /// The coordinator's one refiner; forwards to the chosen model.
     let refiner: PolishRouter
 
     @ObservationIgnored private let applePolisher = TranscriptPolisher()
     @ObservationIgnored private var s1MiniPolisher: S1MiniPolisher?
     @ObservationIgnored private let files: ModelFiles
     @ObservationIgnored private let statusRelay = MainActorRelay<(ModelFile, ModelFileStatus)>()
-    /// The file the settings name, nil for Apple's model.
     @ObservationIgnored private var chosenFile: ModelFile?
 
     init() {
@@ -52,8 +35,6 @@ final class PolishModelController {
     }
 
     func apply(model: PolishModel, polishing: Bool) {
-        // A download nobody will use any more stops: the user picked another
-        // model, or turned polish off before it finished.
         if let previous = chosenFile, previous != ModelFile(for: model) || !polishing {
             let files = self.files
             Task { await files.cancel(previous) }
@@ -86,7 +67,6 @@ final class PolishModelController {
         }
     }
 
-    /// Tries a failed download again; the picker's "Try Again".
     func retryDownload() {
         guard let file = chosenFile else { return }
         let files = self.files

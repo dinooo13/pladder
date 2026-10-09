@@ -51,8 +51,6 @@ struct ProcessingSettingsView: View {
         .formStyle(.grouped)
     }
 
-    /// What stands between the chosen model and a polished dictation:
-    /// Apple Intelligence switched off, or an S1-mini file still to come.
     @ViewBuilder
     private var polishModelStatus: some View {
         if let status = model.polish.status {
@@ -84,7 +82,6 @@ struct ProcessingSettingsView: View {
         }
     }
 
-    /// Settings stores the *disabled* IDs, so absence means on.
     private func binding(for id: String) -> Binding<Bool> {
         Binding(
             get: { !model.settings.disabledProcessors.contains(id) },
