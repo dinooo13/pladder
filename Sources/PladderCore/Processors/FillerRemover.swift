@@ -37,8 +37,6 @@ public struct FillerRemover: TextProcessor {
     public static let processorID = "fillers"
 
     public let id = FillerRemover.processorID
-    public let displayName = "Remove fillers"
-    public let detail = "Strips hesitation sounds like “uh” and “um” from English, German and Spanish transcripts."
 
     /// Never a word in English, German or Spanish, so no language evidence
     /// is required.
@@ -114,7 +112,7 @@ public struct FillerRemover: TextProcessor {
         spaceRun = try! NSRegularExpression(pattern: Self.spaceRunPattern)
     }
 
-    public func process(_ text: String) async throws -> String {
+    public func process(_ text: String) -> String {
         let afterUniversal = Self.apply(universal, spaceRun: spaceRun, to: text)
         guard !afterUniversal.isEmpty else { return afterUniversal }
 

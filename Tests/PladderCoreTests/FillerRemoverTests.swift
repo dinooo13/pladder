@@ -6,7 +6,7 @@ import Testing
         _ text: String,
         hint: (@Sendable (String) -> String?)? = nil
     ) async throws -> String {
-        try await FillerRemover(languageHint: hint).process(text)
+        FillerRemover(languageHint: hint).process(text)
     }
 
     // MARK: Real words that must survive without language evidence

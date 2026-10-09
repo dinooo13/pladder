@@ -36,10 +36,7 @@ public enum StandardProcessors {
     }
 
     /// The pipeline the app and the CLI run.
-    public static func pipeline(
-        for settings: DictationSettings,
-        onFailure: (@Sendable (String, any Error) -> Void)? = nil
-    ) -> ProcessorPipeline {
-        ProcessorPipeline(entries.map { $0.make(settings) }, onFailure: onFailure)
+    public static func pipeline(for settings: DictationSettings) -> ProcessorPipeline {
+        ProcessorPipeline(entries.map { $0.make(settings) })
     }
 }

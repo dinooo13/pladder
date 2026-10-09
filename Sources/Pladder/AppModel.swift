@@ -44,11 +44,6 @@ final class AppModel {
     /// Release-to-paste time per dictation, the number the user feels. Read
     /// it with: log show --last 1h --predicate 'subsystem == "de.dinooo13.pladder"'
     private static let timingLog = Logger(subsystem: "de.dinooo13.pladder", category: "timing")
-    /// A processor that throws is skipped by `ProcessorPipeline` rather than
-    /// losing the dictation; this is where that gets logged. `Logger` is
-    /// `Sendable`, so this is safe to reach from the `@Sendable` failure
-    /// closure below without hopping back to the main actor.
-    private nonisolated static let processorLog = Logger(subsystem: "de.dinooo13.pladder", category: "processors")
     /// Every mute and unmute of the output device. A mute that gets stuck —
     /// the app quitting mid-recording, a device vanishing — is silent and
     /// baffling otherwise, so both ends of it are logged `.public`.
@@ -78,16 +73,13 @@ final class AppModel {
 
     init(location: SettingsLocation) {
         // Engines, in the order the settings picker shows them. The first
-        // entry is the default for new installs.
+        // entry is the default for new installs. The catalog's detail is the
+        // English catalog key; it is worded here, where the catalog is.
         var registry = EngineRegistry()
-        registry.register(
-            EngineRegistry.Entry(
-                id: FluidAudioIncrementalEngine.engineID,
-                displayName: "Parakeet TDT v3",
-                detail: String(localized: "NVIDIA Parakeet via FluidAudio, runs on the Neural Engine. ~700 MB download on first use."),
-                make: { FluidAudioIncrementalEngine() }
-            )
-        )
+        for var entry in StandardEngines.entries {
+            entry.detail = String(localized: String.LocalizationValue(entry.detail))
+            registry.register(entry)
+        }
         #if DEBUG
         registry.register(
             EngineRegistry.Entry(
@@ -101,7 +93,7 @@ final class AppModel {
         self.registry = registry
 
         location.migrateLegacySettingsIfNeeded()
-        store = SettingsStore(url: location.settingsURL, defaults: Settings(engineID: FluidAudioIncrementalEngine.engineID))
+        store = SettingsStore(url: location.settingsURL, defaults: Settings(engineID: StandardEngines.defaultEntry.id))
         // One read: the store moves an undecodable file aside on load, so a
         // second read could see different settings than the first.
         var initial = store.load()
@@ -132,11 +124,7 @@ final class AppModel {
                 log: { Self.muteLog.info("\($0, privacy: .public)") }),
             refiner: polish.refiner,
             hotkeyMonitor: hotkeys.initialMonitor,
-            makePipeline: { settings in
-                StandardProcessors.pipeline(for: settings, onFailure: { id, error in
-                    Self.processorLog.error("processor \(id, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
-                })
-            },
+            makePipeline: { StandardProcessors.pipeline(for: $0) },
             // Stamped when the coordinator emits it, not when the main actor
             // gets to it, so the release-to-paste measurement does not
             // include scheduling delay.

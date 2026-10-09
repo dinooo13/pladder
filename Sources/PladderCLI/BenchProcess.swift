@@ -44,10 +44,8 @@ enum ProcessorBench {
         guard !fixtures.isEmpty else {
             fail("no fixture scripts in \(directory); run scripts/make-fixtures.sh first", status: 1)
         }
-        let settings = DictationSettings(Settings(engineID: FluidAudioIncrementalEngine.engineID))
-        let pipeline = StandardProcessors.pipeline(for: settings, onFailure: { id, error in
-            FileHandle.standardError.write(Data("processor \(id) failed: \(error)\n".utf8))
-        })
+        let settings = DictationSettings(engineID: FluidAudioIncrementalEngine.engineID)
+        let pipeline = StandardProcessors.pipeline(for: settings)
 
         print("Pladder processor benchmark")
         print("runs:    \(runs) per variant, first discarded, median reported")
@@ -66,7 +64,7 @@ enum ProcessorBench {
                     let started = clock.now
                     // `await` whether or not `run` is async, so this file
                     // builds against either.
-                    _ = await pipeline.run(variant)
+                    _ = pipeline.run(variant)
                     let elapsed = clock.now - started
                     if attempt > 1 { times.append(elapsed / .milliseconds(1)) }
                 }

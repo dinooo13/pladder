@@ -31,10 +31,8 @@ func transcribeFile(_ path: String, process: Bool, verbose: Bool) async {
         var text = transcript.text
         if process {
             let settings = DictationSettings(appSettings())
-            let pipeline = StandardProcessors.pipeline(for: settings, onFailure: { id, error in
-                eprint("pladder-cli: processor \(id) failed: \(error)")
-            })
-            text = await pipeline.run(text, disabled: settings.disabledProcessors)
+            let pipeline = StandardProcessors.pipeline(for: settings)
+            text = pipeline.run(text, disabled: settings.disabledProcessors)
         }
         if verbose {
             print(String(format: "audio %.2fs, processed in %.3fs (%.0fx realtime)", transcript.audioDuration, transcript.processingTime, transcript.realtimeFactor))
