@@ -52,7 +52,10 @@ final class PasteHarness: Sendable {
     let poster: RecordingKeyPoster
     let output: PasteboardOutput
 
-    init(submitDelay: Duration = .milliseconds(50), snapshotLimit: Int = ClipboardSnapshot.maximumItemBytes) {
+    init(
+        clipboard: String? = nil, submitDelay: Duration = .milliseconds(50),
+        snapshotLimit: Int = ClipboardSnapshot.maximumItemBytes
+    ) {
         let poster = RecordingKeyPoster(clock: clock)
         self.poster = poster
         let grant = Grant()
@@ -60,6 +63,7 @@ final class PasteHarness: Sendable {
         output = PasteboardOutput(
             submitDelay: submitDelay, pasteboard: name, poster: poster,
             isTrusted: { grant.value }, clock: clock.pasteClock, snapshotLimit: snapshotLimit)
+        if let clipboard { userCopies(clipboard) }
     }
 
     /// The grant, shared with the output's `isTrusted`.
