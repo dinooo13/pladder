@@ -347,20 +347,6 @@ private func pastTheDelay() async {
 
         #expect(control.setCalls.isEmpty)
     }
-
-    /// Transitional: the session-less pair today's coordinator still calls.
-    @Test func theSessionlessPairStillMutesAndRestores() async {
-        let control = FakeMuteControl()
-        let muter = makeController(control)
-
-        await muter.recordingStarted()
-        #expect(control.state(of: 1) == true)
-        await muter.recordingEnded()
-        await muter.recordingStarted()
-        await muter.recordingEnded()
-
-        #expect(control.setCalls == [.mute(1), .unmute(1), .mute(1), .unmute(1)])
-    }
 }
 
 /// Collects the controller's log lines from the `@Sendable` closure.

@@ -23,6 +23,11 @@ final class CorrectionInbox {
     /// app once it exists.
     @ObservationIgnored var dictionary: () -> [DictionaryEntry] = { [] }
     @ObservationIgnored var addRules: ([DictionaryEntry]) -> Void = { _ in }
+    /// False while a dictation is being recorded or is on its way out.
+    @ObservationIgnored var isQuiet: () -> Bool = { true }
+
+    /// How often a review held back by a dictation looks again.
+    private static let quietPoll: Duration = .milliseconds(200)
 
     @ObservationIgnored private let dismissed: DismissedCorrections
     @ObservationIgnored private let relay = MainActorRelay<CorrectionProposal>()
@@ -41,12 +46,22 @@ final class CorrectionInbox {
             dismissed: dismissed,
             dictionary: { [weak self] in await self?.currentDictionary() ?? [] },
             log: { Self.log.info("\($0, privacy: .private)") },
+            // The review and Apple's polish share the system model, which
+            // answers one request at a time, so a review is held while a
+            // dictation is recorded or on its way out: one running at the
+            // release would eat into that dictation's polish budget.
+            waitUntilQuiet: { [weak self] in
+                while await self?.isQuietNow() == false {
+                    try? await Task.sleep(for: Self.quietPoll)
+                }
+            },
             onProposal: { relay.send($0) }
         )
         relay.handler = { [weak self] in self?.propose($0) }
     }
 
     private func currentDictionary() -> [DictionaryEntry] { dictionary() }
+    private func isQuietNow() -> Bool { isQuiet() }
 
     /// The text that was pasted, strictly after the paste.
     func pasted(_ text: String) {

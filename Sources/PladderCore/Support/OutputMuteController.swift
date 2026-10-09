@@ -116,14 +116,4 @@ public actor OutputMuteController: OutputMuter {
             log("could not unmute output device \(restore.device): \(error.localizedDescription)")
         }
     }
-
-    /// Transitional: the next session, for a caller that does not number them.
-    public func recordingStarted() async {
-        await recordingStarted(session: (latestSession ?? 0) + 1)
-    }
-
-    /// Transitional: ends the newest session.
-    public func recordingEnded() async {
-        await recordingEnded(session: latestSession ?? 0)
-    }
 }
