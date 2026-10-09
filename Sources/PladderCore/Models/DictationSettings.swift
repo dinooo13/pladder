@@ -41,8 +41,4 @@ public struct DictationSettings: Sendable, Equatable {
     public init(engineID: EngineID) {
         self.init(Settings(engineID: engineID))
     }
-
-    public mutating func setProcessor(_ id: String, enabled: Bool) {
-        if enabled { disabledProcessors.remove(id) } else { disabledProcessors.insert(id) }
-    }
 }

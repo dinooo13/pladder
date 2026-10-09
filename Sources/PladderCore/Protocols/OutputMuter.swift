@@ -37,9 +37,6 @@ public struct MuteState: Sendable, Equatable {
     public init(_ elements: [UInt32: Bool]) {
         self.elements = elements
     }
-
-    /// Every switch is on: muted by the user, nothing for us to do.
-    public var isFullyMuted: Bool { !elements.isEmpty && elements.values.allSatisfy { $0 } }
 }
 
 /// The one thing `OutputMuteController` needs from the audio system. Small

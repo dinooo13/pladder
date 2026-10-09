@@ -666,7 +666,7 @@ final class EventLog: @unchecked Sendable {
     @Test func disabledProcessorIsSkipped() async {
         var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.dictionary = [DictionaryEntry(from: "hello", to: "goodbye")]
-        settings.setProcessor(DictionaryReplacer.processorID, enabled: false)
+        settings.disabledProcessors.insert(DictionaryReplacer.processorID)
         settings.appendTrailingSpace = false
         let (c, output, _) = makeCoordinator(settings: settings)
         await c.startIdle()
