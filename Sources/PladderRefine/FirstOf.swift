@@ -1,12 +1,7 @@
 import Foundation
 
-/// Runs `work` against the wall clock: its value, or nil if `deadline` comes
-/// first, and the task that ran it, cancelled either way.
-///
-/// Not a task group: that waits for every child before returning, so a
-/// model call that ignores cancellation would still hold the paste. A
-/// one-shot `AsyncStream` lets the loser be abandoned. Both tasks are
-/// detached so neither inherits the caller's actor.
+// Not a task group: that waits for every child, so a model call ignoring cancellation
+// would still hold the paste. Both tasks detached, so neither inherits the caller's actor.
 func firstOf<Value: Sendable>(
     until deadline: ContinuousClock.Instant,
     priority: TaskPriority? = nil,
