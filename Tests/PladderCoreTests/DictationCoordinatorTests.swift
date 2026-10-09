@@ -687,15 +687,22 @@ final class EventLog: @unchecked Sendable {
         #expect(output.inserted.count == 1)
     }
 
-    @Test func hotkeyChangeWhileRecordingStopsTheMicrophone() async {
-        let (c, output, capture) = makeCoordinator()
-        await c.startIdle()
-        await c.hotkeyPressed()
-        #expect(c.state.isRecording)
-        c.settings.hotkey = .rightOption
-        #expect(await waitUntil { c.state == .idle })
-        #expect(await capture.stopCount == 1)
-        #expect(output.inserted.isEmpty)
+    @Test func aChordChangeWhileRecordingStopsTheMicrophone() async {
+        let changes: [(inout DictationSettings) -> Void] = [
+            { $0.hotkey = .rightOption },
+            { $0.submitKey = Hotkey(0x24) },
+            { $0.toggleHotkey = Hotkey(0x3B, 0x02) },
+        ]
+        for change in changes {
+            let (c, output, capture) = makeCoordinator()
+            await c.startIdle()
+            await c.hotkeyPressed()
+            #expect(c.state.isRecording)
+            change(&c.settings)
+            #expect(await waitUntil { c.state == .idle })
+            #expect(await capture.stopCount == 1)
+            #expect(output.inserted.isEmpty)
+        }
     }
 
     @Test func engineChangeWhileRecordingUsesTheEngineThatRecorded() async {
@@ -802,17 +809,6 @@ final class EventLog: @unchecked Sendable {
         c.settings.dictionary = [DictionaryEntry(from: "hello", to: "bye")]
         await c.dictate()
         #expect(output.inserted == ["bye world"])
-    }
-
-    @Test func submitKeyChangeWhileRecordingStopsTheMicrophone() async {
-        let (c, output, capture) = makeCoordinator()
-        await c.startIdle()
-        await c.hotkeyPressed()
-        #expect(c.state.isRecording)
-        c.settings.submitKey = Hotkey(0x24)
-        #expect(await waitUntil { c.state == .idle })
-        #expect(await capture.stopCount == 1)
-        #expect(output.inserted.isEmpty)
     }
 
     @Test func keyDownWarmsTheEngine() async {
@@ -948,30 +944,26 @@ final class EventLog: @unchecked Sendable {
         #expect(muter.startedCount == 0)
     }
 
-    @Test func cancelRecordingRestoresTheOutputDevice() async {
+    @Test func everyDiscardRestoresTheOutputDevice() async {
         var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.muteOutputWhileDictating = true
-        let muter = FakeOutputMuter()
-        let (c, _, _) = makeCoordinator(settings: settings, outputMuter: muter)
-        await c.startIdle()
-        await c.hotkeyPressed()
-        await c.cancelRecording()
-        #expect(await waitUntil { muter.endedCount == 1 })
+        let discards: [(DictationCoordinator, FakeHotkey) async -> Void] = [
+            { c, _ in await c.cancelRecording() },
+            { c, _ in await c.escapePressed() },
+            { _, hotkey in hotkey.cancel() },
+        ]
+        for discard in discards {
+            let hotkey = FakeHotkey()
+            let muter = FakeOutputMuter()
+            let (c, _, _) = makeCoordinator(settings: settings, hotkeyMonitor: hotkey, outputMuter: muter)
+            await c.startIdle()
+            hotkey.press()
+            #expect(await waitUntil { c.state.isRecording })
+            await discard(c, hotkey)
+            #expect(await waitUntil { muter.endedCount == 1 })
+        }
     }
 
-    @Test func theCancelledHotkeyEventRestoresTheOutputDevice() async {
-        var settings = DictationSettings(engineID: EchoEngine.engineID)
-        settings.muteOutputWhileDictating = true
-        let hotkey = FakeHotkey()
-        let muter = FakeOutputMuter()
-        let (c, _, _) = makeCoordinator(
-            settings: settings, hotkeyMonitor: hotkey, outputMuter: muter)
-        await c.startIdle()
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
-        hotkey.cancel()
-        #expect(await waitUntil { muter.endedCount == 1 })
-    }
 }
 
 // MARK: - Polish toggle
@@ -1385,17 +1377,6 @@ final class EventLog: @unchecked Sendable {
         #expect(events.names == ["recordingStarted"])
     }
 
-    @Test func toggleKeyChangeWhileRecordingStopsTheMicrophone() async {
-        let (c, output, capture) = makeCoordinator()
-        await c.startIdle()
-        await c.hotkeyPressed()
-        #expect(c.state.isRecording)
-        c.settings.toggleHotkey = Self.controlD
-        #expect(await waitUntil { c.state == .idle })
-        #expect(await capture.stopCount == 1)
-        #expect(output.inserted.isEmpty)
-    }
-
     @Test func aRefusedStartDoesNotLatch() async {
         let hotkey = FakeHotkey()
         var settings = DictationSettings(engineID: EngineID("flaky"))
@@ -1507,17 +1488,6 @@ final class EventLog: @unchecked Sendable {
         hotkey.press()
         #expect(await waitUntil { c.state.isRecording })
         await c.cancelRecording()
-    }
-
-    @Test func escapePressedRestoresTheOutputDevice() async {
-        var settings = DictationSettings(engineID: EchoEngine.engineID)
-        settings.muteOutputWhileDictating = true
-        let muter = FakeOutputMuter()
-        let (c, _, _) = makeCoordinator(settings: settings, outputMuter: muter)
-        await c.startIdle()
-        await c.hotkeyPressed()
-        await c.escapePressed()
-        #expect(await waitUntil { muter.endedCount == 1 })
     }
 
     @Test func theCancelKeyIsOnlyOnWhileRecording() async {
