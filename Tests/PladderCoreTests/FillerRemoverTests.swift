@@ -1,3 +1,4 @@
+import PladderTestSupport
 import Testing
 @testable import PladderCore
 
@@ -151,21 +152,14 @@ import Testing
     }
 
     @Test func languageHintIsOnlyCalledWhenAGatedTokenIsPresent() async throws {
-        let counter = CallCounter()
-        let hint: @Sendable (String) -> String? = { _ in
-            counter.count += 1
+        let calls = Recorder<String>()
+        let hint: @Sendable (String) -> String? = { text in
+            calls.append(text)
             return "en"
         }
         _ = try await run("we could, uh, ship it", hint: hint)
-        #expect(counter.count == 0)
+        #expect(calls.all.isEmpty)
         _ = try await run("um the meeting is at three", hint: hint)
-        #expect(counter.count == 1)
+        #expect(calls.all.count == 1)
     }
-}
-
-/// A mutable counter, used to assert how many times the language hint
-/// closure fired. Test-only, single-threaded call sites, so `@unchecked`
-/// is safe here.
-private final class CallCounter: @unchecked Sendable {
-    var count = 0
 }

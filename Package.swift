@@ -85,10 +85,11 @@ let package = Package(
             dependencies: ["PladderCore", "PladderEngines", "PladderAudio", "PladderBench", "PladderRefine", "PladderSystem"]
         ),
 
-        .testTarget(name: "PladderCoreTests", dependencies: ["PladderCore"]),
+        .target(name: "PladderTestSupport", path: "Tests/PladderTestSupport"),
+        .testTarget(name: "PladderCoreTests", dependencies: ["PladderCore", "PladderTestSupport"]),
         .testTarget(name: "PladderAudioTests", dependencies: ["PladderAudio"]),
         .testTarget(name: "PladderBenchTests", dependencies: ["PladderBench"]),
-        .testTarget(name: "PladderSystemTests", dependencies: ["PladderSystem"]),
-        .testTarget(name: "PladderRefineTests", dependencies: ["PladderRefine"]),
+        .testTarget(name: "PladderSystemTests", dependencies: ["PladderSystem", "PladderTestSupport"]),
+        .testTarget(name: "PladderRefineTests", dependencies: ["PladderRefine", "PladderTestSupport"]),
     ]
 )

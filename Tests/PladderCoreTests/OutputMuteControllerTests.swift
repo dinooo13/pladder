@@ -1,4 +1,5 @@
 import Foundation
+import PladderTestSupport
 import Testing
 @testable import PladderCore
 
@@ -147,12 +148,12 @@ private func pastTheDelay() async {
     @Test func aHalfAppliedMuteRestoresWhatLanded() async {
         let control = FakeMuteControl(devices: [1: [1: false, 2: false]])
         control.setFailingElements([2])
-        let recorder = LineRecorder()
+        let recorder = Recorder<String>()
         let muter = makeController(control) { recorder.append($0) }
 
         await muter.recordingStarted(session: 1)
         #expect(control.elements(of: 1) == [1: true, 2: false])
-        #expect(recorder.lines.contains { $0.contains("could not mute") })
+        #expect(recorder.all.contains { $0.contains("could not mute") })
 
         await muter.recordingEnded(session: 1)
         #expect(control.elements(of: 1) == [1: false, 2: false])
@@ -177,26 +178,26 @@ private func pastTheDelay() async {
     @Test func aDeviceWithoutAMuteControlIsSkipped() async {
         // No entry in `devices` means `muteState` answers nil.
         let control = FakeMuteControl(defaultDevice: 7, devices: [:])
-        let recorder = LineRecorder()
+        let recorder = Recorder<String>()
         let muter = makeController(control) { recorder.append($0) }
 
         await muter.recordingStarted(session: 1)
         await muter.recordingEnded(session: 1)
 
         #expect(control.setCalls.isEmpty)
-        #expect(recorder.lines.contains { $0.contains("no mute control") })
+        #expect(recorder.all.contains { $0.contains("no mute control") })
     }
 
     @Test func noDefaultDeviceIsSkipped() async {
         let control = FakeMuteControl(defaultDevice: nil)
-        let recorder = LineRecorder()
+        let recorder = Recorder<String>()
         let muter = makeController(control) { recorder.append($0) }
 
         await muter.recordingStarted(session: 1)
         await muter.recordingEnded(session: 1)
 
         #expect(control.setCalls.isEmpty)
-        #expect(recorder.lines.contains { $0.contains("no default output device") })
+        #expect(recorder.all.contains { $0.contains("no default output device") })
     }
 
     /// started → ended → started, all inside the delay: the last session wins
@@ -239,13 +240,13 @@ private func pastTheDelay() async {
     @Test func aThrowingSetIsSwallowedAndLogged() async {
         let control = FakeMuteControl()
         control.setThrowOnSet(true)
-        let recorder = LineRecorder()
+        let recorder = Recorder<String>()
         let muter = makeController(control) { recorder.append($0) }
 
         await muter.recordingStarted(session: 1)
         await muter.recordingEnded(session: 1)
 
-        #expect(recorder.lines.contains { $0.contains("could not mute") })
+        #expect(recorder.all.contains { $0.contains("could not mute") })
         // The mute never took, so there is nothing to restore and no second
         // call that could throw.
         #expect(control.setCalls == [.mute(1)])
@@ -253,14 +254,14 @@ private func pastTheDelay() async {
 
     @Test func aThrowingUnmuteIsSwallowedAndLogged() async {
         let control = FakeMuteControl()
-        let recorder = LineRecorder()
+        let recorder = Recorder<String>()
         let muter = makeController(control) { recorder.append($0) }
 
         await muter.recordingStarted(session: 1)
         control.setThrowOnSet(true)
         await muter.recordingEnded(session: 1)
 
-        #expect(recorder.lines.contains { $0.contains("could not unmute") })
+        #expect(recorder.all.contains { $0.contains("could not unmute") })
     }
 
     @Test func endingWithNothingMutedDoesNothing() async {
@@ -347,12 +348,4 @@ private func pastTheDelay() async {
 
         #expect(control.setCalls.isEmpty)
     }
-}
-
-/// Collects the controller's log lines from the `@Sendable` closure.
-private final class LineRecorder: @unchecked Sendable {
-    private let lock = NSLock()
-    private var _lines: [String] = []
-    var lines: [String] { lock.withLock { _lines } }
-    func append(_ line: String) { lock.withLock { _lines.append(line) } }
 }
