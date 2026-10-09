@@ -19,7 +19,7 @@ struct PolishedTranscript {
 /// its one piece of state, the session `prepare()` warms while the user is
 /// still speaking; the model call itself runs detached inside
 /// `OnDeviceLanguageModel`, never on this actor's executor.
-public actor TranscriptPolisher: TranscriptRefiner {
+public actor TranscriptPolisher: ReportingRefiner {
     /// The rules mirror the issue's list, in our own words. Tuned with
     /// `pladder-cli polish` on a self-correction, a spoken list, a German
     /// transcript and an embedded request: without the three inline examples
@@ -52,9 +52,6 @@ public actor TranscriptPolisher: TranscriptRefiner {
     /// near the 10 min cap is about six calls, all inside the one budget.
     public static let chunkThreshold = 600
     static let chunkSize = 300
-
-    /// The report both polishers share; the name the CLI has always used.
-    public typealias Report = PolishReport
 
     private let model: OnDeviceLanguageModel
     private let calls: any PolishCalls
@@ -93,7 +90,7 @@ public actor TranscriptPolisher: TranscriptRefiner {
 
     /// `refine` with the numbers kept. One log line per call, numbers only:
     /// the transcript is the user's words and never goes in the log.
-    public func polish(_ text: String) async -> Report {
+    public func polish(_ text: String) async -> PolishReport {
         let started = ContinuousClock.now
         let deadline = started + timeout
         // The prewarmed session belongs to this utterance only.
@@ -101,7 +98,7 @@ public actor TranscriptPolisher: TranscriptRefiner {
         prepared = nil
 
         let pieces = Self.chunks(of: text)
-        var report = Report(
+        var report = PolishReport(
             text: nil, elapsed: .zero, wordsIn: PolishChunking.wordCount(text), wordsOut: 0,
             chunks: pieces.count, mode: .guided, failure: nil)
         var cleaned: [String] = []
@@ -121,7 +118,7 @@ public actor TranscriptPolisher: TranscriptRefiner {
             report.failure = Self.describe(error)
         }
         report.elapsed = ContinuousClock.now - started
-        Self.log(report)
+        Self.log.notice("\(report.logLine(), privacy: .public)")
         return report
     }
 
@@ -135,7 +132,7 @@ public actor TranscriptPolisher: TranscriptRefiner {
     /// Both calls run to the polish's one deadline, never a fresh budget.
     private func polishOne(
         _ piece: String, session: LanguageModelSession?, deadline: ContinuousClock.Instant
-    ) async throws -> (String, Report.Mode) {
+    ) async throws -> (String, PolishReport.Mode) {
         let prompt = Self.prompt(for: piece)
         do {
             return (try await calls.guided(prompt, session: session, deadline: deadline), .guided)
@@ -186,21 +183,6 @@ public actor TranscriptPolisher: TranscriptRefiner {
         case OnDeviceModelError.generation(let name): return "model error \(name)"
         case Failure.emptyAnswer: return "empty answer"
         default: return "error \(type(of: error))"
-        }
-    }
-
-    private static func log(_ report: Report) {
-        let secs = String(format: "%.3f", report.elapsed.timeInterval)
-        if let failure = report.failure {
-            log.notice(
-                "polish failed after \(secs, privacy: .public) s, \(report.wordsIn, privacy: .public) words in: \(failure, privacy: .public)")
-        } else {
-            log.notice(
-                """
-                polish \(secs, privacy: .public) s, \(report.wordsIn, privacy: .public) words in, \
-                \(report.wordsOut, privacy: .public) out, \(report.mode.rawValue, privacy: .public)\
-                \(report.chunks > 1 ? ", \(report.chunks) chunks" : "", privacy: .public)
-                """)
         }
     }
 }

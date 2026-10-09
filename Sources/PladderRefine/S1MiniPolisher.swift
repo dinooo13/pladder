@@ -16,7 +16,7 @@ import os
 /// time budget, an empty answer all return nil and the coordinator pastes
 /// the text as dictated. The model stays loaded from the first `prepare()`
 /// until `unload()`, as the speech engine does.
-public actor S1MiniPolisher: TranscriptRefiner {
+public actor S1MiniPolisher: ReportingRefiner {
     /// S1-mini's system prompt, word for word from its model card; it is
     /// part of the input format the model was trained on.
     static let systemPrompt = "You are a text normalizer for speech-to-text transcripts. The input begins with a control line specifying the styling, structure, and context settings; clean the transcript to match those settings and output only the cleaned text."
@@ -156,7 +156,7 @@ public actor S1MiniPolisher: TranscriptRefiner {
             report.failure = FileManager.default.fileExists(atPath: location.path) ? "model did not load" : "not downloaded"
         }
         report.elapsed = ContinuousClock.now - started
-        Self.log(report, file: file)
+        Self.log.notice("\(report.logLine(model: self.file.fileName), privacy: .public)")
         return report
     }
 
@@ -179,21 +179,8 @@ public actor S1MiniPolisher: TranscriptRefiner {
         guard let task = startLoad() else { return .noModel }
         // Not a task group: that would wait for the load however long it
         // took. The waiter left behind ends with the load.
-        let (stream, continuation) = AsyncStream<Loaded>.makeStream()
-        let waiter = Task.detached {
-            continuation.yield(await task.value.map(Loaded.ready) ?? .noModel)
-        }
-        let timer = Task.detached {
-            try? await Task.sleep(until: deadline, clock: .continuous)
-            continuation.yield(.stillLoading)
-        }
-        defer {
-            waiter.cancel()
-            timer.cancel()
-            continuation.finish()
-        }
-        var results = stream.makeAsyncIterator()
-        return await results.next() ?? .stillLoading
+        guard let model = await firstOf(until: deadline, { await task.value }).value else { return .stillLoading }
+        return model.map(Loaded.ready) ?? .noModel
     }
 
     /// The running load, or a new one if the file is there; nil without a
@@ -221,21 +208,6 @@ public actor S1MiniPolisher: TranscriptRefiner {
         guard generation == self.generation else { return }
         self.model = model
         loading = nil
-    }
-
-    private static func log(_ report: PolishReport, file: ModelFile) {
-        let secs = String(format: "%.3f", report.elapsed.timeInterval)
-        if let failure = report.failure {
-            log.notice(
-                "polish (\(file.fileName, privacy: .public)) failed after \(secs, privacy: .public) s, \(report.wordsIn, privacy: .public) words in: \(failure, privacy: .public)")
-        } else {
-            log.notice(
-                """
-                polish (\(file.fileName, privacy: .public)) \(secs, privacy: .public) s, \
-                \(report.wordsIn, privacy: .public) words in, \(report.wordsOut, privacy: .public) out\
-                \(report.chunks > 1 ? ", \(report.chunks) chunks" : "", privacy: .public)
-                """)
-        }
     }
 }
 
