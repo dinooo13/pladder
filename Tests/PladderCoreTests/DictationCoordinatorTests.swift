@@ -106,8 +106,8 @@ final class FakeHotkey: HotkeyMonitor, @unchecked Sendable {
     func release(_ role: HotkeyRole = .dictate, submit: Bool = false) {
         continuation?.yield(HotkeyMonitorEvent(role: role, event: .released(submit: submit), instant: stamp()))
     }
-    func cancel(_ role: HotkeyRole = .dictate) {
-        continuation?.yield(HotkeyMonitorEvent(role: role, event: .cancelled, instant: stamp()))
+    func interrupt(_ role: HotkeyRole = .dictate) {
+        continuation?.yield(HotkeyMonitorEvent(role: role, event: .interrupted, instant: stamp()))
     }
     func send(_ event: HotkeyMonitorEvent) {
         if let instant = event.instant, instant > time { time = instant }
@@ -488,13 +488,13 @@ final class EventLog: @unchecked Sendable {
         await c.inFlight?.value
     }
 
-    @Test func cancelledEventDropsTheRecordingSilently() async {
+    @Test func interruptedPressDropsTheRecordingSilently() async {
         let hotkey = FakeHotkey()
         let events = EventLog()
         let (c, output, capture) = makeCoordinator(hotkeyMonitor: hotkey, events: events)
         await c.startIdle()
         await c.press(hotkey)
-        hotkey.cancel()
+        hotkey.interrupt()
         #expect(await waitUntil { c.state == .idle })
         #expect(await capture.stopCount == 1)
         #expect(output.inserted.isEmpty)
@@ -534,10 +534,10 @@ final class EventLog: @unchecked Sendable {
 
     private static let standIn = Hotkey(0x3B, 0x38, 0x31)
 
-    @Test func hotkeyOverrideIsWhatTheMonitorStarts() async {
+    @Test func standInHotkeyIsWhatTheMonitorStarts() async {
         let fake = FakeHotkey()
         let (c, _, _) = makeCoordinator(hotkeyMonitor: fake)
-        c.hotkeyOverride = Self.standIn
+        c.standInHotkey = Self.standIn
         #expect(fake.startCount == 0)
         await c.startIdle()
         #expect(fake.startCount == 1)
@@ -545,12 +545,12 @@ final class EventLog: @unchecked Sendable {
         #expect(c.settings.hotkey == .optionSpace)
     }
 
-    @Test func changingTheOverrideWhileRecordingStopsTheMicrophone() async {
+    @Test func changingTheStandInWhileRecordingStopsTheMicrophone() async {
         let fake = FakeHotkey()
         let (c, output, capture) = makeCoordinator(hotkeyMonitor: fake)
         await c.startIdle()
         await c.press(fake)
-        c.hotkeyOverride = Self.standIn
+        c.standInHotkey = Self.standIn
         #expect(await waitUntil { c.state == .idle })
         #expect(await capture.stopCount == 1)
         #expect(output.inserted.isEmpty)
@@ -558,33 +558,33 @@ final class EventLog: @unchecked Sendable {
         #expect(fake.lastHotkey == Self.standIn)
     }
 
-    @Test func clearingTheOverrideReturnsToTheStoredChord() async {
+    @Test func clearingTheStandInReturnsToTheStoredChord() async {
         let fake = FakeHotkey()
         let (c, _, _) = makeCoordinator(hotkeyMonitor: fake)
-        c.hotkeyOverride = Self.standIn
+        c.standInHotkey = Self.standIn
         await c.startIdle()
-        c.hotkeyOverride = nil
+        c.standInHotkey = nil
         #expect(fake.startCount == 2)
         #expect(fake.lastHotkey == c.settings.hotkey)
         await c.press(fake)
         await c.cancelRecording()
     }
 
-    @Test func unchangedOverrideDoesNotRestartTheMonitor() async {
+    @Test func unchangedStandInDoesNotRestartTheMonitor() async {
         let fake = FakeHotkey()
         let (c, _, _) = makeCoordinator(hotkeyMonitor: fake)
-        c.hotkeyOverride = Self.standIn
+        c.standInHotkey = Self.standIn
         await c.startIdle()
-        c.hotkeyOverride = Self.standIn
+        c.standInHotkey = Self.standIn
         #expect(fake.startCount == 1)
     }
 
-    @Test func overrideWhileSuspendedStartsOnResume() async {
+    @Test func standInWhileSuspendedStartsOnResume() async {
         let fake = FakeHotkey()
         let (c, _, _) = makeCoordinator(hotkeyMonitor: fake)
         await c.startIdle()
         c.isHotkeySuspended = true
-        c.hotkeyOverride = Self.standIn
+        c.standInHotkey = Self.standIn
         #expect(fake.startCount == 1)
         c.isHotkeySuspended = false
         #expect(fake.startCount == 2)
@@ -876,7 +876,7 @@ final class EventLog: @unchecked Sendable {
         let discards: [(DictationCoordinator, FakeHotkey) async -> Void] = [
             { c, _ in await c.cancelRecording() },
             { c, _ in await c.escapePressed() },
-            { _, hotkey in hotkey.cancel() },
+            { _, hotkey in hotkey.interrupt() },
         ]
         for discard in discards {
             let hotkey = FakeHotkey()
@@ -1028,13 +1028,13 @@ final class EventLog: @unchecked Sendable {
         #expect(fake.lastChords == [.dictate: .optionSpace, .toggle: Hotkey(0x3B, 0x3A, 0x31)])
     }
 
-    @Test func theOverrideAppliesOnlyToTheDictateChord() async {
+    @Test func theStandInAppliesOnlyToTheDictateChord() async {
         let fake = FakeHotkey()
         let standIn = Hotkey(0x3B, 0x38, 0x31)
         var settings = Self.settings()
         settings.toggleHotkey = Hotkey(0x3B, 0x3A, 0x31)
         let (c, _, _) = makeCoordinator(settings: settings, hotkeyMonitor: fake)
-        c.hotkeyOverride = standIn
+        c.standInHotkey = standIn
         await c.startIdle()
         #expect(fake.lastChords[.dictate] == standIn)
         #expect(fake.lastChords[.toggle] == Hotkey(0x3B, 0x3A, 0x31))
@@ -1051,7 +1051,7 @@ final class EventLog: @unchecked Sendable {
         hotkey.press(.dictate)
         #expect(await waitUntil { c.state.isRecording })
         hotkey.release(.toggle)
-        hotkey.cancel(.toggle)
+        hotkey.interrupt(.toggle)
         #expect(await waitUntil { c.handledHotkeyEvents == 3 })
         #expect(c.state.isRecording)
         hotkey.release(.dictate)
@@ -1060,14 +1060,14 @@ final class EventLog: @unchecked Sendable {
         #expect(refiner.calls.isEmpty)
     }
 
-    @Test func cancelledPolishDictationDropsTheRecording() async {
+    @Test func interruptedPolishDictationDropsTheRecording() async {
         let hotkey = FakeHotkey()
         let refiner = FakeRefiner()
         let (c, output, capture) = makeCoordinator(
             engineText: Self.sentence, settings: Self.settings(), hotkeyMonitor: hotkey, refiner: refiner)
         await c.startIdle()
         await c.press(hotkey)
-        hotkey.cancel()
+        hotkey.interrupt()
         #expect(await waitUntil { c.state == .idle })
         #expect(await capture.stopCount == 1)
         #expect(output.inserted.isEmpty)
@@ -1222,7 +1222,7 @@ final class EventLog: @unchecked Sendable {
         settings.toggleHotkey = .rightCommand
         let hotkey = FakeHotkey()
         let (c, _, _) = makeCoordinator(settings: settings, hotkeyMonitor: hotkey)
-        c.hotkeyOverride = .optionSpace
+        c.standInHotkey = .optionSpace
         c.holdThreshold = .seconds(2)
         await c.startIdle()
         #expect(hotkey.lastChords == [.dictate: .optionSpace])
@@ -1258,7 +1258,7 @@ final class EventLog: @unchecked Sendable {
             settings: hybridSettings(), hotkeyMonitor: hotkey, events: events)
         await c.startIdle()
         await c.press(hotkey)
-        hotkey.cancel()
+        hotkey.interrupt()
         #expect(await waitUntil { c.state == .idle })
         #expect(!c.isLatched)
         #expect(await capture.stopCount == 1)
@@ -1374,7 +1374,7 @@ final class EventLog: @unchecked Sendable {
         await c.cycleFinished()
         #expect(hotkey.cancelKeyEnabled == [true, false])
         await c.press(hotkey)
-        hotkey.cancel()
+        hotkey.interrupt()
         #expect(await waitUntil { c.state == .idle })
         #expect(hotkey.cancelKeyEnabled == [true, false, true, false])
         await c.hotkeyPressed()

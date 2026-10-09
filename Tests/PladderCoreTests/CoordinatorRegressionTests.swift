@@ -125,7 +125,7 @@ import Testing
         let first = FakeHotkey()
         let second = FakeHotkey()
         let (c, _, _) = makeCoordinator(hotkeyMonitor: first)
-        c.hotkeyOverride = .rightOption
+        c.standInHotkey = .rightOption
         c.replaceHotkeyMonitor(second)
         c.settings.toggleHotkey = Hotkey(0x31)
         #expect(first.startCount == 0)

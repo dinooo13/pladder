@@ -75,6 +75,6 @@ final class HotkeyRouter {
     }
 
     private func applyStandIn() {
-        coordinator?.hotkeyOverride = standInHotkey
+        coordinator?.standInHotkey = standInHotkey
     }
 }

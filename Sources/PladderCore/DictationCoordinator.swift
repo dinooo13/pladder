@@ -31,10 +31,9 @@ public final class DictationCoordinator {
         }
     }
 
-    // Stands in for a stored chord Carbon cannot register while Accessibility is missing.
-    public var hotkeyOverride: Hotkey? {
+    public var standInHotkey: Hotkey? {
         didSet {
-            guard hotkeyOverride != oldValue else { return }
+            guard standInHotkey != oldValue else { return }
             hotkeyConfigurationChanged()
         }
     }
@@ -82,7 +81,7 @@ public final class DictationCoordinator {
     // a warm pass waits for it; the log shows that as `engine` above `engine-time`.
     private var warmupTask: Task<Void, Never>?
     private var feedTask: Task<Int, Never>?
-    private var recording = 0
+    private var recordingID = 0
     private var cancelCleanup: Task<Void, Never>?
     private var muteRestoreTask: Task<Void, Never>?
 
@@ -241,7 +240,7 @@ public final class DictationCoordinator {
     private func startHotkey() {
         stopHotkey()
         startGesture()
-        var chords: [HotkeyRole: Hotkey] = [.dictate: hotkeyOverride ?? settings.hotkey]
+        var chords: [HotkeyRole: Hotkey] = [.dictate: standInHotkey ?? settings.hotkey]
         if let toggle = separateToggleChord { chords[.toggle] = toggle }
         let stream = hotkeyMonitor.start(chords: chords, submitKey: settings.submitKey)
         hotkeyTask = Task { [weak self] in
@@ -264,7 +263,7 @@ public final class DictationCoordinator {
             await act(outcome)
         case .chord(let role, .released(let submit)):
             await act(gesture.released(role, submit: submit, at: at))
-        case .chord(let role, .cancelled):
+        case .chord(let role, .interrupted):
             await act(gesture.interrupted(role))
         case .escape:
             await escapePressed()
@@ -274,7 +273,7 @@ public final class DictationCoordinator {
     private var toggleIsHybrid: Bool {
         let toggle = settings.toggleHotkey.canonical
         guard !toggle.isEmpty else { return false }
-        return toggle == settings.hotkey.canonical || toggle == hotkeyOverride?.canonical
+        return toggle == settings.hotkey.canonical || toggle == standInHotkey?.canonical
     }
 
     private var separateToggleChord: Hotkey? {
@@ -339,8 +338,8 @@ public final class DictationCoordinator {
         // concurrent press cannot start capture twice.
         state = .recording
         inputLevel = 0
-        recording += 1
-        let mine = recording
+        recordingID += 1
+        let mine = recordingID
         hotkeyMonitor.setCancelKeyEnabled(true)
         // Waits for the last cancel's `abandonUtterance`, so it cannot drop this new
         // utterance in place of the old one.
@@ -365,7 +364,7 @@ public final class DictationCoordinator {
         onEvent(.recordingStarted)
         armOutputMute()
         startKeyDownWork()
-        await startEngineWork(live: live, recording: mine)
+        await startEngineWork(live: live, recordingID: mine)
         guard isCurrent(mine) else { return }
         levelTask = Task { [weak self] in
             for await level in levels {
@@ -391,12 +390,12 @@ public final class DictationCoordinator {
     }
 
     private func isCurrent(_ id: Int) -> Bool {
-        state.isRecording && recording == id
+        state.isRecording && recordingID == id
     }
 
     // A streaming engine that cannot begin an utterance is used like a batch engine:
     // transcribed whole at release, slower but not lost.
-    private func startEngineWork(live: Bool, recording id: Int) async {
+    private func startEngineWork(live: Bool, recordingID id: Int) async {
         if let streaming = cycleEngine as? (any StreamingTranscriptionEngine),
            (try? await streaming.beginUtterance()) != nil {
             guard isCurrent(id) else {
@@ -453,7 +452,7 @@ public final class DictationCoordinator {
 
     private func armOutputMute() {
         guard settings.muteOutputWhileDictating, let outputMuter else { return }
-        let session = recording
+        let session = recordingID
         Task { await outputMuter.recordingStarted(session: session) }
     }
 
@@ -461,7 +460,7 @@ public final class DictationCoordinator {
     // device. Detached so the paste never waits on CoreAudio.
     private func restoreOutputDevice() {
         guard let outputMuter else { return }
-        let session = recording
+        let session = recordingID
         let previous = muteRestoreTask
         muteRestoreTask = Task.detached(priority: .utility) {
             await previous?.value

@@ -28,7 +28,7 @@ private struct Pipeline {
             switch tagged.kind {
             case .chord(let role, .pressed): gesture.pressed(role, at: instant).action
             case .chord(let role, .released(let submit)): gesture.released(role, submit: submit, at: instant).action
-            case .chord(let role, .cancelled): gesture.interrupted(role).action
+            case .chord(let role, .interrupted): gesture.interrupted(role).action
             case .escape: nil
             }
         }

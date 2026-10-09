@@ -47,11 +47,11 @@ let keyV: UInt16 = 0x09
     @Test func anotherKeyWhileHeldEndsThePress() {
         var t = HotkeyChordTracker(hotkey: .rightOption)
         #expect(t.flagsChanged(modifiers: [rightOption]) == .init(event: .pressed))
-        #expect(t.keyDown(keyA, modifiers: [rightOption]) == .init(event: .cancelled))
+        #expect(t.keyDown(keyA, modifiers: [rightOption]) == .init(event: .interrupted))
         #expect(t.keyUp(keyA, modifiers: [rightOption]) == .init())
         #expect(t.flagsChanged(modifiers: []) == .init())
         #expect(t.flagsChanged(modifiers: [rightOption]) == .init(event: .pressed))
-        #expect(t.flagsChanged(modifiers: [rightOption, leftShift]) == .init(event: .cancelled))
+        #expect(t.flagsChanged(modifiers: [rightOption, leftShift]) == .init(event: .interrupted))
         #expect(t.flagsChanged(modifiers: [rightOption]) == .init())
         #expect(t.flagsChanged(modifiers: []) == .init())
     }
@@ -181,13 +181,13 @@ let keyV: UInt16 = 0x09
     @Test func foreignModifierEndsThePressWithoutSubmit() {
         var t = HotkeyChordTracker(hotkey: .rightCommand, submitKey: .rightOption)
         _ = t.flagsChanged(modifiers: [rightCommand])
-        #expect(t.flagsChanged(modifiers: [rightCommand, leftShift]) == .init(event: .cancelled))
+        #expect(t.flagsChanged(modifiers: [rightCommand, leftShift]) == .init(event: .interrupted))
     }
 
     @Test func emptySubmitKeyBehavesAsBefore() {
         var t = HotkeyChordTracker(hotkey: .rightCommand)
         #expect(t.flagsChanged(modifiers: [rightCommand]) == .init(event: .pressed))
-        #expect(t.keyDown(returnKey, modifiers: [rightCommand]) == .init(event: .cancelled))
+        #expect(t.keyDown(returnKey, modifiers: [rightCommand]) == .init(event: .interrupted))
         #expect(t.flagsChanged(modifiers: []) == .init())
     }
 
@@ -258,7 +258,7 @@ let keyV: UInt16 = 0x09
                 == .init(event: .pressed, swallow: true))
         #expect(
             t.flagsChanged(modifiers: [leftControl, leftOption], at: t0 + .milliseconds(100))
-                == .init(event: .cancelled))
+                == .init(event: .interrupted))
     }
 
     @Test func sendKeyArmsOnEitherOptionWhileOptionSpaceIsHeld() {
@@ -439,7 +439,7 @@ let keyV: UInt16 = 0x09
         #expect(t.flagsChanged(modifiers: [rightCommand], at: t0) == .init(event: .pressed))
         #expect(
             t.keyDown(keyC, modifiers: [rightCommand], at: t0 + .milliseconds(80))
-                == .init(event: .cancelled))
+                == .init(event: .interrupted))
         #expect(t.flagsChanged(modifiers: [], at: t0 + .milliseconds(200)) == .init())
     }
 
@@ -470,7 +470,7 @@ let keyV: UInt16 = 0x09
         #expect(t.flagsChanged(modifiers: [rightCommand], at: t0) == .init(event: .pressed))
         #expect(
             t.flagsChanged(modifiers: [rightCommand, leftShift], at: t0 + .milliseconds(100))
-                == .init(event: .cancelled))
+                == .init(event: .interrupted))
     }
 
     @Test func submitKeyIsNotAnInterruption() {
@@ -488,7 +488,7 @@ let keyV: UInt16 = 0x09
         #expect(t.keyDown(space, modifiers: [leftControl], at: t0) == .init(event: .pressed, swallow: true))
         #expect(
             t.keyDown(keyA, modifiers: [leftControl], at: t0 + .milliseconds(50))
-                == .init(event: .cancelled))
+                == .init(event: .interrupted))
         #expect(t.keyUp(space, modifiers: [leftControl], at: t0 + .milliseconds(120)) == .init(swallow: true))
     }
 
@@ -498,7 +498,7 @@ let keyV: UInt16 = 0x09
         #expect(t.flagsChanged(modifiers: [rightCommand, rightOption], at: t0 + .milliseconds(50)) == .init())
         #expect(
             t.keyDown(keyC, modifiers: [rightCommand, rightOption], at: t0 + .milliseconds(100))
-                == .init(event: .cancelled))
+                == .init(event: .interrupted))
         #expect(t.isSubmitArmed == false)
         #expect(t.flagsChanged(modifiers: [], at: t0 + .milliseconds(200)) == .init())
         #expect(t.flagsChanged(modifiers: [rightCommand], at: t0 + .milliseconds(300)) == .init(event: .pressed))
@@ -514,7 +514,7 @@ let keyV: UInt16 = 0x09
         #expect(t.flagsChanged(modifiers: [rightCommand], at: t0 + .seconds(6)) == .init(event: .pressed))
         #expect(
             t.keyDown(keyC, modifiers: [rightCommand], at: t0 + .seconds(6) + .milliseconds(80))
-                == .init(event: .cancelled))
+                == .init(event: .interrupted))
     }
 
     @Test func aShorterWindowIsRespected() {

@@ -45,7 +45,7 @@ private func event(_ role: HotkeyRole, _ event: HotkeyEvent) -> HotkeyMonitorEve
         #expect(set.flagsChanged(modifiers: [rightCommand], at: start) == .init(events: [event(.dictate, .pressed)]))
         #expect(
             set.flagsChanged(modifiers: [rightCommand, rightOption], at: start + .milliseconds(100))
-                == .init(events: [event(.dictate, .cancelled), event(.toggle, .pressed)])
+                == .init(events: [event(.dictate, .interrupted), event(.toggle, .pressed)])
         )
         #expect(
             set.flagsChanged(modifiers: [], at: start + .seconds(3))
@@ -82,7 +82,7 @@ private func event(_ role: HotkeyRole, _ event: HotkeyEvent) -> HotkeyMonitorEve
         var set = HotkeyChordSet(chords: [.toggle: Hotkey(rightCommand, rightOption), .dictate: .rightCommand])
         _ = set.flagsChanged(modifiers: [rightCommand], at: start)
         let handOver = set.flagsChanged(modifiers: [rightCommand, rightOption], at: start + .milliseconds(10))
-        #expect(handOver.events == [event(.dictate, .cancelled), event(.toggle, .pressed)])
+        #expect(handOver.events == [event(.dictate, .interrupted), event(.toggle, .pressed)])
     }
 }
 
@@ -98,7 +98,7 @@ private func event(_ role: HotkeyRole, _ event: HotkeyEvent) -> HotkeyMonitorEve
         #expect(set.flagsChanged(modifiers: [rightCommand], at: start) == .init(events: [event(.toggle, .pressed)]))
         #expect(
             set.flagsChanged(modifiers: [rightCommand, rightOption], at: start + .milliseconds(100))
-                == .init(events: [event(.toggle, .cancelled), event(.dictate, .pressed)]))
+                == .init(events: [event(.toggle, .interrupted), event(.dictate, .pressed)]))
         #expect(
             set.flagsChanged(modifiers: [], at: start + .seconds(3))
                 == .init(events: [event(.dictate, .released(submit: false))]))

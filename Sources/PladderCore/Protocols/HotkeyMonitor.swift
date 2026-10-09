@@ -37,7 +37,6 @@ public protocol HotkeyMonitor: Sendable {
 public enum HotkeyEvent: Sendable, Equatable {
     case pressed
     case released(submit: Bool)
-    // Another key went down within the interruption window: a shortcut, not a
-    // dictation. Only the tap reports it; Carbon never sees the other key.
-    case cancelled
+    // Only the tap reports it; Carbon never sees the other key.
+    case interrupted
 }

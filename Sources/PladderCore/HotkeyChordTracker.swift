@@ -165,7 +165,7 @@ public struct HotkeyChordTracker: Sendable, Equatable {
             engagedAt = nil
             if wasInterrupted {
                 wasInterrupted = false
-                return .cancelled
+                return .interrupted
             }
             return .released(submit: submit)
         }
