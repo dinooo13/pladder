@@ -40,6 +40,8 @@ final class HotkeyRouter {
     /// Only a *sustained* reading counts, so the password field the user
     /// tabs through does not swap the monitor twice in four seconds.
     @ObservationIgnored private var secureInput = SustainedCondition()
+    /// The last poll's answer, so a chord change between polls decides with it.
+    @ObservationIgnored private var secureInputSustained = false
     @ObservationIgnored private weak var coordinator: DictationCoordinator?
     /// So the first `update` applies the stand-in even though nothing
     /// flipped; `usesTap` already matches the grant at that point.
@@ -61,21 +63,18 @@ final class HotkeyRouter {
     /// Called after every permission poll.
     func update(accessibilityTrusted trusted: Bool, secureInputEnabled: Bool) {
         if trusted != accessibilityTrusted { accessibilityTrusted = trusted }
-        let sustained = secureInput.observe(secureInputEnabled)
-        let wantsTap = HotkeySource.choose(
-            accessibilityTrusted: trusted, secureInputSustained: sustained, hotkey: hotkey) == .tap
-        let flipped = wantsTap != usesTap
-        if flipped {
-            usesTap = wantsTap
+        secureInputSustained = secureInput.observe(secureInputEnabled)
+        let flipped = chooseMonitor()
+        if let flipped {
             // A recording in progress is dropped by the coordinator, since the
             // old monitor's release can no longer arrive.
-            coordinator?.replaceHotkeyMonitor(wantsTap ? tap : carbon)
+            coordinator?.replaceHotkeyMonitor(flipped)
         }
         // After the swap: the new monitor is started with the old stand-in and
         // then, if it changed, once more with the new one. The other order
         // would make the Carbon monitor log a failure for a modifier-only
         // chord on the way to being replaced by the tap.
-        if flipped || !didApplyStandIn {
+        if flipped != nil || !didApplyStandIn {
             didApplyStandIn = true
             applyStandIn()
             refreshSystemShortcuts()
@@ -83,11 +82,26 @@ final class HotkeyRouter {
     }
 
     /// A chord with a regular key no longer needs a stand-in, and a
-    /// modifier-only one does. The app hands the coordinator the new
-    /// `standInHotkey` with the new chord, in one restart.
-    func hotkeyChanged(to hotkey: Hotkey) {
-        guard hotkey != self.hotkey else { return }
+    /// modifier-only one does; under Secure Event Input it may also need the
+    /// other monitor, which Carbon cannot register it on. Returns that
+    /// monitor when it changed, and the app hands the coordinator it, the new
+    /// `standInHotkey` and the new chord in one restart, rather than leaving
+    /// the chord on the wrong monitor until the next permission poll.
+    func hotkeyChanged(to hotkey: Hotkey) -> (any HotkeyMonitor)? {
+        guard hotkey != self.hotkey else { return nil }
         self.hotkey = hotkey
+        return chooseMonitor()
+    }
+
+    /// Re-decides between the tap and Carbon; returns the monitor to switch
+    /// to, or nil when it stays.
+    private func chooseMonitor() -> (any HotkeyMonitor)? {
+        let wantsTap = HotkeySource.choose(
+            accessibilityTrusted: accessibilityTrusted, secureInputSustained: secureInputSustained,
+            hotkey: hotkey) == .tap
+        guard wantsTap != usesTap else { return nil }
+        usesTap = wantsTap
+        return wantsTap ? tap : carbon
     }
 
     /// The default chord, standing in for a stored chord Carbon cannot

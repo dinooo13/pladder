@@ -229,6 +229,23 @@ import Testing
         #expect(fake.lastChords == [.dictate: .optionSpace, .toggle: Hotkey(0x3B, 0x02)])
     }
 
+    // Before: the app swapped the monitor for a new chord only at the next
+    // permission poll, up to two seconds later. Under Secure Event Input a
+    // modifier-only chord recorded while Carbon was in charge was handed to
+    // Carbon, which cannot register it, and nothing listened until then.
+    @Test func aChordAndTheMonitorItNeedsChangeInOneRestart() async {
+        let carbon = FakeHotkey()
+        let tap = FakeHotkey()
+        let (c, _, _) = makeCoordinator(hotkeyMonitor: carbon)
+        await c.startIdle()
+        var settings = c.settings
+        settings.hotkey = .rightCommand
+        c.update(settings, hotkeyOverride: nil, monitor: tap)
+        #expect(carbon.startedHotkeys == [.optionSpace])
+        #expect(carbon.stopCount >= 1)
+        #expect(tap.startedHotkeys == [.rightCommand])
+    }
+
     @Test func changesBeforeStartRegisterOnceAtStart() async {
         let first = FakeHotkey()
         let second = FakeHotkey()

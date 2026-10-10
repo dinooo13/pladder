@@ -181,12 +181,10 @@ final class AppModel {
     // MARK: Settings
 
     private func settingsChanged(from old: Settings) {
-        if settings.hotkey != old.hotkey {
-            hotkeys.hotkeyChanged(to: settings.hotkey)
-        }
-        // Together, so a new chord and the stand-in it calls for restart the
-        // monitor once.
-        coordinator.update(DictationSettings(settings), hotkeyOverride: hotkeys.standInHotkey)
+        let monitor = settings.hotkey != old.hotkey ? hotkeys.hotkeyChanged(to: settings.hotkey) : nil
+        // Together, so a new chord and the stand-in and monitor it calls for
+        // restart the monitor once.
+        coordinator.update(DictationSettings(settings), hotkeyOverride: hotkeys.standInHotkey, monitor: monitor)
         if settings.appearance != old.appearance {
             applyAppearance(settings.appearance)
         }
