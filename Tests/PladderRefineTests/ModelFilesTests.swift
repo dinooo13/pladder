@@ -152,6 +152,55 @@ private actor StandInTransport: ModelFileTransport {
         #expect(await transport.resumes == [nil, nil])
     }
 
+    // Before: the checksum ran to its end on a task of its own, so a cancel
+    // while verifying waited for up to 1.5 GB of hashing, and the download
+    // of the model picked next queued behind it.
+    @Test func cancelReachesTheChecksum() async throws {
+        let dir = try scratchDirectory("ModelFilesTests")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = weights(in: dir)
+        let models = dir.appending(path: "models")
+        let transport = StandInTransport { _, _, staging in try Data("weights".utf8).write(to: staging) }
+        let started = Recorder<Bool>()
+        let cancelled = Recorder<Bool>()
+        // A checksum that ends only when cancelled, or after two seconds.
+        let files = ModelFiles(directory: models, transport: transport, hash: { _ in
+            started.append(true)
+            let deadline = ContinuousClock.now + .seconds(2)
+            while ContinuousClock.now < deadline {
+                if Task.isCancelled {
+                    cancelled.append(true)
+                    return nil
+                }
+                Thread.sleep(forTimeInterval: 0.001)
+            }
+            return nil
+        })
+        await files.ensure(file)
+        #expect(await eventually { !started.all.isEmpty })
+        #expect(await files.status(of: file) == .verifying)
+        let cancelledAt = ContinuousClock.now
+        await files.cancel(file)
+        #expect(ContinuousClock.now - cancelledAt < .seconds(1))
+        #expect(cancelled.all == [true])
+        #expect(await files.status(of: file) == .missing)
+        #expect(try contents(of: models).isEmpty)
+    }
+
+    @Test func theChecksumStopsBetweenChunksWhenCancelled() async throws {
+        let dir = try scratchDirectory("ModelFilesTests")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appending(path: "abc")
+        try Data("abc".utf8).write(to: url)
+        let abc = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        #expect(ModelFiles.sha256(of: url, chunkSize: 1) == abc)
+        let cancelled = Task.detached {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return ModelFiles.sha256(of: url, chunkSize: 1)
+        }
+        #expect(await cancelled.value == nil)
+    }
+
     @Test func anInterruptedDownloadResumesWhereItStopped() async throws {
         let dir = try scratchDirectory("ModelFilesTests")
         defer { try? FileManager.default.removeItem(at: dir) }

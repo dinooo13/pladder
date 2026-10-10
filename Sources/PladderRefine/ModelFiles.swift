@@ -72,6 +72,7 @@ public actor ModelFiles {
     public let directory: URL
     private let onChange: @Sendable (ModelFile, ModelFileStatus) -> Void
     private let transport: any ModelFileTransport
+    private let hash: @Sendable (URL) -> String?
     private var statuses: [String: ModelFileStatus] = [:]
     private var downloads: [String: Download] = [:]
     /// Cancelled downloads still winding down. They clean up the staging
@@ -94,13 +95,16 @@ public actor ModelFiles {
         self.init(directory: directory, transport: URLSessionModelFileTransport(), onChange: onChange)
     }
 
-    /// `transport` stands in for URLSession in the tests.
+    /// `transport` stands in for URLSession in the tests, and `hash` for
+    /// the SHA-256 of the downloaded file.
     init(
         directory: URL, transport: any ModelFileTransport,
-        onChange: @escaping @Sendable (ModelFile, ModelFileStatus) -> Void = { _, _ in }
+        onChange: @escaping @Sendable (ModelFile, ModelFileStatus) -> Void = { _, _ in },
+        hash: @escaping @Sendable (URL) -> String? = { ModelFiles.sha256(of: $0) }
     ) {
         self.directory = directory
         self.transport = transport
+        self.hash = hash
         self.onChange = onChange
     }
 
@@ -151,7 +155,8 @@ public actor ModelFiles {
     /// Stops `file`'s download, if one is under way, and forgets it: nothing
     /// is left at the file's location or beside it, and the next `ensure`
     /// starts from the beginning. For the user picking another model or
-    /// turning polish off; returns once the download has wound down.
+    /// turning polish off; returns once the download has wound down, which
+    /// takes at most one chunk of the checksum when it is verifying.
     public func cancel(_ file: ModelFile) async {
         resumeData[file.fileName] = nil
         guard let download = downloads.removeValue(forKey: file.fileName) else { return }
@@ -202,7 +207,14 @@ public actor ModelFiles {
         // A resumed download is checked like a fresh one: the checksum covers
         // the whole file, whichever way its bytes arrived.
         set(file, .verifying)
-        let digest = await Task.detached(priority: .utility) { Self.sha256(of: staging) }.value
+        // Detached so 1.5 GB of hashing stays off this actor, and cancelled
+        // with the download, so a `cancel` does not sit out the whole hash.
+        let hashing = Task.detached(priority: .utility) { [hash] in hash(staging) }
+        let digest = await withTaskCancellationHandler {
+            await hashing.value
+        } onCancel: {
+            hashing.cancel()
+        }
         guard isCurrent(file, id), digest == file.sha256 else {
             try? FileManager.default.removeItem(at: staging)
             if isCurrent(file, id) { set(file, .failed(.checksum)) }
@@ -244,12 +256,14 @@ public actor ModelFiles {
         set(file, .downloading(fraction: min(1, Double(received) / Double(max(file.byteCount, 1)))))
     }
 
-    /// Streamed, so a 1.5 GB file never sits in memory.
-    private static func sha256(of url: URL) -> String? {
+    /// Streamed, so a 1.5 GB file never sits in memory. Nil when the task
+    /// running it is cancelled, which it checks between chunks.
+    static func sha256(of url: URL, chunkSize: Int = 16 << 20) -> String? {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
         defer { try? handle.close() }
         var hasher = SHA256()
-        while let chunk = try? handle.read(upToCount: 16 << 20), !chunk.isEmpty {
+        while let chunk = try? handle.read(upToCount: chunkSize), !chunk.isEmpty {
+            if Task.isCancelled { return nil }
             hasher.update(data: chunk)
         }
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
