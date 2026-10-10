@@ -111,6 +111,28 @@ import Testing
         #expect(lifecycle == ["begin", "abandon", "begin", "end"])
     }
 
+    // Before: a press cancelled while it waited for a cleanup went on to
+    // start the microphone, and so restarted the capture of the recording
+    // that had started since, dropping what it had buffered.
+    @Test func aPressCancelledWhileItWaitsLeavesTheMicrophoneAlone() async {
+        let (c, _, capture) = makeCoordinator()
+        await capture.setStopDelay(.milliseconds(150))
+        await c.startIdle()
+        await c.hotkeyPressed()
+        let cancel = Task { await c.cancelRecording() }
+        #expect(await waitUntil { c.state == .idle })
+        let cancelledPress = Task { await c.hotkeyPressed() }
+        #expect(await waitUntil { c.state.isRecording })
+        let cancelPress = Task { await c.cancelRecording() }
+        #expect(await waitUntil { c.state == .idle })
+        let press = Task { await c.hotkeyPressed() }
+        #expect(await waitUntil { c.state.isRecording })
+        _ = await (cancel.value, cancelledPress.value, cancelPress.value, press.value)
+        #expect(c.state.isRecording)
+        #expect(await capture.startCount == 2)
+        await c.cancelRecording()
+    }
+
     // Before: the engine kept one utterance and no handle, so the abandon
     // of a recording cancelled while its utterance began, landing after
     // the next recording had begun its own, dropped that one instead.

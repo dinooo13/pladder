@@ -563,6 +563,9 @@ public final class DictationCoordinator {
         // Normally long finished: only a press right on the heels of a cancel
         // waits here.
         await cancelCleanup?.value
+        // Cancelled while it waited. A newer recording, if one has started
+        // since, owns the microphone; starting it again would restart theirs.
+        guard isCurrent(mine) else { return }
         let levels: AsyncStream<Float>
         do {
             levels = try await capture.start()
