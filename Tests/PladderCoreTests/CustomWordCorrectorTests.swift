@@ -193,6 +193,16 @@ import Testing
         #expect(c.apply(to: "the rost") == "the Rust")
     }
 
+    // Before: the cap was keyed on the longer of key and candidate, so a
+    // six-letter candidate lifted it: "soviet" is three edits from "swift",
+    // shares its Soundex code, and was pasted as "Swift".
+    @Test func aLongerCandidateDoesNotLiftTheShortKeyCap() {
+        let c = CustomWordCorrector(entries: [DictionaryEntry(from: "", to: "Swift")], isOrdinaryWord: { _ in false })
+        #expect(c.apply(to: "the soviet union") == "the soviet union")
+        // One edit is still excused, whichever side is longer.
+        #expect(c.apply(to: "the swifft code") == "the Swift code")
+    }
+
     @Test func theLexiconIsWhatKeepsALongerOrdinaryWord() {
         // "cloud" clears the distance rule, so only the lexicon stops it.
         let terms = [DictionaryEntry(from: "", to: "Claude")]
