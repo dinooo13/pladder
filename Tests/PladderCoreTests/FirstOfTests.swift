@@ -8,8 +8,7 @@ import Testing
         #expect(result.value == 42)
     }
 
-    // The work ignores cancellation, as a model call in flight does: the
-    // race still ends at the deadline instead of waiting for it.
+    // Ignores cancellation, as a model call in flight does.
     @Test func theDeadlineWinsOverWorkThatIgnoresCancellation() async {
         let started = ContinuousClock.now
         let result = await firstOf(until: .now + .milliseconds(50)) { () -> Int in

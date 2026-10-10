@@ -1,8 +1,5 @@
 import Foundation
 
-/// Development engine that returns fixed text after a short delay. Used to prove
-/// the hotkey, overlay, and paste path before any model is involved, and by
-/// tests.
 public actor EchoEngine: TranscriptionEngine {
     public static let engineID = EngineID("echo")
 

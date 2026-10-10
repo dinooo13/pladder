@@ -2,17 +2,9 @@ import AppKit
 import Foundation
 import PladderCore
 
-/// `Pladder --overlay-demo` plays one dictation per overlay path through the
-/// real coordinator and the real pill, then quits. The engine, capture,
-/// paste, refiner and hotkey are stand-ins and the press and release come
-/// from here, so it never starts the hotkey, the microphone or the engine and
-/// can run beside a copy of Pladder that is in use. It prints every press,
-/// release and state change with its wall-clock time, which is what
-/// `scripts/overlay-demo.sh` lines the screen recording up against.
-///
-/// `--style compact|minimal|liveTranscript` and
-/// `--speed instant|quick|expressive` pick the pill; the default is Compact
-/// at Quick.
+// `--overlay-demo`: every overlay path through the real coordinator and pill, with
+// stand-ins for the engine, capture, paste, refiner and hotkey, so it can run beside
+// a copy in use. `scripts/overlay-demo.sh` lines its timed output up with a recording.
 @MainActor
 enum OverlayDemo {
     static var isRequested: Bool { CommandLine.arguments.contains("--overlay-demo") }
@@ -21,8 +13,6 @@ enum OverlayDemo {
         let name: String
         let text: String
         var polish = false
-        /// How long the engine takes; past the pill's collapse it holds the
-        /// disc, spinner in it, until the paste.
         var engineDelay: Duration = .milliseconds(200)
         var result: InsertResult = .pasted
     }
@@ -127,8 +117,7 @@ enum OverlayDemo {
     }
 }
 
-/// A steady wave for the meter and two seconds of silence at the release,
-/// enough to clear the coordinator's minimum duration.
+// Two seconds of silence at the release clear the coordinator's minimum duration.
 private actor DemoCapture: AudioCapture {
     private var levels: AsyncStream<Float>.Continuation?
 
@@ -166,7 +155,7 @@ private final class DemoOutput: TextOutput, @unchecked Sendable {
     func prepare() async {}
 }
 
-/// About as long as the on-device model takes for a short dictation.
+// About as long as the on-device model takes for a short dictation.
 private final class DemoRefiner: TranscriptRefiner, @unchecked Sendable {
     func prepare() async {}
     func refine(_ text: String) async -> String? {

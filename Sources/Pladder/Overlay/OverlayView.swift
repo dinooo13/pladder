@@ -1,9 +1,6 @@
 import SwiftUI
 import PladderCore
 
-/// Liquid Glass pill: a capsule that samples the desktop behind the
-/// transparent panel and morphs between the recording, transcribing, copied
-/// and error states.
 struct OverlayView: View {
     let model: OverlayModel
 
@@ -19,9 +16,7 @@ struct OverlayView: View {
             presentation: model.presentation,
             animationSpeed: model.speed
         )
-            // Glass carries its own edge highlight; this is only enough shadow
-            // to lift the pill off a light desktop. The flat background gets
-            // the same treatment.
+            // Glass carries its own edge highlight; this only lifts the pill off a light desktop.
             .compositingGroup()
             .shadow(color: .black.opacity(0.16), radius: 8, y: 3)
             .animation(.smooth(duration: 0.25), value: phase)
@@ -31,10 +26,6 @@ struct OverlayView: View {
     }
 }
 
-/// Overrides the SwiftUI color scheme under a forced appearance. AppKit's
-/// window-appearance propagation reaches a borderless panel inconsistently,
-/// so this sets the scheme in the environment directly, which is what
-/// `glassEffect` and the text colours follow.
 private struct ForcedScheme: ViewModifier {
     let appearance: Appearance
 

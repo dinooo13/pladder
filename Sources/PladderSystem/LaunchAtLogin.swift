@@ -1,21 +1,14 @@
 import Foundation
 import ServiceManagement
 
-/// Login item registration for the app bundle itself.
-///
-/// `SMAppService.mainApp` only works from a signed, bundled app; running the raw
-/// SwiftPM binary throws. The settings UI surfaces the thrown error instead of
-/// silently showing a toggle that does nothing.
+// `SMAppService.mainApp` works only from a signed bundle; the bare binary throws,
+// and the settings show the error.
 public struct LaunchAtLogin {
     public static var isEnabled: Bool {
         SMAppService.mainApp.status == .enabled
     }
 
-    /// Registers or unregisters the app as a login item.
-    ///
-    /// If the user disabled the item in System Settings > General > Login Items,
-    /// the status stays `.requiresApproval` and registering again is a no-op from
-    /// their point of view.
+    // Disabled by the user in Login Items, the status stays `.requiresApproval`.
     public static func setEnabled(_ enabled: Bool) throws {
         let service = SMAppService.mainApp
         if enabled {

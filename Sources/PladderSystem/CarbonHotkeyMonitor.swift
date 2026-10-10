@@ -3,56 +3,14 @@ import Foundation
 import PladderCore
 import os
 
-/// Watches the push-to-talk chords with Carbon's `RegisterEventHotKey`, which
-/// needs no permission at all.
-///
-/// This is the fallback for accounts that cannot grant Accessibility: a
-/// standard (non-admin) user is asked for an administrator password when they
-/// tick the Accessibility box, and Input Monitoring is gated the same way, so
-/// the event tap in `GlobalHotkeyMonitor` never comes alive for them.
-/// `RegisterEventHotKey` is the one system-wide hotkey API with no privacy
-/// gate; the window server consumes the combination, so the front app never
-/// sees it, which is what the tap's swallowing does when trusted.
-///
-/// What it cannot do, and why this is only the fallback:
-/// - the chord needs exactly one regular key: a modifier-only chord such as
-///   Right Command cannot be registered (`Hotkey`'s
-///   `canBeRegisteredWithoutAccessibility` is the predicate),
-/// - the modifier mask is side-agnostic, so Left and Right Shift are the same
-///   chord here, and there is no bit for Fn,
-/// - the send key is not supported: it would need a second observer of the
-///   keyboard, and posting the Return it asks for needs Accessibility anyway.
-///   `submitKey` is therefore ignored and every release says `submit: false`.
-/// - the cancel key has to be a hot key of its own, and a hot key is taken
-///   from every app, so Escape is registered when a recording starts and
-///   unregistered when it ends; that is why the monitor has to be told when
-///   one is on (`setCancelKeyEnabled`). Its mask is empty, so only a bare
-///   Escape cancels here, where the tap also accepts Escape with the chord's
-///   own modifiers still held.
-///
-/// Each chord is its own hot key; a chord that cannot be registered is
-/// skipped on its own, the others still work.
-///
-/// This stays a dumb registrar: an unregistrable chord is refused here, and it
-/// is `AppModel` that hands the coordinator the default chord instead, since
-/// the menu and the settings window have to name what is actually being
-/// listened for. See `Hotkey.standInWithoutAccessibility`.
-///
-/// Carbon delivers its events on the main run loop, and registration is main
-/// thread work, so everything hops there. Mutable state lives behind the
-/// lock of `HotkeyMonitorLifecycle`, which also does the session bookkeeping
-/// it shares with the tap, because the protocol is `Sendable` and callers are
-/// not all on the main actor. The event handler holds the monitor retained,
-/// so the monitor outlives every event it is handed, and lives until `stop`
-/// or the end of its stream removes the handler.
+// The fallback without Accessibility: `RegisterEventHotKey` has no privacy gate, and
+// the window server consumes the chord. Its limits: docs/ARCHITECTURE.md, "Hotkeys".
+// `@unchecked Sendable`: mutable state is behind the lifecycle's lock.
 public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
     private struct SessionState: Sendable {
-        /// The session's hot key IDs and which roles are pressed.
         var hotKeys: CarbonHotkeySession
-        /// Escape, registered only while a recording is on.
         var cancelKey: CancelKey?
-        /// What the coordinator last asked for. Remembered so an enable that
-        /// lands before the session's registration is honoured by it.
+        // Remembered so an enable that lands before the session's registration is honoured.
         var cancelKeyWanted = false
     }
 
@@ -65,16 +23,14 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
 
     private static let log = Logger(subsystem: "de.dinooo13.pladder", category: "hotkey")
 
-    /// 'PLDR' as a four-character code. Every hot key we register carries it,
-    /// so the handler can tell our events from another client's.
+    // On every hot key we register, so the handler can tell ours from another client's.
     private static let signature: OSType = Array("PLDR".utf8)
         .reduce(OSType(0)) { ($0 << 8) | OSType($1) }
 
     public init() {}
 
     deinit {
-        // Only once no handler holds the monitor; this ends the stream and
-        // takes Escape down if a recording was still on.
+        // Runs only once no handler holds the monitor.
         stop()
     }
 
@@ -85,10 +41,8 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
         for (role, chord) in chords.sorted(by: { $0.key < $1.key }) where !chord.isEmpty {
             guard chord.canBeRegisteredWithoutAccessibility,
                   let keyCode = chord.regularKeyCodes.first else {
-                // Nothing to register for this role. The stream stays open so
-                // the coordinator behaves exactly as it does before a tap
-                // comes up; the settings window is where the user is told to
-                // pick a chord with a regular key.
+                // The stream stays open, so the coordinator behaves as it does before a tap comes
+                // up; the settings window tells the user to pick a chord with a regular key.
                 let codes = chord.keyCodes.sorted().map(String.init).joined(separator: ", ")
                 Self.log.error(
                     """
@@ -101,8 +55,6 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
             registrable.append(HotKeyEntry(role: role, keyCode: UInt32(keyCode), modifiers: chord.carbonModifierMask))
         }
 
-        // Starting twice replaces the previous session rather than stacking
-        // registrations, the same rule `GlobalHotkeyMonitor` follows.
         let (stream, generation) = lifecycle.start { generation in
             SessionState(hotKeys: CarbonHotkeySession(generation: generation, roles: registrable.map(\.role)))
         }
@@ -117,9 +69,8 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
         lifecycle.stop()
     }
 
-    /// Never registers or unregisters inline: the coordinator calls this on
-    /// the release path, and a Carbon call there would wait on the window
-    /// server. The main queue does it straight after.
+    // Never registers inline: this is called on the release path, and a Carbon call
+    // there would wait on the window server.
     public func setCancelKeyEnabled(_ enabled: Bool) {
         let generation = lifecycle.withSession { session in
             session.state.cancelKeyWanted = enabled
@@ -133,39 +84,35 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
 
     // MARK: Registration
 
-    /// The session's hot keys, the one event handler that feeds them all,
-    /// and the monitor that handler reads, retained. Neither Carbon type is
-    /// `Sendable`; both are only ever created and destroyed on the main
-    /// thread, so boxing them to hop there is safe.
+    // Neither Carbon type is `Sendable`; both are created and destroyed on the main
+    // thread only, so boxing them to hop there is safe.
     private struct Registration: @unchecked Sendable {
         let hotKeys: [EventHotKeyRef]
         let handler: EventHandlerRef
         let monitor: Unmanaged<CarbonHotkeyMonitor>
 
-        /// Main thread only, and exactly once per registration: by the
-        /// lifecycle for an adopted one, by `register` for one it refused.
+        // Main thread only, once per registration: by the lifecycle for an adopted one, by
+        // `register` for one it refused.
         func tearDown() {
             for hotKey in hotKeys { UnregisterEventHotKey(hotKey) }
             RemoveEventHandler(handler)
-            // Last: events arrive on this thread, and none can follow the
-            // handler's removal.
+            // Last: events arrive on this thread, and none can follow the handler's removal.
             monitor.release()
         }
     }
 
-    /// Escape's hot key. Only ever created and destroyed on the main thread.
+    // Created and destroyed on the main thread only.
     private struct CancelKey: @unchecked Sendable {
         var hotKey: EventHotKeyRef
     }
 
-    /// One chord to register: which role it is, and Carbon's spelling of it.
     private struct HotKeyEntry: Sendable {
         var role: HotkeyRole
         var keyCode: UInt32
         var modifiers: UInt32
     }
 
-    /// Main thread only.
+    // Main thread only.
     private func register(_ entries: [HotKeyEntry], generation: UInt64) {
         guard lifecycle.needsResource(generation) else { return }
 
@@ -177,9 +124,8 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
                 eventClass: OSType(kEventClassKeyboard),
                 eventKind: UInt32(kEventHotKeyReleased)),
         ]
-        // Retained for as long as the handler can call back into it:
-        // released by `Registration.tearDown` once the handler is removed, or
-        // below when no registration came of it.
+        // Retained while the handler can call back into it: released by
+        // `Registration.tearDown`, or below when no registration came of it.
         let monitor = Unmanaged.passRetained(self)
         var handler: EventHandlerRef?
         let installed = InstallEventHandler(
@@ -199,7 +145,6 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
             let registered = RegisterEventHotKey(
                 entry.keyCode, entry.modifiers, id, GetApplicationEventTarget(), 0, &hotKey)
             guard registered == noErr, let hotKey else {
-                // This chord is lost; the others still work.
                 let role = entry.role.rawValue
                 if registered == OSStatus(eventHotKeyExistsErr) {
                     Self.log.error("The \(role, privacy: .public) key is already in use by another app")
@@ -225,14 +170,11 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
         syncCancelKey(generation: generation)
     }
 
-    /// Main thread only. Brings Escape's registration in line with what the
-    /// coordinator last asked for. Needs the session's handler, which only
-    /// exists once a chord registered; without one no recording can start
-    /// from this monitor anyway.
+    // Main thread only. Needs the session's handler, which exists once a chord registered.
     private func syncCancelKey(generation: UInt64) {
         let snapshot = lifecycle.withSession(generation) { session in
-            // Taken under the lock, so a session ending meanwhile, whose
-            // `ended` unregisters it too, cannot unregister it twice.
+            // Taken under the lock, so a session ending meanwhile, whose `ended` unregisters it
+            // too, cannot unregister it twice.
             let taken = session.state.cancelKeyWanted ? nil : session.state.cancelKey
             if taken != nil { session.state.cancelKey = nil }
             return (wanted: session.state.cancelKeyWanted, current: session.state.cancelKey, taken: taken,
@@ -272,7 +214,7 @@ public final class CarbonHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
         return monitor.handle(event)
     }
 
-    /// Main thread only, as Carbon delivers it.
+    // Main thread only, as Carbon delivers it.
     private func handle(_ event: EventRef) -> OSStatus {
         var id = EventHotKeyID()
         let read = GetEventParameter(

@@ -56,11 +56,9 @@ import Testing
     }
 
     @Test func aRewriteYieldsNothing() {
-        // Four separate changes: a rewrite, not three corrections and a spare.
         #expect(CorrectionDiff.candidates(
             pasted: "one two three four five six seven eight nine ten",
             final: "one to three for five sicks seven ate nine ten") == [])
-        // More than half the words changed.
         #expect(CorrectionDiff.candidates(
             pasted: "the quick brown fox jumps",
             final: "a slow brown cat sleeps") == [])
@@ -96,8 +94,6 @@ import Testing
         #expect(CorrectionDiff.candidates(pasted: "say \(long) now", final: "say \(long)b now") == [])
     }
 
-    /// A control character is no word character, so it stands as a
-    /// punctuation token, on either side, and the pair is never formed.
     @Test func controlCharactersAreRejected() {
         #expect(CorrectionDiff.tokens("Cla\u{7}ude").map(\.isWord) == [true, false, true])
         #expect(CorrectionDiff.candidates(pasted: "say Claud now", final: "say Cla\u{7}ude now") == [])
@@ -106,7 +102,6 @@ import Testing
     }
 
     @Test func theLastReadingThatStillHoldsThePasteIsUsed() {
-        // The user fixed the word and pressed Return; the chat field emptied.
         let observation = PasteObservation(
             pasted: "I tried Claud today", readings: ["I tried Claud today", "I tried Claude today", ""])
         #expect(CorrectionDiff.candidates(in: observation) == [pair("Claud", "Claude")])

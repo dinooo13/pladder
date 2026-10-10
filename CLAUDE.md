@@ -2,6 +2,8 @@
 
 Push-to-talk dictation for macOS 26 on Apple Silicon. Hold a key, speak, release, and the words are pasted where the cursor is. Everything runs on the Mac.
 
+How the code fits together — the dictation flow, the hotkey pipeline, the clipboard timing, the settings file, the polish and the correction learner — is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 ## What the project optimises for
 
 1. **Speed of the release-to-paste path.** This is the metric. The path runs from the hotkey release to the paste: capture stop, engine, processors, output. In code it is everything between the coordinator's `recordingStopped` and `inserted` events. Nothing goes on that path without a before-and-after benchmark.
@@ -72,6 +74,14 @@ swift run -c release pladder-cli polish-set docs/polish-set.json --model s1-mini
 - Adding a language: add a `<code>` localization to both catalogs; nothing else. Adding a *string*: the key is the exact English text, and `PladderCore` never holds one — it emits an enum case and `Sources/Pladder/StatusText.swift` words it.
 - Engine and capture are actors. The coordinator is `@MainActor` because it drives UI. It owns the state machine and nothing else; every dependency is injected, its clock included, so tests run it with in-memory fakes and fire its timers with `ManualClock`. It sees `DictationSettings`, the part of `Settings` it acts on, and the app hands it a new value only when that part changed.
 - The app target is split by job: `AppModel` is the composition root and owns the settings; `HotkeyRouter` picks the tap or Carbon (the rule itself is `HotkeySource.choose` in Core); `PermissionMonitor` polls the grants; `PolishModelController` owns the polish model and its file; `CorrectionInbox` the learned corrections; `SettingsLocation` the files. Decisions worth testing go to Core as values (`HotkeyWarning`, `HotkeySource`, the timing line) and the app words them in `StatusText.swift`. Views talk to `AppModel` and its parts, not to the coordinator.
+
+## Code style
+
+- A comment stays in code only when it says something the code cannot say and a reader would otherwise get wrong: a constraint from outside the code (macOS, AppKit, a framework, a model), a measured number and where it comes from, or a trap — an ordering, a race or an invariant that looks removable but is not. One to three lines, at the one place it applies.
+- No doc comment that restates a name or a signature, no narration of what the next lines do, no history ("used to", "the fix for"), nothing CLAUDE.md already says, and no explanation repeated in a second file. Where a comment would only explain what something is, rename it instead.
+- Design explanations too long for a comment go in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); the code points there with one line, `// See docs/ARCHITECTURE.md, "<section>".` Keep the section names stable.
+- Tests need almost no comments: the test's name says what it checks. Keep only what a reader would get wrong, such as why a test sleeps in real time or that it never touches the general pasteboard.
+- `// MARK:` lines are fine in source files; tests do without them.
 
 ## Risks
 

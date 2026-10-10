@@ -3,14 +3,8 @@ import PladderCore
 import PladderRefine
 import PladderSystem
 
-/// The wording for every state `PladderCore` and `PladderEngines` report as a
-/// value.
-///
-/// Core imports Foundation only and must not produce user-facing text, so it
-/// emits enum cases and this is the single place that turns them into
-/// sentences — which also means the sentences are here, in the app, where the
-/// String Catalog is. None of it runs between `recordingStopped` and
-/// `inserted`: these are read by the menu and the overlay, and on failure.
+// Read by the menu, the overlay and settings; none of it runs between
+// `recordingStopped` and `inserted`.
 extension UnavailableReason {
     var text: String {
         switch self {
@@ -25,8 +19,7 @@ extension EngineFailure {
     var text: String {
         switch self {
         case .download(let reason):
-            // Retry calls `load()` again, which resumes the `.partial` rather
-            // than starting the ~460 MB over; saying so is the point.
+            // Retry resumes the partial download rather than starting the ~460 MB over.
             String(localized: "Download failed: \(reason.text) (Retry resumes it)")
         case .incompleteFiles:
             String(localized: "Model files incomplete (Retry re-downloads them)")
@@ -68,9 +61,7 @@ extension DictationFailure {
 }
 
 extension OnDeviceModelAvailability {
-    /// The sentence under the "Polish dictations" toggle, nil when the model
-    /// can run. Each says what dictations do meanwhile: they paste as
-    /// dictated, only without the polish.
+    // Each sentence says what dictations do meanwhile: they paste as dictated.
     var polishWarning: String? {
         switch self {
         case .available: nil
@@ -87,8 +78,7 @@ extension OnDeviceModelAvailability {
 }
 
 extension PolishModel {
-    /// The picker's wording. S1-mini's licence asks for its name exactly
-    /// so: "S1-mini" by "Superwhisper".
+    // S1-mini's licence asks for the name exactly so: "S1-mini" by "Superwhisper".
     var displayName: String {
         switch self {
         case .appleIntelligence: String(localized: "Apple Intelligence")
@@ -99,7 +89,6 @@ extension PolishModel {
 }
 
 extension ModelFileFailure {
-    /// Each says what dictations do meanwhile, like the Apple sentences.
     var text: String {
         switch self {
         case .download:
@@ -112,18 +101,11 @@ extension ModelFileFailure {
     }
 }
 
-/// The menu's first line and its last-transcript entry.
 enum MenuStatus {
-    /// The chords the line can name, already worded for the monitor that
-    /// matches them.
     struct Chords {
-        /// What to hold to dictate: the stored chord or its stand-in.
         var hold: String
-        /// What ends a latched recording.
         var stop: String
-        /// The stand-in is listening because Accessibility is missing.
         var accessibilityOff: Bool
-        /// Carbon is standing in for a deaf tap.
         var secureKeyboardEntry: Bool
     }
 
@@ -155,9 +137,7 @@ enum MenuStatus {
         }
     }
 
-    /// What to say when nothing is happening. Say why the send key and the
-    /// swallowing stopped when they did: both are the tap's. A whole
-    /// sentence either way: a suffix glued on cannot be translated.
+    // A whole sentence either way: a suffix glued on cannot be translated.
     private static func readyLine(_ chords: Chords) -> String {
         if chords.accessibilityOff {
             return String(localized: "Ready — hold \(chords.hold) (Accessibility is off)")
@@ -168,8 +148,6 @@ enum MenuStatus {
         return String(localized: "Ready — hold \(chords.hold)")
     }
 
-    /// A short, word-boundary-aware summary of the most recent transcript;
-    /// longer previews make the menu bar menu comically wide.
     static func summary(of text: String) -> String? {
         guard !text.isEmpty else { return nil }
         let limit = 32
@@ -182,9 +160,6 @@ enum MenuStatus {
     }
 }
 
-/// The Processing tab's wording for the standard processors, by id. Core
-/// holds no strings, so a processor is a stable id there and its name and
-/// one-line description are here, beside the catalog.
 enum ProcessorText {
     static func name(_ id: String) -> String {
         switch id {
@@ -215,7 +190,6 @@ enum ProcessorText {
 }
 
 extension HotkeyWarning {
-    /// The sentence under the recorder field.
     @MainActor var text: String {
         switch self {
         case .standIn(let stored, let standIn):

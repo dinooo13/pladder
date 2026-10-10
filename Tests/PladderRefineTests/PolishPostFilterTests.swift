@@ -2,8 +2,7 @@ import Foundation
 import Testing
 @testable import PladderRefine
 
-// Nothing here calls the model: these run on a Mac without Apple
-// Intelligence and keep `swift test` well under a second.
+// Nothing here calls the model.
 
 @Suite struct PolishPostFilterTests {
     @Test func stripsALeadingThinkBlock() {
@@ -42,7 +41,6 @@ import Testing
     }
 
     @Test func aLongTranscriptIsCutAtSentenceEnds() {
-        // 700 words in sentences of seven.
         let sentence = "one two three four five six seven."
         let text = Array(repeating: sentence, count: 100).joined(separator: " ")
         let chunks = TranscriptPolisher.chunks(of: text)

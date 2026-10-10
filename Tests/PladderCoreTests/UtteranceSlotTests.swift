@@ -2,8 +2,6 @@ import Foundation
 import Testing
 @testable import PladderCore
 
-/// The streaming engine's utterance slot: only the handle that holds it
-/// reaches the session, whatever order a reentrant actor runs the calls in.
 @Suite struct UtteranceSlotTests {
     @Test func aBeginHandsBackTheSessionItReplaces() {
         var slot = UtteranceSlot<String>()
@@ -17,8 +15,6 @@ import Testing
         #expect(slot.session(for: second.utterance) == nil)
     }
 
-    // Before: an abandon dropped whichever utterance was current when it
-    // ran, the next recording's included.
     @Test func aStaleHandleLeavesTheCurrentUtteranceAlone() {
         var slot = UtteranceSlot<String>()
         let old = slot.begin().utterance
@@ -34,8 +30,6 @@ import Testing
         #expect(slot.session(for: current) == "current")
     }
 
-    // Before: two overlapping begins each assigned their session after an
-    // await, the last assignment won, and the other was never cancelled.
     @Test func aBeginOvertakenByAnotherIsRefusedItsSession() {
         var slot = UtteranceSlot<String>()
         let overtaken = slot.begin().utterance

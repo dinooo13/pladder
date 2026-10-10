@@ -9,7 +9,7 @@ import Testing
 
 @MainActor
 @Suite(.timeLimit(.minutes(1))) struct ObservationLoopTests {
-    /// Lets the loop's hop onto the main actor run.
+    // The loop acts on a task of its own, so each change needs a moment to land.
     private func settle() async {
         for _ in 0..<5 { await Task.yield() }
         try? await Task.sleep(for: .milliseconds(10))
@@ -27,9 +27,6 @@ import Testing
         #expect(calls == 2)
     }
 
-    // Before: the overlay's chain re-armed from its own callback, so one left
-    // pending by `stop()` re-armed after `start()`, and every level change
-    // from then on ran two trackers.
     @Test func aStopAndStartLeavesOneChain() async {
         let meter = Meter()
         let loop = ObservationLoop()

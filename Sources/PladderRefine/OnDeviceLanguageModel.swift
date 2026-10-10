@@ -3,57 +3,35 @@ import FoundationModels
 import PladderCore
 import Synchronization
 
-/// Why the model cannot be used right now, as a value; the app words it.
 public enum OnDeviceModelAvailability: Equatable, Sendable {
     case available
     case deviceNotEligible
     case appleIntelligenceNotEnabled
     case modelNotReady
-    /// A reason this build does not know about yet.
     case unavailable
 }
 
 public enum OnDeviceModelError: Error, Sendable, Equatable {
     case unavailable(OnDeviceModelAvailability)
     case timedOut
-    /// The guided answer could not be decoded into the requested type. A
-    /// plain call with the same prompt may still work.
     case decodingFailure
-    /// The model does not support the requested guide; a plain call may.
     case unsupportedGuide
-    /// Anything else the framework threw, by its case or type name only,
-    /// for the log (see `OnDeviceLanguageModel.modelError(from:)`).
     case generation(String)
 }
 
-/// One instruction set for Apple's on-device model: a session factory, a
-/// plain and a guided call, a wall-clock budget, and the drain of a call that
-/// ran past it. Value type; hold one per prompt.
-///
-/// What the earlier tidy pass measured, and how this honours it:
-/// - A `respond` awaited from inside an actor ran on that actor's executor
-///   and turned sub-second replies into multi-second timeouts, so the call
-///   always runs in a detached task and the caller only awaits its value.
-/// - The system model serialises requests, so a call abandoned at the
-///   timeout blocks the next one. It is parked and the next call drains it
-///   before it starts, within that call's own budget.
-/// - Sessions carry a transcript: one session per exchange, then dropped,
-///   so nothing leaks from one dictation into the next.
-/// - Greedy sampling: the same prompt gives the same answer, so a harness
-///   measures the prompt and not the dice.
+// Measured: a `respond` awaited inside an actor ran on its executor and turned
+// sub-second replies into multi-second timeouts, so every call runs detached. Sessions
+// carry a transcript, so one serves one exchange and is dropped.
 public struct OnDeviceLanguageModel: Sendable {
     public let instructions: String
-    /// Greedy: same transcript, same answer, so the CLI harness measures the
-    /// prompt and not the dice. The macOS 27 SDK renamed the label to
-    /// `samplingMode:` and deprecated `sampling:`; the macOS 26 SDK, which CI
-    /// builds with, has only `sampling:`. Both run on macOS 26.
+    // Greedy: the same transcript gives the same answer, so a harness measures the
+    // prompt. The macOS 27 SDK renamed the label to `samplingMode:`; the macOS 26 SDK,
+    // which CI builds with, has only `sampling:`.
     #if compiler(>=6.4)
     public var options = GenerationOptions(samplingMode: .greedy)
     #else
     public var options = GenerationOptions(sampling: .greedy)
     #endif
-    /// Wall-clock budget for one call that names no deadline of its own.
-    /// Past it the call is abandoned and `respond` throws `.timedOut`.
     public var timeout: Duration
 
     public init(instructions: String, timeout: Duration = .seconds(8)) {
@@ -61,12 +39,10 @@ public struct OnDeviceLanguageModel: Sendable {
         self.timeout = timeout
     }
 
-    /// `.permissiveContentTransformations`: the input is the user's own words
-    /// to rewrite, which is the case those guardrails exist for.
+    // The input is the user's own words to rewrite, the case these guardrails exist for.
     private static let model = SystemLanguageModel(
         useCase: .general, guardrails: .permissiveContentTransformations)
 
-    /// Cheap; read where it is shown and before every call.
     public static var availability: OnDeviceModelAvailability {
         switch model.availability {
         case .available: .available
@@ -77,18 +53,15 @@ public struct OnDeviceLanguageModel: Sendable {
         }
     }
 
-    /// A session with these instructions, prewarmed. Sessions carry a
-    /// transcript, so one is used for one exchange and dropped.
     public func makeSession() -> LanguageModelSession {
         let session = LanguageModelSession(model: Self.model, instructions: instructions)
-        // Off any actor for the same reason the call is: work the framework
-        // starts from an actor's executor runs slowly enough to matter.
+        // Off any actor: work the framework starts from an actor's executor runs slowly
+        // enough to matter.
         Task.detached(priority: .utility) { session.prewarm() }
         return session
     }
 
-    /// A plain text reply to `prompt`. `deadline` bounds the call instead of
-    /// `timeout`, for a caller whose budget covers several calls.
+    // `deadline` replaces `timeout` for a caller whose budget covers several calls.
     public func respond(
         to prompt: String, session: LanguageModelSession? = nil, deadline: ContinuousClock.Instant? = nil
     ) async throws -> String {
@@ -99,8 +72,6 @@ public struct OnDeviceLanguageModel: Sendable {
         }
     }
 
-    /// A reply filled into `Content`. Guided generation is what keeps a small
-    /// model from answering the text instead of working on it.
     public func respond<Content: Generable & Sendable>(
         to prompt: String,
         generating type: Content.Type,
@@ -122,13 +93,8 @@ public struct OnDeviceLanguageModel: Sendable {
         return session ?? LanguageModelSession(model: Self.model, instructions: instructions)
     }
 
-    /// Runs `work` against the wall clock and returns whichever finishes
-    /// first. Every error comes out as an `OnDeviceModelError`.
-    ///
-    /// The drain of an abandoned call runs inside the budget, not before it:
-    /// a call that never comes back would otherwise hold every later paste
-    /// with no limit at all. A deadline already past starts nothing, so no
-    /// call is parked for the next one to drain.
+    // Draining an abandoned call happens inside the budget: one that never comes back
+    // would otherwise hold every later paste. A deadline already past starts nothing.
     static func race<Value: Sendable>(
         until deadline: ContinuousClock.Instant,
         _ work: @escaping @Sendable () async throws -> Value
@@ -149,16 +115,9 @@ public struct OnDeviceLanguageModel: Sendable {
         return try outcome.get()
     }
 
-    /// What the framework threw, as the cases the callers act on. The one
-    /// place the error is matched: callers switch on `OnDeviceModelError`.
-    ///
-    /// By type, never by text. On macOS 27 `String(describing:)` of these
-    /// errors is their debug description, which names no case and can quote
-    /// the model's input or output, the user's words; `.generation` carries
-    /// the case name (or, for a struct, the type name) and nothing else, so
-    /// it is safe in a public log line. The macOS 27 SDK deprecates these
-    /// cases for new types, a parsing error and an unsupported generation
-    /// guide, so both generations are mapped.
+    // By type, never by text: on macOS 27 the description can quote the model's input
+    // or output, the user's words. The macOS 27 SDK moves these cases to new types, so
+    // both are mapped.
     static func modelError(from error: any Error) -> OnDeviceModelError {
         if let error = error as? OnDeviceModelError { return error }
         if let error = error as? LanguageModelSession.GenerationError {
@@ -177,22 +136,16 @@ public struct OnDeviceLanguageModel: Sendable {
         return .generation(logName(of: error))
     }
 
-    /// An enum's case name, which reflection gives without its payload, or
-    /// the type name of anything else.
     static func logName(of error: any Error) -> String {
         let mirror = Mirror(reflecting: error)
         if mirror.displayStyle == .enum, let label = mirror.children.first?.label { return label }
         return String(describing: type(of: error))
     }
 
-    /// The most recent call that ran past its budget and was abandoned.
-    /// Cancellation reaches the system model late or not at all, and the model
-    /// serialises requests, so the next call would queue behind it and time
-    /// out too. Static because the model is one shared resource, whichever
-    /// prompt is talking to it.
+    // Cancellation reaches the system model late or not at all, and it serialises
+    // requests, so the next call drains this first. Static: the model is shared.
     private static let leftover = Mutex<Task<Void, Never>?>(nil)
 
-    /// Waits for an abandoned call, if any, to run its course.
     private static func drain() async {
         guard let pending = leftover.withLock({ $0 }) else { return }
         await pending.value

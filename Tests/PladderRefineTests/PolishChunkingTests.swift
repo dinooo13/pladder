@@ -3,13 +3,10 @@ import Testing
 @testable import PladderRefine
 
 @Suite struct PolishChunkingTests {
-    /// `count` distinct words, no punctuation at all.
     private func unpunctuated(_ count: Int) -> String {
         (1...count).map { "word\($0)" }.joined(separator: " ")
     }
 
-    // Before: no sentence end, no cut, so a long unpunctuated dictation was
-    // one chunk past S1-mini's 2,048-token context and nothing was polished.
     @Test func aLongTranscriptWithoutSentenceEndsIsCutBetweenWords() {
         let text = unpunctuated(1_000)
         for (threshold, size) in [
@@ -24,7 +21,6 @@ import Testing
     }
 
     @Test func aSentenceEndBeforeTheHardLimitStillDecidesTheCut() {
-        // Sentences of 300 words: past S1-mini's 250, inside its 375.
         let sentence = Array(repeating: "word", count: 299).joined(separator: " ") + " end."
         let text = Array(repeating: sentence, count: 3).joined(separator: " ")
         let chunks = PolishChunking.chunks(

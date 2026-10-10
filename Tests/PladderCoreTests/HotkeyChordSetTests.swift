@@ -20,12 +20,10 @@ private func event(_ role: HotkeyRole, _ event: HotkeyEvent) -> HotkeyMonitorEve
     }
 
     @Test func swallowIsTheUnionOfTheTrackers() {
-        // Only the polish tracker swallows the Space; the set still drops it.
         var set = HotkeyChordSet(chords: [.dictate: .rightCommand, .toggle: Hotkey(leftControl, space)])
         #expect(set.flagsChanged(modifiers: [leftControl]) == .init())
         #expect(set.keyDown(space, modifiers: [leftControl]).swallow)
         #expect(set.keyUp(space, modifiers: [leftControl]).swallow)
-        // A key neither chord owns passes through.
         #expect(!set.keyDown(0x00, modifiers: []).swallow)
     }
 
@@ -45,11 +43,9 @@ private func event(_ role: HotkeyRole, _ event: HotkeyEvent) -> HotkeyMonitorEve
         let start = ContinuousClock.now
         var set = HotkeyChordSet(chords: [.dictate: .rightCommand, .toggle: Hotkey(rightCommand, rightOption)])
         #expect(set.flagsChanged(modifiers: [rightCommand], at: start) == .init(events: [event(.dictate, .pressed)]))
-        // Right Option inside the window: the lone Right Command was the
-        // start of the longer chord, not a dictation.
         #expect(
             set.flagsChanged(modifiers: [rightCommand, rightOption], at: start + .milliseconds(100))
-                == .init(events: [event(.dictate, .cancelled), event(.toggle, .pressed)])
+                == .init(events: [event(.dictate, .interrupted), event(.toggle, .pressed)])
         )
         #expect(
             set.flagsChanged(modifiers: [], at: start + .seconds(3))
@@ -62,7 +58,6 @@ private func event(_ role: HotkeyRole, _ event: HotkeyEvent) -> HotkeyMonitorEve
         _ = set.flagsChanged(modifiers: [leftControl])
         _ = set.keyDown(space, modifiers: [leftControl])
         #expect(set.reset() == [event(.toggle, .released(submit: false))])
-        // Nothing is engaged after a reset.
         #expect(set.reset() == [])
     }
 
@@ -83,19 +78,14 @@ private func event(_ role: HotkeyRole, _ event: HotkeyEvent) -> HotkeyMonitorEve
     }
 
     @Test func endsComeBeforePressesWhicheverRoleIsBuiltFirst() {
-        // Built in the other order; the end still comes out first.
         let start = ContinuousClock.now
         var set = HotkeyChordSet(chords: [.toggle: Hotkey(rightCommand, rightOption), .dictate: .rightCommand])
         _ = set.flagsChanged(modifiers: [rightCommand], at: start)
         let handOver = set.flagsChanged(modifiers: [rightCommand, rightOption], at: start + .milliseconds(10))
-        #expect(handOver.events == [event(.dictate, .cancelled), event(.toggle, .pressed)])
+        #expect(handOver.events == [event(.dictate, .interrupted), event(.toggle, .pressed)])
     }
 }
 
-/// The hand-over the other way round: the shorter chord is the toggle chord.
-/// Whatever the roles, a keystroke that ends one chord and engages another
-/// reports the end first, so the gesture tracker has let go of the first
-/// before it hears of the second.
 @Suite struct ReversedNestingTests {
     private let start = ContinuousClock.now
 
@@ -108,7 +98,7 @@ private func event(_ role: HotkeyRole, _ event: HotkeyEvent) -> HotkeyMonitorEve
         #expect(set.flagsChanged(modifiers: [rightCommand], at: start) == .init(events: [event(.toggle, .pressed)]))
         #expect(
             set.flagsChanged(modifiers: [rightCommand, rightOption], at: start + .milliseconds(100))
-                == .init(events: [event(.toggle, .cancelled), event(.dictate, .pressed)]))
+                == .init(events: [event(.toggle, .interrupted), event(.dictate, .pressed)]))
         #expect(
             set.flagsChanged(modifiers: [], at: start + .seconds(3))
                 == .init(events: [event(.dictate, .released(submit: false))]))

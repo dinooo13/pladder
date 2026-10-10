@@ -5,36 +5,21 @@ import PladderCore
 import PladderRefine
 import PladderSystem
 
-/// The learned-corrections menu lines: the learner watches a field after
-/// each paste and proposes what the user corrected; this keeps the proposals
-/// until the user answers Add or Dismiss.
-///
-/// Nothing here runs before the paste: `pasted` hands the text over and the
-/// learner watches and reviews on its own thread and task.
 @MainActor
 @Observable
 final class CorrectionInbox {
-    /// Corrections the model agreed with, newest first. Kept for the app's
-    /// life or until answered.
     private(set) var proposals: [CorrectionProposal] = []
     static let maximumProposals = 3
-
-    /// The dictionary as it is now, and how a rule gets into it. Set by the
-    /// app once it exists.
     @ObservationIgnored var dictionary: () -> [DictionaryEntry] = { [] }
     @ObservationIgnored var addRules: ([DictionaryEntry]) -> Void = { _ in }
-    /// False while a dictation is being recorded or is on its way out.
     @ObservationIgnored var isQuiet: () -> Bool = { true }
-
-    /// How often a review held back by a dictation looks again.
     private static let quietPoll: Duration = .milliseconds(200)
 
     @ObservationIgnored private let dismissed: DismissedCorrections
     @ObservationIgnored private let relay = MainActorRelay<CorrectionProposal>()
     @ObservationIgnored private var learner: CorrectionLearner?
 
-    /// The learner's stages. They quote the user's words, so the text is
-    /// `.private`: `log show` prints it only with private data on.
+    // The stages quote the user's words, so the text is `.private`.
     private nonisolated static let log = Logger(subsystem: "de.dinooo13.pladder", category: "learning")
 
     init(dismissedURL: URL) {
@@ -46,10 +31,6 @@ final class CorrectionInbox {
             dismissed: dismissed,
             dictionary: { [weak self] in await self?.currentDictionary() ?? [] },
             log: { Self.log.info("\($0, privacy: .private)") },
-            // The review and Apple's polish share the system model, which
-            // answers one request at a time, so a review is held while a
-            // dictation is recorded or on its way out: one running at the
-            // release would eat into that dictation's polish budget.
             waitUntilQuiet: { [weak self] in
                 while await self?.isQuietNow() == false {
                     try? await Task.sleep(for: Self.quietPoll)
@@ -63,19 +44,15 @@ final class CorrectionInbox {
     private func currentDictionary() -> [DictionaryEntry] { dictionary() }
     private func isQuietNow() -> Bool { isQuiet() }
 
-    /// The text that was pasted, strictly after the paste.
     func pasted(_ text: String) {
         learner?.pasted(text)
     }
 
-    /// Adds `heard → corrected` to the dictionary, overwriting a rule with the
-    /// same `from` the way the Dictionary tab's import does.
     func accept(_ proposal: CorrectionProposal) {
         proposals.removeAll { $0.id == proposal.id }
         addRules([DictionaryEntry(from: proposal.pair.heard, to: proposal.pair.corrected)])
     }
 
-    /// Drops the line and remembers the pair so it is never proposed again.
     func dismiss(_ proposal: CorrectionProposal) {
         proposals.removeAll { $0.id == proposal.id }
         let dismissed = self.dismissed

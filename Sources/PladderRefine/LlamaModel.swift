@@ -1,16 +1,9 @@
 import Foundation
 import llama
 
-/// One GGUF model and one context on llama.cpp, generating greedily.
-///
-/// Every llama.cpp call runs on the model's own serial queue: a decode blocks
-/// its thread for hundreds of milliseconds, which must not happen on Swift's
-/// cooperative pool, and the context is not thread-safe. Callers await.
-///
-/// The prompt is split into a fixed prefix (the system prompt and whatever
-/// never changes) and the part that does. The prefix is decoded once, at
-/// load, and its key-value cache kept, so a dictation only pays for its own
-/// tokens.
+// Every llama.cpp call runs on one serial queue: a decode blocks its thread for
+// hundreds of milliseconds, too long for the cooperative pool, and the context is not
+// thread-safe. The fixed prefix is decoded once at load and its cache kept.
 final class LlamaModel: @unchecked Sendable {
     enum Failure: Error, Equatable {
         case load
@@ -18,14 +11,11 @@ final class LlamaModel: @unchecked Sendable {
         case decode(Int32)
         case contextFull
         case timedOut
-        /// The token budget ran out before the model ended its answer: the
-        /// end of the dictation would be missing, so it is not used.
         case truncated
     }
 
-    /// Context length in tokens. The key-value cache is allocated for all of
-    /// it up front (about 114 KB a token for Qwen3-0.6B), so it is sized for
-    /// one chunk of a long dictation, in and out, not for the model's limit.
+    // The key-value cache is allocated for all of it up front, about 114 KB a token for
+    // Qwen3-0.6B, so it is sized for one chunk, not the model's limit.
     static let contextLength: UInt32 = 2048
 
     private let queue = DispatchQueue(label: "de.dinooo13.pladder.llama", qos: .userInitiated)
@@ -36,15 +26,9 @@ final class LlamaModel: @unchecked Sendable {
     private let sampler: UnsafeMutablePointer<llama_sampler>
     private let prefix: [llama_token]
 
-    /// Loads the model onto the GPU and decodes `prefix`. Blocking; call from
-    /// `load(path:prefix:)`.
-    ///
-    /// The order matters. `deinit` only runs once every stored property is
-    /// set, so anything that can throw before then frees what is already
-    /// allocated itself: the prefix is tokenized (it needs only the
-    /// vocabulary, which belongs to the model) before the context, with its
-    /// key-value cache on the GPU, exists. From the last assignment on, a
-    /// throw runs `deinit`, which frees all three.
+    // `deinit` runs only once every stored property is set, so whatever can throw
+    // before then frees what is already allocated: the prefix is tokenized before the
+    // context and its GPU cache exist.
     private init(path: String, prefix: String) throws {
         _ = Self.backend
         var modelParams = llama_model_default_params()
@@ -82,7 +66,6 @@ final class LlamaModel: @unchecked Sendable {
         llama_model_free(model)
     }
 
-    /// Loads `path` and decodes `prefix` off the caller's thread.
     static func load(path: String, prefix: String) async throws -> LlamaModel {
         try await withCheckedThrowingContinuation { continuation in
             loadQueue.async {
@@ -91,10 +74,7 @@ final class LlamaModel: @unchecked Sendable {
         }
     }
 
-    /// Greedy continuation of the prefix with `suffix`, up to an end-of-turn
-    /// token. Throws `.truncated` when `maxTokens` (or the room left in the
-    /// context) runs out first, and `.timedOut` past `deadline`, which is
-    /// checked between tokens, so an answer can overrun it by one token.
+    // The deadline is checked between tokens, so an answer can overrun it by one.
     func complete(suffix: String, maxTokens: Int, deadline: ContinuousClock.Instant) async throws -> String {
         try await withCheckedThrowingContinuation { continuation in
             queue.async {
@@ -108,8 +88,7 @@ final class LlamaModel: @unchecked Sendable {
     // MARK: On the queue
 
     private func completeNow(suffix: String, maxTokens: Int, deadline: ContinuousClock.Instant) throws -> String {
-        // Back to the prefix: the previous dictation's tokens go, the
-        // prefix's cache stays.
+        // Back to the prefix: the previous dictation's tokens go, the prefix's cache stays.
         let memory = llama_get_memory(context)
         if !llama_memory_seq_rm(memory, 0, llama_pos(prefix.count), -1) {
             llama_memory_clear(memory, true)
@@ -137,18 +116,13 @@ final class LlamaModel: @unchecked Sendable {
         }
     }
 
-    /// One step of generation as the loop sees it: the end of the answer, or
-    /// the bytes of one more token.
     enum Step: Equatable {
         case end
         case piece([UInt8])
     }
 
-    /// The generation loop, apart from llama.cpp so the tests can drive it
-    /// with a stand-in: pulls steps from `next` until one is `.end`. Running
-    /// out of `limit` first is a failure, not a short answer, since the cut
-    /// would fall mid-dictation and the coordinator would paste the rest
-    /// away; the text as dictated is the better paste.
+    // Running out of `limit` is a failure, not a short answer: the cut would fall
+    // mid-dictation, and the text as dictated is the better paste.
     static func generate(
         limit: Int, deadline: ContinuousClock.Instant, next: () throws -> Step
     ) throws -> String {
@@ -157,8 +131,7 @@ final class LlamaModel: @unchecked Sendable {
             guard ContinuousClock.now < deadline else { throw Failure.timedOut }
             switch try next() {
             case .end:
-                // Pieces are bytes; a multi-byte character may span two of
-                // them, so the text is only decoded once it is whole.
+                // A multi-byte character may span two pieces, so decode only the whole answer.
                 return String(decoding: bytes, as: UTF8.self)
             case .piece(let piece):
                 bytes.append(contentsOf: piece)
@@ -176,9 +149,8 @@ final class LlamaModel: @unchecked Sendable {
         if status != 0 { throw Failure.decode(status) }
     }
 
-    /// Special tokens such as `<|im_start|>` are parsed, since the chat
-    /// format is written out by hand; no beginning-of-text token is added,
-    /// which the Qwen family does not use.
+    // Special tokens are parsed, since the chat format is written out by hand; no
+    // beginning-of-text token, which the Qwen family does not use.
     static func tokenize(_ text: String, vocab: OpaquePointer) throws -> [llama_token] {
         let utf8 = Array(text.utf8CString.dropLast())
         var tokens = [llama_token](repeating: 0, count: utf8.count + 8)
@@ -193,10 +165,8 @@ final class LlamaModel: @unchecked Sendable {
 
     // MARK: Process-wide
 
-    /// Sets up the backends ahead of the first load. The first time a build
-    /// of llama.cpp runs, Metal compiles its shaders, about seven seconds on
-    /// an M1; macOS caches them after that, so only the first launch after
-    /// an install or update pays, and with this it pays in the background.
+    // The first run of a llama.cpp build compiles Metal shaders, about seven seconds on
+    // an M1; macOS caches them, so only the first launch after an install pays.
     static func warmUp() async {
         await withCheckedContinuation { continuation in
             loadQueue.async {
@@ -206,12 +176,10 @@ final class LlamaModel: @unchecked Sendable {
         }
     }
 
-    /// Loads are rare and slow; they get a queue of their own so a load never
-    /// waits behind another model's generation.
+    // A queue of their own, so a load never waits behind another model's generation.
     private static let loadQueue = DispatchQueue(label: "de.dinooo13.pladder.llama.load", qos: .userInitiated)
 
-    /// Once per process, before the first model: the backends, and llama.cpp's
-    /// own logging, which would otherwise print every tensor to stderr.
+    // llama.cpp's own logging would otherwise print every tensor to stderr.
     private static let backend: Void = {
         llama_log_set({ _, _, _ in }, nil)
         llama_backend_init()

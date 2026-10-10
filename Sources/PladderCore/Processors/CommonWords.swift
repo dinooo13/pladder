@@ -1,32 +1,16 @@
 import Foundation
 
-/// The built-in lexicon `CustomWordCorrector` checks a single word against
-/// before it rewrites it: a short list of the most common words of English,
-/// German and Spanish, the languages the app dictates in.
-///
-/// Short on purpose. A word here is taken as what the speaker said and is
-/// never fuzzily turned into one of the user's terms, so the list holds the
-/// everyday words a term could sound like ("cloud", "shift", "rest") and
-/// leaves out rarer ones a mis-hearing tends to produce ("clawed" for
-/// "Claude"), which the corrector still has to repair. A full dictionary
-/// would stop those repairs too, which is also why this is not AppKit's
-/// spell checker; `PladderCore` may not import it anyway.
-///
-/// Only what a fuzzy match can reach is listed: lowercase ASCII letters, four
-/// or more of them. Shorter keys only ever match exactly, and a word with an
-/// umlaut or an accent never reaches the corrector's fuzzy path at all.
-/// Contractions are spelled as the corrector keys them, without the
-/// apostrophe ("dont").
+// Short on purpose: a word here is never fuzzily turned into a term, so the list
+// holds everyday words a term could sound like ("cloud") and leaves out the rarer
+// mis-hearings ("clawed") the corrector must still repair. Four ASCII letters or more.
 enum CommonWords {
-    /// Builds the set, if it is not built yet. `CustomWordCorrector` calls
-    /// this from `init`, which runs when settings change, so the first
-    /// dictation that needs the lexicon does not pay for building it.
+    // Called from `CustomWordCorrector.init`, which runs when settings change, so no
+    // dictation pays for building the set.
     static func prepare() {
         _ = all
     }
 
-    /// Split on bytes rather than characters: the lists are ASCII, and
-    /// grapheme breaking would make building the set several times slower.
+    // Split on bytes: grapheme breaking would make building the set several times slower.
     static let all: Set<String> = {
         var words = Set<String>(minimumCapacity: 2_048)
         for list in [english, german, spanish] {

@@ -1,8 +1,5 @@
 import Foundation
 
-/// A thread that does nothing but run a run loop. Work is handed to it as
-/// blocks, which is how the hotkey tap and the AX observer get installed and
-/// removed on the same thread whose run loop they live on.
 final class RunLoopThread: Thread, @unchecked Sendable {
     private let condition = NSCondition()
     private var loop: CFRunLoop?
@@ -18,8 +15,8 @@ final class RunLoopThread: Thread, @unchecked Sendable {
         loop = CFRunLoopGetCurrent()
         condition.broadcast()
         condition.unlock()
-        // A run loop with nothing to watch returns straight away; what it
-        // watches only arrives later, so keep a port on it until told to stop.
+        // A run loop with nothing to watch returns straight away; what it watches arrives
+        // later, so a port keeps it running until told to stop.
         RunLoop.current.add(NSMachPort(), forMode: .common)
         while !isCancelled {
             RunLoop.current.run(mode: .default, before: .distantFuture)
@@ -35,8 +32,8 @@ final class RunLoopThread: Thread, @unchecked Sendable {
         CFRunLoopWakeUp(loop)
     }
 
-    /// Does not wait for the loop the way `perform` does: a thread cancelled
-    /// before it got going never runs `main`, and would never publish one.
+    // Does not wait for the loop as `perform` does: a thread cancelled before it got
+    // going never runs `main`, and would never publish one.
     func finish() {
         cancel()
         condition.lock()

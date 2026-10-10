@@ -28,10 +28,6 @@ private final class FakeRecorder {
         #expect(!slot.isSuspended)
     }
 
-    // Before: the session was keyed on the recorder's address. A recorder
-    // freed mid-recording left the hotkey down, and the next recorder at the
-    // same address looked like it beginning again, so its end resumed
-    // nothing either.
     @Test func aRecorderFreedWhileRecordingHandsTheSessionOver() {
         let slot = makeSlot()
         var calls: [Bool] = []
@@ -45,7 +41,6 @@ private final class FakeRecorder {
         let token = slot.makeToken()
         slot.claim(token, by: next) { calls.append($0) }
         #expect(slot.isSuspended)
-        // A late release under the freed recorder's token changes nothing.
         slot.release(stale)
         #expect(slot.isSuspended)
         slot.release(token)
@@ -61,7 +56,6 @@ private final class FakeRecorder {
             let recorder = FakeRecorder()
             slot.claim(token, by: recorder) { calls.append($0) }
         }
-        // What the recorder's deinit does.
         slot.release(token)
         #expect(calls == [true, false])
         #expect(!slot.isSuspended)

@@ -1,15 +1,9 @@
 import Foundation
 import Observation
 
-/// Calls `onChange` after every change to what `track` reads, from `start`
-/// until `stop`.
-///
-/// `withObservationTracking` fires once per change, so the loop re-arms it
-/// from its own callback. That callback runs before the new value is stored,
-/// hence the hop onto a task to act on it. Each `start` begins a generation
-/// of its own, and a callback armed by an older one ends there: one left
-/// pending by a `stop` would otherwise re-arm after the next `start`, and two
-/// chains would fire for every change from then on.
+// `withObservationTracking` fires once, before the new value is stored, so the loop re-arms from a
+// task. A callback from an older generation ends there: one pending at `stop()` would otherwise
+// re-arm after the next `start()`, and two chains would fire for every change.
 @MainActor
 public final class ObservationLoop {
     private var generation = 0

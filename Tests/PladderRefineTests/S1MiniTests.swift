@@ -4,13 +4,12 @@ import PladderTestSupport
 import Testing
 @testable import PladderRefine
 
-// Nothing here loads a model or touches the network: the polisher is asked
-// about a file that is not there, or given a stand-in for llama.cpp.
+// Nothing here loads a model or touches the network.
 
 @Suite(.timeLimit(.minutes(1))) struct S1MiniPromptTests {
     @Test func thePromptIsQwensChatFormatWithAnEmptyThinkBlock() {
-        // What S1-mini's own chat template renders with enable_thinking=False,
-        // taken from its tokenizer: the model was trained on exactly this.
+        // What S1-mini's own chat template renders with enable_thinking=False, taken from
+        // its tokenizer: the model was trained on exactly this.
         let prompt = S1MiniPolisher.promptPrefix + S1MiniPolisher.promptSuffix(for: "hello there")
         #expect(prompt == """
             <|im_start|>system
@@ -46,7 +45,6 @@ import Testing
         #expect(ModelFile(for: .appleIntelligence) == nil)
         #expect(ModelFile(for: .s1Mini) == .s1MiniFullPrecision)
         #expect(ModelFile(for: .s1Mini8Bit) == .s1Mini8Bit)
-        // Pinned to a commit, never a branch.
         for file in [ModelFile.s1MiniFullPrecision, .s1Mini8Bit] {
             #expect(file.url.host() == "huggingface.co")
             #expect(!file.url.path().contains("/resolve/main/"))
@@ -65,7 +63,6 @@ import Testing
     }
 }
 
-/// A loaded model that answers with `answer`, in place of llama.cpp.
 private struct StandInModel: PromptCompleter {
     let answer: @Sendable (_ suffix: String) async throws -> String
 
@@ -75,7 +72,6 @@ private struct StandInModel: PromptCompleter {
 }
 
 @Suite(.timeLimit(.minutes(1))) struct S1MiniLoadTests {
-    /// A polisher over a file that is there, loaded by `load`.
     private func polisher(
         timeout: Duration, load: @escaping S1MiniPolisher.Loader
     ) throws -> (S1MiniPolisher, URL) {
@@ -87,10 +83,6 @@ private struct StandInModel: PromptCompleter {
         return (polisher, dir)
     }
 
-    // The first dictation after launch: the load (and on a first launch
-    // Metal's shader compile) is still running when the budget runs out.
-    // Before: the polish waited for the load however long it took, here the
-    // gate's two seconds, and pasted late.
     @Test func aLoadPastTheBudgetPastesAsDictatedAndTheNextDictationGetsTheModel() async throws {
         let gate = Gate()
         let loads = Recorder<Int>()
@@ -107,7 +99,6 @@ private struct StandInModel: PromptCompleter {
         #expect(report.failure == "still loading")
         #expect(ContinuousClock.now - started < .seconds(1))
 
-        // The load carried on in the background; nothing restarted it.
         await gate.open()
         await polisher.prepare()
         #expect(await polisher.refine("send it on friday") == "Send it on Friday.")
@@ -145,22 +136,17 @@ private struct StandInModel: PromptCompleter {
         _ = await polisher.polish("send it")
         await polisher.unload()
         await gate.open()
-        // Time for the first load to finish and try to store its model.
-        // The right answer does not depend on it: either way the next call
-        // starts a load of its own.
+        // Time for the first load to finish and try to store its model; the right answer
+        // does not depend on it.
         try await Task.sleep(for: .milliseconds(20))
         #expect(await polisher.refine("send it") == "Second.")
     }
 
-    // Before: `unload()` forgot the running load, so polish off and on again
-    // during a load started a second one while the first still read its
-    // weights, and both models were resident at once.
     @Test func aLoadAfterUnloadWaitsForTheAbandonedOneToBeFreed() async throws {
         let gate = Gate()
         let resident = Resident()
         let loadsStarted = Recorder<Int>()
         let (polisher, dir) = try polisher(timeout: .milliseconds(40)) { _, _ in
-            // How many models were alive when this load began.
             loadsStarted.append(resident.count)
             if loadsStarted.all.count == 1 { await gate.wait() }
             return CountedModel(resident)
@@ -171,18 +157,15 @@ private struct StandInModel: PromptCompleter {
         await polisher.unload()
         let second = Task { await polisher.prepare() }
         try await Task.sleep(for: .milliseconds(30))
-        // The second load waits for the first instead of starting beside it.
         #expect(loadsStarted.all == [0])
         await gate.open()
         await second.value
-        // The first model was dropped and freed before the second was read.
         #expect(loadsStarted.all == [0, 0])
         #expect(resident.count == 1)
         #expect(await polisher.refine("send it") == "Counted.")
     }
 }
 
-/// Counts the stand-in models alive, the way the weights would be resident.
 private final class Resident: Sendable {
     private let state = Recorder<Int>()
     var count: Int { state.all.reduce(0, +) }
@@ -204,8 +187,6 @@ private final class CountedModel: PromptCompleter {
 @Suite(.timeLimit(.minutes(1))) struct LlamaGenerationTests {
     private let later = ContinuousClock.now + .seconds(60)
 
-    /// Hands out `pieces` one per step, then `.end` when `ends`, and more
-    /// text for as long as it is asked after that.
     private func steps(_ pieces: [String], ends: Bool) -> () -> LlamaModel.Step {
         var queue = pieces.map { LlamaModel.Step.piece(Array($0.utf8)) }
         if ends { queue.append(.end) }
@@ -222,8 +203,6 @@ private final class CountedModel: PromptCompleter {
         #expect(text == "Send it Friday.")
     }
 
-    // Before: the loop stopped at the limit and returned "Send it Friday",
-    // which was pasted with the rest of the dictation gone.
     @Test func anAnswerCutOffByTheLimitIsAFailureNotAShortAnswer() {
         #expect(throws: LlamaModel.Failure.truncated) {
             try LlamaModel.generate(limit: 3, deadline: later, next: steps(["Send", " it", " Friday", " and copy Anna."], ends: true))

@@ -4,14 +4,11 @@ import PladderTestSupport
 import Testing
 @testable import PladderSystem
 
-extension PasteboardTests {
-    /// `PasteboardOutput` end to end, against a private named pasteboard, a
-    /// recording key poster and a manual clock. Nothing here types a key or
-    /// touches the general pasteboard: the developer dictates with a running
-    /// Pladder while these run.
-    @Suite(.timeLimit(.minutes(1))) struct PasteFlowTests {
-        // MARK: Whose clipboard comes back
+// Never the general pasteboard, never a real key: the developer dictates with a
+// running Pladder while these run.
 
+extension PasteboardTests {
+    @Suite(.timeLimit(.minutes(1))) struct PasteFlowTests {
         @Test func theClipboardComesBackAfterAPaste() async throws {
             let h = PasteHarness(clipboard: "original")
 
@@ -25,9 +22,6 @@ extension PasteboardTests {
             #expect(h.clipboard == "original")
         }
 
-        /// Two pastes inside one restore wait, nothing copied in between: the
-        /// second carries the first's snapshot, since capturing then would only
-        /// read our own transcript.
         @Test func backToBackPastesRestoreTheOriginalClipboard() async throws {
             let h = PasteHarness(clipboard: "original")
 
@@ -38,9 +32,6 @@ extension PasteboardTests {
             #expect(h.clipboard == "original")
         }
 
-        /// Nothing reads the first paste, so its restore waits for the cap; the
-        /// user copies something, then dictates again inside those eight
-        /// seconds. Their new copy is the clipboard now, not the older one.
         @Test func aCopyBetweenTwoPastesIsWhatComesBack() async throws {
             let h = PasteHarness(clipboard: "original")
 
@@ -52,8 +43,6 @@ extension PasteboardTests {
             #expect(h.clipboard == "copied meanwhile")
         }
 
-        /// The same with the key-down snapshot in between, the order the app
-        /// runs in.
         @Test func aCopyBeforeTheNextKeyDownIsWhatComesBack() async throws {
             let h = PasteHarness(clipboard: "original")
 
@@ -64,7 +53,6 @@ extension PasteboardTests {
 
             await h.restoreFallsDue()
             #expect(h.clipboard == "copied meanwhile")
-            // The key-down snapshot was used, not a second read at insert.
             #expect(await h.output.keeper.snapshotsTaken == 2)
         }
 
@@ -76,10 +64,8 @@ extension PasteboardTests {
             h.clock.advance(to: .seconds(1))
             try await h.output.insert("second", submit: false)
 
-            // The first restore's timer is cancelled, not merely outrun.
             await first.value
             #expect(!h.clock.deadlines.contains(h.clock.start + .seconds(8)))
-            // Past the first paste's cap, short of the second's.
             h.clock.advance(to: .milliseconds(8_500))
             #expect(h.holdsTranscript)
             await h.restoreFallsDue()
@@ -91,7 +77,6 @@ extension PasteboardTests {
 
             try await h.output.insert("transcript", submit: false)
             #expect(await h.clock.waitForSleeper(at: .seconds(8)))
-            // A busy page reads a second late.
             h.clock.advance(to: .seconds(1))
             await h.targetReads()
 
@@ -119,8 +104,6 @@ extension PasteboardTests {
             #expect(h.clipboard == "original")
         }
 
-        /// The read as AppKit reports it: an in-process read of the promise on
-        /// the main thread, which hops to the keeper on a task of its own.
         @MainActor @Test func aRealReadOfThePromiseIsReported() async throws {
             let h = PasteHarness(clipboard: "original")
 
@@ -146,7 +129,6 @@ extension PasteboardTests {
             h.clock.advance(by: .seconds(60))
             #expect(await h.output.keeper.pendingRestore == nil)
             #expect(h.clipboard == "second")
-            // No Cmd+V and no Return for the copied one.
             #expect(h.poster.keys == [PasteHarness.keyV])
         }
 
@@ -161,9 +143,6 @@ extension PasteboardTests {
             #expect(await h.output.keeper.pendingRestore == nil)
         }
 
-        // Before: a failed Cmd+V over a clipboard too large to keep left the
-        // transcript on the pasteboard unknown to the keeper, and the next
-        // key-down snapshotted it as the user's clipboard.
         @Test func aFailedCmdVThatCannotRestoreStillHoldsTheTranscript() async throws {
             let h = PasteHarness(snapshotLimit: 4)
             h.userCopies("far too long to keep")
@@ -174,13 +153,11 @@ extension PasteboardTests {
             }
             #expect(h.holdsTranscript)
             #expect(await h.output.keeper.pendingRestore == nil)
-            #expect(await h.output.keeper.leftPromise != nil)
+            #expect(await h.output.keeper.leftBehindPromise != nil)
             let before = await h.output.keeper.snapshotsTaken
             await h.output.prepare()
             #expect(await h.output.keeper.snapshotsTaken == before)
         }
-
-        // MARK: Flush
 
         @Test func flushRestoresOnceTheTargetHasRead() async throws {
             let h = PasteHarness(clipboard: "original")
@@ -190,22 +167,17 @@ extension PasteboardTests {
             h.clock.advance(to: .milliseconds(10))
             await h.targetReads()
             let flush = Task { await h.output.flush() }
-            // Not before the floor, as the timer would not: Chromium may read
-            // again for the real paste.
             #expect(await h.clock.waitForSleeper(at: .milliseconds(400)))
             #expect(h.holdsTranscript)
             h.clock.advance(to: .milliseconds(400))
             await flush.value
 
             #expect(h.clipboard == "original")
-            // The timer is gone too, so it cannot restore a second time later.
             await restore.value
             #expect(await h.output.keeper.pendingRestore == nil)
         }
 
         @Test func flushRightAfterCmdVWaitsForTheReadBeforeRestoring() async throws {
-            // A dictation pasted on the way out: restoring at once would hand the
-            // target app the old clipboard instead of the transcript.
             let h = PasteHarness(clipboard: "original")
 
             try await h.output.insert("transcript", submit: false)
@@ -214,7 +186,6 @@ extension PasteboardTests {
             h.clock.advance(to: .milliseconds(300))
             #expect(h.holdsTranscript)
             await h.targetReads()
-            // Read at 300 ms: back 200 ms later, not at the floor.
             #expect(await h.clock.waitForSleeper(at: .milliseconds(500)))
             #expect(h.holdsTranscript)
             h.clock.advance(to: .milliseconds(500))
@@ -230,7 +201,6 @@ extension PasteboardTests {
             #expect(await h.clock.waitForSleeper(at: .milliseconds(400)))
             h.clock.advance(to: .milliseconds(400))
             await flush.value
-            // Not the eight-second cap: a quit cannot wait that long.
             #expect(h.clipboard == "original")
         }
 
@@ -253,8 +223,6 @@ extension PasteboardTests {
             #expect(h.pasteboard.changeCount == before)
         }
 
-        // MARK: Prepare
-
         @Test func prepareTwiceWithNothingChangedReadsTheClipboardOnce() async {
             let h = PasteHarness(clipboard: "original")
 
@@ -267,8 +235,6 @@ extension PasteboardTests {
             #expect(await h.output.keeper.snapshotsTaken == 2)
         }
 
-        /// Key-down and release both prepare, with a copy in between: the paste
-        /// reads nothing itself and restores the newer copy.
         @Test func aPrepareAtReleaseKeepsTheCaptureOffThePaste() async throws {
             let h = PasteHarness(clipboard: "original")
             await h.output.keeper.prepare()
@@ -290,13 +256,10 @@ extension PasteboardTests {
             #expect(await h.output.keeper.snapshotsTaken == 1)
         }
 
-        // MARK: Return
-
         @Test func returnWaitsForTheReadPlusTheSubmitDelay() async throws {
             let h = PasteHarness(clipboard: "original")
 
             try await h.output.insert("send this", submit: true)
-            // `insert` has returned and only Cmd+V has gone out.
             #expect(h.poster.keys == [PasteHarness.keyV])
             #expect(await h.clock.waitForSleeper(at: .milliseconds(400)))
 
@@ -325,7 +288,6 @@ extension PasteboardTests {
             #expect(await eventually { h.poster.posts.count == 2 })
             #expect(h.poster.posts.last?.key == PasteboardOutput.virtualKeyReturn)
             #expect(h.poster.posts.last?.at == h.clock.start + .milliseconds(400))
-            // The clipboard is still waiting for its cap; the Return does not end it.
             #expect(h.holdsTranscript)
         }
 
@@ -347,11 +309,8 @@ extension PasteboardTests {
             #expect(await h.clock.waitForSleeper(at: .milliseconds(400)))
             h.clock.advance(to: .milliseconds(100))
             try await h.output.insert("second", submit: false)
-            // The first send's Return went out ahead of the second Cmd+V, not
-            // after it, which would have sent both texts.
             #expect(h.poster.keys == [PasteHarness.keyV, PasteboardOutput.virtualKeyReturn, PasteHarness.keyV])
 
-            // Its own timer, when it fires, posts nothing more.
             h.clock.advance(to: .milliseconds(1_000))
             #expect(await eventually { !h.clock.deadlines.contains(h.clock.start + .milliseconds(400)) })
             for _ in 0..<10 { await Task.yield() }
@@ -365,12 +324,9 @@ extension PasteboardTests {
             try await h.output.insert("send this", submit: true)
             #expect(await h.clock.waitForSleeper(at: .milliseconds(410)))
             let promise = try #require(await h.output.keeper.pendingPromise)
-            // Stamped before Cmd+V, which went out at 10 ms.
             await h.output.keeper.transcriptRead(promise, at: h.clock.start + .milliseconds(5))
 
-            // Counted, it would have sent Return at 55 ms; the Return waits for
-            // the floor instead. A short real wait gives a wrongly counted read
-            // the time to post; nothing else is waiting on it.
+            // A short real wait gives a wrongly counted read the time to post its Return.
             h.clock.advance(to: .milliseconds(100))
             try? await Task.sleep(for: .milliseconds(20))
             #expect(h.poster.keys == [PasteHarness.keyV])
@@ -380,25 +336,20 @@ extension PasteboardTests {
         }
 
         @Test func aTranscriptTheRestoreCouldNotReplaceIsStillHeld() async throws {
-            // Every item of the user's clipboard is over the limit, so the
-            // restore leaves the transcript where it is.
             let h = PasteHarness(snapshotLimit: 4)
             h.userCopies("far too long to keep")
 
             try await h.output.insert("transcript", submit: false)
             await h.restoreFallsDue()
             #expect(h.holdsTranscript)
-            // Its promise is still served, and the next key-down does not read
-            // our own transcript back as the user's clipboard.
-            #expect(await h.output.keeper.leftPromise != nil)
+            #expect(await h.output.keeper.leftBehindPromise != nil)
             let before = await h.output.keeper.snapshotsTaken
             await h.output.prepare()
             #expect(await h.output.keeper.snapshotsTaken == before)
 
-            // The user's next copy ends it.
             h.userCopies("new")
             try await h.output.insert("again", submit: false)
-            #expect(await h.output.keeper.leftPromise == nil)
+            #expect(await h.output.keeper.leftBehindPromise == nil)
         }
     }
 }

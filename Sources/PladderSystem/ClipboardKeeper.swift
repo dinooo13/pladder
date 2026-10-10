@@ -2,100 +2,43 @@ import AppKit
 import Foundation
 import os
 
-/// Owns the user's clipboard across a paste: the snapshot taken before it,
-/// the transcript published as a promise, and when the snapshot goes back.
-///
-/// The restore waits for the paste as well as for a clock. The transcript goes
-/// on the pasteboard as a promise, so the target app's read comes back to us as
-/// a call to `TranscriptPromise`. The old clipboard returns `restoreFloor` after
-/// Cmd+V, as it always has, if the transcript has been read by then, and
-/// otherwise `readSettle` after the read. An app that is busy when Cmd+V
-/// arrives reads late, and the fixed delay alone handed it the user's old
-/// clipboard instead of the transcript. If nothing reads it, `restoreCap` ends
-/// the wait, which leaves the transcript on the clipboard a little longer and
-/// never pastes stale text. Issue #40 has the measurements.
-///
-/// An actor because the pending restore is shared mutable state: a second
-/// paste may start while the previous restore is still waiting. The restore
-/// itself runs on a detached task, so the caller being cancelled — a cancelled
-/// dictation — can never yank the pasteboard out from under an app that has
-/// not read it yet.
-///
-/// The pasteboard and the clock are parameters, so the tests run every path
-/// against a private named pasteboard and a manual clock.
+// When the user's clipboard comes back: the Output row of CLAUDE.md's Decisions, and
+// docs/ARCHITECTURE.md, "Paste and clipboard". Apps read 0 to 25 ms after Cmd+V, a
+// busy web page a second or more.
 actor ClipboardKeeper {
-    /// The earliest the previous clipboard comes back after Cmd+V, read or not.
-    ///
-    /// The paste is asynchronous from our point of view: the target app reads the
-    /// pasteboard on its own run loop some time after it receives the key event,
-    /// 0 to 25 ms later for every app measured, a second or more for a web page
-    /// whose main thread is busy. Restoring before the read gives the app the
-    /// *old* contents.
-    ///
-    /// A read is not always the paste: Chromium sometimes reads once as Cmd+V
-    /// arrives and again when the page gets round to pasting, and the
-    /// pasteboard keeps the data after the first read, so the second never
-    /// reaches us. Nothing says which read is which, so a read never brings
-    /// the clipboard back sooner than this. 400 ms is the fixed delay this
-    /// replaced, which is enough for every app that is not busy.
     nonisolated let restoreFloor = Duration.milliseconds(400)
-
-    /// How long after the target app's last read the previous clipboard comes
-    /// back, when that is later than `restoreFloor`: a busy app that read late.
     nonisolated let readSettle = Duration.milliseconds(200)
-
-    /// How long after Cmd+V the previous clipboard comes back when nothing has
-    /// read the transcript: a paste into something that takes no text, or an
-    /// app that never got the key event. The transcript stays on the clipboard
-    /// until then, which is the safe way to be wrong.
     nonisolated let restoreCap = Duration.seconds(8)
 
     private let pasteboard: NSPasteboard
     private let clock: PasteClock
-    /// The largest item a snapshot keeps; the tests make it small.
     private let snapshotLimit: Int
 
-    /// A restore that has been scheduled but has not run yet.
     private struct Pending {
-        /// The user's clipboard, as it was before *our first* uninterrupted
-        /// paste. Carried forward across back-to-back pastes.
+        // The clipboard before our first paste, carried across back-to-back pastes.
         let snapshot: ClipboardSnapshot
-        /// The change count our write produced, i.e. what the pasteboard must
-        /// still be at for the restore to be safe.
+        // What the pasteboard must still be at for the restore to be safe.
         let changeCount: Int
-        /// The transcript on the pasteboard, which reports every read. Held
-        /// here so it outlives the paste whatever the pasteboard item does.
+        // Held so the promise outlives the paste, whatever the pasteboard item does.
         let promise: TranscriptPromise
-        /// When Cmd+V was posted. Nil while it is still being posted; a read
-        /// before then is not the paste and does not count.
+        // Nil while Cmd+V is being posted; a read before then is not the paste.
         var posted: ContinuousClock.Instant?
-        /// The first and the last read of the transcript since Cmd+V.
         var firstRead: ContinuousClock.Instant?
         var lastRead: ContinuousClock.Instant?
-        /// The detached task waiting for the restore to fall due. Nil while
-        /// the paste is still being posted.
         var task: Task<Void, Never>?
     }
 
     private var pending: Pending?
 
-    /// A transcript a restore had to leave on the pasteboard, because every
-    /// item of the user's clipboard was too large to keep. Held so its promise
-    /// can still be served, and so the next snapshot does not read our own
-    /// text back as the user's: until the user copies something, the
-    /// clipboard is still this, and its snapshot is the one that restores
-    /// nothing.
-    private var left: (snapshot: ClipboardSnapshot, changeCount: Int, promise: TranscriptPromise)?
+    // A transcript a restore had to leave, because every item of the user's clipboard
+    // was too large to keep: its promise must still be served, and the next snapshot
+    // must not read it back as the user's.
+    private var leftBehind: (snapshot: ClipboardSnapshot, changeCount: Int, promise: TranscriptPromise)?
 
-    /// The clipboard as it was when `prepare()` last looked, ready for
-    /// `paste` to carry forward. Nil when already used. Reading every
-    /// representation can take tens of milliseconds, so `prepare()` does it
-    /// while the user is still speaking instead of on the release-to-paste
-    /// path.
+    // Reading every representation can take tens of milliseconds, so it happens here,
+    // while the user is still speaking.
     private var prepared: (snapshot: ClipboardSnapshot, changeCount: Int)?
 
-    /// Someone waiting in `firstRead(of:by:)`, and the timer that ends the
-    /// wait at its deadline.
     private struct ReadWaiter {
         let promise: TranscriptPromise
         let continuation: CheckedContinuation<ContinuousClock.Instant?, Never>
@@ -104,9 +47,6 @@ actor ClipboardKeeper {
 
     private var readWaiters: [Int: ReadWaiter] = [:]
     private var nextReadWaiter = 0
-
-    /// How many snapshots have been read off the pasteboard. The tests count
-    /// these to see that a repeated `prepare()` reads nothing.
     private(set) var snapshotsTaken = 0
 
     private static let log = Logger(subsystem: "de.dinooo13.pladder", category: "paste")
@@ -116,32 +56,24 @@ actor ClipboardKeeper {
         clock: PasteClock = .continuous,
         snapshotLimit: Int = ClipboardSnapshot.maximumItemBytes
     ) {
-        // By name rather than the object: `NSPasteboard` is not `Sendable`,
-        // and the one made here never leaves the actor.
+        // By name: `NSPasteboard` is not `Sendable`, and this one never leaves the actor.
         pasteboard = NSPasteboard(name: name)
         self.clock = clock
         self.snapshotLimit = snapshotLimit
     }
 
-    /// What `paste` hands back: enough to wait for the transcript's read.
     struct Paste: Sendable {
         let promise: TranscriptPromise
-        /// When Cmd+V was posted.
         let posted: ContinuousClock.Instant
     }
 
     // MARK: Before the paste
 
-    /// Snapshots the clipboard while the user is still speaking. Cheap when
-    /// called again with nothing changed: the snapshot already taken is kept,
-    /// so a caller may call this at key-down and again at release.
     func prepare() {
         let now = pasteboard.changeCount
-        // While our own transcript is still on the pasteboard the user's
-        // clipboard is the pending snapshot, which `paste` carries forward.
-        // Capturing would only read our own promise, from off the main
-        // thread, which AppKit warns against.
-        if pending?.changeCount == now || left?.changeCount == now {
+        // While our transcript is still on the pasteboard, the user's clipboard is the
+        // pending snapshot. Capturing would only read our own promise, off the main thread.
+        if pending?.changeCount == now || leftBehind?.changeCount == now {
             prepared = nil
             return
         }
@@ -154,26 +86,20 @@ actor ClipboardKeeper {
         return ClipboardSnapshot.capture(from: pasteboard, maximumItemBytes: snapshotLimit)
     }
 
-    /// The user's clipboard to put back after the paste about to happen, and
-    /// the end of any restore still pending, which this paste takes over.
+    // Also ends any restore still pending: this paste takes it over.
     private func clipboardToRestore() -> ClipboardSnapshot {
         let prep = prepared
         prepared = nil
         let now = pasteboard.changeCount
-        let leftOver = left
-        left = nil
+        let leftOver = leftBehind
+        leftBehind = nil
         if let leftOver, leftOver.changeCount == now { return leftOver.snapshot }
         if let carried = pending {
             endPending()
-            // Our previous transcript is still on the pasteboard: the user's
-            // clipboard is the one that paste saved, and snapshotting now
-            // would capture our own text. If anything was written since, the
-            // user copied it, and that copy is their clipboard now; carrying
-            // the old snapshot would put the older one back over it.
+            // Our previous transcript is still on the pasteboard, so the user's clipboard is
+            // the one that paste saved. If anything was written since, the user copied it.
             if carried.changeCount == now { return carried.snapshot }
         }
-        // The snapshot from `prepare()` is only valid if nobody touched the
-        // pasteboard in between; anything the user copied since wins.
         if let prep, prep.changeCount == now {
             return prep.snapshot
         }
@@ -182,10 +108,6 @@ actor ClipboardKeeper {
 
     // MARK: The paste
 
-    /// Publishes `text` as a promise, calls `post` to send Cmd+V, and
-    /// schedules the restore. Returns as soon as `post` has returned; the
-    /// restore runs on a detached task afterwards. If `post` throws, the
-    /// clipboard is put back at once and the error rethrown.
     func paste(_ text: String, post: @Sendable () throws -> Void) throws -> Paste {
         let snapshot = clipboardToRestore()
 
@@ -198,10 +120,8 @@ actor ClipboardKeeper {
         do {
             try post()
         } catch {
-            // Never leave the user's clipboard holding our transcript. The
-            // same restore as after a paste: a snapshot that cannot replace
-            // the transcript leaves it in `left`, so the next `prepare()`
-            // does not take it for the user's clipboard.
+            // The same restore as after a paste: a transcript the snapshot cannot replace is
+            // kept in `leftBehind`, so the next `prepare()` does not take it for the user's clipboard.
             if let failed = pending, failed.changeCount == ourChangeCount {
                 endPending()
                 restore(failed)
@@ -214,31 +134,19 @@ actor ClipboardKeeper {
         return Paste(promise: promise, posted: posted)
     }
 
-    /// The clipboard-only path: `text` replaces the clipboard and stays, and
-    /// nothing is restored. A restore still pending from an earlier paste
-    /// would put the old clipboard back over the transcript, so it is dropped.
+    // A restore still pending would put the old clipboard back over the transcript.
     func copy(_ text: String) {
         endPending()
         prepared = nil
-        left = nil
+        leftBehind = nil
         _ = ClipboardSnapshot.write(text, to: pasteboard)
     }
 
-    /// Puts the user's clipboard back as soon as that is safe instead of on
-    /// the timer, if our transcript is still on it. For quitting: a restore
-    /// pending on a detached task would die with the process.
-    ///
-    /// Safe is not "now". A dictation can be pasted on the way out, and the
-    /// target app reads the transcript some time after Cmd+V; restoring
-    /// before that hands it the user's old clipboard instead. So this waits
-    /// as the timer would — for the read, and `readSettle` after it, no
-    /// sooner than `restoreFloor` after Cmd+V — except that it gives up on
-    /// an app that has not read by the floor, since a quit cannot wait out
-    /// the cap. At most `restoreFloor` plus `readSettle`.
+    // Safe is not "now": the target app reads some time after Cmd+V. Waits as the timer
+    // would, but gives up on an app that has not read by the floor, since a quit cannot
+    // wait out the cap: at most `restoreFloor` plus `readSettle`.
     func flush() async {
         guard let current = pending else { return }
-        // The user copied something since: theirs stays, so there is nothing
-        // to put back and nothing to wait for.
         guard pasteboard.changeCount == current.changeCount else {
             endPending()
             return
@@ -246,8 +154,7 @@ actor ClipboardKeeper {
         if let posted = current.posted {
             let floor = posted + restoreFloor
             if current.firstRead == nil { _ = await firstRead(of: current.promise, by: floor) }
-            // The timer, or a newer paste, may have got there while this
-            // waited.
+            // The timer, or a newer paste, may have got there while this waited.
             guard let latest = pending, latest.promise === current.promise else { return }
             let due = latest.lastRead.map { min(max(floor, $0 + readSettle), floor + readSettle) } ?? floor
             if due > clock.now() { try? await clock.sleep(due) }
@@ -259,9 +166,6 @@ actor ClipboardKeeper {
 
     // MARK: After the paste
 
-    /// When the pending restore falls due: `settle` after the last read since
-    /// Cmd+V but no sooner than `floor` after Cmd+V, or `cap` after Cmd+V if
-    /// nothing has read it, and never later than that.
     static func restoreDue(
         posted: ContinuousClock.Instant,
         lastRead: ContinuousClock.Instant?,
@@ -274,7 +178,6 @@ actor ClipboardKeeper {
         return min(max(posted + floor, lastRead + settle), latest)
     }
 
-    /// (Re)starts the pending restore's wait from what is known now.
     private func scheduleRestore() {
         guard let current = pending, let posted = current.posted else { return }
         current.task?.cancel()
@@ -283,12 +186,10 @@ actor ClipboardKeeper {
         pending?.task = restoreTask(for: current.promise, at: due)
     }
 
-    /// The target app read the transcript. Called from the main thread, where
-    /// AppKit serves promises, by way of a task.
+    // AppKit serves promises on the main thread; this arrives from there by a task.
     func transcriptRead(_ promise: TranscriptPromise, at instant: ContinuousClock.Instant) {
-        // A read before Cmd+V was posted is not the paste: the actor finishes
-        // `paste` before this runs, so `posted` is set by now either way, and
-        // only the instant tells them apart.
+        // The actor finishes `paste` before this runs, so `posted` is set either way; only
+        // the instant tells a read before Cmd+V, which is not the paste, from the paste.
         guard let current = pending, current.promise === promise, let posted = current.posted,
               instant >= posted else { return }
         if current.firstRead == nil {
@@ -301,15 +202,12 @@ actor ClipboardKeeper {
         scheduleRestore()
     }
 
-    /// Waits off the critical path for the restore to fall due, then hands
-    /// back to the actor to do it. Detached so the caller's cancellation
-    /// cannot make the restore fire early, which would give the target app
-    /// the user's old clipboard instead of the transcript.
+    // Detached, so the caller's cancellation cannot make the restore fire early and give
+    // the target app the user's old clipboard.
     private func restoreTask(for promise: TranscriptPromise, at due: ContinuousClock.Instant) -> Task<Void, Never> {
         Task.detached(priority: .utility) { [clock] in
-            // A read that moves the deadline, or a *newer* paste, cancels this
-            // task; the newer paste takes ownership of the snapshot, so there
-            // is nothing left to restore.
+            // A read that moves the deadline, or a newer paste, which takes over the snapshot,
+            // cancels this.
             guard (try? await clock.sleep(due)) != nil, !Task.isCancelled else { return }
             await self.completeRestore(promise)
         }
@@ -324,17 +222,13 @@ actor ClipboardKeeper {
         restore(pending)
     }
 
-    /// Puts the snapshot back, and keeps the transcript's promise alive when
-    /// the snapshot could not replace it.
     private func restore(_ done: Pending) {
         done.snapshot.restore(ifChangeCountIs: done.changeCount, on: pasteboard)
         if pasteboard.changeCount == done.changeCount {
-            left = (done.snapshot, done.changeCount, done.promise)
+            leftBehind = (done.snapshot, done.changeCount, done.promise)
         }
     }
 
-    /// Ends the pending restore without restoring: its timer stops and anyone
-    /// waiting for its read is let go.
     private func endPending() {
         guard let current = pending else { return }
         current.task?.cancel()
@@ -344,9 +238,6 @@ actor ClipboardKeeper {
 
     // MARK: Waiting for the read
 
-    /// The instant the target app first read `promise` after Cmd+V. Nil at
-    /// `deadline` if nothing has, or as soon as the paste is no longer
-    /// pending: restored, taken over by a newer paste, or dropped.
     func firstRead(of promise: TranscriptPromise, by deadline: ContinuousClock.Instant) async -> ContinuousClock.Instant? {
         guard let current = pending, current.promise === promise else { return nil }
         if let read = current.firstRead { return read }
@@ -356,8 +247,8 @@ actor ClipboardKeeper {
             guard (try? await clock.sleep(deadline)) != nil else { return }
             await self.resolveReadWaiter(id, with: nil)
         }
-        // The actor is held until the continuation is stored, so the timer,
-        // however short, finds the waiter there.
+        // The actor is held until the continuation is stored, so the timer, however short,
+        // finds the waiter there.
         return await withCheckedContinuation { continuation in
             readWaiters[id] = ReadWaiter(promise: promise, continuation: continuation, timer: timer)
         }
@@ -379,15 +270,11 @@ actor ClipboardKeeper {
 
     var pendingRestore: Task<Void, Never>? { pending?.task }
     var pendingPromise: TranscriptPromise? { pending?.promise }
-    var leftPromise: TranscriptPromise? { left?.promise }
+    var leftBehindPromise: TranscriptPromise? { leftBehind?.promise }
 }
 
-/// The time the paste waits on: the continuous clock in the app, a manual
-/// one in the tests, which is what keeps the restore and Return tests to
-/// milliseconds instead of the eight seconds the cap would take.
 struct PasteClock: Sendable {
     let now: @Sendable () -> ContinuousClock.Instant
-    /// Returns at `deadline`, or throws when the waiting task is cancelled.
     let sleep: @Sendable (_ deadline: ContinuousClock.Instant) async throws -> Void
 
     static let continuous = PasteClock(

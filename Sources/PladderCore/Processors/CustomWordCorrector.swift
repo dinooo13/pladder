@@ -1,112 +1,38 @@
 import Foundation
 
-/// Repairs near misses of the user's own words.
-///
-/// `DictionaryReplacer` only fires when the engine produced exactly the string
-/// the user predicted. This one takes a list of *correct* terms and repairs
-/// whatever came out: "Chat G P T" → "ChatGPT", "Charge B" → "ChargeBee",
-/// "R and D" → "R&D". The terms are the dictionary entries whose `from` is
-/// empty, so the Dictionary tab is the whole UI and there is no new screen.
-///
-/// How a match is decided:
-///
-/// - Every term is reduced once, at init, to a *key*: lowercased with every
-///   character that is not a letter or digit removed, so "Claude Code" keys as
-///   "claudecode". A term containing "&" also gets a second key with the "&"
-///   spelled out, so "R&D" keys as both "rd" and "randd".
-/// - The transcript is tokenised on whitespace and each position is tried as a
-///   1-, 2-, 3- or 4-token n-gram, joined with nothing and reduced the same
-///   way. Four is the longest term anybody spells out letter by letter
-///   ("Chat G P T"); beyond that the candidate keys get long enough that the
-///   distance threshold starts admitting whole phrases.
-/// - Leading punctuation is split off the first token and trailing punctuation
-///   off the last, and an n-gram never steps over punctuation in between, so
-///   "chat, g p t" is three separate candidates rather than one. A possessive
-///   "'s" counts as trailing punctuation, so "Claude's" matches on "Claude" and
-///   keeps its suffix; a term that is itself a possessive takes the suffix back.
-/// - Score is the Levenshtein distance over the longer key length, times 0.3
-///   when the Soundex codes agree, accepted below 0.18. The best score at a
-///   position wins; ties go to the longer n-gram.
-/// - A key of three characters or fewer must match exactly. This is the
-///   false-positive guard: without it "the" turns into a configured "Tee" or
-///   "TS", and one wrong word costs the user more than ten missed ones.
-/// - The Soundex bonus lifts the bar to a normalised distance of 0.6, which
-///   on a short key is two edits in four or five letters. Soundex keeps the
-///   first letter and three consonant codes, nearly all of a short word, so
-///   there its agreement says little: "roast" and "Rust" share it. On a key
-///   of five characters or fewer the bonus excuses one edit and no more.
-/// - A single word the lexicon knows ("cloud", "shift", "rest") only ever
-///   matches exactly. The speech model writes real words, so a near miss that
-///   is itself an everyday word is what the speaker said far more often than
-///   it is a mis-hearing: "to the cloud" must not become "to the Claude", and
-///   no distance rule can tell that apart from "clawed", which is further
-///   from "Claude" and should become it. A rarer word is still repaired, and
-///   so is a run of everyday words ("cloud code" → "Claude Code"), which is
-///   the spelled-out case this processor exists for. The lexicon is a closure
-///   so tests can swap it; the default is `CommonWords`, a short built-in list.
-/// - The term is emitted verbatim unless it is entirely lowercase, in which
-///   case the matched text's case pattern is mirrored: a capital first letter
-///   carries over, as in `DictionaryReplacer.adjustCase`, and a match in
-///   capitals (two letters or more) comes out in capitals, which the replacer
-///   does not do. Brand names keep their own capitals either way.
-/// - Terms whose key is not pure ASCII are skipped: Soundex is defined over
-///   the English alphabet and would rank them by accident. They still work
-///   through the exact replacer.
-///
-/// This sits on the release-to-paste path, so it is built to skip work rather
-/// than to do it quickly: the keys are computed once in `init` and bucketed by
-/// length, so a candidate only ever sees the handful of terms the length
-/// prefilter could admit; the distance runs over byte arrays with two reusable
-/// rows and abandons the matrix as soon as no path through it can clear the
-/// threshold; and a transcript with no match is returned unchanged rather than
-/// rebuilt. A hundred words against fifty terms costs a few hundred
-/// microseconds, against an engine that takes a quarter of a second.
+// How a match is decided: docs/ARCHITECTURE.md, "Processors". On the release path,
+// so it is built to skip work: keys bucketed by length at init, a distance that
+// gives up early, and an unchanged transcript returned as it came.
 public struct CustomWordCorrector: TextProcessor {
     public static let processorID = "customWords"
 
     public let id = CustomWordCorrector.processorID
-
-    /// Accept below this normalised distance.
     private static let threshold = 0.18
-    /// Multiplier applied when the two Soundex codes agree.
     private static let soundexBonus = 0.3
-    /// Keys this short or shorter get at most `shortKeySoundexEdits` from the
-    /// Soundex bonus.
     private static let shortKeyLength = 5
     private static let shortKeySoundexEdits = 1
-    /// Keys this short or shorter only ever match exactly.
     private static let exactOnlyLength = 3
-    /// Longest n-gram tried at each token position.
+    // The longest term anybody spells out ("Chat G P T"); longer candidate keys let the
+    // threshold admit whole phrases.
     private static let maxNGram = 4
 
     private let terms: [Term]
     private let isOrdinaryWord: @Sendable (String) -> Bool
 
-    /// Every term key bucketed by its length, index = length. The length
-    /// prefilter then costs an index range instead of a scan over all the
-    /// terms: a seven-character candidate never even looks at "elasticsearch".
+    // Index = key length, so the length prefilter costs a range rather than a scan.
     private let keysByLength: [[Key]]
 
     private struct Term: Sendable {
         let text: String
-        /// True when the term carries no capitals of its own, so the matched
-        /// text's case pattern may be mirrored onto it.
         let isLowercase: Bool
     }
 
     private struct Key: Sendable {
-        /// Lowercase ASCII letters and digits only.
         let bytes: [UInt8]
-        /// Four bytes, or empty when the key holds no letters.
         let soundex: [UInt8]
-        /// Index into `terms`.
-        let term: Int
+        let termIndex: Int
     }
 
-    /// - Parameter isOrdinaryWord: Whether a word, lowercased and reduced to
-    ///   its letters and digits, is an everyday word the speaker most likely
-    ///   said. Such a word is never fuzzily rewritten into a term; an exact
-    ///   key still matches. Defaults to the built-in `isCommonWord`.
     public init(
         entries: [DictionaryEntry],
         isOrdinaryWord: @escaping @Sendable (String) -> Bool = CustomWordCorrector.isCommonWord
@@ -118,15 +44,17 @@ public struct CustomWordCorrector: TextProcessor {
             guard entry.from.trimmingCharacters(in: .whitespaces).isEmpty else { continue }
             let text = entry.to.trimmingCharacters(in: .whitespaces)
             guard !text.isEmpty else { continue }
+            // A term with a non-ASCII letter is left to the exact replacer; see
+            // docs/ARCHITECTURE.md, "Processors".
             guard let primary = Self.key(for: text), !primary.isEmpty else { continue }
 
-            let term = built.count
+            let termIndex = built.count
             built.append(Term(text: text, isLowercase: text == text.lowercased()))
-            keys.append(Key(bytes: primary, soundex: Self.soundex(primary), term: term))
+            keys.append(Key(bytes: primary, soundex: Self.soundex(primary), termIndex: termIndex))
             if text.contains("&") {
                 let spelled = text.replacingOccurrences(of: "&", with: "and")
                 if let expanded = Self.key(for: spelled), !expanded.isEmpty, expanded != primary {
-                    keys.append(Key(bytes: expanded, soundex: Self.soundex(expanded), term: term))
+                    keys.append(Key(bytes: expanded, soundex: Self.soundex(expanded), termIndex: termIndex))
                 }
             }
         }
@@ -139,8 +67,6 @@ public struct CustomWordCorrector: TextProcessor {
         keysByLength = buckets
     }
 
-    /// The built-in lexicon: a short list of the most common English, German
-    /// and Spanish words. See `CommonWords` for what is on it and why.
     public static func isCommonWord(_ word: String) -> Bool {
         CommonWords.all.contains(word)
     }
@@ -164,14 +90,13 @@ public struct CustomWordCorrector: TextProcessor {
         while index < tokens.count {
             var best: (score: Double, size: Int, term: Term)?
 
-            // Ascending sizes, so an equal score from a longer n-gram replaces
-            // the shorter one: ties go to the longer match.
+            // Ascending sizes, so an equal score from a longer n-gram wins.
             for size in 1...Self.maxNGram where index + size <= tokens.count {
                 guard Self.spanIsUnbroken(tokens, from: index, size: size) else { continue }
                 guard Self.candidateKey(tokens, from: index, size: size, into: &candidate) else { continue }
                 guard let match = bestMatch(for: candidate, rows: &rows) else { continue }
-                // An everyday word on its own is taken as said; see the type's
-                // comment. Checked only once a match is found, which is rare.
+                // An everyday word on its own is taken as said: "to the cloud" must not become "to
+                // the Claude". Checked only once a match is found, which is rare.
                 if size == 1, match.score > 0, isOrdinaryWord(String(decoding: candidate, as: UTF8.self)) {
                     continue
                 }
@@ -187,8 +112,7 @@ public struct CustomWordCorrector: TextProcessor {
 
             let first = tokens[index]
             let last = tokens[index + best.size - 1]
-            // A term that is itself a possessive ("McDonald's") takes the
-            // suffix back, so the match does not come out as "McDonald's's".
+            // A term that is itself a possessive ("McDonald's") takes the suffix back.
             var end = last.core.upperBound
             if let possessiveEnd = last.possessiveEnd, Self.endsInPossessive(best.term.text) {
                 end = possessiveEnd
@@ -212,21 +136,18 @@ public struct CustomWordCorrector: TextProcessor {
 
     // MARK: Matching
 
-    /// The best-scoring term for one candidate key, or nil when nothing clears
-    /// the threshold. Ties go to the term the user listed first.
     private func bestMatch(for candidate: [UInt8], rows: inout Rows) -> (score: Double, term: Term)? {
         let length = candidate.count
         guard length > 0, keysByLength.count > 1 else { return nil }
 
-        // The widest band of key lengths the length prefilter can admit. It is
-        // deliberately a touch wide: `score` re-applies the exact rule, so slack
-        // here costs one comparison and never changes the answer.
+        // Deliberately a touch wide: `score` re-applies the exact rule, so slack here costs
+        // one comparison and never changes the answer.
         let lower = max(0, length - max(2, length / 4))
         let upper = min(keysByLength.count - 1, (4 * (length + 2)) / 3 + 2)
         guard lower <= upper else { return nil }
 
         var bestScore = Self.threshold
-        var bestTerm: Int?
+        var bestTermIndex: Int?
         let candidateSoundex = Self.soundex(candidate)
 
         for bucket in lower...upper {
@@ -237,17 +158,16 @@ public struct CustomWordCorrector: TextProcessor {
                     key: key,
                     rows: &rows
                 ) else { continue }
-                if score < bestScore || (bestTerm != nil && score == bestScore && key.term < bestTerm!) {
+                if score < bestScore || (bestTermIndex != nil && score == bestScore && key.termIndex < bestTermIndex!) {
                     bestScore = score
-                    bestTerm = key.term
+                    bestTermIndex = key.termIndex
                 }
             }
         }
-        guard let bestTerm else { return nil }
-        return (bestScore, terms[bestTerm])
+        guard let bestTermIndex else { return nil }
+        return (bestScore, terms[bestTermIndex])
     }
 
-    /// nil when the pair is rejected outright; otherwise the normalised score.
     private static func score(
         candidate: [UInt8],
         candidateSoundex: [UInt8],
@@ -259,10 +179,9 @@ public struct CustomWordCorrector: TextProcessor {
         let longer = max(a.count, b.count)
         let shorter = min(a.count, b.count)
 
-        // Length prefilter: the cheapest way to skip the distance entirely.
         guard longer - shorter <= max(2, longer / 4) else { return nil }
 
-        // Short keys only ever match exactly. "the" must never become "Tee".
+        // Short keys only ever match exactly: "the" must never become "Tee".
         if a.count <= exactOnlyLength || b.count <= exactOnlyLength {
             return a == b ? 0 : nil
         }
@@ -270,17 +189,14 @@ public struct CustomWordCorrector: TextProcessor {
 
         let soundexAgrees = !candidateSoundex.isEmpty && candidateSoundex == key.soundex
         let factor = soundexAgrees ? soundexBonus : 1
-        // The largest distance that could still clear the threshold. Knowing it
-        // up front lets the matrix give up the moment no path can get under it,
-        // which is what happens for nearly every pair: two unrelated words of
-        // similar length diverge within the first few rows.
+        // The largest distance that could still clear the threshold, so the matrix can give
+        // up early, as it does for nearly every pair.
         let bound = threshold * Double(longer) / factor
         var limit = Int(bound)
         if Double(limit) >= bound { limit -= 1 }
         // On a short key Soundex is nearly the whole word, so it buys one edit:
-        // "rost" reaches "Rust", "roast" does not. The key's length decides,
-        // not the longer of the two: a longer candidate must not lift the cap,
-        // or "soviet" becomes "Swift".
+        // "rost" reaches "Rust", "roast" does not. The key's length decides, so a
+        // longer candidate cannot lift the cap ("soviet" is three edits from "Swift").
         if soundexAgrees, b.count <= shortKeyLength { limit = min(limit, shortKeySoundexEdits) }
         guard limit >= 1 else { return nil }
 
@@ -288,15 +204,11 @@ public struct CustomWordCorrector: TextProcessor {
         return Double(distance) / Double(longer) * factor
     }
 
-    /// Two reusable rows, so a whole `apply` allocates them once rather than
-    /// once per comparison.
     private struct Rows {
         var previous: [Int] = []
         var current: [Int] = []
     }
 
-    /// nil when the distance is certainly greater than `limit`, which is all
-    /// the caller needs to know: such a pair can never be accepted.
     private static func levenshtein(_ a: [UInt8], _ b: [UInt8], limit: Int, rows: inout Rows) -> Int? {
         let width = b.count + 1
         if rows.previous.count < width {
@@ -318,8 +230,7 @@ public struct CustomWordCorrector: TextProcessor {
                 rows.current[j] = value
                 if value < rowMinimum { rowMinimum = value }
             }
-            // A row's minimum never falls as the matrix grows, so once every
-            // path through it costs more than the limit, nothing can recover.
+            // A row's minimum never falls as the matrix grows, so nothing can recover.
             if rowMinimum > limit { return nil }
             swap(&rows.previous, &rows.current)
         }
@@ -329,8 +240,6 @@ public struct CustomWordCorrector: TextProcessor {
 
     // MARK: Keys
 
-    /// Lowercase, letters and digits only. nil when a kept character is not
-    /// ASCII.
     private static func key(for text: String) -> [UInt8]? {
         var out: [UInt8] = []
         for character in text where character.isLetter || character.isNumber {
@@ -344,9 +253,6 @@ public struct CustomWordCorrector: TextProcessor {
         (byte >= 65 && byte <= 90) ? byte + 32 : byte
     }
 
-    /// Standard American Soundex over the letters of a key: the first letter
-    /// followed by three digits, same-coded neighbours collapsed, "h" and "w"
-    /// transparent, vowels separating. Empty when the key holds no letters.
     private static func soundex(_ key: [UInt8]) -> [UInt8] {
         var out: [UInt8] = []
         var previous: UInt8 = 0
@@ -362,8 +268,7 @@ public struct CustomWordCorrector: TextProcessor {
                 out.append(48 + code)
                 if out.count == 4 { break }
             }
-            // "h" and "w" are transparent: the letters on either side still
-            // count as neighbours. Every other letter, vowels included, resets.
+            // "h" (104) and "w" (119) are transparent; every other letter resets.
             if byte != 104, byte != 119 { previous = code }
         }
         guard !out.isEmpty else { return [] }
@@ -386,16 +291,10 @@ public struct CustomWordCorrector: TextProcessor {
     // MARK: Tokens
 
     private struct Token {
-        /// The token with edge punctuation trimmed off. Empty for a token that
-        /// is nothing but punctuation.
         let core: Range<String.Index>
-        /// The token's key bytes, or nil when it holds a non-ASCII letter.
         let key: [UInt8]?
         let hasLeadingPunctuation: Bool
         let hasTrailingPunctuation: Bool
-        /// Where a possessive "'s" trimmed off the core ends, so a term that
-        /// already carries its own possessive can swallow it back instead of
-        /// doubling it. nil when the token has no possessive.
         let possessiveEnd: String.Index?
     }
 
@@ -423,8 +322,7 @@ public struct CustomWordCorrector: TextProcessor {
             lower = text.index(after: lower)
         }
         guard lower < range.upperBound else {
-            // Nothing but punctuation. Counting it as both a leading and a
-            // trailing boundary keeps any n-gram from consuming it.
+            // Nothing but punctuation: a boundary on both sides, so no n-gram consumes it.
             return Token(
                 core: range.lowerBound..<range.lowerBound,
                 key: [],
@@ -441,13 +339,8 @@ public struct CustomWordCorrector: TextProcessor {
             upper = previous
         }
 
-        // A possessive "'s" is not part of the word. Left in, the core of
-        // "Claude's" keys as "claudes", which is one edit from "claude", and
-        // the replacement would be spliced over the apostrophe and the s —
-        // "ask Claude's opinion" coming out as "ask Claude opinion". Treating
-        // it as trailing punctuation preserves it and stops an n-gram running
-        // past it. Possessives only: other contractions ("don't", "we'll") keep
-        // their tail, which is part of what was said.
+        // A possessive "'s" is not part of the word: left in, "ask Claude's opinion" would
+        // come out as "ask Claude opinion". Other contractions ("don't") keep their tail.
         var possessiveEnd: String.Index?
         let sIndex = text.index(before: upper)
         if sIndex > lower, text[sIndex] == "s" || text[sIndex] == "S" {
@@ -480,15 +373,12 @@ public struct CustomWordCorrector: TextProcessor {
         character.isLetter || character.isNumber
     }
 
-    /// True for a term that already ends in a possessive, straight or curly.
     private static func endsInPossessive(_ text: String) -> Bool {
         guard let last = text.last, last == "s" || last == "S" else { return false }
         let previous = text.dropLast().last
         return previous == "'" || previous == "\u{2019}"
     }
 
-    /// False when the span would step over punctuation: only the first token
-    /// may carry leading punctuation and only the last may carry trailing.
     private static func spanIsUnbroken(_ tokens: [Token], from start: Int, size: Int) -> Bool {
         guard size > 1 else { return true }
         for offset in 0..<(size - 1) where tokens[start + offset].hasTrailingPunctuation {
@@ -500,8 +390,6 @@ public struct CustomWordCorrector: TextProcessor {
         return true
     }
 
-    /// Fills `into` with the span's joined key. False when any token is
-    /// non-ASCII or the span carries no word characters at all.
     private static func candidateKey(
         _ tokens: [Token],
         from start: Int,
@@ -518,8 +406,6 @@ public struct CustomWordCorrector: TextProcessor {
 
     // MARK: Case
 
-    /// A term with capitals of its own is a brand name and is emitted exactly
-    /// as written. A term that is all lowercase mirrors the matched text.
     private static func adjustCase(term: Term, matched: Substring) -> String {
         guard term.isLowercase else { return term.text }
         let letters = matched.filter(\.isLetter)

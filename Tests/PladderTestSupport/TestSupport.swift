@@ -1,11 +1,7 @@
 import Foundation
 import Synchronization
 
-/// Holds a stand-in until the test lets it go, for a load or a download that
-/// must still be running at a given moment. Every wait ends by itself after
-/// `limit`, so a regression that waits on the stand-in fails its
-/// expectations instead of hanging the run: a time limit cannot end a test
-/// stuck on a continuation. Passing tests open the gate long before.
+// Every wait ends by itself after `limit`, so a regression fails rather than hangs.
 public actor Gate {
     private var isOpen = false
     private var waiters: [UUID: CheckedContinuation<Void, Never>] = [:]
@@ -36,7 +32,6 @@ public actor Gate {
         timers = []
     }
 
-    /// Returns once somebody has arrived at the gate.
     public func untilSomeoneWaits() async {
         guard arrivals == 0 else { return }
         await withCheckedContinuation { watchers.append($0) }
@@ -47,7 +42,6 @@ public actor Gate {
     }
 }
 
-/// Collects values from stand-ins on any thread.
 public final class Recorder<Value: Sendable>: Sendable {
     private let values = Mutex<[Value]>([])
 

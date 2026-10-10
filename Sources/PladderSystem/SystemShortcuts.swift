@@ -3,28 +3,14 @@ import Foundation
 import PladderCore
 import os
 
-/// The keyboard shortcuts macOS itself handles, read from Carbon.
-///
-/// The window server dispatches an enabled symbolic hot key before the front
-/// app — and before a Carbon registration — ever sees the keys, so a chord that
-/// collides with one is dead on arrival. `RegisterEventHotKey` does not say so:
-/// it returns `noErr` for Command+Space and Control+Space alike, because
-/// `eventHotKeyExistsErr` only reports another app's Carbon registration. This
-/// list is the check that works.
-///
-/// Which shortcuts are enabled is per Mac: install a second keyboard layout and
-/// Control+Space becomes the input-source switch, which is why the recorded
-/// chord is checked against this rather than against a fixed list.
+// The window server dispatches an enabled symbolic hot key before any app or Carbon
+// registration sees it, and `RegisterEventHotKey` returns `noErr` for Command+Space
+// anyway. Per Mac: a second input source makes Control+Space the source switch.
 public enum SystemShortcuts {
     private static let log = Logger(subsystem: "de.dinooo13.pladder", category: "hotkey")
 
-    /// Every enabled shortcut as a chord, with each modifier read as its
-    /// left-hand key since the mask cannot say which side was meant.
-    ///
-    /// `CopySymbolicHotKeys` is documented as not thread safe and linear in the
-    /// number of shortcuts (a few hundred here), so this is `@MainActor` and
-    /// called on explicit triggers — launch, a permission flip, a hotkey edit,
-    /// the settings window opening — never on a key press.
+    // `CopySymbolicHotKeys` is not thread-safe and linear in the shortcuts (a few
+    // hundred), so: main actor, on explicit triggers, never on a key press.
     @MainActor
     public static func enabled() -> Set<Hotkey> {
         var array: Unmanaged<CFArray>?
@@ -34,8 +20,7 @@ public enum SystemShortcuts {
             return []
         }
 
-        // The keys are `#define`d CFStrings in CarbonEvents.h rather than
-        // imported constants, so they are spelled out.
+        // `#define`d CFStrings in CarbonEvents.h, not imported constants.
         var shortcuts: Set<Hotkey> = []
         for entry in entries {
             guard entry["kHISymbolicHotKeyEnabled"] as? Bool == true,

@@ -39,8 +39,6 @@ let keyV: UInt16 = 0x09
         var t = HotkeyChordTracker(hotkey: .rightOption)
         #expect(t.flagsChanged(modifiers: [leftShift]) == .init())
         #expect(t.flagsChanged(modifiers: [leftShift, rightOption]) == .init())
-        // Letting go of Shift leaves Right Option alone, but it was not
-        // *pressed* alone: the chord only engages on a chord key going down.
         #expect(t.flagsChanged(modifiers: [rightOption]) == .init())
         #expect(t.flagsChanged(modifiers: []) == .init())
         #expect(t.flagsChanged(modifiers: [rightOption]) == .init(event: .pressed))
@@ -49,15 +47,11 @@ let keyV: UInt16 = 0x09
     @Test func anotherKeyWhileHeldEndsThePress() {
         var t = HotkeyChordTracker(hotkey: .rightOption)
         #expect(t.flagsChanged(modifiers: [rightOption]) == .init(event: .pressed))
-        // Right Option + C is someone's shortcut, not dictation. Nothing is
-        // swallowed, and since these instants are microseconds apart the press
-        // counts as interrupted rather than released (see `InterruptionTests`).
-        #expect(t.keyDown(keyA, modifiers: [rightOption]) == .init(event: .cancelled))
+        #expect(t.keyDown(keyA, modifiers: [rightOption]) == .init(event: .interrupted))
         #expect(t.keyUp(keyA, modifiers: [rightOption]) == .init())
         #expect(t.flagsChanged(modifiers: []) == .init())
-        // Same for an extra modifier.
         #expect(t.flagsChanged(modifiers: [rightOption]) == .init(event: .pressed))
-        #expect(t.flagsChanged(modifiers: [rightOption, leftShift]) == .init(event: .cancelled))
+        #expect(t.flagsChanged(modifiers: [rightOption, leftShift]) == .init(event: .interrupted))
         #expect(t.flagsChanged(modifiers: [rightOption]) == .init())
         #expect(t.flagsChanged(modifiers: []) == .init())
     }
@@ -84,15 +78,12 @@ let keyV: UInt16 = 0x09
         _ = t.flagsChanged(modifiers: [leftControl])
         #expect(t.keyDown(space, modifiers: [leftControl]) == .init(event: .pressed, swallow: true))
         #expect(t.flagsChanged(modifiers: []) == .init(event: .released(submit: false)))
-        // Repeats keep being eaten until the key comes up, so the app never
-        // sees a stream of spaces start out of nowhere.
         #expect(t.keyDown(space, isRepeat: true, modifiers: []) == .init(swallow: true))
         #expect(t.keyUp(space, modifiers: []) == .init(swallow: true))
     }
 
     @Test func keyBeforeModifierEngagesButIsNotSwallowed() {
         var t = HotkeyChordTracker(hotkey: Hotkey(leftControl, space))
-        // The app already received this Space; it is too late to take it back.
         #expect(t.keyDown(space, modifiers: []) == .init())
         #expect(t.flagsChanged(modifiers: [leftControl]) == .init(event: .pressed))
         #expect(t.keyUp(space, modifiers: [leftControl]) == .init(event: .released(submit: false), swallow: false))
@@ -102,7 +93,6 @@ let keyV: UInt16 = 0x09
         var t = HotkeyChordTracker(hotkey: Hotkey(space))
         #expect(t.keyDown(space, modifiers: []) == .init(event: .pressed, swallow: true))
         #expect(t.keyUp(space, modifiers: []) == .init(event: .released(submit: false), swallow: true))
-        // Shift+Space is typing, not dictation.
         #expect(t.keyDown(space, modifiers: [leftShift]) == .init())
         #expect(t.keyUp(space, modifiers: [leftShift]) == .init())
     }
@@ -115,7 +105,6 @@ let keyV: UInt16 = 0x09
     }
 
     @Test func modifierAppearingOnlyInKeyFlagsIsHonoured() {
-        // A key-down can carry a modifier we never saw a flagsChanged for.
         var t = HotkeyChordTracker(hotkey: Hotkey(leftControl, space))
         #expect(t.keyDown(space, modifiers: [leftControl]) == .init(event: .pressed, swallow: true))
         #expect(t.keyUp(space, modifiers: []) == .init(event: .released(submit: false), swallow: true))
@@ -144,7 +133,6 @@ let keyV: UInt16 = 0x09
         var t = HotkeyChordTracker(hotkey: .rightCommand, submitKey: .rightOption)
         _ = t.flagsChanged(modifiers: [rightCommand])
         _ = t.flagsChanged(modifiers: [rightCommand, rightOption])
-        // Submit key up first: the latch holds.
         #expect(t.flagsChanged(modifiers: [rightCommand]) == .init())
         #expect(t.flagsChanged(modifiers: []) == .init(event: .released(submit: true)))
     }
@@ -160,7 +148,6 @@ let keyV: UInt16 = 0x09
         _ = t.flagsChanged(modifiers: [rightCommand])
         _ = t.flagsChanged(modifiers: [rightCommand, rightOption])
         #expect(t.flagsChanged(modifiers: []) == .init(event: .released(submit: true)))
-        // The latch was consumed by the release above.
         _ = t.flagsChanged(modifiers: [rightCommand])
         #expect(t.flagsChanged(modifiers: []) == .init(event: .released(submit: false)))
     }
@@ -175,15 +162,12 @@ let keyV: UInt16 = 0x09
     }
 
     @Test func defaultSubmitKeyWorksWithTheHandHoldingTheChord() {
-        // Option+Space held, V tapped at once: V arms the release rather than
-        // interrupting it, and is swallowed so the app never sees Option+V.
         var t = HotkeyChordTracker(hotkey: .optionSpace, submitKey: .keyV)
         #expect(t.flagsChanged(modifiers: [leftOption]) == .init())
         #expect(t.keyDown(space, modifiers: [leftOption]) == .init(event: .pressed, swallow: true))
         #expect(t.keyDown(keyV, modifiers: [leftOption]) == .init(swallow: true))
         #expect(t.keyUp(keyV, modifiers: [leftOption]) == .init(swallow: true))
         #expect(t.keyUp(space, modifiers: [leftOption]) == .init(event: .released(submit: true), swallow: true))
-        // Afterwards V types again.
         #expect(t.keyDown(keyV, modifiers: []) == .init())
         #expect(t.keyUp(keyV, modifiers: []) == .init())
     }
@@ -197,15 +181,13 @@ let keyV: UInt16 = 0x09
     @Test func foreignModifierEndsThePressWithoutSubmit() {
         var t = HotkeyChordTracker(hotkey: .rightCommand, submitKey: .rightOption)
         _ = t.flagsChanged(modifiers: [rightCommand])
-        #expect(t.flagsChanged(modifiers: [rightCommand, leftShift]) == .init(event: .cancelled))
+        #expect(t.flagsChanged(modifiers: [rightCommand, leftShift]) == .init(event: .interrupted))
     }
 
     @Test func emptySubmitKeyBehavesAsBefore() {
         var t = HotkeyChordTracker(hotkey: .rightCommand)
         #expect(t.flagsChanged(modifiers: [rightCommand]) == .init(event: .pressed))
-        // Return is an ordinary key: it disengages the chord, nothing swallowed,
-        // and this soon after the press that is an interruption.
-        #expect(t.keyDown(returnKey, modifiers: [rightCommand]) == .init(event: .cancelled))
+        #expect(t.keyDown(returnKey, modifiers: [rightCommand]) == .init(event: .interrupted))
         #expect(t.flagsChanged(modifiers: []) == .init())
     }
 
@@ -220,13 +202,9 @@ let keyV: UInt16 = 0x09
     @Test func submitKeyHeldBeforeTheHotkeyDoesNotEngage() {
         var t = HotkeyChordTracker(hotkey: .rightOption, submitKey: .rightCommand)
         #expect(t.flagsChanged(modifiers: [rightCommand]) == .init())
-        // Exactly-modifier rule: Right Command + Right Option is not Right Option,
-        // so pressing Right Option last never engages the chord.
         #expect(t.flagsChanged(modifiers: [rightCommand, rightOption]) == .init())
         #expect(t.flagsChanged(modifiers: []) == .init())
     }
-
-    // MARK: The side rule
 
     @Test func rightOptionSpaceFiresTheOptionSpaceChord() {
         var t = HotkeyChordTracker(hotkey: .optionSpace)
@@ -237,15 +215,12 @@ let keyV: UInt16 = 0x09
     }
 
     @Test func shiftOptionSpaceIsNotTheChord() {
-        // Sides are folded, the set is still compared exactly: an extra
-        // modifier is a different chord.
         var t = HotkeyChordTracker(hotkey: .optionSpace)
         #expect(t.keyDown(space, modifiers: [leftShift, leftOption]) == .init())
         #expect(t.keyUp(space, modifiers: [leftShift, leftOption]) == .init())
     }
 
     @Test func loneRightCommandDoesNotFireOnLeftCommand() {
-        // A modifier-only chord keeps its side; that is what makes it usable.
         var t = HotkeyChordTracker(hotkey: .rightCommand)
         #expect(t.flagsChanged(modifiers: [leftCommand]) == .init())
         #expect(t.flagsChanged(modifiers: []) == .init())
@@ -261,8 +236,6 @@ let keyV: UInt16 = 0x09
     }
 
     @Test func aRedundantOptionLetGoDoesNotEndThePress() {
-        // Both Options down, one released: the chord is still held, so the
-        // release is asked of what is down rather than of what went up.
         var t = HotkeyChordTracker(hotkey: .optionSpace)
         #expect(t.keyDown(space, modifiers: [rightOption]) == .init(event: .pressed, swallow: true))
         #expect(t.flagsChanged(modifiers: [rightOption, leftOption]) == .init())
@@ -278,8 +251,6 @@ let keyV: UInt16 = 0x09
     }
 
     @Test func theOtherSideOfTheSendKeyStillInterrupts() {
-        // The send key is matched by side even when the chord is not, so Left
-        // Option is a foreign modifier here and the press is cancelled.
         let t0 = ContinuousClock.now
         var t = HotkeyChordTracker(hotkey: Hotkey(leftControl, space), submitKey: .rightOption)
         #expect(
@@ -287,12 +258,12 @@ let keyV: UInt16 = 0x09
                 == .init(event: .pressed, swallow: true))
         #expect(
             t.flagsChanged(modifiers: [leftControl, leftOption], at: t0 + .milliseconds(100))
-                == .init(event: .cancelled))
+                == .init(event: .interrupted))
     }
 
     @Test func sendKeyArmsOnEitherOptionWhileOptionSpaceIsHeld() {
-        // Accepted quirk: Right Option is already down as part of the chord,
-        // so pressing the other Option arms the send key.
+        // Accepted quirk: Right Option is already down as part of the chord, so pressing the
+        // other Option arms the send key.
         var t = HotkeyChordTracker(hotkey: .optionSpace, submitKey: .rightOption)
         #expect(t.keyDown(space, modifiers: [rightOption]) == .init(event: .pressed, swallow: true))
         #expect(t.flagsChanged(modifiers: [rightOption, leftOption]) == .init())
@@ -315,7 +286,6 @@ let keyV: UInt16 = 0x09
     }
 
     @Test func readsVersionOneKeyFormWithMask() throws {
-        // NSEvent.ModifierFlags control | option, side agnostic: read as the left keys.
         let json = #"{"keyCode":49,"kind":"key","modifiers":786432}"#
         let hotkey = try JSONDecoder().decode(Hotkey.self, from: Data(json.utf8))
         #expect(hotkey == Hotkey(space, leftControl, leftOption))
@@ -341,8 +311,6 @@ let keyV: UInt16 = 0x09
     }
 
     @Test func settingsWithEmptySubmitKeyStaysEmpty() throws {
-        // Unlike the hotkey, an empty submit chord is meaningful: it turns the
-        // feature off instead of falling back to the default.
         let json = #"{"engineID":"echo","submitKey":{"keyCodes":[]}}"#
         let settings = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
         #expect(settings.submitKey.keyCodes.isEmpty)
@@ -382,8 +350,6 @@ let keyV: UInt16 = 0x09
     }
 
     @Test func fnChordCannot() {
-        // Carbon has no modifier bit for Fn, so the chord could only be
-        // registered as a bare F5 and would fire without Fn held.
         #expect(!Hotkey(fn, f5).canBeRegisteredWithoutAccessibility)
     }
 
@@ -392,24 +358,19 @@ let keyV: UInt16 = 0x09
     }
 }
 
-/// The one chord that stands in while Accessibility is missing, and the rule
-/// that decides which chords macOS has already taken.
 @Suite struct StandInRuleTests {
 
     private var controlShiftSpace: Hotkey { Hotkey(leftControl, leftShift, space) }
 
     @Test func defaultIsOptionSpaceAndRegistrable() {
         #expect(Hotkey.optionSpace == Hotkey(leftOption, space))
-        // The whole point: Carbon takes it, so it needs nothing to stand in.
         #expect(Hotkey.optionSpace.canBeRegisteredWithoutAccessibility)
         #expect(Hotkey.optionSpace.standInWithoutAccessibility == nil)
     }
 
     @Test func defaultIsFreeWithTwoInputSources() {
-        // Command+Space, Option+Command+Space, Control+Space and
-        // Control+Option+Space are the ones enabled on the developer's Mac,
-        // where a second input source turns the last two on. None owns
-        // Option+Space.
+        // The shortcuts enabled on the developer's Mac, where a second input source turns on
+        // the two Control ones.
         let taken: Set<Hotkey> = [
             Hotkey(leftCommand, space), Hotkey(leftCommand, leftOption, space),
             Hotkey(leftControl, space), Hotkey(leftControl, leftOption, space),
@@ -420,7 +381,6 @@ let keyV: UInt16 = 0x09
     @Test func modifierOnlyChordStandsInWithTheDefault() {
         #expect(Hotkey.rightCommand.standInWithoutAccessibility == .optionSpace)
         #expect(Hotkey(rightCommand, rightOption).standInWithoutAccessibility == .optionSpace)
-        // Fn has no Carbon bit, so a chord with it cannot be registered either.
         #expect(Hotkey(fn, f5).standInWithoutAccessibility == .optionSpace)
     }
 
@@ -434,7 +394,6 @@ let keyV: UInt16 = 0x09
         #expect(
             Hotkey(rightControl, rightShift, space).canonical
                 == Hotkey(leftControl, leftShift, space))
-        // A modifier-only chord is matched by side, so it keeps it.
         #expect(Hotkey.rightCommand.canonical == .rightCommand)
         #expect(
             Hotkey(rightCommand, rightOption).canonical == Hotkey(rightCommand, rightOption))
@@ -444,16 +403,12 @@ let keyV: UInt16 = 0x09
         #expect(
             controlShiftSpace.systemShortcutConflict(in: [Hotkey(leftControl, space)])
                 == Hotkey(leftControl, space))
-        // Not the other way round: that shortcut needs a modifier the chord
-        // does not have, so holding the chord never triggers it.
         #expect(
             Hotkey(leftControl, space)
                 .systemShortcutConflict(in: [Hotkey(leftControl, leftOption, space)]) == nil)
     }
 
     @Test func modifierOnlyChordNeverConflicts() {
-        // Symbolic hot keys always carry a regular key, so a lone Right
-        // Command cannot collide with one.
         #expect(Hotkey.rightCommand.systemShortcutConflict(in: [Hotkey(leftControl, space)]) == nil)
     }
 
@@ -461,45 +416,36 @@ let keyV: UInt16 = 0x09
         // 0x1000 controlKey | 0x0200 shiftKey
         #expect(Hotkey(keyCode: space, carbonModifierMask: 0x1200) == controlShiftSpace)
         #expect(controlShiftSpace.carbonModifierMask == 0x1200)
-        // The right-hand keys produce the same mask, which is the whole point.
         #expect(Hotkey(rightControl, rightShift, space).carbonModifierMask == 0x1200)
         #expect(Hotkey(keyCode: space, carbonModifierMask: 0x0100) == Hotkey(leftCommand, space))
         #expect(Hotkey(keyCode: space, carbonModifierMask: 0x0800) == Hotkey(leftOption, space))
     }
 
     @Test func noKeyShortcutsAreNotChords() {
-        // 0xFFFF is how the symbolic hot key list spells "no key assigned".
         #expect(Hotkey(keyCode: 0xFFFF, carbonModifierMask: 0x1200) == nil)
     }
 
     @Test func unknownMaskBitsAreIgnored() {
-        // macOS sets a private bit on the function-key shortcuts; it must not
-        // become a phantom modifier.
+        // macOS sets a private bit on the function-key shortcuts.
         #expect(Hotkey(keyCode: f5, carbonModifierMask: 0x21000) == Hotkey(leftControl, f5))
     }
 }
 
-/// The interruption window: another key going down just after the chord means
-/// the user typed a shortcut, not a dictation. Every instant is passed in, so
-/// nothing here sleeps.
 @Suite struct InterruptionTests {
     private let t0 = ContinuousClock.now
 
     @Test func letterWithinTheWindowCancels() {
         var t = HotkeyChordTracker(hotkey: .rightCommand)
         #expect(t.flagsChanged(modifiers: [rightCommand], at: t0) == .init(event: .pressed))
-        // Cmd+C. The C still reaches the app: swallowing it would break copy.
         #expect(
             t.keyDown(keyC, modifiers: [rightCommand], at: t0 + .milliseconds(80))
-                == .init(event: .cancelled))
+                == .init(event: .interrupted))
         #expect(t.flagsChanged(modifiers: [], at: t0 + .milliseconds(200)) == .init())
     }
 
     @Test func letterAfterTheWindowReleases() {
         var t = HotkeyChordTracker(hotkey: .rightCommand)
         #expect(t.flagsChanged(modifiers: [rightCommand], at: t0) == .init(event: .pressed))
-        // Held for a second and a half first: that was a dictation, and the
-        // stray key ends it the way it always did.
         #expect(
             t.keyDown(keyC, modifiers: [rightCommand], at: t0 + .milliseconds(1500))
                 == .init(event: .released(submit: false)))
@@ -514,8 +460,6 @@ let keyV: UInt16 = 0x09
     @Test func releaseInsideTheWindowIsStillARelease() {
         var t = HotkeyChordTracker(hotkey: .rightCommand)
         #expect(t.flagsChanged(modifiers: [rightCommand], at: t0) == .init(event: .pressed))
-        // A tap of the chord alone is a (very short) dictation, not an
-        // interruption: only another key going down cancels.
         #expect(
             t.flagsChanged(modifiers: [], at: t0 + .milliseconds(80))
                 == .init(event: .released(submit: false)))
@@ -524,10 +468,9 @@ let keyV: UInt16 = 0x09
     @Test func foreignModifierWithinTheWindowCancels() {
         var t = HotkeyChordTracker(hotkey: .rightCommand)
         #expect(t.flagsChanged(modifiers: [rightCommand], at: t0) == .init(event: .pressed))
-        // Cmd+Shift+4 on its way to the screenshot tool.
         #expect(
             t.flagsChanged(modifiers: [rightCommand, leftShift], at: t0 + .milliseconds(100))
-                == .init(event: .cancelled))
+                == .init(event: .interrupted))
     }
 
     @Test func submitKeyIsNotAnInterruption() {
@@ -545,9 +488,7 @@ let keyV: UInt16 = 0x09
         #expect(t.keyDown(space, modifiers: [leftControl], at: t0) == .init(event: .pressed, swallow: true))
         #expect(
             t.keyDown(keyA, modifiers: [leftControl], at: t0 + .milliseconds(50))
-                == .init(event: .cancelled))
-        // The Space we swallowed on the way down must not reach the app on the
-        // way up either, cancelled press or not.
+                == .init(event: .interrupted))
         #expect(t.keyUp(space, modifiers: [leftControl], at: t0 + .milliseconds(120)) == .init(swallow: true))
     }
 
@@ -557,9 +498,8 @@ let keyV: UInt16 = 0x09
         #expect(t.flagsChanged(modifiers: [rightCommand, rightOption], at: t0 + .milliseconds(50)) == .init())
         #expect(
             t.keyDown(keyC, modifiers: [rightCommand, rightOption], at: t0 + .milliseconds(100))
-                == .init(event: .cancelled))
+                == .init(event: .interrupted))
         #expect(t.isSubmitArmed == false)
-        // The next press starts clean: no Return follows it.
         #expect(t.flagsChanged(modifiers: [], at: t0 + .milliseconds(200)) == .init())
         #expect(t.flagsChanged(modifiers: [rightCommand], at: t0 + .milliseconds(300)) == .init(event: .pressed))
         #expect(
@@ -571,11 +511,10 @@ let keyV: UInt16 = 0x09
         var t = HotkeyChordTracker(hotkey: .rightCommand)
         #expect(t.flagsChanged(modifiers: [rightCommand], at: t0) == .init(event: .pressed))
         #expect(t.flagsChanged(modifiers: [], at: t0 + .seconds(5)) == .init(event: .released(submit: false)))
-        // The window is measured from this press, not the first one.
         #expect(t.flagsChanged(modifiers: [rightCommand], at: t0 + .seconds(6)) == .init(event: .pressed))
         #expect(
             t.keyDown(keyC, modifiers: [rightCommand], at: t0 + .seconds(6) + .milliseconds(80))
-                == .init(event: .cancelled))
+                == .init(event: .interrupted))
     }
 
     @Test func aShorterWindowIsRespected() {
@@ -587,7 +526,6 @@ let keyV: UInt16 = 0x09
     }
 }
 
-/// Instants are passed in; nothing sleeps.
 @Suite struct HotkeyGestureTrackerTests {
     typealias Tracker = HotkeyGestureTracker
     private let t0 = ContinuousClock.now
@@ -619,7 +557,6 @@ let keyV: UInt16 = 0x09
     @Test func toggleModeLatchesAndStopsOnTheNextPress() {
         var g = Tracker(modes: Self.twoChords)
         #expect(g.pressed(.toggle, at: at(0)) == .init(action: .start(.toggle)))
-        // However long the press, a toggle chord latches.
         #expect(g.released(.toggle, submit: false, at: at(2_000)) == .init())
         #expect(g.isLatched)
         #expect(g.pressed(.toggle, at: at(9_000)) == .init(action: .stop(submit: false)))
@@ -666,7 +603,6 @@ let keyV: UInt16 = 0x09
         _ = g.released(.dictate, submit: false, at: at(100))
         _ = g.pressed(.dictate, at: at(3_000))
         #expect(g.released(.dictate, submit: true, at: at(3_100)) == .init())
-        // And the next press is a fresh start.
         #expect(g.pressed(.dictate, at: at(6_000)) == .init(action: .start(.dictate)))
     }
 
@@ -687,14 +623,11 @@ let keyV: UInt16 = 0x09
     }
 
     @Test func anotherChordsInterruptionIsIgnored() {
-        // Nested chords: the other tracker's cancel is the hand-over.
         var g = Tracker(modes: Self.twoChords)
         _ = g.pressed(.dictate, at: at(0))
         #expect(g.interrupted(.toggle) == .init())
         #expect(g.released(.dictate, submit: false, at: at(900)).action == .stop(submit: false))
     }
-
-    // The hand-over in the order `HotkeyChordSet` reports it, end first.
 
     @Test func aDictateChordInsideTheToggleChordHandsOver() {
         var g = Tracker(modes: Self.twoChords)
@@ -704,8 +637,6 @@ let keyV: UInt16 = 0x09
     }
 
     @Test func aToggleChordInsideTheDictateChordHandsOver() {
-        // The same the other way round: the dictate chord records and its
-        // release stops it.
         var g = Tracker(modes: Self.twoChords)
         #expect(g.pressed(.toggle, at: at(0)) == .init(action: .start(.toggle)))
         #expect(g.interrupted(.toggle) == .init(action: .discard))
@@ -715,9 +646,6 @@ let keyV: UInt16 = 0x09
     }
 
     @Test func pastTheWindowAToggleChordsHandOverEndsItsRecording() {
-        // Its release latches, and the dictate press is the next press of
-        // any chord: the toggle recording stops, nothing is left latched,
-        // and the dictate chord's own release is ignored.
         var g = Tracker(modes: Self.twoChords)
         _ = g.pressed(.toggle, at: at(0))
         #expect(g.released(.toggle, submit: false, at: at(1_500)) == .init())
@@ -729,7 +657,6 @@ let keyV: UInt16 = 0x09
     @Test func aBouncePressIsIgnoredAndTurnsDeferralOn() {
         var g = Tracker(modes: Self.hold)
         _ = g.pressed(.dictate, at: at(0))
-        // Not deferring yet: the first bounce costs this hold.
         #expect(g.released(.dictate, submit: false, at: at(2_000)).action == .stop(submit: false))
         #expect(!g.deferReleases)
         #expect(g.pressed(.dictate, at: at(2_010)) == .init())
@@ -758,7 +685,6 @@ let keyV: UInt16 = 0x09
     }
 
     @Test func aBounceKeepsTheHoldsStart() {
-        // A hybrid hold that bounced at 500 ms is still a hold, not a new tap.
         var g = Tracker(modes: Self.hybrid, deferReleases: true)
         _ = g.pressed(.dictate, at: at(0))
         #expect(g.released(.dictate, submit: false, at: at(500)).settle != nil)
@@ -813,7 +739,6 @@ let keyV: UInt16 = 0x09
     }
 }
 
-/// The Escape rule of `HotkeyChordSet`.
 @Suite struct CancelKeyTests {
     private static let escape = [HotkeyMonitorEvent(.escape)]
 
@@ -829,7 +754,6 @@ let keyV: UInt16 = 0x09
         #expect(set.keyDown(escapeKey, modifiers: []) == .init(events: Self.escape, swallow: true))
         #expect(set.keyDown(escapeKey, isRepeat: true, modifiers: []) == .init(swallow: true))
         #expect(set.keyUp(escapeKey, modifiers: []) == .init(swallow: true))
-        // And the next Escape is the cancel key again.
         #expect(set.keyDown(escapeKey, modifiers: []).events == Self.escape)
     }
 
@@ -844,7 +768,6 @@ let keyV: UInt16 = 0x09
     }
 
     @Test func escapeWithForeignModifiersPassesThrough() {
-        // Cmd+Option+Escape is Force Quit, recording or not.
         var set = optionSpaceSet()
         set.cancelKeyEnabled = true
         _ = set.flagsChanged(modifiers: [leftCommand, leftOption])
@@ -861,8 +784,6 @@ let keyV: UInt16 = 0x09
     }
 
     @Test func escapeNeverReachesTheChordTrackers() {
-        // Inside the interruption window a foreign key would cancel the
-        // press; the cancel key is caught first, so only `.escape` comes out.
         let start = ContinuousClock.now
         var set = HotkeyChordSet(chords: [.dictate: .rightCommand])
         set.cancelKeyEnabled = true
@@ -871,7 +792,6 @@ let keyV: UInt16 = 0x09
             set.keyDown(escapeKey, modifiers: [rightCommand], at: start + .milliseconds(100))
                 == .init(events: Self.escape, swallow: true))
         #expect(set.keyUp(escapeKey, modifiers: [rightCommand], at: start + .milliseconds(150)) == .init(swallow: true))
-        // The chord is still engaged: letting go is its ordinary release.
         #expect(
             set.flagsChanged(modifiers: [], at: start + .seconds(3)).events
                 == [HotkeyMonitorEvent(role: .dictate, event: .released(submit: false))])
@@ -899,9 +819,7 @@ let keyV: UInt16 = 0x09
         var set = optionSpaceSet()
         set.cancelKeyEnabled = true
         _ = set.keyDown(escapeKey, modifiers: [])
-        // Its key-up is lost; the recording ends.
         set.cancelKeyEnabled = false
-        // The next Escape is the system's, down and up.
         #expect(set.keyDown(escapeKey, modifiers: []) == .init())
         #expect(set.keyUp(escapeKey, modifiers: []) == .init())
     }
@@ -915,14 +833,10 @@ let keyV: UInt16 = 0x09
     }
 }
 
-/// A key-up that never arrives: a tap that missed it, Secure Event Input
-/// switched on between key-down and key-up. The regular key must not stay
-/// held in the tracker's books.
 @Suite struct LostKeyUpTests {
     private let t0 = ContinuousClock.now
     private func at(_ ms: Int) -> ContinuousClock.Instant { t0 + .milliseconds(ms) }
 
-    /// Option+Space pressed, Space's key-up lost, Option let go.
     private func afterALostSpaceKeyUp() -> HotkeyChordTracker {
         var t = HotkeyChordTracker(hotkey: .optionSpace)
         _ = t.flagsChanged(modifiers: [leftOption], at: at(0))
@@ -945,15 +859,12 @@ let keyV: UInt16 = 0x09
     }
 
     @Test func theNextSpaceIsTypedNormally() {
-        // The Space still counted as swallowed would eat the next one typed.
         var t = afterALostSpaceKeyUp()
         #expect(t.keyDown(space, modifiers: [], at: at(5_000)) == .init())
         #expect(t.keyUp(space, modifiers: [], at: at(5_050)) == .init())
     }
 
     @Test func aFreshKeyDownWhileEngagedKeepsThePress() {
-        // The key-up was lost mid-hold and the key went down again: still
-        // the chord, still swallowed, and its key-up releases it.
         var t = HotkeyChordTracker(hotkey: .optionSpace)
         _ = t.flagsChanged(modifiers: [leftOption], at: at(0))
         _ = t.keyDown(space, modifiers: [leftOption], at: at(10))
@@ -967,7 +878,6 @@ let keyV: UInt16 = 0x09
         var t = HotkeyChordTracker(hotkey: controlShiftSpace)
         _ = t.flagsChanged(modifiers: [leftControl, leftShift], at: at(0))
         #expect(t.keyDown(space, modifiers: [leftControl, leftShift], at: at(10)) == .init(event: .pressed, swallow: true))
-        // Space's key-up lost; Shift let go, Control kept.
         #expect(t.flagsChanged(modifiers: [leftControl], at: at(2_000)) == .init(event: .released(submit: false)))
         #expect(t.flagsChanged(modifiers: [leftControl, leftShift], at: at(4_000)) == .init())
     }

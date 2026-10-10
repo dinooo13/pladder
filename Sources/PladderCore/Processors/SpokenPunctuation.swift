@@ -1,37 +1,6 @@
 import Foundation
 
-/// Turns punctuation the speaker said out loud into the mark: "question
-/// mark", "Fragezeichen", "signo de interrogación" become "?", and so on in
-/// English, German and Spanish.
-///
-/// The speech model already turns most spoken marks into punctuation and
-/// numbers into digits; what reaches this step is the rest, usually with the
-/// model's own punctuation stuck to it ("verschieben? Fragezeichen."). That
-/// punctuation is absorbed into the mark, so the result carries it once.
-///
-/// Only phrases that are never an ordinary word are taken. "period",
-/// "Punkt" and "punto" are left alone, since "a trial period", "ein
-/// wichtiger Punkt" and "el punto" are far more common than a dictated full
-/// stop, and so are "colon" and "dos puntos". The one ambiguous phrase kept,
-/// Spanish "coma", is a word in English too, so it needs the same language
-/// evidence the filler remover uses. Between two digits "Komma" and "coma"
-/// are the decimal comma: "3 Komma 5" becomes "3,5".
-///
-/// A phrase right after an article is the noun, not a dictated mark: "add a
-/// semicolon", "un punto y coma", "a new paragraph". So is one after an
-/// article and an adjective that describes a mark ("the Oxford comma", "ein
-/// großes Fragezeichen"). Only such adjectives count, because any other word
-/// there is usually a noun the clause ends on: "to the end comma and then"
-/// is dictated. "this", "that", the German definite articles and "ein" count
-/// only with such an adjective, since on their own they end a clause as often
-/// as they start a noun phrase: "What is that question mark", "Was ist das
-/// Fragezeichen", and "ein" is also the separable prefix that ends "Schaltest
-/// du das Licht ein Fragezeichen". Punctuation between the words ends the
-/// noun phrase, so the speech model's own "book. Full stop." is always a
-/// mark.
-///
-/// Runs after the whitespace step, which would otherwise fold the line
-/// breaks of "new paragraph" back into spaces.
+// Which phrases count as a dictated mark: docs/ARCHITECTURE.md, "Processors".
 public struct SpokenPunctuation: TextProcessor {
     public static let processorID = "spoken-punctuation"
 
@@ -52,7 +21,6 @@ public struct SpokenPunctuation: TextProcessor {
             }
         }
 
-        /// The next word starts a sentence.
         var endsSentence: Bool {
             switch self {
             case .fullStop, .question, .exclamation, .paragraph: true
@@ -61,7 +29,7 @@ public struct SpokenPunctuation: TextProcessor {
         }
     }
 
-    /// Longer phrases first, so "punto y coma" is never read as "coma".
+    // Longer phrases first, so "punto y coma" is never read as "coma".
     private static let phrases: [(pattern: String, mark: Mark)] = [
         ("punto y coma", .semicolon),
         ("semicolon|semikolon", .semicolon),
@@ -73,26 +41,23 @@ public struct SpokenPunctuation: TextProcessor {
         ("comma|komma", .comma),
     ]
 
-    /// Needs the language evidence; see the type's comment.
+    // An English word too, so it needs the language evidence.
     private static let spanishComma = "coma"
 
-    /// Words that never end a clause, so a phrase after one is a noun. "a" is
-    /// the letter when it is a capital in mid-sentence ("plan A comma").
+    // Words that never end a clause, so a phrase after one is a noun. "a" is the
+    // letter when it is a capital in mid-sentence ("plan A comma").
     private static let articles: Set<String> = [
         "a", "an", "the",
         "eine", "einen", "einem",
         "un", "una", "el", "la", "los", "las",
     ]
 
-    /// Determiners that end a clause as well, so they count only with one of
-    /// `markAdjectives` after them: pronouns, and "ein", which is also the
-    /// separable prefix of "einschalten" and "einladen".
+    // They end a clause as well, so they count only with one of `markAdjectives` after them:
+    // pronouns, and "ein", the separable prefix of "einschalten" and "einladen".
     private static let demonstratives: Set<String> = ["this", "that", "der", "die", "das", "dem", "den", "ein"]
 
-    /// Adjectives that describe a punctuation mark. A closed list, because an
-    /// open guess would take the noun in "the end comma" for one. German
-    /// entries are stems: an inflected form ("großes", "kleinen") matches with
-    /// its ending taken off.
+    // A closed list: an open guess would take the noun in "the end comma" for one.
+    // German entries are stems, matched with their ending taken off.
     private static let markAdjectives: Set<String> = [
         "oxford", "serial", "decimal", "extra", "missing", "stray", "trailing", "inverted",
         "misplaced", "unnecessary", "superfluous", "big", "huge", "giant", "little", "small",
@@ -105,14 +70,10 @@ public struct SpokenPunctuation: TextProcessor {
 
     private let universal: [(regex: NSRegularExpression, mark: Mark)]
     private let spanish: NSRegularExpression
-    /// Every phrase in one pass. Almost no dictation holds one, and this is
-    /// the only scan such a dictation pays.
+    // Almost no dictation holds a phrase, and this is the only scan such a one pays.
     private let candidate: NSRegularExpression
     private let languageHint: (@Sendable (String) -> String?)?
 
-    /// - Parameter languageHint: The same closure the filler remover gets:
-    ///   a confident ISO 639-1 code for the text, or nil. Called only when
-    ///   the text holds "coma".
     public init(languageHint: (@Sendable (String) -> String?)? = nil) {
         self.languageHint = languageHint
         universal = Self.phrases.map { (try! NSRegularExpression(pattern: Self.pattern($0.pattern), options: .caseInsensitive), $0.mark) }
@@ -121,9 +82,8 @@ public struct SpokenPunctuation: TextProcessor {
         candidate = try! NSRegularExpression(pattern: Self.pattern(every), options: .caseInsensitive)
     }
 
-    /// The phrase as a whole word. The punctuation around it is taken by
-    /// hand in `apply`: a pattern that starts with optional spaces cannot be
-    /// scanned for quickly.
+    // The punctuation around a phrase is taken by hand in `apply`: a pattern starting
+    // with optional spaces cannot be scanned for quickly.
     private static func pattern(_ phrase: String) -> String {
         "\\b(?:\(phrase))\\b"
     }
@@ -156,8 +116,8 @@ public struct SpokenPunctuation: TextProcessor {
             // Left in the text: the next segment copies it with its neighbours.
             if namesTheMark(ns, at: match.range.location) { continue }
             converted = true
-            // The speech model's own punctuation around the phrase, and the
-            // spaces on either side: "verschieben? Fragezeichen." is one mark.
+            // The speech model's own punctuation around the phrase goes too:
+            // "verschieben? Fragezeichen." is one mark.
             var start = match.range.location
             while start > cursor, isSpace(ns.character(at: start - 1)) { start -= 1 }
             while start > cursor, isStray(ns.character(at: start - 1)) { start -= 1 }
@@ -170,7 +130,6 @@ public struct SpokenPunctuation: TextProcessor {
             let trailStart = cursor
             while cursor < ns.length, isStray(ns.character(at: cursor)) { cursor += 1 }
             let trailed = cursor > trailStart
-            // Spaces after the phrase, up to the next word or line break.
             while cursor < ns.length, isSpace(ns.character(at: cursor)) { cursor += 1 }
             let next = cursor < ns.length ? ns.character(at: cursor) : nil
 
@@ -182,16 +141,13 @@ public struct SpokenPunctuation: TextProcessor {
                 continue
             }
             if mark == .paragraph {
-                // A paragraph keeps the sentence mark before it; only the
-                // spaces go.
+                // A paragraph keeps the sentence mark before it; only the spaces go.
                 out += lead.trimmingCharacters(in: .whitespaces)
                 while out.last?.isWhitespace == true { out.removeLast() }
                 out += out.isEmpty ? "" : mark.text
             } else {
                 while out.last?.isWhitespace == true { out.removeLast() }
                 out += mark.text
-                // One space before the next word; none before a line break
-                // or at the end.
                 if let next, !isNewline(next) { out += " " }
             }
             capitalizeNext = mark.endsSentence
@@ -203,9 +159,6 @@ public struct SpokenPunctuation: TextProcessor {
         return out.trimmingCharacters(in: .whitespaces)
     }
 
-    /// Whether the phrase at `location` is the name of the mark rather than
-    /// the mark: it follows an article, or an article or demonstrative and
-    /// one of `markAdjectives`. See the type's comment.
     private static func namesTheMark(_ ns: NSString, at location: Int) -> Bool {
         guard let previous = word(in: ns, endingAt: location) else { return false }
         let text = ns.substring(with: previous)
@@ -231,8 +184,6 @@ public struct SpokenPunctuation: TextProcessor {
         return germanEndings.contains { word.hasSuffix($0) && markAdjectives.contains(String(word.dropLast($0.count))) }
     }
 
-    /// The word just before `location` with only spaces in between, or nil
-    /// when punctuation or a line break comes first.
     private static func word(in ns: NSString, endingAt location: Int) -> NSRange? {
         var end = location
         while end > 0, isSpace(ns.character(at: end - 1)) { end -= 1 }
@@ -248,11 +199,8 @@ public struct SpokenPunctuation: TextProcessor {
     private static func isSpace(_ c: unichar) -> Bool { c == 0x20 || c == 0x09 || c == 0xA0 }
     private static func isNewline(_ c: unichar) -> Bool { c == 0x0A || c == 0x0D }
     private static func isDigit(_ c: unichar) -> Bool { c >= 0x30 && c <= 0x39 }
-    /// Punctuation the speech model put around the spoken word.
     private static func isStray(_ c: unichar) -> Bool { ",.;:!?".utf16.contains(c) }
 
-    /// The first letter upper-cased, if there is one before anything else.
-    /// A word with a capital inside ("iPhone") is left as it is.
     private static func capitalized(_ text: String) -> String {
         guard let index = text.firstIndex(where: { !$0.isWhitespace }), text[index].isLetter else { return text }
         let next = text.index(after: index)
