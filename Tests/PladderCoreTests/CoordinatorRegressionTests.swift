@@ -205,14 +205,22 @@ import Testing
 
     // MARK: Settings and the monitor
 
-    @Test func onlyARealChangeRebuildsTheProcessors() async {
+    // Before: any dictation setting rebuilt them, compiling a regex per
+    // dictionary entry, although only the dictionary goes into them.
+    @Test func onlyADictionaryChangeRebuildsTheProcessors() async {
         let builds = Recorder<DictationSettings>()
         let (c, _, _) = makeCoordinator(makePipeline: { builds.append($0); return ProcessorPipeline([]) })
         #expect(builds.all.count == 1)
         c.settings = c.settings
+        c.settings.appendTrailingSpace.toggle()
+        c.settings.disabledProcessors = [FillerRemover.processorID]
+        c.settings.liveTranscript.toggle()
+        c.settings.hotkey = .rightOption
         #expect(builds.all.count == 1)
-        c.settings.dictionary = [DictionaryEntry(from: "a", to: "b")]
+        let dictionary = [DictionaryEntry(from: "a", to: "b")]
+        c.settings.dictionary = dictionary
         #expect(builds.all.count == 2)
+        #expect(builds.all.last?.dictionary == dictionary)
     }
 
     @Test func aCombinedUpdateRestartsTheMonitorOnce() async {

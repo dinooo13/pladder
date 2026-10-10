@@ -114,8 +114,10 @@ public final class DictationCoordinator {
             hotkeyMonitor = monitor
         }
         // Rebuilt here so that no processor is constructed on the
-        // release-to-paste path.
-        if old != settings { pipeline = makePipeline(settings) }
+        // release-to-paste path, and only when the dictionary changed: it is
+        // the one setting the processors are built from, and each build
+        // compiles a regex per entry.
+        if old.dictionary != settings.dictionary { pipeline = makePipeline(settings) }
         if restart { hotkeyConfigurationChanged() }
         if old.engineID != settings.engineID { engineChanged() }
     }
@@ -173,6 +175,8 @@ public final class DictationCoordinator {
     /// the polish a no-op.
     private let refiner: (any TranscriptRefiner)?
     private var hotkeyMonitor: any HotkeyMonitor
+    /// Builds the processors from `dictionary`, the only setting they are
+    /// built from; called again only when that changes.
     private let makePipeline: @Sendable (DictationSettings) -> ProcessorPipeline
     /// Rebuilt when settings change so that no processor is constructed on the
     /// release-to-paste path; `DictionaryReplacer` compiles a regex per entry.
