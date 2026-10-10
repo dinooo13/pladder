@@ -73,10 +73,13 @@ release-to-paste log line (`TimingLine.swift`).
 **Ending without text.** `cancelRecording` covers Escape, an interrupted
 press, a hotkey change and quitting. The microphone goes off first; the
 engine drops the utterance only once the feed loop has exited, so no chunk
-lands after it. A press right after a cancel waits for that cleanup, so the
-old utterance's `abandonUtterance` cannot drop the new one. A hotkey change
-ends the recording before the new monitor starts, so a press on the new
-stream finds the machine idle and only waits for that cleanup.
+lands after it. Each cancel's cleanup then waits for the one before it, and a
+press right after a cancel waits for the newest, so its microphone and
+utterance start only after every earlier cancel has stopped its microphone
+and dropped its utterance. A press that is itself cancelled while it waits
+stops there and never starts the microphone. A hotkey change ends the
+recording before the new monitor starts, so a press on the new stream finds
+the machine idle and only waits for that cleanup.
 
 **Engines swapped mid-cycle** are unloaded once the cycle ends: the running
 cycle keeps the engine it started with.
@@ -93,6 +96,19 @@ signal regardless.
 `livePass`. `EngineLoader` builds, loads, polls and swaps the engine;
 `StandardEngines.entries` is the catalog the app, the settings picker and the
 CLI read.
+
+**The utterance handle.** `beginUtterance` returns an `Utterance`, and feed,
+live pass, end and abandon name it; the contract is in CLAUDE.md's
+pluggability rules. The engine is an actor and reentrant across its awaits,
+so with one shared slot and no handle a cancelled recording's abandon that
+landed after the next recording had begun dropped that one instead, and of
+two overlapping begins the later assignment won and the other session was
+never cancelled. `UtteranceSlot` holds the bookkeeping: `begin` claims the
+slot before the first await and hands back the session it replaces;
+`install` refuses a session whose begin was overtaken by another begin or
+by an abandon, and the engine cancels that session and throws; a stale
+handle's feed, live pass and abandon do nothing, and its end throws
+`notLoaded`.
 
 `FluidAudioIncrementalEngine` runs FluidAudio's batch windows while the user
 speaks, through the fork's `IncrementalChunkProcessor`. The text is the
@@ -179,8 +195,14 @@ Input change.
 
 Without Accessibility a stored chord Carbon cannot register is stood in for
 by Option+Space (`DictationCoordinator.standInHotkey`); the stored chord is
-never rewritten. A chord change hands the coordinator the new chord and its
-stand-in together (`update(_:standInHotkey:)`), in one restart.
+never rewritten. A chord change runs `HotkeySource.choose` again at once,
+with the last Secure Event Input reading, and hands the coordinator the new
+chord, its stand-in and, when it changed, the other monitor together
+(`update(_:standInHotkey:monitor:)`), in one restart. Left to the next
+permission poll, a modifier-only chord recorded while Carbon had the hotkey
+under Secure Event Input would sit on Carbon, which cannot register it, for
+up to two seconds. `settings`, `standInHotkey` and `replaceHotkeyMonitor`
+all go through `update`, which works out once whether the monitor restarts.
 
 While a settings field records a chord the hotkey is suspended.
 `HotkeyRecordingSlot` holds the one recording session: beginning in one
@@ -240,7 +262,9 @@ user's clipboard, `KeyPoster` types the keys.
 
 The pipeline is `StandardProcessors.entries`: filler remover, dictionary
 replacer, custom-word corrector, whitespace normaliser, spoken punctuation.
-It is rebuilt when settings change, never per dictation.
+It is rebuilt when the dictionary changes, the one setting it is built
+from, never per dictation; which processors are switched off is read on
+each run.
 
 **Fillers.** Two tiers, so a real word is never removed. Universal tokens
 ("uh", "ähm", "hmm") are not words in English, German or Spanish and always
@@ -287,7 +311,7 @@ model's file and memory.
   decoded. The session is prewarmed at key-down. Every call runs detached
   and is raced against the wall clock; a call abandoned at its deadline is
   drained by the next one, since the system model answers one request at a
-  time.
+  time. The race is `firstOf` in Core, which the app's quit uses too.
 - **S1-mini** (`S1MiniPolisher` on `LlamaModel`). llama.cpp on the GPU,
   greedy, with the fixed prompt prefix decoded once at load and its cache
   kept. The model loads at the first key-down after it is chosen and stays
@@ -296,7 +320,10 @@ model's file and memory.
   for it, so two models are never resident at once.
 - **The file.** `PolishModelController` downloads it only while polish is
   on and the model chosen, and cancels the download when either changes,
-  in the order the settings changed.
+  in the order the settings changed. A cancel returns once the download
+  has wound down; while it is verifying, the checksum stops at its next
+  16 MB chunk, so the next model's download does not queue behind 1.5 GB
+  of hashing.
 
 Neither logs the transcript: log lines carry numbers and error case names.
 
