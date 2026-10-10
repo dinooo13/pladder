@@ -81,6 +81,36 @@ import Testing
         #expect(lifecycle == ["begin", "abandon", "begin", "end"])
     }
 
+    // Before: each cancel's cleanup replaced the one before, so a press
+    // waited for the newest only. An older cleanup still waiting for its
+    // feed then dropped the utterance after the next recording had begun
+    // one, and that dictation failed as "not loaded".
+    @Test func aPressWaitsForEveryEarlierCancel() async {
+        let engine = FakeStreamingEngine(feedDelay: .milliseconds(300))
+        let (c, output, _, _) = await makeStreamingCoordinator(style: .compact, engine: engine)
+        await c.startIdle()
+        // Cancelled while the feed is inside the engine: its cleanup waits
+        // for the feed before it drops the utterance.
+        await c.hotkeyPressed()
+        #expect(await waitUntil { engine.isFeeding })
+        let first = Task { await c.cancelRecording() }
+        #expect(await waitUntil { c.state == .idle })
+        // Waits for that cleanup, and is cancelled before its microphone is
+        // up, so its own cleanup has nothing to wait for but the first.
+        let second = Task { await c.hotkeyPressed() }
+        #expect(await waitUntil { c.state.isRecording })
+        let secondCancel = Task { await c.cancelRecording() }
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed()
+        #expect(c.state.isRecording)
+        c.hotkeyReleased()
+        await c.inFlight?.value
+        _ = await (first.value, second.value, secondCancel.value)
+        #expect(output.inserted == ["final"])
+        let lifecycle = engine.log.filter { ["begin", "abandon", "stale abandon", "end"].contains($0) }
+        #expect(lifecycle == ["begin", "abandon", "begin", "end"])
+    }
+
     // Before: the engine kept one utterance and no handle, so the abandon
     // of a recording cancelled while its utterance began, landing after
     // the next recording had begun its own, dropped that one instead.

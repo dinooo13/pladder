@@ -218,9 +218,10 @@ public final class DictationCoordinator {
     /// order the two arrive in.
     private var recording = 0
     /// The tail of the last cancelled recording: the microphone stopping and
-    /// the engine dropping the utterance. A press that comes before it is
-    /// done waits for it, so the engine cannot be told to drop the new
-    /// utterance in place of the old one.
+    /// the engine dropping the utterance. Each one waits for the one before
+    /// it, so a press that comes before it is done waits for every earlier
+    /// cancel, and its microphone and utterance start only after theirs have
+    /// stopped.
     private var cancelCleanup: Task<Void, Never>?
     /// The mute that was armed at key-down and the restore that undoes it,
     /// kept so quitting can wait for the speakers to come back.
@@ -887,13 +888,17 @@ public final class DictationCoordinator {
         becomeIdle()
         cycleEngine = nil
         // The microphone goes off first. The engine drops the utterance only
-        // once the feed is out of the way, so no chunk lands after it.
+        // once the feed is out of the way, so no chunk lands after it. Then
+        // the cancel before this one, still under way, is waited for, so
+        // whoever waits for this one waits for both.
+        let previous = cancelCleanup
         let cleanup = Task { [capture] in
             _ = await capture.stop()
             if let stream {
                 _ = await stream.feed.value
                 await stream.engine.abandonUtterance(stream.utterance)
             }
+            await previous?.value
         }
         cancelCleanup = cleanup
         return cleanup
