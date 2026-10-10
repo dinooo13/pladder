@@ -45,7 +45,7 @@ struct PladderApp: App {
 }
 
 // `LSUIElement` hides the Dock icon; setting the policy too keeps `swift run`, which
-// has no Info.plist, the same. See docs/ARCHITECTURE.md, "The app", for quitting.
+// has no Info.plist, the same. See docs/ARCHITECTURE.md, "Dictation flow", for quitting.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     static var shutdown: (@MainActor () async -> Void)?

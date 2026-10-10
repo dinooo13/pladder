@@ -10,6 +10,8 @@ import PladderSystem
 final class HotkeyRouter {
     private(set) var usesTap: Bool
     private(set) var accessibilityTrusted: Bool
+    // `CopySymbolicHotKeys` is main-thread work linear in the shortcut count: read at launch,
+    // a permission flip and settings opening, never on a key press.
     private(set) var systemShortcuts: Set<Hotkey> = []
     private(set) var hotkey: Hotkey
 

@@ -13,6 +13,8 @@ public final class GlobalHotkeyMonitor: HotkeyMonitor, @unchecked Sendable {
 
     private let thread: RunLoopThread
     private let lifecycle: HotkeyMonitorLifecycle<TapHandle, TapState>
+    // A refused `tapCreate` (the grant revoked between the poll and the start) is retried on a
+    // timer: macOS posts no notification to wait for.
     private let retryInterval: TimeInterval = 2
 
     public init() {
