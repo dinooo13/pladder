@@ -87,6 +87,20 @@ public final class DictationCoordinator {
         }
     }
 
+    /// Hands over the settings and the stand-in chord together, so a chord
+    /// change that also changes the stand-in restarts the monitor once, with
+    /// both. Set one after the other, the first restart would register the
+    /// new chord with the old stand-in: without Accessibility a modifier-only
+    /// chord that Carbon refuses, on its way to being stood in for.
+    public func update(_ settings: DictationSettings, hotkeyOverride: Hotkey?) {
+        deferredHotkeyRestart = false
+        if settings != self.settings { self.settings = settings }
+        self.hotkeyOverride = hotkeyOverride
+        let restart = deferredHotkeyRestart == true
+        deferredHotkeyRestart = nil
+        if restart { hotkeyConfigurationChanged() }
+    }
+
     /// Minimum recording length worth transcribing. Taps shorter than this are
     /// treated as accidental.
     public var minimumDuration: TimeInterval = 0.3
@@ -151,6 +165,9 @@ public final class DictationCoordinator {
     /// chord change made while the app is still setting up costs nothing,
     /// and `start()` registers what is current by then, once.
     private var isStarted = false
+    /// Non-nil inside `update(_:hotkeyOverride:)`: true once a change there
+    /// needs the monitor restarted, which happens once, at the end.
+    private var deferredHotkeyRestart: Bool?
     private var hotkeyTask: Task<Void, Never>?
     private var levelTask: Task<Void, Never>?
     /// Returns `.error` or `.copied` to idle after its display duration.
@@ -377,6 +394,10 @@ public final class DictationCoordinator {
     /// in progress is dropped, and the monitor starts over unless it is
     /// suspended or the coordinator has not started yet.
     private func hotkeyConfigurationChanged() {
+        if deferredHotkeyRestart != nil {
+            deferredHotkeyRestart = true
+            return
+        }
         dropRecording()
         guard isStarted, !isHotkeySuspended else { return }
         startHotkey()
@@ -388,10 +409,17 @@ public final class DictationCoordinator {
         hotkeyMonitor.stop()
     }
 
-    /// Cancels a recording in progress from a synchronous context.
+    /// Cancels a recording in progress from a synchronous context. The
+    /// recording ends here, before the caller starts a new monitor, so a
+    /// press on the new stream finds the machine idle and waits only for the
+    /// microphone to stop; ended from a task, it could find `.recording`
+    /// still set and be refused.
     private func dropRecording() {
-        guard state.isRecording else { return }
-        Task { await cancelRecording() }
+        guard let cleanup = beginCancel() else { return }
+        Task {
+            await cleanup.value
+            drainPendingUnloads()
+        }
     }
 
     private func startHotkey() {
@@ -837,7 +865,16 @@ public final class DictationCoordinator {
     /// that never transcribe: an interrupted chord, Escape, a hotkey change,
     /// `stop()`.
     public func cancelRecording() async {
-        guard state.isRecording else { return }
+        guard let cleanup = beginCancel() else { return }
+        await cleanup.value
+        drainPendingUnloads()
+    }
+
+    /// The synchronous half of a cancel: the recording is over and the state
+    /// idle when this returns. The returned task stops the microphone and
+    /// drops the utterance; nil when nothing was recording.
+    private func beginCancel() -> Task<Void, Never>? {
+        guard state.isRecording else { return nil }
         let feed = endRecording()
         willPolish = false
         becomeIdle()
@@ -851,8 +888,7 @@ public final class DictationCoordinator {
             await engine?.abandonUtterance()
         }
         cancelCleanup = cleanup
-        await cleanup.value
-        drainPendingUnloads()
+        return cleanup
     }
 
     /// Escape while recording: drop the audio without transcribing and say

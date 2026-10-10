@@ -83,11 +83,11 @@ final class HotkeyRouter {
     }
 
     /// A chord with a regular key no longer needs a stand-in, and a
-    /// modifier-only one does.
+    /// modifier-only one does. The app hands the coordinator the new
+    /// `standInHotkey` with the new chord, in one restart.
     func hotkeyChanged(to hotkey: Hotkey) {
         guard hotkey != self.hotkey else { return }
         self.hotkey = hotkey
-        applyStandIn()
     }
 
     /// The default chord, standing in for a stored chord Carbon cannot
