@@ -68,6 +68,65 @@ import Testing
         #expect(lifecycle == ["begin", "abandon", "begin", "end"])
     }
 
+    @Test func aPressWaitsForEveryEarlierCancel() async {
+        let engine = FakeStreamingEngine(feedDelay: .milliseconds(300))
+        let (c, output, _, _) = await makeStreamingCoordinator(style: .compact, engine: engine)
+        await c.startIdle()
+        await c.hotkeyPressed()
+        #expect(await waitUntil { engine.isFeeding })
+        let first = Task { await c.cancelRecording() }
+        #expect(await waitUntil { c.state == .idle })
+        let second = Task { await c.hotkeyPressed() }
+        #expect(await waitUntil { c.state.isRecording })
+        let secondCancel = Task { await c.cancelRecording() }
+        #expect(await waitUntil { c.state == .idle })
+        await c.hotkeyPressed()
+        #expect(c.state.isRecording)
+        c.hotkeyReleased()
+        await c.inFlight?.value
+        _ = await (first.value, second.value, secondCancel.value)
+        #expect(output.inserted == ["final"])
+        let lifecycle = engine.log.filter { ["begin", "abandon", "stale abandon", "end"].contains($0) }
+        #expect(lifecycle == ["begin", "abandon", "begin", "end"])
+    }
+
+    @Test func aPressCancelledWhileItWaitsLeavesTheMicrophoneAlone() async {
+        let (c, _, capture) = makeCoordinator()
+        await capture.setStopDelay(.milliseconds(150))
+        await c.startIdle()
+        await c.hotkeyPressed()
+        let cancel = Task { await c.cancelRecording() }
+        #expect(await waitUntil { c.state == .idle })
+        let cancelledPress = Task { await c.hotkeyPressed() }
+        #expect(await waitUntil { c.state.isRecording })
+        let cancelPress = Task { await c.cancelRecording() }
+        #expect(await waitUntil { c.state == .idle })
+        let press = Task { await c.hotkeyPressed() }
+        #expect(await waitUntil { c.state.isRecording })
+        _ = await (cancel.value, cancelledPress.value, cancelPress.value, press.value)
+        #expect(c.state.isRecording)
+        #expect(await capture.startCount == 2)
+        await c.cancelRecording()
+    }
+
+    @Test func aLateAbandonOfACancelledUtteranceLeavesTheNextOne() async {
+        let engine = FakeStreamingEngine(beginDelay: .milliseconds(100), abandonDelay: .milliseconds(300))
+        let (c, output, _, _) = await makeStreamingCoordinator(style: .compact, engine: engine)
+        await c.startIdle()
+        let cancelled = Task { await c.hotkeyPressed() }
+        #expect(await waitUntil { engine.log.contains("begin") })
+        await c.cancelRecording()
+        #expect(await waitUntil { engine.abandonCalls == 1 })
+        await c.hotkeyPressed()
+        #expect(c.state.isRecording)
+        #expect(await waitUntil { engine.log.contains("stale abandon") })
+        c.hotkeyReleased()
+        await c.inFlight?.value
+        await cancelled.value
+        #expect(output.inserted == ["final"])
+        #expect(!engine.log.contains("abandon"))
+    }
+
     @Test func cancelAbandonsTheEngineThatRecordedAndOnlyOnce() async {
         let first = FakeStreamingEngine(id: EngineID("first"))
         let second = FakeStreamingEngine(id: EngineID("second"))
@@ -111,14 +170,47 @@ import Testing
         }
     }
 
-    @Test func onlyARealChangeRebuildsTheProcessors() async {
+    @Test func onlyADictionaryChangeRebuildsTheProcessors() async {
         let builds = Recorder<DictationSettings>()
         let (c, _, _) = makeCoordinator(makePipeline: { builds.append($0); return ProcessorPipeline([]) })
         #expect(builds.all.count == 1)
         c.settings = c.settings
+        c.settings.appendTrailingSpace.toggle()
+        c.settings.disabledProcessors = [FillerRemover.processorID]
+        c.settings.liveTranscript.toggle()
+        c.settings.hotkey = .rightOption
         #expect(builds.all.count == 1)
-        c.settings.dictionary = [DictionaryEntry(from: "a", to: "b")]
+        let dictionary = [DictionaryEntry(from: "a", to: "b")]
+        c.settings.dictionary = dictionary
         #expect(builds.all.count == 2)
+        #expect(builds.all.last?.dictionary == dictionary)
+    }
+
+    @Test func aCombinedUpdateRestartsTheMonitorOnce() async {
+        let fake = FakeHotkey()
+        let (c, _, _) = makeCoordinator(hotkeyMonitor: fake)
+        await c.startIdle()
+        var settings = c.settings
+        settings.hotkey = .rightOption
+        settings.submitKey = Hotkey(0x0B)
+        settings.toggleHotkey = Hotkey(0x3B, 0x02)
+        settings.dictionary = [DictionaryEntry(from: "a", to: "b")]
+        c.update(settings, standInHotkey: .optionSpace)
+        #expect(fake.startCount == 2)
+        #expect(fake.lastChords == [.dictate: .optionSpace, .toggle: Hotkey(0x3B, 0x02)])
+    }
+
+    @Test func aChordAndTheMonitorItNeedsChangeInOneRestart() async {
+        let carbon = FakeHotkey()
+        let tap = FakeHotkey()
+        let (c, _, _) = makeCoordinator(hotkeyMonitor: carbon)
+        await c.startIdle()
+        var settings = c.settings
+        settings.hotkey = .rightCommand
+        c.update(settings, standInHotkey: nil, monitor: tap)
+        #expect(carbon.startedHotkeys == [.optionSpace])
+        #expect(carbon.stopCount >= 1)
+        #expect(tap.startedHotkeys == [.rightCommand])
     }
 
     @Test func changesBeforeStartRegisterOnceAtStart() async {

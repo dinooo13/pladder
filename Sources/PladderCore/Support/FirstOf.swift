@@ -2,7 +2,7 @@ import Foundation
 
 // Not a task group: that waits for every child, so a model call ignoring cancellation
 // would still hold the paste. Both tasks detached, so neither inherits the caller's actor.
-func firstOf<Value: Sendable>(
+public func firstOf<Value: Sendable>(
     until deadline: ContinuousClock.Instant,
     priority: TaskPriority? = nil,
     _ work: @escaping @Sendable () async -> Value

@@ -1,5 +1,6 @@
 import Foundation
 import FoundationModels
+import PladderCore
 import Synchronization
 
 public enum OnDeviceModelAvailability: Equatable, Sendable {

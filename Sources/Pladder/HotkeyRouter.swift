@@ -18,6 +18,7 @@ final class HotkeyRouter {
     @ObservationIgnored private let tap = GlobalHotkeyMonitor()
     @ObservationIgnored private let carbon = CarbonHotkeyMonitor()
     @ObservationIgnored private var secureInput = SustainedCondition()
+    @ObservationIgnored private var secureInputSustained = false
     @ObservationIgnored private weak var coordinator: DictationCoordinator?
     // So the first `update` applies the stand-in even though nothing flipped.
     @ObservationIgnored private var didApplyStandIn = false
@@ -36,26 +37,33 @@ final class HotkeyRouter {
 
     func update(accessibilityTrusted trusted: Bool, secureInputEnabled: Bool) {
         if trusted != accessibilityTrusted { accessibilityTrusted = trusted }
-        let sustained = secureInput.observe(secureInputEnabled)
-        let wantsTap = HotkeySource.choose(
-            accessibilityTrusted: trusted, secureInputSustained: sustained, hotkey: hotkey) == .tap
-        let flipped = wantsTap != usesTap
-        if flipped {
-            usesTap = wantsTap
-            coordinator?.replaceHotkeyMonitor(wantsTap ? tap : carbon)
+        secureInputSustained = secureInput.observe(secureInputEnabled)
+        let flipped = chooseMonitor()
+        if let flipped {
+            coordinator?.replaceHotkeyMonitor(flipped)
         }
         // After the swap: the other order would make the Carbon monitor log a failure for a
         // modifier-only chord on its way to being replaced by the tap.
-        if flipped || !didApplyStandIn {
+        if flipped != nil || !didApplyStandIn {
             didApplyStandIn = true
             applyStandIn()
             refreshSystemShortcuts()
         }
     }
 
-    func hotkeyChanged(to hotkey: Hotkey) {
-        guard hotkey != self.hotkey else { return }
+    func hotkeyChanged(to hotkey: Hotkey) -> (any HotkeyMonitor)? {
+        guard hotkey != self.hotkey else { return nil }
         self.hotkey = hotkey
+        return chooseMonitor()
+    }
+
+    private func chooseMonitor() -> (any HotkeyMonitor)? {
+        let wantsTap = HotkeySource.choose(
+            accessibilityTrusted: accessibilityTrusted, secureInputSustained: secureInputSustained,
+            hotkey: hotkey) == .tap
+        guard wantsTap != usesTap else { return nil }
+        usesTap = wantsTap
+        return wantsTap ? tap : carbon
     }
 
     var standInHotkey: Hotkey? {

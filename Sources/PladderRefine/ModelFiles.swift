@@ -59,6 +59,7 @@ public actor ModelFiles {
     public let directory: URL
     private let onChange: @Sendable (ModelFile, ModelFileStatus) -> Void
     private let transport: any ModelFileTransport
+    private let hash: @Sendable (URL) -> String?
     private var statuses: [String: ModelFileStatus] = [:]
     private var downloads: [String: Download] = [:]
     // They clean up the staging path the next download of the same file writes to, so
@@ -79,10 +80,12 @@ public actor ModelFiles {
 
     init(
         directory: URL, transport: any ModelFileTransport,
-        onChange: @escaping @Sendable (ModelFile, ModelFileStatus) -> Void = { _, _ in }
+        onChange: @escaping @Sendable (ModelFile, ModelFileStatus) -> Void = { _, _ in },
+        hash: @escaping @Sendable (URL) -> String? = { ModelFiles.sha256(of: $0) }
     ) {
         self.directory = directory
         self.transport = transport
+        self.hash = hash
         self.onChange = onChange
     }
 
@@ -169,7 +172,14 @@ public actor ModelFiles {
         }
         // A resumed download is checked like a fresh one: the checksum covers the whole file.
         set(file, .verifying)
-        let digest = await Task.detached(priority: .utility) { Self.sha256(of: staging) }.value
+        // Off this actor, and cancelled with the download, so a cancel need not sit out
+        // 1.5 GB of hashing.
+        let hashing = Task.detached(priority: .utility) { [hash] in hash(staging) }
+        let digest = await withTaskCancellationHandler {
+            await hashing.value
+        } onCancel: {
+            hashing.cancel()
+        }
         guard isCurrent(file, id), digest == file.sha256 else {
             try? FileManager.default.removeItem(at: staging)
             if isCurrent(file, id) { set(file, .failed(.checksum)) }
@@ -209,11 +219,12 @@ public actor ModelFiles {
     }
 
     // Streamed, so a 1.5 GB file never sits in memory.
-    private static func sha256(of url: URL) -> String? {
+    static func sha256(of url: URL, chunkSize: Int = 16 << 20) -> String? {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
         defer { try? handle.close() }
         var hasher = SHA256()
-        while let chunk = try? handle.read(upToCount: 16 << 20), !chunk.isEmpty {
+        while let chunk = try? handle.read(upToCount: chunkSize), !chunk.isEmpty {
+            if Task.isCancelled { return nil }
             hasher.update(data: chunk)
         }
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()

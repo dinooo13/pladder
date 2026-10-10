@@ -217,12 +217,12 @@ func runPacedBench(dir: String, runs: Int, pause: Double, includeShort: Bool, li
         var lastText = ""
         for run in 1...runs {
             if pause > 0 { try await Task.sleep(for: .seconds(pause)) }
-            try await engine.beginUtterance()
+            let utterance = try await engine.beginUtterance()
             let passes = LivePassLog()
             let liveTask: Task<Void, Never>? = live ? Task {
                 while !Task.isCancelled {
                     let started = clock.now
-                    _ = await engine.livePass()
+                    _ = await engine.livePass(utterance)
                     passes.record((clock.now - started).timeInterval)
                     try? await Task.sleep(for: .milliseconds(500))
                 }
@@ -230,7 +230,7 @@ func runPacedBench(dir: String, runs: Int, pause: Double, includeShort: Bool, li
             var offset = 0
             let oneSecond = Int(CapturedAudio.sampleRate)
             while offset + oneSecond < fixture.samples.count {
-                await engine.feed(Array(fixture.samples[offset..<offset + oneSecond]))
+                await engine.feed(Array(fixture.samples[offset..<offset + oneSecond]), to: utterance)
                 try await Task.sleep(for: .seconds(1))
                 offset += oneSecond
             }
@@ -239,7 +239,7 @@ func runPacedBench(dir: String, runs: Int, pause: Double, includeShort: Bool, li
             // cannot be aborted, so the timed call waits for it, which is part of the style's cost.
             liveTask?.cancel()
             let started = clock.now
-            let transcript = try await engine.endUtterance(tail)
+            let transcript = try await engine.endUtterance(utterance, tail: tail)
             let elapsed = (clock.now - started).timeInterval
             lastText = transcript.text
             let wer = WordErrorRate.compute(reference: fixture.reference, hypothesis: transcript.text)

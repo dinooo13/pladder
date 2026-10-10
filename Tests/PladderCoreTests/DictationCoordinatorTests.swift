@@ -204,19 +204,28 @@ actor FakeStreamingEngine: StreamingTranscriptionEngine {
     private(set) var status: EngineStatus = .unloaded
 
     private let counters = StreamingCounters()
+    private var slot = UtteranceSlot<Void>()
     private let livePassDelay: Duration
     private let feedDelay: Duration
+    private let beginDelay: Duration
+    private let abandonDelay: Duration
     private let beginFails: Bool
 
+    // `beginDelay` falls between claiming the utterance and returning it, where the real
+    // engine builds its session.
     init(
         id: EngineID = FakeStreamingEngine.engineID,
         livePassDelay: Duration = .zero,
         feedDelay: Duration = .zero,
+        beginDelay: Duration = .zero,
+        abandonDelay: Duration = .zero,
         beginFails: Bool = false
     ) {
         self.id = id
         self.livePassDelay = livePassDelay
         self.feedDelay = feedDelay
+        self.beginDelay = beginDelay
+        self.abandonDelay = abandonDelay
         self.beginFails = beginFails
     }
 
@@ -224,6 +233,7 @@ actor FakeStreamingEngine: StreamingTranscriptionEngine {
     nonisolated var livePassCount: Int { counters.livePassCount }
     nonisolated var warmPassCount: Int { counters.warmPassCount }
     nonisolated var endCount: Int { counters.endCount }
+    nonisolated var abandonCalls: Int { counters.abandonCalls }
     nonisolated var log: [String] { counters.log }
     nonisolated var isFeeding: Bool { counters.isFeeding }
 
@@ -237,12 +247,18 @@ actor FakeStreamingEngine: StreamingTranscriptionEngine {
         return Transcript(text: "whole", audioDuration: 0, processingTime: 0, engineID: id)
     }
 
-    func beginUtterance() async throws {
+    func beginUtterance() async throws -> Utterance {
         counters.record("begin")
         if beginFails { throw BeginFailed() }
+        let utterance = slot.begin().utterance
+        if beginDelay > .zero { await uncancellableSleep(beginDelay) }
+        guard slot.install((), for: utterance) else { throw CancellationError() }
+        counters.record("begun")
+        return utterance
     }
 
-    func feed(_ samples: [Float]) async {
+    func feed(_ samples: [Float], to utterance: Utterance) async {
+        guard slot.current == utterance else { return }
         counters.fed(samples.count)
         if feedDelay > .zero {
             counters.setFeeding(true)
@@ -252,16 +268,22 @@ actor FakeStreamingEngine: StreamingTranscriptionEngine {
         counters.record("fed")
     }
 
-    func endUtterance(_ tail: [Float]) async throws -> Transcript {
+    func endUtterance(_ utterance: Utterance, tail: [Float]) async throws -> Transcript {
+        guard slot.release(utterance).wasCurrent else { throw TranscriptionError.notLoaded }
         counters.ended()
         return Transcript(text: "final", audioDuration: 0, processingTime: 0, engineID: id)
     }
 
-    func abandonUtterance() async { counters.record("abandon") }
+    func abandonUtterance(_ utterance: Utterance) async {
+        counters.abandonCalled()
+        if abandonDelay > .zero { await uncancellableSleep(abandonDelay) }
+        counters.record(slot.release(utterance).wasCurrent ? "abandon" : "stale abandon")
+    }
 
     func warmPass() async { counters.warmed() }
 
-    func livePass() async -> String? {
+    func livePass(_ utterance: Utterance) async -> String? {
+        guard slot.current == utterance else { return nil }
         let n = counters.lived()
         // Counted before the delay, so a test can catch a pass in flight.
         if livePassDelay > .zero { await uncancellableSleep(livePassDelay) }
@@ -275,12 +297,15 @@ private final class StreamingCounters: @unchecked Sendable {
     private var _livePassCount = 0
     private var _warmPassCount = 0
     private var _endCount = 0
+    private var _abandonCalls = 0
     private var _log: [String] = []
     private var _isFeeding = false
     var feedCounts: [Int] { lock.withLock { _feedCounts } }
     var livePassCount: Int { lock.withLock { _livePassCount } }
     var warmPassCount: Int { lock.withLock { _warmPassCount } }
     var endCount: Int { lock.withLock { _endCount } }
+    var abandonCalls: Int { lock.withLock { _abandonCalls } }
+    func abandonCalled() { lock.withLock { _abandonCalls += 1 } }
     var log: [String] { lock.withLock { _log } }
     var isFeeding: Bool { lock.withLock { _isFeeding } }
     func fed(_ count: Int) { lock.withLock { _feedCounts.append(count); _log.append("feed") } }

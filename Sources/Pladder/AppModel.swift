@@ -147,10 +147,8 @@ final class AppModel {
     // MARK: Settings
 
     private func settingsChanged(from old: Settings) {
-        if settings.hotkey != old.hotkey {
-            hotkeys.hotkeyChanged(to: settings.hotkey)
-        }
-        coordinator.update(DictationSettings(settings), standInHotkey: hotkeys.standInHotkey)
+        let monitor = settings.hotkey != old.hotkey ? hotkeys.hotkeyChanged(to: settings.hotkey) : nil
+        coordinator.update(DictationSettings(settings), standInHotkey: hotkeys.standInHotkey, monitor: monitor)
         if settings.appearance != old.appearance {
             applyAppearance(settings.appearance)
         }

@@ -14,7 +14,7 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
 
     private let version: AsrModelVersion
     private var manager: AsrManager?
-    private var session: IncrementalChunkProcessor?
+    private var slot = UtteranceSlot<IncrementalChunkProcessor>()
     private var fedSampleCount = 0
     // Kept only for `livePass`; the session holds its own copy. 38 MB at the 10 min cap,
     // dropped when the utterance ends.
@@ -122,16 +122,30 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
 
     // MARK: StreamingTranscriptionEngine
 
-    public func beginUtterance() async throws {
+    public func beginUtterance() async throws -> Utterance {
         guard let manager, status.isReady else { throw TranscriptionError.notLoaded }
-        await session?.cancel()
+        // Claimed before the awaits: the actor is reentrant, and another begin or an abandon
+        // of this one may arrive meanwhile.
+        let (utterance, replaced) = slot.begin()
         fedSampleCount = 0
         liveAudio.removeAll(keepingCapacity: true)
-        session = try await IncrementalChunkProcessor(manager: manager)
+        await replaced?.cancel()
+        let session: IncrementalChunkProcessor
+        do {
+            session = try await IncrementalChunkProcessor(manager: manager)
+        } catch {
+            slot.release(utterance)
+            throw error
+        }
+        guard slot.install(session, for: utterance) else {
+            await session.cancel()
+            throw CancellationError()
+        }
+        return utterance
     }
 
-    public func feed(_ samples: [Float]) async {
-        guard !samples.isEmpty, let session else { return }
+    public func feed(_ samples: [Float], to utterance: Utterance) async {
+        guard !samples.isEmpty, let session = slot.session(for: utterance) else { return }
         fedSampleCount += samples.count
         liveAudio.append(contentsOf: samples)
         // A window failing mid-recording must not take the dictation down: `finish()` still
@@ -140,16 +154,13 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
     }
 
     // Times `finish()` alone, the last window and the merge: all that is left at release.
-    public func endUtterance(_ tail: [Float]) async throws -> Transcript {
+    public func endUtterance(_ utterance: Utterance, tail: [Float]) async throws -> Transcript {
         guard status.isReady else { throw TranscriptionError.notLoaded }
-        guard let session else { throw TranscriptionError.notLoaded }
+        guard let session = slot.session(for: utterance) else { throw TranscriptionError.notLoaded }
         // The actor is reentrant across the awaits below, so a `beginUtterance` may already
-        // have installed the next session; that one is left be.
+        // have claimed the slot for the next one; that one is left be.
         defer {
-            if self.session === session {
-                self.session = nil
-                liveAudio.removeAll(keepingCapacity: true)
-            }
+            if slot.release(utterance).wasCurrent { liveAudio.removeAll(keepingCapacity: true) }
         }
         fedSampleCount += tail.count
         let sampleCount = fedSampleCount
@@ -167,9 +178,9 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
         )
     }
 
-    public func abandonUtterance() async {
-        let session = self.session
-        self.session = nil
+    public func abandonUtterance(_ utterance: Utterance) async {
+        let (wasCurrent, session) = slot.release(utterance)
+        guard wasCurrent else { return }
         fedSampleCount = 0
         liveAudio.removeAll(keepingCapacity: true)
         await session?.cancel()
@@ -182,8 +193,8 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
 
     // Never touches the session, so the windows the release merges are unchanged, which
     // `bench --paced --live` checks. With nothing fed yet it is the plain warm pass.
-    public func livePass() async -> String? {
-        guard let manager, status.isReady else { return nil }
+    public func livePass(_ utterance: Utterance) async -> String? {
+        guard let manager, status.isReady, slot.current == utterance else { return nil }
         let window = liveWindow()
         guard !window.isEmpty else {
             await warmPass()
@@ -218,7 +229,7 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
     }
 
     public func unload() async {
-        await abandonUtterance()
+        if let current = slot.current { await abandonUtterance(current) }
         await manager?.cleanup()
         manager = nil
         status = .unloaded

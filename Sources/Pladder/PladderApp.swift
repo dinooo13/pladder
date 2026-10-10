@@ -77,31 +77,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // A second Quit while this one waits quits at once.
         Self.shutdown = nil
         Task { @MainActor in
-            await Self.firstOf(shutdown, deadline: Self.shutdownDeadline)
+            _ = await firstOf(until: .now + Self.shutdownDeadline) { await shutdown() }
             sender.reply(toApplicationShouldTerminate: true)
         }
         return .terminateLater
-    }
-
-    // `work` keeps running past the deadline; the process ends around it.
-    private static func firstOf(_ work: @escaping @MainActor () async -> Void, deadline: Duration) async {
-        final class Once { var done = false }
-        let once = Once()
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            func finish() {
-                guard !once.done else { return }
-                once.done = true
-                continuation.resume()
-            }
-            Task { @MainActor in
-                await work()
-                finish()
-            }
-            Task { @MainActor in
-                try? await Task.sleep(for: deadline)
-                finish()
-            }
-        }
     }
 }
 
