@@ -81,6 +81,29 @@ import Testing
         #expect(lifecycle == ["begin", "abandon", "begin", "end"])
     }
 
+    // Before: the engine kept one utterance and no handle, so the abandon
+    // of a recording cancelled while its utterance began, landing after
+    // the next recording had begun its own, dropped that one instead.
+    @Test func aLateAbandonOfACancelledUtteranceLeavesTheNextOne() async {
+        let engine = FakeStreamingEngine(beginDelay: .milliseconds(100), abandonDelay: .milliseconds(300))
+        let (c, output, _, _) = await makeStreamingCoordinator(style: .compact, engine: engine)
+        await c.startIdle()
+        let cancelled = Task { await c.hotkeyPressed() }
+        #expect(await waitUntil { engine.log.contains("begin") })
+        await c.cancelRecording()
+        // Its utterance begins anyway, and the abandon that follows lands
+        // late.
+        #expect(await waitUntil { engine.abandonCalls == 1 })
+        await c.hotkeyPressed()
+        #expect(c.state.isRecording)
+        #expect(await waitUntil { engine.log.contains("stale abandon") })
+        c.hotkeyReleased()
+        await c.inFlight?.value
+        await cancelled.value
+        #expect(output.inserted == ["final"])
+        #expect(!engine.log.contains("abandon"))
+    }
+
     @Test func cancelAbandonsTheEngineThatRecordedAndOnlyOnce() async {
         let first = FakeStreamingEngine(id: EngineID("first"))
         let second = FakeStreamingEngine(id: EngineID("second"))
