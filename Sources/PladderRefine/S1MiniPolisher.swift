@@ -57,6 +57,10 @@ public actor S1MiniPolisher: ReportingRefiner {
     private let load: Loader
     private var model: (any PromptCompleter)?
     private var loading: Task<(any PromptCompleter)?, Never>?
+    /// A load `unload()` gave up on, still reading weights: llama.cpp does
+    /// not stop for cancellation. The next load waits for it, so two weight
+    /// sets and two key-value caches are never resident at once.
+    private var abandoned: Task<(any PromptCompleter)?, Never>?
     /// Bumped by `unload()`, so a load it interrupted cannot store its model.
     private var generation = 0
     private static let log = Logger(subsystem: "de.dinooo13.pladder", category: "polish")
@@ -101,9 +105,14 @@ public actor S1MiniPolisher: ReportingRefiner {
         await LlamaModel.warmUp()
     }
 
-    /// Frees the model's memory; the next `prepare()` loads it again.
+    /// Frees the model's memory; the next `prepare()` loads it again. A load
+    /// still running is dropped when it finishes, and the next one waits
+    /// for that.
     public func unload() {
-        loading?.cancel()
+        if let loading {
+            loading.cancel()
+            abandoned = loading
+        }
         loading = nil
         model = nil
         generation += 1
@@ -194,20 +203,25 @@ public actor S1MiniPolisher: ReportingRefiner {
         let prefix = Self.promptPrefix(control: control)
         let load = load
         let generation = generation
+        let previous = abandoned
         let task = Task {
+            // Its model is dropped, and freed, before this one is read.
+            _ = await previous?.value
             let model = try? await load(path, prefix)
-            self.finishLoad(model, generation: generation)
-            return model
+            return self.finishLoad(model, generation: generation)
         }
         loading = task
         return task
     }
 
-    private func finishLoad(_ model: (any PromptCompleter)?, generation: Int) {
-        // `unload()` during the load: drop the result.
-        guard generation == self.generation else { return }
+    /// The model to keep, or nil when `unload()` came during the load: then
+    /// the result is dropped here, so the task does not hold it either.
+    private func finishLoad(_ model: (any PromptCompleter)?, generation: Int) -> (any PromptCompleter)? {
+        guard generation == self.generation else { return nil }
         self.model = model
         loading = nil
+        abandoned = nil
+        return model
     }
 }
 
