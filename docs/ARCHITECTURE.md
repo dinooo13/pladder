@@ -189,7 +189,9 @@ Input change.
   It takes exactly one regular key, cannot tell sides apart, has no Fn and no
   send key, and never sees an interrupting key. Escape is registered as a hot
   key of its own while a recording is on, from the main queue so the release
-  path never waits on the window server. `CarbonHotkeySession` packs each hot
+  path never waits on the window server. Its modifier mask is empty, so only
+  a bare Escape cancels there, where the tap also takes Escape with the
+  chord's own modifiers still held. `CarbonHotkeySession` packs each hot
   key's ID from the session's generation and the role, so an old session's
   events are not found, and forces each role's events to alternate.
 - `HotkeyMonitorLifecycle` is the session bookkeeping both share: the OS
@@ -285,7 +287,10 @@ of three characters or fewer must match exactly, Soundex buys at most one
 edit on keys of five or fewer however long the candidate, so "soviet" never
 becomes "Swift", and a single everyday word
 (`CommonWords`) is never rewritten, since the speaker most likely said it. A
-match never crosses punctuation, and a possessive "'s" is kept.
+match never crosses punctuation, and a possessive "'s" is kept. A term with a
+non-ASCII letter is not fuzzy-matched at all: Soundex is defined over the
+English alphabet and would rank it by accident. It still works through the
+exact replacer.
 
 **Spoken punctuation.** Only phrases that are never ordinary words are taken
 ("question mark", "Fragezeichen"); "period", "Punkt" and "punto" stay words.
@@ -324,10 +329,12 @@ model's file and memory.
   for it, so two models are never resident at once.
 - **The file.** `PolishModelController` downloads it only while polish is
   on and the model chosen, and cancels the download when either changes,
-  in the order the settings changed. A cancel returns once the download
-  has wound down; while it is verifying, the checksum stops at its next
-  16 MB chunk, so the next model's download does not queue behind 1.5 GB
-  of hashing.
+  in the order the settings changed. A cancelled download is forgotten: its
+  resume data is dropped and the next `ensure` starts from zero, where a
+  failed one resumes from where it stopped if URLSession left resume data.
+  A cancel returns once the download has wound down; while it is
+  verifying, the checksum stops at its next 16 MB chunk, so the next
+  model's download does not queue behind 1.5 GB of hashing.
 
 Neither logs the transcript: log lines carry numbers and error case names.
 
@@ -341,12 +348,16 @@ next:
 1. **Reviewer available?** Without Apple Intelligence the field is not even
    watched.
 2. **Watch** (`AXPasteObserver`). On its own thread, since every AX call
-   blocks on the target app. Find the paste just before the caret (retried a
-   few times: apps paste on their own run loop), then read only a window of
-   the paste plus a margin either side, after every value change, for up to
-   60 s or until focus leaves. Chromium and Electron are asked for their
-   accessibility tree once per app if they expose no focus. A new paste ends
-   the watch in progress, which still returns what it saw.
+   blocks on the target app. The focused element must be a text area, text
+   field or combo box, and never a secure field, so a password is never
+   read. Find the paste just before the caret (retried a few times: apps
+   paste on their own run loop), then read only a window of the paste plus a
+   margin either side, after every value change, for up to 60 s or until
+   focus leaves. The reads are not debounced: a chat field empties the
+   instant Return is pressed, and a debounced read would see only the empty
+   field. Chromium and Electron are asked for their accessibility tree once
+   per app if they expose no focus. A new paste ends the watch in progress,
+   which still returns what it saw.
 3. **Diff** (`CorrectionDiff`). Tokens are words and single punctuation
    marks. The window as found is aligned against the last reading that still
    holds most of it (an emptied field means the message was sent; the

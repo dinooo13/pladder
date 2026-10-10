@@ -44,6 +44,8 @@ public struct CustomWordCorrector: TextProcessor {
             guard entry.from.trimmingCharacters(in: .whitespaces).isEmpty else { continue }
             let text = entry.to.trimmingCharacters(in: .whitespaces)
             guard !text.isEmpty else { continue }
+            // A term with a non-ASCII letter is left to the exact replacer; see
+            // docs/ARCHITECTURE.md, "Processors".
             guard let primary = Self.key(for: text), !primary.isEmpty else { continue }
 
             let termIndex = built.count

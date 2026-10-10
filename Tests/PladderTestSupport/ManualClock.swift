@@ -73,12 +73,15 @@ public final class ManualClock: Clock, Sendable {
         }
     }
 
+    // Waits in real time, but briefly, until a detached task has reached its sleep.
     public func waitForSleeper(at offset: Duration) async -> Bool {
         let deadline = start + offset
         return await eventually { self.deadlines.contains(deadline) }
     }
 }
 
+// Polls in real time, a millisecond at a time for up to about two seconds, for what a
+// detached task does on its own schedule.
 public func eventually(_ condition: @Sendable () async -> Bool) async -> Bool {
     for _ in 0..<2_000 {
         if await condition() { return true }

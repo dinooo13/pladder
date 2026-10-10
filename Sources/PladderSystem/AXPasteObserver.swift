@@ -146,6 +146,7 @@ public final class AXPasteObserver: PastedTextObserver, @unchecked Sendable {
         guard let element, let role = Reader.string(element, "AXRole"), textRoles.contains(role) else {
             return false
         }
+        // Never a password field.
         return Reader.string(element, "AXSubrole") != "AXSecureTextField"
     }
 
@@ -251,6 +252,7 @@ public final class AXPasteObserver: PastedTextObserver, @unchecked Sendable {
             }
             switch notification {
             case "AXValueChanged":
+                // Undebounced on purpose; see docs/ARCHITECTURE.md, "Learned corrections".
                 read()
             case "AXFocusedUIElementChanged":
                 // WebKit re-announces the focused textarea right after a paste, as a new object, so

@@ -3,7 +3,9 @@ import PladderCore
 
 // A session's resource, the tap or Carbon's handler, is made on another thread after
 // `start` returns: `needsResource` is asked first, and `adopt` refuses one made for a
-// session that ended meanwhile. `@unchecked Sendable`: everything mutable is behind `lock`.
+// session that ended meanwhile. Every session end, `stop`, a restart or the consumer
+// dropping the stream, finishes the continuation, tears the resource down and calls
+// `ended`. `@unchecked Sendable`: everything mutable is behind `lock`.
 final class HotkeyMonitorLifecycle<Resource: Sendable, State: Sendable>: @unchecked Sendable {
     typealias Continuation = AsyncStream<HotkeyMonitorEvent>.Continuation
 
