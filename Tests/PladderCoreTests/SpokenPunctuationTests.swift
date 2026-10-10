@@ -83,6 +83,15 @@ import Testing
         #expect(try await run("I read the book. Full stop.") == "I read the book.")
     }
 
+    // Before: "ein" counted as an article, so the mark after a separable
+    // verb's prefix was kept as a noun and pasted as the words.
+    @Test func aMarkAfterTheSeparablePrefixEinIsDictated() async throws {
+        #expect(try await run("Schaltest du das Licht ein Fragezeichen") == "Schaltest du das Licht ein?")
+        #expect(try await run("Ich lade dich ein Komma dann reden wir") == "Ich lade dich ein, dann reden wir")
+        // With an adjective that describes a mark it is still the noun.
+        #expect(try await run("ein großes Fragezeichen dahinter") == "ein großes Fragezeichen dahinter")
+    }
+
     @Test func spanishComaNeedsSpanishEvidence() async throws {
         #expect(try await run("The patient was in a coma for a week.", hint: { _ in "en" })
             == "The patient was in a coma for a week.")
