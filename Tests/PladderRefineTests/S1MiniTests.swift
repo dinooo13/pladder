@@ -151,6 +151,54 @@ private struct StandInModel: PromptCompleter {
         try await Task.sleep(for: .milliseconds(20))
         #expect(await polisher.refine("send it") == "Second.")
     }
+
+    // Before: `unload()` forgot the running load, so polish off and on again
+    // during a load started a second one while the first still read its
+    // weights, and both models were resident at once.
+    @Test func aLoadAfterUnloadWaitsForTheAbandonedOneToBeFreed() async throws {
+        let gate = Gate()
+        let resident = Resident()
+        let loadsStarted = Recorder<Int>()
+        let (polisher, dir) = try polisher(timeout: .milliseconds(40)) { _, _ in
+            // How many models were alive when this load began.
+            loadsStarted.append(resident.count)
+            if loadsStarted.all.count == 1 { await gate.wait() }
+            return CountedModel(resident)
+        }
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        _ = await polisher.polish("send it")
+        await polisher.unload()
+        let second = Task { await polisher.prepare() }
+        try await Task.sleep(for: .milliseconds(30))
+        // The second load waits for the first instead of starting beside it.
+        #expect(loadsStarted.all == [0])
+        await gate.open()
+        await second.value
+        // The first model was dropped and freed before the second was read.
+        #expect(loadsStarted.all == [0, 0])
+        #expect(resident.count == 1)
+        #expect(await polisher.refine("send it") == "Counted.")
+    }
+}
+
+/// Counts the stand-in models alive, the way the weights would be resident.
+private final class Resident: Sendable {
+    private let state = Recorder<Int>()
+    var count: Int { state.all.reduce(0, +) }
+    func add(_ delta: Int) { state.append(delta) }
+}
+
+private final class CountedModel: PromptCompleter {
+    private let resident: Resident
+    init(_ resident: Resident) {
+        self.resident = resident
+        resident.add(1)
+    }
+    deinit { resident.add(-1) }
+    func complete(suffix: String, maxTokens: Int, deadline: ContinuousClock.Instant) async throws -> String {
+        "Counted."
+    }
 }
 
 @Suite(.timeLimit(.minutes(1))) struct LlamaGenerationTests {
