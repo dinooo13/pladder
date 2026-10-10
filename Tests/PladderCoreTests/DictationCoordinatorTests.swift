@@ -1,8 +1,18 @@
 import Foundation
+import PladderTestSupport
 import Testing
 @testable import PladderCore
 
 // MARK: - Fakes
+
+/// Waits without honouring cancellation, the way a CoreML pass in flight
+/// does: the coordinator cancels its loops at release, and a fake that woke
+/// early would hide what the release really waits for.
+func uncancellableSleep(_ duration: Duration) async {
+    await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
+        DispatchQueue.global().asyncAfter(deadline: .now() + duration.timeInterval) { done.resume() }
+    }
+}
 
 actor FakeCapture: AudioCapture {
     var samplesToReturn: [Float] = Array(repeating: 0.1, count: 16_000)
@@ -12,6 +22,8 @@ actor FakeCapture: AudioCapture {
     var startCount = 0
     var stopCount = 0
     var levelContinuation: AsyncStream<Float>.Continuation?
+    /// How long `stop()` takes, to widen the window a cancel leaves open.
+    var stopDelay: Duration = .zero
 
     func start() async throws -> AsyncStream<Float> {
         startCount += 1
@@ -27,6 +39,7 @@ actor FakeCapture: AudioCapture {
     func stop() async -> CapturedAudio {
         stopCount += 1
         levelContinuation?.finish()
+        if stopDelay > .zero { try? await Task.sleep(for: stopDelay) }
         return CapturedAudio(samples: samplesToReturn)
     }
 
@@ -34,6 +47,7 @@ actor FakeCapture: AudioCapture {
 
     func setSamples(_ s: [Float]) { samplesToReturn = s }
     func setDrainSamples(_ s: [Float]) { drainSamples = s }
+    func setStopDelay(_ d: Duration) { stopDelay = d }
     func emitLevel(_ l: Float) { levelContinuation?.yield(l) }
 }
 
@@ -42,7 +56,9 @@ final class FakeOutput: TextOutput, @unchecked Sendable {
     private var _inserted: [String] = []
     private var _submitted: [Bool] = []
     private var _prepareCount = 0
+    private var _flushCount = 0
     var inserted: [String] { lock.withLock { _inserted } }
+    var flushCount: Int { lock.withLock { _flushCount } }
     var submitted: [Bool] { lock.withLock { _submitted } }
     var prepareCount: Int { lock.withLock { _prepareCount } }
     var shouldFail = false
@@ -63,6 +79,10 @@ final class FakeOutput: TextOutput, @unchecked Sendable {
     func prepare() async {
         lock.withLock { _prepareCount += 1 }
     }
+
+    func flush() async {
+        lock.withLock { _flushCount += 1 }
+    }
 }
 
 final class FakeHotkey: HotkeyMonitor, @unchecked Sendable {
@@ -72,29 +92,50 @@ final class FakeHotkey: HotkeyMonitor, @unchecked Sendable {
     private(set) var startCount = 0
     private(set) var lastChords: [HotkeyRole: Hotkey] = [:]
     var lastHotkey: Hotkey? { lastChords[.dictate] }
+    /// The dictate chord of every start, in order.
+    private(set) var startedHotkeys: [Hotkey?] = []
     func start(chords: [HotkeyRole: Hotkey], submitKey: Hotkey) -> AsyncStream<HotkeyMonitorEvent> {
         startCount += 1
         lastChords = chords
+        startedHotkeys.append(chords[.dictate])
         let (stream, cont) = AsyncStream<HotkeyMonitorEvent>.makeStream()
         continuation = cont
         return stream
     }
-    func stop() { continuation?.finish() }
+    private(set) var stopCount = 0
+    func stop() {
+        stopCount += 1
+        continuation?.finish()
+    }
+    /// The keyboard's own clock. Every event is stamped with it, as the real
+    /// monitors stamp theirs, and it moves on by `step` per event, so holds
+    /// and the gaps the bounce rule looks at are arithmetic rather than the
+    /// test sleeping. The coordinator times gestures by these instants only.
+    private(set) var time = ContinuousClock.now
+    var step: Duration = .milliseconds(100)
+    private func stamp() -> ContinuousClock.Instant {
+        time += step
+        return time
+    }
     func press(_ role: HotkeyRole = .dictate) {
-        continuation?.yield(HotkeyMonitorEvent(role: role, event: .pressed))
+        continuation?.yield(HotkeyMonitorEvent(role: role, event: .pressed, instant: stamp()))
     }
     func release(_ role: HotkeyRole = .dictate, submit: Bool = false) {
-        continuation?.yield(HotkeyMonitorEvent(role: role, event: .released(submit: submit)))
+        continuation?.yield(HotkeyMonitorEvent(role: role, event: .released(submit: submit), instant: stamp()))
     }
     func cancel(_ role: HotkeyRole = .dictate) {
-        continuation?.yield(HotkeyMonitorEvent(role: role, event: .cancelled))
+        continuation?.yield(HotkeyMonitorEvent(role: role, event: .cancelled, instant: stamp()))
     }
-    /// Any event, for a test that stamps its own instants.
-    func send(_ event: HotkeyMonitorEvent) { continuation?.yield(event) }
+    /// Any event, for a test that stamps its own instants; later events
+    /// continue from it.
+    func send(_ event: HotkeyMonitorEvent) {
+        if let instant = event.instant, instant > time { time = instant }
+        continuation?.yield(event)
+    }
     /// Every `setCancelKeyEnabled` call, in order.
     private(set) var cancelKeyEnabled: [Bool] = []
     func setCancelKeyEnabled(_ enabled: Bool) { cancelKeyEnabled.append(enabled) }
-    func escape() { continuation?.yield(HotkeyMonitorEvent(role: .dictate, event: .escape)) }
+    func escape() { continuation?.yield(HotkeyMonitorEvent(.escape)) }
 }
 
 /// Stands in for the on-device model: records what it was asked, answers
@@ -122,18 +163,21 @@ final class FakeRefiner: TranscriptRefiner, @unchecked Sendable {
     }
 }
 
-/// Counts the two calls the coordinator makes. The real controller's timing
-/// is tested on its own; what matters here is that both ends are called, from
-/// every path that ends a recording.
+/// Records the two calls the coordinator makes and the session each names.
+/// The real controller's ordering rules are tested on their own; what
+/// matters here is that both ends are called, from every path that ends a
+/// recording, and that an end names the session its start named.
 final class FakeOutputMuter: OutputMuter, @unchecked Sendable {
     private let lock = NSLock()
-    private var _startedCount = 0
-    private var _endedCount = 0
-    var startedCount: Int { lock.withLock { _startedCount } }
-    var endedCount: Int { lock.withLock { _endedCount } }
+    private var _started: [Int] = []
+    private var _ended: [Int] = []
+    var startedSessions: [Int] { lock.withLock { _started } }
+    var endedSessions: [Int] { lock.withLock { _ended } }
+    var startedCount: Int { startedSessions.count }
+    var endedCount: Int { endedSessions.count }
 
-    func recordingStarted() async { lock.withLock { _startedCount += 1 } }
-    func recordingEnded() async { lock.withLock { _endedCount += 1 } }
+    func recordingStarted(session: Int) async { lock.withLock { _started.append(session) } }
+    func recordingEnded(session: Int) async { lock.withLock { _ended.append(session) } }
 }
 
 /// Fails `load()` a set number of times, then succeeds.
@@ -165,11 +209,11 @@ actor CountingEngine: TranscriptionEngine {
     nonisolated let id = CountingEngine.engineID
     nonisolated let displayName = "Counting"
     private(set) var status: EngineStatus = .unloaded
-    private let recorder = SampleRecorder()
+    private let recorder = Recorder<Int>()
     private let delay: Duration
 
     init(delay: Duration = .zero) { self.delay = delay }
-    nonisolated var calls: [Int] { recorder.callCounts }
+    nonisolated var calls: [Int] { recorder.all }
 
     func load() async throws { status = .ready }
     func transcribe(_ samples: [Float]) async throws -> Transcript {
@@ -182,47 +226,105 @@ actor CountingEngine: TranscriptionEngine {
 
 /// A streaming engine that counts everything the coordinator asks of it, so a
 /// test can tell a live loop from a warm one. `livePass` answers
-/// "partial <n>"; only `endUtterance` produces the text that gets inserted.
+/// "partial <n>"; only `endUtterance` produces the text that gets inserted,
+/// and `transcribe` answers "whole", so a test can tell the two paths apart.
+/// Every call is also logged by name, in order. Utterances are kept the way
+/// the real engine keeps them, in an `UtteranceSlot`: a call naming one that
+/// is no longer current does nothing, and an abandon of one is logged as
+/// "stale abandon".
 actor FakeStreamingEngine: StreamingTranscriptionEngine {
     static let engineID = EngineID("fake-streaming")
-    nonisolated let id = FakeStreamingEngine.engineID
+    nonisolated let id: EngineID
     nonisolated let displayName = "Fake streaming"
     private(set) var status: EngineStatus = .unloaded
 
     private let counters = StreamingCounters()
+    private var slot = UtteranceSlot<Void>()
     private let livePassDelay: Duration
+    private let feedDelay: Duration
+    private let beginDelay: Duration
+    private let abandonDelay: Duration
+    private let beginFails: Bool
 
-    init(livePassDelay: Duration = .zero) { self.livePassDelay = livePassDelay }
+    /// `beginDelay` passes between claiming the utterance and returning it,
+    /// where the real engine builds its session; `abandonDelay` passes
+    /// before an abandon takes effect, for one that lands late.
+    init(
+        id: EngineID = FakeStreamingEngine.engineID,
+        livePassDelay: Duration = .zero,
+        feedDelay: Duration = .zero,
+        beginDelay: Duration = .zero,
+        abandonDelay: Duration = .zero,
+        beginFails: Bool = false
+    ) {
+        self.id = id
+        self.livePassDelay = livePassDelay
+        self.feedDelay = feedDelay
+        self.beginDelay = beginDelay
+        self.abandonDelay = abandonDelay
+        self.beginFails = beginFails
+    }
 
     nonisolated var feedCounts: [Int] { counters.feedCounts }
     nonisolated var livePassCount: Int { counters.livePassCount }
     nonisolated var warmPassCount: Int { counters.warmPassCount }
     nonisolated var endCount: Int { counters.endCount }
+    /// Abandons asked for, whether or not they have taken effect yet.
+    nonisolated var abandonCalls: Int { counters.abandonCalls }
+    nonisolated var log: [String] { counters.log }
+    /// True while a `feed` is waiting out its delay.
+    nonisolated var isFeeding: Bool { counters.isFeeding }
+
+    struct BeginFailed: Error {}
 
     func load() async throws { status = .ready }
     func unload() { status = .unloaded }
 
     func transcribe(_ samples: [Float]) async throws -> Transcript {
-        Transcript(text: "final", audioDuration: 0, processingTime: 0, engineID: id)
+        counters.record("transcribe")
+        return Transcript(text: "whole", audioDuration: 0, processingTime: 0, engineID: id)
     }
 
-    func beginUtterance() async throws {}
+    func beginUtterance() async throws -> Utterance {
+        counters.record("begin")
+        if beginFails { throw BeginFailed() }
+        let utterance = slot.begin().utterance
+        if beginDelay > .zero { await uncancellableSleep(beginDelay) }
+        guard slot.install((), for: utterance) else { throw CancellationError() }
+        counters.record("begun")
+        return utterance
+    }
 
-    func feed(_ samples: [Float]) async { counters.fed(samples.count) }
+    func feed(_ samples: [Float], to utterance: Utterance) async {
+        guard slot.current == utterance else { return }
+        counters.fed(samples.count)
+        if feedDelay > .zero {
+            counters.setFeeding(true)
+            await uncancellableSleep(feedDelay)
+            counters.setFeeding(false)
+        }
+        counters.record("fed")
+    }
 
-    func endUtterance(_ tail: [Float]) async throws -> Transcript {
+    func endUtterance(_ utterance: Utterance, tail: [Float]) async throws -> Transcript {
+        guard slot.release(utterance).wasCurrent else { throw TranscriptionError.notLoaded }
         counters.ended()
         return Transcript(text: "final", audioDuration: 0, processingTime: 0, engineID: id)
     }
 
-    func abandonUtterance() async {}
+    func abandonUtterance(_ utterance: Utterance) async {
+        counters.abandonCalled()
+        if abandonDelay > .zero { await uncancellableSleep(abandonDelay) }
+        counters.record(slot.release(utterance).wasCurrent ? "abandon" : "stale abandon")
+    }
 
     func warmPass() async { counters.warmed() }
 
-    func livePass() async -> String? {
+    func livePass(_ utterance: Utterance) async -> String? {
+        guard slot.current == utterance else { return nil }
         let n = counters.lived()
         // Counted before the delay, so a test can catch a pass in flight.
-        if livePassDelay > .zero { try? await Task.sleep(for: livePassDelay) }
+        if livePassDelay > .zero { await uncancellableSleep(livePassDelay) }
         return "partial \(n)"
     }
 }
@@ -234,111 +336,100 @@ private final class StreamingCounters: @unchecked Sendable {
     private var _livePassCount = 0
     private var _warmPassCount = 0
     private var _endCount = 0
+    private var _abandonCalls = 0
+    private var _log: [String] = []
+    private var _isFeeding = false
     var feedCounts: [Int] { lock.withLock { _feedCounts } }
     var livePassCount: Int { lock.withLock { _livePassCount } }
     var warmPassCount: Int { lock.withLock { _warmPassCount } }
     var endCount: Int { lock.withLock { _endCount } }
-    func fed(_ count: Int) { lock.withLock { _feedCounts.append(count) } }
+    var abandonCalls: Int { lock.withLock { _abandonCalls } }
+    func abandonCalled() { lock.withLock { _abandonCalls += 1 } }
+    var log: [String] { lock.withLock { _log } }
+    var isFeeding: Bool { lock.withLock { _isFeeding } }
+    func fed(_ count: Int) { lock.withLock { _feedCounts.append(count); _log.append("feed") } }
     func warmed() { lock.withLock { _warmPassCount += 1 } }
-    func ended() { lock.withLock { _endCount += 1 } }
-    func lived() -> Int { lock.withLock { _livePassCount += 1; return _livePassCount } }
-}
-
-/// Lock-protected so `calls` can be read synchronously from test assertions.
-private final class SampleRecorder: @unchecked Sendable {
-    private let lock = NSLock()
-    private var _callCounts: [Int] = []
-    var callCounts: [Int] { lock.withLock { _callCounts } }
-    func append(_ count: Int) { lock.withLock { _callCounts.append(count) } }
+    func ended() { lock.withLock { _endCount += 1; _log.append("end") } }
+    func lived() -> Int { lock.withLock { _livePassCount += 1; _log.append("live"); return _livePassCount } }
+    func record(_ name: String) { lock.withLock { _log.append(name) } }
+    func setFeeding(_ feeding: Bool) { lock.withLock { _isFeeding = feeding } }
 }
 
 // MARK: - Helpers
 
 @MainActor
-private func makeCoordinator(
+func makeCoordinator(
     engineText: String = "hello world",
-    settings: Settings? = nil,
+    engines: [EngineRegistry.Entry]? = nil,
+    settings: DictationSettings? = nil,
     output: FakeOutput = FakeOutput(),
     capture: FakeCapture = FakeCapture(),
     hotkeyMonitor: FakeHotkey? = nil,
     outputMuter: (any OutputMuter)? = nil,
     refiner: (any TranscriptRefiner)? = nil,
+    makePipeline: @escaping @Sendable (DictationSettings) -> ProcessorPipeline = { s in
+        ProcessorPipeline([DictionaryReplacer(entries: s.dictionary), WhitespaceNormalizer()])
+    },
+    clock: any Clock<Duration> = ContinuousClock(),
     events: EventLog? = nil
 ) -> (DictationCoordinator, FakeOutput, FakeCapture) {
-    let registry = EngineRegistry([
-        .init(id: EchoEngine.engineID, displayName: "Echo", detail: "") {
-            EchoEngine(text: engineText, delay: .milliseconds(5))
-        }
-    ])
-    let settings = settings ?? Settings(engineID: EchoEngine.engineID)
+    let engines = engines ?? [.serving(EchoEngine(text: engineText, delay: .milliseconds(5)))]
     let coordinator = DictationCoordinator(
-        settings: settings,
-        registry: registry,
+        settings: settings ?? DictationSettings(engineID: engines[0].id),
+        registry: EngineRegistry(engines),
         capture: capture,
         output: output,
         outputMuter: outputMuter,
         refiner: refiner,
         hotkeyMonitor: hotkeyMonitor ?? FakeHotkey(),
-        makePipeline: { s in
-            ProcessorPipeline([DictionaryReplacer(entries: s.dictionary), WhitespaceNormalizer()])
-        },
+        makePipeline: makePipeline,
+        clock: clock,
         onEvent: { event in events?.append(event) }
     )
     return (coordinator, output, capture)
 }
 
+extension EngineRegistry.Entry {
+    static func serving(_ engine: any TranscriptionEngine) -> Self {
+        .init(id: engine.id, displayName: engine.displayName, detail: "") { engine }
+    }
+}
+
 /// Builds a coordinator around a CountingEngine.
 @MainActor
-private func makeCountingCoordinator(
-    engineDelay: Duration = .zero
+func makeCountingCoordinator(
+    engineDelay: Duration = .zero,
+    clock: any Clock<Duration> = ContinuousClock()
 ) -> (DictationCoordinator, FakeOutput, FakeCapture, CountingEngine) {
-    let output = FakeOutput()
-    let capture = FakeCapture()
     let engine = CountingEngine(delay: engineDelay)
-    let registry = EngineRegistry([
-        .init(id: CountingEngine.engineID, displayName: "Counting", detail: "") { engine }
-    ])
-    var settings = Settings(engineID: CountingEngine.engineID)
+    var settings = DictationSettings(engineID: CountingEngine.engineID)
     settings.appendTrailingSpace = false
-    let coordinator = DictationCoordinator(
-        settings: settings,
-        registry: registry,
-        capture: capture,
-        output: output,
-        hotkeyMonitor: FakeHotkey(),
-        makePipeline: { s in ProcessorPipeline([DictionaryReplacer(entries: s.dictionary), WhitespaceNormalizer()]) }
-    )
+    let (coordinator, output, capture) = makeCoordinator(engines: [.serving(engine)], settings: settings, clock: clock)
     return (coordinator, output, capture, engine)
 }
 
 /// Builds a coordinator around a streaming engine, with the capture handing
 /// the feed loop half a second of audio per drain.
 @MainActor
-private func makeStreamingCoordinator(
+func makeStreamingCoordinator(
     style: OverlayStyle,
-    livePassDelay: Duration = .zero
+    livePassDelay: Duration = .zero,
+    engine: FakeStreamingEngine? = nil,
+    events: EventLog? = nil
 ) async -> (DictationCoordinator, FakeOutput, FakeCapture, FakeStreamingEngine) {
-    let output = FakeOutput()
     let capture = FakeCapture()
     await capture.setDrainSamples(Array(repeating: 0.1, count: 8_000))
-    let engine = FakeStreamingEngine(livePassDelay: livePassDelay)
-    let registry = EngineRegistry([
-        .init(id: FakeStreamingEngine.engineID, displayName: "Fake streaming", detail: "") { engine }
-    ])
-    var settings = Settings(engineID: FakeStreamingEngine.engineID)
+    let engine = engine ?? FakeStreamingEngine(livePassDelay: livePassDelay)
+    var settings = DictationSettings(engineID: engine.id)
     settings.appendTrailingSpace = false
-    settings.overlayStyle = style
-    let coordinator = DictationCoordinator(
-        settings: settings,
-        registry: registry,
-        capture: capture,
-        output: output,
-        hotkeyMonitor: FakeHotkey(),
-        makePipeline: { _ in ProcessorPipeline([]) }
-    )
-    // Both loops on a short fuse so the tests do not have to wait seconds.
+    settings.liveTranscript = style == .liveTranscript
+    let (coordinator, output, _) = makeCoordinator(
+        engines: [.serving(engine)], settings: settings, capture: capture, makePipeline: { _ in ProcessorPipeline([]) },
+        events: events)
+    // Every loop on a short fuse so the tests do not have to wait seconds.
     coordinator.livePassInterval = .milliseconds(10)
     coordinator.warmupInterval = .milliseconds(10)
+    coordinator.feedInterval = .milliseconds(10)
     return (coordinator, output, capture, engine)
 }
 
@@ -352,6 +443,40 @@ func waitUntil(_ timeout: Duration = .seconds(2), _ condition: @MainActor () -> 
     return condition()
 }
 
+/// `waitUntil` for a condition that has to ask an actor: a dropped
+/// recording is idle at once, and its microphone stops on a task after.
+func eventually(_ timeout: Duration = .seconds(2), _ condition: () async -> Bool) async -> Bool {
+    let deadline = ContinuousClock.now + timeout
+    while ContinuousClock.now < deadline {
+        if await condition() { return true }
+        try? await Task.sleep(for: .milliseconds(10))
+    }
+    return await condition()
+}
+
+extension DictationCoordinator {
+    func startIdle(sourceLocation: SourceLocation = #_sourceLocation) async {
+        start()
+        #expect(await waitUntil { self.state == .idle }, sourceLocation: sourceLocation)
+    }
+
+    func dictate(submit: Bool = false) async {
+        await hotkeyPressed()
+        hotkeyReleased(submit: submit)
+        await inFlight?.value
+    }
+
+    func press(_ hotkey: FakeHotkey, sourceLocation: SourceLocation = #_sourceLocation) async {
+        hotkey.press()
+        #expect(await waitUntil { self.state.isRecording }, sourceLocation: sourceLocation)
+    }
+
+    func cycleFinished(sourceLocation: SourceLocation = #_sourceLocation) async {
+        #expect(await waitUntil { self.inFlight != nil }, sourceLocation: sourceLocation)
+        await inFlight?.value
+    }
+}
+
 /// Records the coordinator's events by name, for assertions about order.
 final class EventLog: @unchecked Sendable {
     private let lock = NSLock()
@@ -360,10 +485,10 @@ final class EventLog: @unchecked Sendable {
     var names: [String] { lock.withLock { _names } }
     var events: [DictationCoordinator.Event] { lock.withLock { _events } }
 
-    /// The timing of the last `inserted` event, if there was one.
-    var lastTiming: DictationCoordinator.CycleTiming? {
+    /// The last `inserted` event, if there was one.
+    var lastInsertion: DictationCoordinator.Insertion? {
         for event in events.reversed() {
-            if case .inserted(_, let timing) = event { return timing }
+            if case .inserted(let insertion) = event { return insertion }
         }
         return nil
     }
@@ -388,12 +513,11 @@ final class EventLog: @unchecked Sendable {
 // MARK: - Tests
 
 @MainActor
-@Suite struct DictationCoordinatorTests {
+@Suite(.timeLimit(.minutes(1))) struct DictationCoordinatorTests {
     @Test func startsUnavailableThenIdleWhenEngineReady() async {
         let (c, _, _) = makeCoordinator()
         #expect(c.state == .unavailable(.starting))
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         #expect(c.engineStatus == .ready)
     }
 
@@ -405,11 +529,10 @@ final class EventLog: @unchecked Sendable {
     }
 
     @Test func fullDictationCycleInsertsProcessedText() async {
-        var settings = Settings(engineID: EchoEngine.engineID)
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.dictionary = [DictionaryEntry(from: "hello world", to: "Hello, World!")]
         let (c, output, capture) = makeCoordinator(settings: settings)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
 
         await c.hotkeyPressed()
         #expect(c.state.isRecording)
@@ -425,126 +548,39 @@ final class EventLog: @unchecked Sendable {
     }
 
     @Test func noTrailingSpaceWhenDisabled() async {
-        var settings = Settings(engineID: EchoEngine.engineID)
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.appendTrailingSpace = false
         let (c, output, _) = makeCoordinator(settings: settings)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
-        c.hotkeyReleased()
-        await c.inFlight?.value
+        await c.startIdle()
+        await c.dictate()
         #expect(output.inserted == ["hello world"])
     }
 
     @Test func shortTapIsDiscarded() async {
         let (c, output, capture) = makeCoordinator()
         await capture.setSamples(Array(repeating: 0, count: 1_600)) // 0.1 s
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
-        c.hotkeyReleased()
-        await c.inFlight?.value
+        await c.startIdle()
+        await c.dictate()
         #expect(c.state == .idle)
         #expect(output.inserted.isEmpty)
     }
 
     @Test func levelUpdatesFlowIntoState() async {
         let (c, _, capture) = makeCoordinator()
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         await c.hotkeyPressed()
         await capture.emitLevel(0.7)
-        #expect(await waitUntil { c.state == .recording(level: 0.7) })
+        #expect(await waitUntil { c.inputLevel == 0.7 })
         c.hotkeyReleased()
         await c.inFlight?.value
-    }
-
-    @Test func copiedResultShowsTheHintThenIdles() async {
-        let output = FakeOutput()
-        output.result = .copied
-        let (c, _, _) = makeCoordinator(output: output)
-        c.copiedDisplayDuration = .milliseconds(50)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
-        c.hotkeyReleased()
-        await c.inFlight?.value
-        #expect(c.state == .copied)
-        #expect(output.inserted.count == 1)
-        #expect(c.lastTranscript?.text == "hello world")
-        #expect(await waitUntil { c.state == .idle })
-    }
-
-    @Test func copiedResultStillEmitsInserted() async {
-        let output = FakeOutput()
-        output.result = .copied
-        let events = EventLog()
-        let registry = EngineRegistry([
-            .init(id: EchoEngine.engineID, displayName: "Echo", detail: "") {
-                EchoEngine(text: "hello world", delay: .milliseconds(5))
-            }
-        ])
-        let c = DictationCoordinator(
-            settings: Settings(engineID: EchoEngine.engineID),
-            registry: registry,
-            capture: FakeCapture(),
-            output: output,
-            hotkeyMonitor: FakeHotkey(),
-            makePipeline: { _ in ProcessorPipeline([]) },
-            onEvent: { [events] in events.append($0) }
-        )
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
-        c.hotkeyReleased()
-        await c.inFlight?.value
-        #expect(events.names.last == "inserted")
-        #expect(!events.names.contains("failed"))
-    }
-
-    @Test func pressDuringCopiedHintStartsRecording() async {
-        let output = FakeOutput()
-        output.result = .copied
-        let (c, _, _) = makeCoordinator(output: output)
-        // Long enough that the hint would still be up without the press.
-        c.copiedDisplayDuration = .seconds(5)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
-        c.hotkeyReleased()
-        await c.inFlight?.value
-        #expect(c.state == .copied)
-        await c.hotkeyPressed()
-        #expect(c.state.isRecording)
-        // The cancelled hint timer must not drop us back to idle.
-        try? await Task.sleep(for: .milliseconds(100))
-        #expect(c.state.isRecording)
-        await c.cancelRecording()
     }
 
     @Test func cancelledEventDropsTheRecordingSilently() async {
         let hotkey = FakeHotkey()
         let events = EventLog()
-        let output = FakeOutput()
-        let capture = FakeCapture()
-        let registry = EngineRegistry([
-            .init(id: EchoEngine.engineID, displayName: "Echo", detail: "") {
-                EchoEngine(text: "hello world", delay: .milliseconds(5))
-            }
-        ])
-        let c = DictationCoordinator(
-            settings: Settings(engineID: EchoEngine.engineID),
-            registry: registry,
-            capture: capture,
-            output: output,
-            hotkeyMonitor: hotkey,
-            makePipeline: { _ in ProcessorPipeline([]) },
-            onEvent: { [events] in events.append($0) }
-        )
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        let (c, output, capture) = makeCoordinator(hotkeyMonitor: hotkey, events: events)
+        await c.startIdle()
+        await c.press(hotkey)
         hotkey.cancel()
         #expect(await waitUntil { c.state == .idle })
         #expect(await capture.stopCount == 1)
@@ -559,22 +595,18 @@ final class EventLog: @unchecked Sendable {
         let a = FakeHotkey()
         let b = FakeHotkey()
         let (c, output, capture) = makeCoordinator(hotkeyMonitor: a)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        a.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.startIdle()
+        await c.press(a)
         c.replaceHotkeyMonitor(b)
         #expect(await waitUntil { c.state == .idle })
-        #expect(await capture.stopCount == 1)
+        #expect(await eventually { await capture.stopCount == 1 })
         #expect(output.inserted.isEmpty)
         #expect(b.startCount == 1)
         #expect(b.lastHotkey == c.settings.hotkey)
-        // The old monitor is detached; only the new one drives the machine.
-        a.press()
-        try? await Task.sleep(for: .milliseconds(50))
-        #expect(c.state == .idle)
-        b.press()
-        #expect(await waitUntil { c.state.isRecording })
+        // The old monitor is stopped, so its stream is over; only the new one
+        // drives the machine.
+        #expect(a.stopCount >= 1)
+        await c.press(b)
         await c.cancelRecording()
     }
 
@@ -582,15 +614,13 @@ final class EventLog: @unchecked Sendable {
         let a = FakeHotkey()
         let b = FakeHotkey()
         let (c, _, _) = makeCoordinator(hotkeyMonitor: a)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         c.isHotkeySuspended = true
         c.replaceHotkeyMonitor(b)
         #expect(b.startCount == 0)
         c.isHotkeySuspended = false
         #expect(b.startCount == 1)
-        b.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(b)
         await c.cancelRecording()
     }
 
@@ -606,8 +636,7 @@ final class EventLog: @unchecked Sendable {
         // Set before `start()`, the way the app does it: one registration.
         c.hotkeyOverride = Self.standIn
         #expect(fake.startCount == 0)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         #expect(fake.startCount == 1)
         #expect(fake.lastHotkey == Self.standIn)
         #expect(c.settings.hotkey == .optionSpace)
@@ -616,13 +645,11 @@ final class EventLog: @unchecked Sendable {
     @Test func changingTheOverrideWhileRecordingStopsTheMicrophone() async {
         let fake = FakeHotkey()
         let (c, output, capture) = makeCoordinator(hotkeyMonitor: fake)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        fake.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.startIdle()
+        await c.press(fake)
         c.hotkeyOverride = Self.standIn
         #expect(await waitUntil { c.state == .idle })
-        #expect(await capture.stopCount == 1)
+        #expect(await eventually { await capture.stopCount == 1 })
         #expect(output.inserted.isEmpty)
         #expect(fake.startCount == 2)
         #expect(fake.lastHotkey == Self.standIn)
@@ -632,14 +659,12 @@ final class EventLog: @unchecked Sendable {
         let fake = FakeHotkey()
         let (c, _, _) = makeCoordinator(hotkeyMonitor: fake)
         c.hotkeyOverride = Self.standIn
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         // What granting Accessibility does.
         c.hotkeyOverride = nil
         #expect(fake.startCount == 2)
         #expect(fake.lastHotkey == c.settings.hotkey)
-        fake.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(fake)
         await c.cancelRecording()
     }
 
@@ -647,19 +672,64 @@ final class EventLog: @unchecked Sendable {
         let fake = FakeHotkey()
         let (c, _, _) = makeCoordinator(hotkeyMonitor: fake)
         c.hotkeyOverride = Self.standIn
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         // The app recomputes the stand-in on every permission flip; the same
         // answer must not tear the registration down and build it again.
         c.hotkeyOverride = Self.standIn
         #expect(fake.startCount == 1)
     }
 
+    // Before: the app set the chord, which restarted the monitor with the
+    // old stand-in, then the stand-in, which restarted it again. Without
+    // Accessibility the first restart handed Carbon a modifier-only chord it
+    // cannot register.
+    @Test func aChordAndItsStandInChangeInOneRestart() async {
+        let fake = FakeHotkey()
+        let (c, _, _) = makeCoordinator(hotkeyMonitor: fake)
+        await c.startIdle()
+        var settings = c.settings
+        settings.hotkey = .rightOption
+        c.update(settings, hotkeyOverride: Self.standIn)
+        #expect(fake.startedHotkeys == [.optionSpace, Self.standIn])
+
+        // And back: a chord Carbon can register clears the stand-in, again
+        // in one restart, never with the modifier-only chord.
+        settings.hotkey = Hotkey(0x3B, 0x02)
+        c.update(settings, hotkeyOverride: nil)
+        #expect(fake.startedHotkeys == [.optionSpace, Self.standIn, Hotkey(0x3B, 0x02)])
+
+        // Nothing that concerns the monitor: no restart.
+        settings.appendTrailingSpace.toggle()
+        c.update(settings, hotkeyOverride: nil)
+        #expect(fake.startCount == 3)
+    }
+
+    // Before: the recording was dropped from a task while the new monitor
+    // started at once, so a press on the new stream that came first found
+    // `.recording` still set and was refused.
+    @Test func aPressRightAfterAMonitorSwapStartsADictation() async {
+        let a = FakeHotkey()
+        let b = FakeHotkey()
+        let (c, _, capture) = makeCoordinator(hotkeyMonitor: a)
+        await capture.setStopDelay(.milliseconds(50))
+        await c.startIdle()
+        await c.press(a)
+        c.replaceHotkeyMonitor(b)
+        // Ended before the new monitor can deliver anything.
+        #expect(c.state == .idle)
+        b.press()
+        // The press waited for the microphone to stop, then started it again.
+        #expect(await waitUntil { c.handledHotkeyEvents == 2 })
+        #expect(c.state.isRecording)
+        #expect(await capture.startCount == 2)
+        #expect(await capture.stopCount == 1)
+        await c.cancelRecording()
+    }
+
     @Test func overrideWhileSuspendedStartsOnResume() async {
         let fake = FakeHotkey()
         let (c, _, _) = makeCoordinator(hotkeyMonitor: fake)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         c.isHotkeySuspended = true
         c.hotkeyOverride = Self.standIn
         #expect(fake.startCount == 1)
@@ -668,25 +738,9 @@ final class EventLog: @unchecked Sendable {
         #expect(fake.lastHotkey == Self.standIn)
     }
 
-    @Test func outputFailureSurfacesErrorThenRecovers() async {
-        let output = FakeOutput()
-        output.shouldFail = true
-        let (c, _, _) = makeCoordinator(output: output)
-        c.errorDisplayDuration = .milliseconds(50)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
-        c.hotkeyReleased()
-        await c.inFlight?.value
-        #expect(c.state == .error(.other(detail: "paste failed")))
-        #expect(c.lastError == .other(detail: "paste failed"))
-        #expect(await waitUntil { c.state == .idle })
-    }
-
     @Test func releaseWithoutPressIsNoop() async {
         let (c, output, capture) = makeCoordinator()
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         c.hotkeyReleased()
         await c.inFlight?.value
         #expect(c.state == .idle)
@@ -696,8 +750,7 @@ final class EventLog: @unchecked Sendable {
 
     @Test func cancelRecordingDropsAudio() async {
         let (c, output, capture) = makeCoordinator()
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         await c.hotkeyPressed()
         await c.cancelRecording()
         #expect(c.state == .idle)
@@ -706,23 +759,19 @@ final class EventLog: @unchecked Sendable {
     }
 
     @Test func disabledProcessorIsSkipped() async {
-        var settings = Settings(engineID: EchoEngine.engineID)
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.dictionary = [DictionaryEntry(from: "hello", to: "goodbye")]
-        settings.setProcessor(DictionaryReplacer.processorID, enabled: false)
+        settings.disabledProcessors.insert(DictionaryReplacer.processorID)
         settings.appendTrailingSpace = false
         let (c, output, _) = makeCoordinator(settings: settings)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
-        c.hotkeyReleased()
-        await c.inFlight?.value
+        await c.startIdle()
+        await c.dictate()
         #expect(output.inserted == ["hello world"])
     }
 
     @Test func pressDuringTranscriptionIsDropped() async {
         let (c, output, capture) = makeCoordinator()
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         await c.hotkeyPressed()
         c.hotkeyReleased()
         // A second press while transcribing must not start the mic again.
@@ -733,36 +782,41 @@ final class EventLog: @unchecked Sendable {
         #expect(output.inserted.count == 1)
     }
 
-    @Test func hotkeyChangeWhileRecordingStopsTheMicrophone() async {
-        let (c, output, capture) = makeCoordinator()
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
-        #expect(c.state.isRecording)
-        c.settings.hotkey = .rightOption
-        #expect(await waitUntil { c.state == .idle })
-        #expect(await capture.stopCount == 1)
-        #expect(output.inserted.isEmpty)
+    @Test func aChordChangeWhileRecordingStopsTheMicrophone() async {
+        let changes: [(inout DictationSettings) -> Void] = [
+            { $0.hotkey = .rightOption },
+            { $0.submitKey = Hotkey(0x24) },
+            { $0.toggleHotkey = Hotkey(0x3B, 0x02) },
+        ]
+        for change in changes {
+            let (c, output, capture) = makeCoordinator()
+            await c.startIdle()
+            await c.hotkeyPressed()
+            #expect(c.state.isRecording)
+            change(&c.settings)
+            #expect(await waitUntil { c.state == .idle })
+            #expect(await eventually { await capture.stopCount == 1 })
+            #expect(output.inserted.isEmpty)
+        }
     }
 
     @Test func engineChangeWhileRecordingUsesTheEngineThatRecorded() async {
-        var registry = EngineRegistry([
-            .init(id: EchoEngine.engineID, displayName: "Echo", detail: "") { EchoEngine(text: "one", delay: .milliseconds(5)) }
-        ])
-        registry.register(.init(id: EngineID("two"), displayName: "Two", detail: "") { EchoEngine(text: "two", delay: .milliseconds(500)) })
-        let output = FakeOutput()
-        let capture = FakeCapture()
-        var settings = Settings(engineID: EchoEngine.engineID)
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.appendTrailingSpace = false
-        let c = DictationCoordinator(
-            settings: settings, registry: registry, capture: capture, output: output,
-            hotkeyMonitor: FakeHotkey(), makePipeline: { _ in ProcessorPipeline([]) })
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        let (c, output, capture) = makeCoordinator(
+            engines: [
+                .serving(EchoEngine(text: "one", delay: .milliseconds(5))),
+                .init(id: EngineID("two"), displayName: "Two", detail: "") { EchoEngine(text: "two", delay: .milliseconds(500)) },
+            ],
+            settings: settings)
+        await c.startIdle()
         await c.hotkeyPressed()
         c.settings.engineID = EngineID("two")
+        // Still recording: the switch must not clobber the state.
+        #expect(c.state.isRecording)
         c.hotkeyReleased()
         await c.inFlight?.value
+        #expect(await capture.stopCount == 1)
         // The dictation goes to the engine that was ready at release, not
         // the one the settings switched to mid-recording.
         #expect(output.inserted == ["one"])
@@ -772,55 +826,10 @@ final class EventLog: @unchecked Sendable {
         #expect(await waitUntil { c.state == .idle })
     }
 
-    @Test func engineChangeWhileRecordingKeepsTheCycleAlive() async {
-        var registry = EngineRegistry([
-            .init(id: EchoEngine.engineID, displayName: "Echo", detail: "") { EchoEngine(text: "one", delay: .milliseconds(5)) }
-        ])
-        registry.register(.init(id: EngineID("two"), displayName: "Two", detail: "") { EchoEngine(text: "two", delay: .milliseconds(5)) })
-        let output = FakeOutput()
-        let capture = FakeCapture()
-        var settings = Settings(engineID: EchoEngine.engineID)
-        settings.appendTrailingSpace = false
-        let c = DictationCoordinator(
-            settings: settings, registry: registry, capture: capture, output: output,
-            hotkeyMonitor: FakeHotkey(), makePipeline: { _ in ProcessorPipeline([]) })
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
-        c.settings.engineID = EngineID("two")
-        // Still recording: the switch must not clobber the state.
-        #expect(c.state.isRecording)
-        c.hotkeyReleased()
-        await c.inFlight?.value
-        #expect(await capture.stopCount == 1)
-        // The new engine may or may not be loaded by the time we transcribe; either
-        // way the cycle ends in a terminal state and the mic is off.
-        #expect(await waitUntil { c.state == .idle || !c.state.isBusy })
-        #expect(await waitUntil { c.engineStatus == .ready })
-        #expect(await waitUntil { c.state == .idle })
-    }
-
-    @Test func maximumDurationReleasesAutomatically() async {
-        let (c, output, capture) = makeCoordinator()
-        c.maximumDuration = .milliseconds(60)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
-        #expect(await waitUntil { c.state == .transcribing || c.state == .idle })
-        #expect(await waitUntil { c.inFlight != nil })
-        await c.inFlight?.value
-        #expect(await capture.stopCount == 1)
-        #expect(output.inserted.count == 1)
-        #expect(output.submitted == [false])
-    }
-
     @Test func submittedReleaseIsPassedToTheOutput() async {
         let (c, output, _) = makeCoordinator()
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
-        c.hotkeyReleased(submit: true)
-        await c.inFlight?.value
+        await c.startIdle()
+        await c.dictate(submit: true)
         #expect(output.inserted.count == 1)
         #expect(output.submitted == [true])
     }
@@ -828,11 +837,8 @@ final class EventLog: @unchecked Sendable {
     @Test func shortTapWithSubmitInsertsNothing() async {
         let (c, output, capture) = makeCoordinator()
         await capture.setSamples(Array(repeating: 0, count: 1_600)) // 0.1 s
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
-        c.hotkeyReleased(submit: true)
-        await c.inFlight?.value
+        await c.startIdle()
+        await c.dictate(submit: true)
         #expect(output.inserted.isEmpty)
         #expect(output.submitted.isEmpty)
     }
@@ -840,125 +846,66 @@ final class EventLog: @unchecked Sendable {
     @Test func eventStreamReleaseCarriesSubmitFlag() async {
         let hotkey = FakeHotkey()
         let (c, output, _) = makeCoordinator(hotkeyMonitor: hotkey)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.startIdle()
+        await c.press(hotkey)
         hotkey.release(submit: true)
-        #expect(await waitUntil { c.inFlight != nil })
-        await c.inFlight?.value
+        await c.cycleFinished()
         #expect(output.submitted == [true])
         #expect(output.inserted.count == 1)
     }
 
-    @Test func insertedEventCarriesCycleTiming() async {
-        final class EventRecorder: @unchecked Sendable {
-            private let lock = NSLock()
-            private var _events: [DictationCoordinator.Event] = []
-            var events: [DictationCoordinator.Event] { lock.withLock { _events } }
-            func append(_ e: DictationCoordinator.Event) { lock.withLock { _events.append(e) } }
-        }
-        let recorder = EventRecorder()
-        let output = FakeOutput()
-        let registry = EngineRegistry([
-            .init(id: EchoEngine.engineID, displayName: "Echo", detail: "") {
-                EchoEngine(text: "hello world", delay: .milliseconds(50))
-            }
-        ])
-        var settings = Settings(engineID: EchoEngine.engineID)
+    @Test func insertedEventCarriesCycleTiming() async throws {
+        let events = EventLog()
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.appendTrailingSpace = false
-        let capture = FakeCapture()
-        let timed = DictationCoordinator(
-            settings: settings, registry: registry, capture: capture, output: output,
-            hotkeyMonitor: FakeHotkey(), makePipeline: { _ in ProcessorPipeline([]) },
-            onEvent: { recorder.append($0) })
-        timed.start()
-        #expect(await waitUntil { timed.state == .idle })
-        await timed.hotkeyPressed()
-        timed.hotkeyReleased()
-        await timed.inFlight?.value
-        guard case .inserted(_, let timing) = recorder.events.last else {
-            Issue.record("expected an inserted event, got \(String(describing: recorder.events.last))")
-            return
-        }
+        let (c, output, _) = makeCoordinator(
+            engines: [.serving(EchoEngine(text: "hello world", delay: .milliseconds(50)))],
+            settings: settings, events: events)
+        await c.startIdle()
+        await c.dictate()
+        let timing = try #require(events.lastInsertion?.timing)
         #expect(timing.engine >= .milliseconds(50))
         #expect(timing.polish == nil)
         #expect(output.inserted == ["hello world"])
     }
 
-    @Test func engineLoadFailureShowsTheEngineMessage() async {
-        let registry = EngineRegistry([
-            .init(id: EngineID("flaky"), displayName: "Flaky", detail: "") { FlakyEngine(failures: 1) }
-        ])
-        let c = DictationCoordinator(
-            settings: Settings(engineID: EngineID("flaky")), registry: registry,
-            capture: FakeCapture(), output: FakeOutput(),
-            hotkeyMonitor: FakeHotkey(), makePipeline: { _ in ProcessorPipeline([]) })
+    @Test func engineLoadFailureShowsTheEngineMessageAndReloadRecovers() async {
+        let (c, _, _) = makeCoordinator(engines: [.serving(FlakyEngine(failures: 1))])
         c.start()
         #expect(await waitUntil { c.state == .unavailable(.engineFailed(.loadFailed(detail: "boom"))) })
         #expect(c.engineStatus == .failed(.loadFailed(detail: "boom")))
-    }
-
-    @Test func reloadAfterLoadFailureRecovers() async {
-        let registry = EngineRegistry([
-            .init(id: EngineID("flaky"), displayName: "Flaky", detail: "") { FlakyEngine(failures: 1) }
-        ])
-        let c = DictationCoordinator(
-            settings: Settings(engineID: EngineID("flaky")), registry: registry,
-            capture: FakeCapture(), output: FakeOutput(),
-            hotkeyMonitor: FakeHotkey(), makePipeline: { _ in ProcessorPipeline([]) })
-        c.start()
-        #expect(await waitUntil { c.state == DictationState.unavailable(.engineFailed(.loadFailed(detail: "boom"))) })
         c.reloadEngine()
-        #expect(await waitUntil { c.state == DictationState.idle })
+        #expect(await waitUntil { c.state == .idle })
     }
 
     @Test func suspendingTheHotkeyDropsTheRecording() async {
         let hotkey = FakeHotkey()
         let (c, output, capture) = makeCoordinator(hotkeyMonitor: hotkey)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         await c.hotkeyPressed()
         #expect(c.state.isRecording)
         c.isHotkeySuspended = true
         #expect(await waitUntil { c.state == .idle })
-        #expect(await capture.stopCount == 1)
+        #expect(await eventually { await capture.stopCount == 1 })
         #expect(output.inserted.isEmpty)
         c.isHotkeySuspended = false
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
     }
 
     @Test func dictionaryChangeAfterStartIsUsedByTheNextDictation() async {
-        var settings = Settings(engineID: EchoEngine.engineID)
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.dictionary = []
         settings.appendTrailingSpace = false
         let (c, output, _) = makeCoordinator(settings: settings)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         c.settings.dictionary = [DictionaryEntry(from: "hello", to: "bye")]
-        await c.hotkeyPressed()
-        c.hotkeyReleased()
-        await c.inFlight?.value
+        await c.dictate()
         #expect(output.inserted == ["bye world"])
-    }
-
-    @Test func submitKeyChangeWhileRecordingStopsTheMicrophone() async {
-        let (c, output, capture) = makeCoordinator()
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
-        #expect(c.state.isRecording)
-        c.settings.submitKey = Hotkey(0x24)
-        #expect(await waitUntil { c.state == .idle })
-        #expect(await capture.stopCount == 1)
-        #expect(output.inserted.isEmpty)
     }
 
     @Test func keyDownWarmsTheEngine() async {
         let (c, output, capture, engine) = makeCountingCoordinator()
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         await c.hotkeyPressed()
         // Half a second of silence was sent to the engine while recording.
         #expect(await waitUntil { engine.calls == [8_000] })
@@ -971,35 +918,10 @@ final class EventLog: @unchecked Sendable {
         #expect(await capture.stopCount == 1)
     }
 
-    @Test func theEngineKeepsWarmingWhileTheKeyIsHeld() async {
-        let (c, _, _, engine) = makeCountingCoordinator()
-        // A real dictation warms every two seconds; the interval is settable
-        // so the test does not have to wait that long.
-        c.warmupInterval = .milliseconds(10)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
-        // One pass at key-down is not enough for a long dictation: the chip
-        // goes idle between them, and a cold pass costs far more than the rest
-        // of the path together.
-        #expect(await waitUntil { engine.calls.filter { $0 == 8_000 }.count >= 3 })
-        c.hotkeyReleased()
-        await c.inFlight?.value
-        // The loop stops at release, so nothing is queued ahead of the real
-        // call, and the last thing the engine saw is the utterance itself.
-        let afterRelease = engine.calls.count
-        #expect(engine.calls.last == 16_000)
-        try? await Task.sleep(for: .milliseconds(60))
-        #expect(engine.calls.count == afterRelease)
-    }
-
     @Test func releaseDuringWarmupStillInserts() async {
         let (c, output, _, _) = makeCountingCoordinator(engineDelay: .milliseconds(200))
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
-        c.hotkeyReleased()
-        await c.inFlight?.value
+        await c.startIdle()
+        await c.dictate()
         // The warm-up discarded its result; exactly one transcript lands.
         #expect(output.inserted.count == 1)
         #expect(c.state == .idle)
@@ -1007,8 +929,7 @@ final class EventLog: @unchecked Sendable {
 
     @Test func keyDownPreparesTheOutput() async {
         let (c, output, _) = makeCoordinator()
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         await c.hotkeyPressed()
         #expect(await waitUntil { output.prepareCount == 1 })
         c.hotkeyReleased()
@@ -1019,8 +940,7 @@ final class EventLog: @unchecked Sendable {
 
     @Test func liveStylePublishesPartialsAndInsertsOnce() async {
         let (c, output, _, engine) = await makeStreamingCoordinator(style: .liveTranscript)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         await c.hotkeyPressed()
         #expect(await waitUntil { engine.livePassCount >= 3 })
         #expect(c.partialTranscript?.hasPrefix("partial") == true)
@@ -1036,8 +956,7 @@ final class EventLog: @unchecked Sendable {
 
     @Test func partialTranscriptNeverReachesTheOutput() async {
         let (c, output, _, engine) = await makeStreamingCoordinator(style: .liveTranscript)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         await c.hotkeyPressed()
         #expect(await waitUntil { engine.livePassCount >= 2 })
         c.hotkeyReleased()
@@ -1050,26 +969,23 @@ final class EventLog: @unchecked Sendable {
     @Test func releaseDuringLivePassStillInsertsExactlyOnce() async {
         let (c, output, _, engine) = await makeStreamingCoordinator(
             style: .liveTranscript, livePassDelay: .milliseconds(200))
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         await c.hotkeyPressed()
         #expect(await waitUntil { engine.livePassCount == 1 })
         c.hotkeyReleased()
         await c.inFlight?.value
         #expect(output.inserted.count == 1)
         #expect(c.state == .idle)
-        // The pass that was in flight at release finishes afterwards; its text
-        // belongs to a recording that has already been pasted, so it must not
-        // reappear on screen.
-        try? await Task.sleep(for: .milliseconds(250))
+        // The release waited for the pass that was in flight; its text
+        // belongs to a recording that has already been pasted, so it never
+        // reached the screen.
         #expect(c.partialTranscript == nil)
     }
 
     @Test func livePassesDoNotRunForOtherStyles() async {
         for style in [OverlayStyle.compact, .minimal, .menuBar] {
             let (c, output, _, engine) = await makeStreamingCoordinator(style: style)
-            c.start()
-            #expect(await waitUntil { c.state == .idle })
+            await c.startIdle()
             await c.hotkeyPressed()
             #expect(await waitUntil { engine.warmPassCount >= 1 })
             #expect(engine.livePassCount == 0)
@@ -1083,8 +999,7 @@ final class EventLog: @unchecked Sendable {
 
     @Test func cancelRecordingClearsThePartialTranscript() async {
         let (c, output, _, engine) = await makeStreamingCoordinator(style: .liveTranscript)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         await c.hotkeyPressed()
         #expect(await waitUntil { c.partialTranscript != nil })
         await c.cancelRecording()
@@ -1097,12 +1012,11 @@ final class EventLog: @unchecked Sendable {
     // MARK: Output mute
 
     @Test func mutesAndRestoresTheOutputDeviceWhenTheSettingIsOn() async {
-        var settings = Settings(engineID: EchoEngine.engineID)
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.muteOutputWhileDictating = true
         let muter = FakeOutputMuter()
         let (c, _, _) = makeCoordinator(settings: settings, outputMuter: muter)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         await c.hotkeyPressed()
         #expect(await waitUntil { muter.startedCount == 1 })
         c.hotkeyReleased()
@@ -1116,52 +1030,42 @@ final class EventLog: @unchecked Sendable {
     @Test func withTheSettingOffNothingIsMutedButTheRestoreStillRuns() async {
         let muter = FakeOutputMuter()
         let (c, _, _) = makeCoordinator(outputMuter: muter)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
-        c.hotkeyReleased()
-        await c.inFlight?.value
+        await c.startIdle()
+        await c.dictate()
         #expect(await waitUntil { muter.endedCount == 1 })
         #expect(muter.startedCount == 0)
     }
 
-    @Test func cancelRecordingRestoresTheOutputDevice() async {
-        var settings = Settings(engineID: EchoEngine.engineID)
+    @Test func everyDiscardRestoresTheOutputDevice() async {
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.muteOutputWhileDictating = true
-        let muter = FakeOutputMuter()
-        let (c, _, _) = makeCoordinator(settings: settings, outputMuter: muter)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
-        await c.cancelRecording()
-        #expect(await waitUntil { muter.endedCount == 1 })
+        let discards: [(DictationCoordinator, FakeHotkey) async -> Void] = [
+            { c, _ in await c.cancelRecording() },
+            { c, _ in await c.escapePressed() },
+            { _, hotkey in hotkey.cancel() },
+        ]
+        for discard in discards {
+            let hotkey = FakeHotkey()
+            let muter = FakeOutputMuter()
+            let (c, _, _) = makeCoordinator(settings: settings, hotkeyMonitor: hotkey, outputMuter: muter)
+            await c.startIdle()
+            await c.press(hotkey)
+            await discard(c, hotkey)
+            #expect(await waitUntil { muter.endedCount == 1 })
+        }
     }
 
-    @Test func theCancelledHotkeyEventRestoresTheOutputDevice() async {
-        var settings = Settings(engineID: EchoEngine.engineID)
-        settings.muteOutputWhileDictating = true
-        let hotkey = FakeHotkey()
-        let muter = FakeOutputMuter()
-        let (c, _, _) = makeCoordinator(
-            settings: settings, hotkeyMonitor: hotkey, outputMuter: muter)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
-        hotkey.cancel()
-        #expect(await waitUntil { muter.endedCount == 1 })
-    }
 }
 
 // MARK: - Polish toggle
 
 @MainActor
-@Suite struct PolishToggleTests {
+@Suite(.timeLimit(.minutes(1))) struct PolishToggleTests {
     /// Long enough to clear `minimumPolishWords`.
     private static let sentence = "send it on Friday please"
 
-    private static func settings(polish: Bool = true) -> Settings {
-        var s = Settings(engineID: EchoEngine.engineID)
+    private static func settings(polish: Bool = true) -> DictationSettings {
+        var s = DictationSettings(engineID: EchoEngine.engineID)
         s.polishDictations = polish
         return s
     }
@@ -1173,17 +1077,14 @@ final class EventLog: @unchecked Sendable {
         let (c, output, _) = makeCoordinator(
             engineText: Self.sentence, settings: Self.settings(),
             hotkeyMonitor: hotkey, refiner: refiner, events: events)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.startIdle()
+        await c.press(hotkey)
         hotkey.release()
-        #expect(await waitUntil { c.inFlight != nil })
-        await c.inFlight?.value
+        await c.cycleFinished()
         #expect(output.inserted == ["polished "])
         #expect(refiner.calls == [Self.sentence])
         #expect(c.lastTranscript?.text == "polished")
-        #expect(events.lastTiming?.polish != nil)
+        #expect(events.lastInsertion?.timing.polish != nil)
     }
 
     @Test func normalHotkeyNeverCallsTheRefiner() async {
@@ -1193,29 +1094,23 @@ final class EventLog: @unchecked Sendable {
         let (c, output, _) = makeCoordinator(
             engineText: Self.sentence, settings: Self.settings(polish: false),
             hotkeyMonitor: hotkey, refiner: refiner, events: events)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.startIdle()
+        await c.press(hotkey)
         #expect(!c.willPolish)
         hotkey.release()
-        #expect(await waitUntil { c.inFlight != nil })
-        await c.inFlight?.value
+        await c.cycleFinished()
         #expect(output.inserted == [Self.sentence + " "])
         #expect(refiner.calls.isEmpty)
         #expect(refiner.prepareCount == 0)
-        #expect(events.lastTiming != nil)
-        #expect(events.lastTiming?.polish == nil)
+        #expect(events.lastInsertion != nil)
+        #expect(events.lastInsertion?.timing.polish == nil)
     }
 
     @Test func blankTranscriptSkipsTheRefiner() async {
         let refiner = FakeRefiner()
         let (c, output, _) = makeCoordinator(engineText: "", settings: Self.settings(), refiner: refiner)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
-        c.hotkeyReleased()
-        await c.inFlight?.value
+        await c.startIdle()
+        await c.dictate()
         #expect(output.inserted.isEmpty)
         #expect(refiner.calls.isEmpty)
         #expect(c.state == .idle)
@@ -1226,25 +1121,19 @@ final class EventLog: @unchecked Sendable {
         let events = EventLog()
         let (c, output, _) = makeCoordinator(
             engineText: "one two three", settings: Self.settings(), refiner: refiner, events: events)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
-        c.hotkeyReleased()
-        await c.inFlight?.value
+        await c.startIdle()
+        await c.dictate()
         #expect(output.inserted == ["one two three "])
         #expect(refiner.calls.isEmpty)
-        #expect(events.lastTiming?.polish == .zero)
+        #expect(events.lastInsertion?.timing.polish == .zero)
     }
 
     @Test func fourWordsAreRefined() async {
         let refiner = FakeRefiner()
         let (c, output, _) = makeCoordinator(
             engineText: "one two three four", settings: Self.settings(), refiner: refiner)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
-        c.hotkeyReleased()
-        await c.inFlight?.value
+        await c.startIdle()
+        await c.dictate()
         #expect(refiner.calls == ["one two three four"])
         #expect(output.inserted == ["polished "])
     }
@@ -1255,11 +1144,8 @@ final class EventLog: @unchecked Sendable {
         let events = EventLog()
         let (c, output, _) = makeCoordinator(
             engineText: Self.sentence, settings: Self.settings(), refiner: refiner, events: events)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
-        c.hotkeyReleased()
-        await c.inFlight?.value
+        await c.startIdle()
+        await c.dictate()
         #expect(refiner.calls == [Self.sentence])
         #expect(output.inserted == [Self.sentence + " "])
         #expect(c.lastTranscript?.text == Self.sentence)
@@ -1272,19 +1158,15 @@ final class EventLog: @unchecked Sendable {
 
     @Test func withoutARefinerPolishIsAPlainDictation() async {
         let (c, output, _) = makeCoordinator(engineText: Self.sentence, settings: Self.settings())
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
-        c.hotkeyReleased()
-        await c.inFlight?.value
+        await c.startIdle()
+        await c.dictate()
         #expect(output.inserted == [Self.sentence + " "])
     }
 
     @Test func polishSettingWarmsTheRefiner() async {
         let refiner = FakeRefiner()
         let (c, _, _) = makeCoordinator(engineText: Self.sentence, settings: Self.settings(), refiner: refiner)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         await c.hotkeyPressed()
         #expect(await waitUntil { refiner.prepareCount == 1 })
         #expect(c.state.isRecording)
@@ -1294,8 +1176,7 @@ final class EventLog: @unchecked Sendable {
     @Test func polishingStateIsPublishedWhileTheModelRuns() async {
         let refiner = FakeRefiner(delay: .milliseconds(200))
         let (c, output, _) = makeCoordinator(engineText: Self.sentence, settings: Self.settings(), refiner: refiner)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         await c.hotkeyPressed()
         #expect(c.willPolish)
         c.hotkeyReleased()
@@ -1313,8 +1194,7 @@ final class EventLog: @unchecked Sendable {
         var settings = Self.settings()
         settings.toggleHotkey = Hotkey(0x3B, 0x3A, 0x31)
         let (c, _, _) = makeCoordinator(settings: settings, hotkeyMonitor: fake)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         #expect(fake.lastChords == [.dictate: .optionSpace, .toggle: Hotkey(0x3B, 0x3A, 0x31)])
     }
 
@@ -1325,8 +1205,7 @@ final class EventLog: @unchecked Sendable {
         settings.toggleHotkey = Hotkey(0x3B, 0x3A, 0x31)
         let (c, _, _) = makeCoordinator(settings: settings, hotkeyMonitor: fake)
         c.hotkeyOverride = standIn
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         #expect(fake.lastChords[.dictate] == standIn)
         #expect(fake.lastChords[.toggle] == Hotkey(0x3B, 0x3A, 0x31))
     }
@@ -1338,18 +1217,16 @@ final class EventLog: @unchecked Sendable {
         settings.toggleHotkey = Hotkey(0x3B, 0x3A, 0x31)
         let (c, output, _) = makeCoordinator(
             engineText: Self.sentence, settings: settings, hotkeyMonitor: hotkey, refiner: refiner)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         hotkey.press(.dictate)
         #expect(await waitUntil { c.state.isRecording })
         hotkey.release(.toggle)
         hotkey.cancel(.toggle)
-        // Give the stream a moment to deliver both; neither may end the take.
-        try? await Task.sleep(for: .milliseconds(50))
+        // Both delivered; neither may end the take.
+        #expect(await waitUntil { c.handledHotkeyEvents == 3 })
         #expect(c.state.isRecording)
         hotkey.release(.dictate)
-        #expect(await waitUntil { c.inFlight != nil })
-        await c.inFlight?.value
+        await c.cycleFinished()
         #expect(output.inserted == [Self.sentence + " "])
         #expect(refiner.calls.isEmpty)
     }
@@ -1359,10 +1236,8 @@ final class EventLog: @unchecked Sendable {
         let refiner = FakeRefiner()
         let (c, output, capture) = makeCoordinator(
             engineText: Self.sentence, settings: Self.settings(), hotkeyMonitor: hotkey, refiner: refiner)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.startIdle()
+        await c.press(hotkey)
         hotkey.cancel()
         #expect(await waitUntil { c.state == .idle })
         #expect(await capture.stopCount == 1)
@@ -1375,21 +1250,17 @@ final class EventLog: @unchecked Sendable {
         let hotkey = FakeHotkey()
         let (c, output, _) = makeCoordinator(
             engineText: Self.sentence, settings: Self.settings(), hotkeyMonitor: hotkey, refiner: FakeRefiner())
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.startIdle()
+        await c.press(hotkey)
         hotkey.release(submit: true)
-        #expect(await waitUntil { c.inFlight != nil })
-        await c.inFlight?.value
+        await c.cycleFinished()
         #expect(output.inserted == ["polished "])
         #expect(output.submitted == [true])
     }
 
     @Test func cancelRecordingClearsWillPolish() async {
         let (c, _, _) = makeCoordinator(settings: Self.settings(), refiner: FakeRefiner())
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         await c.hotkeyPressed()
         #expect(c.willPolish)
         await c.cancelRecording()
@@ -1401,18 +1272,18 @@ final class EventLog: @unchecked Sendable {
 // MARK: - Toggle key
 
 @MainActor
-@Suite struct ToggleHotkeyTests {
+@Suite(.timeLimit(.minutes(1))) struct ToggleHotkeyTests {
     /// Control + D: a toggle chord that is not the push-to-talk chord.
     private static let controlD = Hotkey(0x3B, 0x02)
 
-    private func hybridSettings() -> Settings {
-        var settings = Settings(engineID: EchoEngine.engineID)
+    private func hybridSettings() -> DictationSettings {
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.toggleHotkey = settings.hotkey
         return settings
     }
 
-    private func separateSettings() -> Settings {
-        var settings = Settings(engineID: EchoEngine.engineID)
+    private func separateSettings() -> DictationSettings {
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.toggleHotkey = Self.controlD
         return settings
     }
@@ -1421,24 +1292,20 @@ final class EventLog: @unchecked Sendable {
         let hotkey = FakeHotkey()
         let (c, output, _) = makeCoordinator(settings: hybridSettings(), hotkeyMonitor: hotkey)
         c.holdThreshold = .seconds(2)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         #expect(hotkey.lastChords == [.dictate: .optionSpace])
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
         hotkey.release()
         #expect(await waitUntil { c.isLatched })
-        // Past the bounce window, or the press would be taken for a bounce.
-        try? await Task.sleep(for: .milliseconds(80))
         #expect(c.state.isRecording)
+        // A step past the release, well outside the bounce window.
         hotkey.press()
-        #expect(await waitUntil { c.inFlight != nil })
-        await c.inFlight?.value
+        await c.cycleFinished()
         #expect(output.inserted.count == 1)
         #expect(!c.isLatched)
         // The closing press's release arrives in idle and does nothing.
         hotkey.release()
-        try? await Task.sleep(for: .milliseconds(30))
+        #expect(await waitUntil { c.handledHotkeyEvents == 4 })
         #expect(c.state == .idle)
     }
 
@@ -1446,31 +1313,29 @@ final class EventLog: @unchecked Sendable {
         let hotkey = FakeHotkey()
         let (c, output, _) = makeCoordinator(settings: hybridSettings(), hotkeyMonitor: hotkey)
         c.holdThreshold = .milliseconds(20)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
-        try? await Task.sleep(for: .milliseconds(60))
+        await c.startIdle()
+        await c.press(hotkey)
+        // A step (100 ms) is longer than the threshold: a hold.
         hotkey.release()
-        #expect(await waitUntil { c.inFlight != nil })
-        await c.inFlight?.value
+        await c.cycleFinished()
         #expect(output.inserted.count == 1)
         #expect(!c.isLatched)
     }
 
     @Test func theHoldIsTimedByTheEventsOwnInstants() async {
-        // The release is delivered late, but it happened 100 ms after the
-        // press: a tap, however long the loop took to get to it.
+        // The release is delivered late, but it happened 10 ms after the
+        // press: a tap, however long the loop took to get to it. The one
+        // test that has to sleep: it is about wall time passing.
         let hotkey = FakeHotkey()
         let (c, _, _) = makeCoordinator(settings: hybridSettings(), hotkeyMonitor: hotkey)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        c.holdThreshold = .milliseconds(50)
+        await c.startIdle()
         let pressed = ContinuousClock.now
         hotkey.send(HotkeyMonitorEvent(role: .dictate, event: .pressed, instant: pressed))
         #expect(await waitUntil { c.state.isRecording })
-        try? await Task.sleep(for: .milliseconds(500))
+        try? await Task.sleep(for: .milliseconds(100))
         hotkey.send(HotkeyMonitorEvent(
-            role: .dictate, event: .released(submit: false), instant: pressed + .milliseconds(100)))
+            role: .dictate, event: .released(submit: false), instant: pressed + .milliseconds(10)))
         #expect(await waitUntil { c.isLatched })
         await c.cancelRecording()
     }
@@ -1479,29 +1344,23 @@ final class EventLog: @unchecked Sendable {
         let hotkey = FakeHotkey()
         let (c, output, _) = makeCoordinator(settings: separateSettings(), hotkeyMonitor: hotkey)
         c.holdThreshold = .milliseconds(20)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         hotkey.press(.toggle)
         #expect(await waitUntil { c.state.isRecording })
-        try? await Task.sleep(for: .milliseconds(60))
+        // Held for a step, past the threshold, and still it latches.
         hotkey.release(.toggle)
         #expect(await waitUntil { c.isLatched })
         #expect(c.state.isRecording)
-        // Past the bounce window, or the press would be taken for a bounce.
-        try? await Task.sleep(for: .milliseconds(80))
         hotkey.press(.toggle)
-        #expect(await waitUntil { c.inFlight != nil })
-        await c.inFlight?.value
+        await c.cycleFinished()
         #expect(output.inserted.count == 1)
     }
 
     @Test func pushToTalkStaysPlainWhenTheChordsDiffer() async {
         let hotkey = FakeHotkey()
         let (c, output, _) = makeCoordinator(settings: separateSettings(), hotkeyMonitor: hotkey)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.startIdle()
+        await c.press(hotkey)
         hotkey.release()
         #expect(await waitUntil { c.inFlight != nil })
         #expect(!c.isLatched)
@@ -1512,15 +1371,13 @@ final class EventLog: @unchecked Sendable {
     @Test func eitherChordEndsALatchedRecording() async {
         let hotkey = FakeHotkey()
         let (c, output, _) = makeCoordinator(settings: separateSettings(), hotkeyMonitor: hotkey)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         hotkey.press(.toggle)
         #expect(await waitUntil { c.state.isRecording })
         hotkey.release(.toggle)
         #expect(await waitUntil { c.isLatched })
         hotkey.press()
-        #expect(await waitUntil { c.inFlight != nil })
-        await c.inFlight?.value
+        await c.cycleFinished()
         #expect(output.inserted.count == 1)
     }
 
@@ -1539,19 +1396,17 @@ final class EventLog: @unchecked Sendable {
     }
 
     @Test func aHybridChordFollowsTheStandIn() async {
-        var settings = Settings(engineID: EchoEngine.engineID)
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.hotkey = .rightCommand
         settings.toggleHotkey = .rightCommand
         let hotkey = FakeHotkey()
         let (c, _, _) = makeCoordinator(settings: settings, hotkeyMonitor: hotkey)
         c.hotkeyOverride = .optionSpace
         c.holdThreshold = .seconds(2)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         // Not a second chord Carbon could not register: the stand-in is hybrid.
         #expect(hotkey.lastChords == [.dictate: .optionSpace])
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
         hotkey.release()
         #expect(await waitUntil { c.isLatched })
         await c.cancelRecording()
@@ -1559,24 +1414,22 @@ final class EventLog: @unchecked Sendable {
 
     @Test func theCapFiresInToggleMode() async {
         let hotkey = FakeHotkey()
-        let (c, output, _) = makeCoordinator(settings: hybridSettings(), hotkeyMonitor: hotkey)
+        let clock = ManualClock()
+        let (c, output, _) = makeCoordinator(settings: hybridSettings(), hotkeyMonitor: hotkey, clock: clock)
         c.holdThreshold = .seconds(2)
-        c.maximumDuration = .milliseconds(150)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.startIdle()
+        await c.press(hotkey)
         hotkey.release()
         #expect(await waitUntil { c.isLatched })
-        #expect(await waitUntil { c.inFlight != nil })
-        await c.inFlight?.value
+        #expect(await waitUntil { clock.sleeperCount >= 2 })
+        clock.advance(by: c.maximumDuration)
+        await c.cycleFinished()
         #expect(output.inserted.count == 1)
         #expect(output.submitted == [false])
         #expect(!c.isLatched)
         // The latch went with the recording: the next press starts afresh
         // rather than ending a recording that is no longer there.
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
         await c.cancelRecording()
     }
 
@@ -1585,10 +1438,8 @@ final class EventLog: @unchecked Sendable {
         let events = EventLog()
         let (c, output, capture) = makeCoordinator(
             settings: hybridSettings(), hotkeyMonitor: hotkey, events: events)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.startIdle()
+        await c.press(hotkey)
         hotkey.cancel()
         #expect(await waitUntil { c.state == .idle })
         #expect(!c.isLatched)
@@ -1597,95 +1448,34 @@ final class EventLog: @unchecked Sendable {
         #expect(events.names == ["recordingStarted"])
     }
 
-    @Test func toggleKeyChangeWhileRecordingStopsTheMicrophone() async {
-        let (c, output, capture) = makeCoordinator()
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
-        #expect(c.state.isRecording)
-        c.settings.toggleHotkey = Self.controlD
-        #expect(await waitUntil { c.state == .idle })
-        #expect(await capture.stopCount == 1)
-        #expect(output.inserted.isEmpty)
-    }
-
     @Test func aRefusedStartDoesNotLatch() async {
         let hotkey = FakeHotkey()
-        let registry = EngineRegistry([
-            .init(id: EngineID("flaky"), displayName: "Flaky", detail: "") { FlakyEngine(failures: 1) }
-        ])
-        var settings = Settings(engineID: EngineID("flaky"))
+        var settings = DictationSettings(engineID: EngineID("flaky"))
         settings.toggleHotkey = settings.hotkey
-        let capture = FakeCapture()
-        let c = DictationCoordinator(
-            settings: settings, registry: registry,
-            capture: capture, output: FakeOutput(),
-            hotkeyMonitor: hotkey, makePipeline: { _ in ProcessorPipeline([]) })
+        let (c, _, _) = makeCoordinator(
+            engines: [.serving(FlakyEngine(failures: 1))], settings: settings, hotkeyMonitor: hotkey)
         c.start()
         #expect(await waitUntil { c.state == .unavailable(.engineFailed(.loadFailed(detail: "boom"))) })
         // A tap while the engine is down: refused, and not remembered as a latch.
         hotkey.press()
         hotkey.release()
-        try? await Task.sleep(for: .milliseconds(80))
+        #expect(await waitUntil { c.handledHotkeyEvents == 2 })
         #expect(!c.isLatched)
         c.reloadEngine()
         #expect(await waitUntil { c.state == .idle })
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
         await c.cancelRecording()
     }
 
     // MARK: Bounce
 
-    @Test func withDeferralAReleaseStopsAfterTheBounceWindow() async {
-        let hotkey = FakeHotkey()
-        let (c, output, _) = makeCoordinator(hotkeyMonitor: hotkey)
-        c.deferReleases = true
-        c.bounceWindow = .milliseconds(30)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
-        hotkey.release()
-        try? await Task.sleep(for: .milliseconds(5))
-        #expect(c.state.isRecording)
-        #expect(await waitUntil { c.inFlight != nil })
-        await c.inFlight?.value
-        #expect(output.inserted.count == 1)
-    }
-
-    @Test func aBounceDuringSettleKeepsRecording() async {
-        let hotkey = FakeHotkey()
-        let (c, output, _) = makeCoordinator(hotkeyMonitor: hotkey)
-        c.deferReleases = true
-        c.bounceWindow = .milliseconds(30)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
-        // Release and bounce back inside the window, stamped so the loop's
-        // own scheduling cannot stretch the gap.
-        let released = ContinuousClock.now
-        hotkey.send(HotkeyMonitorEvent(role: .dictate, event: .released(submit: false), instant: released))
-        hotkey.send(HotkeyMonitorEvent(role: .dictate, event: .pressed, instant: released + .milliseconds(10)))
-        try? await Task.sleep(for: .milliseconds(100))
-        #expect(c.state.isRecording)
-        #expect(c.inFlight == nil)
-        hotkey.release()
-        #expect(await waitUntil { c.inFlight != nil })
-        await c.inFlight?.value
-        #expect(output.inserted.count == 1)
-    }
-
     @Test func aBounceIsAnnouncedOnce() async {
         let hotkey = FakeHotkey()
         let events = EventLog()
         let (c, _, _) = makeCoordinator(hotkeyMonitor: hotkey, events: events)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
-        let released = ContinuousClock.now
+        await c.startIdle()
+        await c.press(hotkey)
+        let released = hotkey.time + .seconds(1)
         hotkey.send(HotkeyMonitorEvent(role: .dictate, event: .released(submit: false), instant: released))
         hotkey.send(HotkeyMonitorEvent(role: .dictate, event: .pressed, instant: released + .milliseconds(10)))
         hotkey.send(HotkeyMonitorEvent(
@@ -1700,19 +1490,17 @@ final class EventLog: @unchecked Sendable {
 // MARK: - Escape
 
 @MainActor
-@Suite struct EscapeTests {
+@Suite(.timeLimit(.minutes(1))) struct EscapeTests {
     @Test func escapeDiscardsWithoutPastingAndAnnouncesIt() async {
         let hotkey = FakeHotkey()
         let events = EventLog()
         let (c, output, capture) = makeCoordinator(hotkeyMonitor: hotkey, events: events)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.startIdle()
+        await c.press(hotkey)
         hotkey.escape()
-        #expect(await waitUntil { c.state == .idle })
-        await c.inFlight?.value
-        try? await Task.sleep(for: .milliseconds(20))
+        // Handled means the cancel has run to its end, microphone included.
+        #expect(await waitUntil { c.handledHotkeyEvents == 2 })
+        #expect(c.state == .idle)
         #expect(await capture.stopCount == 1)
         #expect(output.inserted.isEmpty)
         // No `recordingStopped`, so no timing line; `recordingDiscarded` is
@@ -1724,13 +1512,11 @@ final class EventLog: @unchecked Sendable {
     @Test func theReleaseAfterEscapeDoesNothing() async {
         let hotkey = FakeHotkey()
         let (c, output, capture) = makeCoordinator(hotkeyMonitor: hotkey)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.startIdle()
+        await c.press(hotkey)
         hotkey.escape()
         hotkey.release()
-        try? await Task.sleep(for: .milliseconds(50))
+        #expect(await waitUntil { c.handledHotkeyEvents == 3 })
         #expect(c.state == .idle)
         #expect(c.inFlight == nil)
         #expect(await capture.stopCount == 1)
@@ -1741,10 +1527,9 @@ final class EventLog: @unchecked Sendable {
         let hotkey = FakeHotkey()
         let events = EventLog()
         let (c, _, capture) = makeCoordinator(hotkeyMonitor: hotkey, events: events)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        await c.startIdle()
         hotkey.escape()
-        try? await Task.sleep(for: .milliseconds(30))
+        #expect(await waitUntil { c.handledHotkeyEvents == 1 })
         #expect(c.state == .idle)
         #expect(events.names.isEmpty)
         #expect(await capture.stopCount == 0)
@@ -1752,15 +1537,13 @@ final class EventLog: @unchecked Sendable {
     }
 
     @Test func escapeWhileLatchedDiscards() async {
-        var settings = Settings(engineID: EchoEngine.engineID)
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.toggleHotkey = settings.hotkey
         let hotkey = FakeHotkey()
         let (c, output, _) = makeCoordinator(settings: settings, hotkeyMonitor: hotkey)
         c.holdThreshold = .seconds(2)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.startIdle()
+        await c.press(hotkey)
         hotkey.release()
         #expect(await waitUntil { c.isLatched })
         hotkey.escape()
@@ -1768,165 +1551,31 @@ final class EventLog: @unchecked Sendable {
         #expect(!c.isLatched)
         #expect(output.inserted.isEmpty)
         // Not latched any more: the next press starts a recording.
-        try? await Task.sleep(for: .milliseconds(80))
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
         await c.cancelRecording()
-    }
-
-    @Test func escapePressedRestoresTheOutputDevice() async {
-        var settings = Settings(engineID: EchoEngine.engineID)
-        settings.muteOutputWhileDictating = true
-        let muter = FakeOutputMuter()
-        let (c, _, _) = makeCoordinator(settings: settings, outputMuter: muter)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
-        await c.escapePressed()
-        #expect(await waitUntil { muter.endedCount == 1 })
     }
 
     @Test func theCancelKeyIsOnlyOnWhileRecording() async {
         let hotkey = FakeHotkey()
-        let (c, _, _) = makeCoordinator(hotkeyMonitor: hotkey)
-        c.maximumDuration = .milliseconds(60)
-        c.start()
-        #expect(await waitUntil { c.state == .idle })
+        let clock = ManualClock()
+        let (c, _, _) = makeCoordinator(hotkeyMonitor: hotkey, clock: clock)
+        await c.startIdle()
         // A dictation.
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        await c.press(hotkey)
         hotkey.release()
-        #expect(await waitUntil { c.inFlight != nil })
-        await c.inFlight?.value
+        await c.cycleFinished()
         #expect(hotkey.cancelKeyEnabled == [true, false])
-        // An interrupted press, past the bounce window of that release.
-        try? await Task.sleep(for: .milliseconds(80))
-        hotkey.press()
-        #expect(await waitUntil { c.state.isRecording })
+        // An interrupted press, a step past that release.
+        await c.press(hotkey)
         hotkey.cancel()
         #expect(await waitUntil { c.state == .idle })
         #expect(hotkey.cancelKeyEnabled == [true, false, true, false])
-        // The cap.
+        // The cap: it and the warm loop wait on the clock.
         await c.hotkeyPressed()
+        #expect(await waitUntil { clock.sleeperCount >= 2 })
+        clock.advance(by: c.maximumDuration)
         #expect(await waitUntil { !c.state.isRecording })
         await c.inFlight?.value
         #expect(hotkey.cancelKeyEnabled == [true, false, true, false, true, false])
-    }
-}
-
-@Suite struct SettingsStoreTests {
-    @Test func roundTrip() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        let url = dir.appendingPathComponent("settings.json")
-        let defaults = Settings(engineID: EchoEngine.engineID)
-        let store = SettingsStore(url: url, defaults: defaults)
-        #expect(store.load() == defaults)
-
-        var changed = defaults
-        changed.hotkey = .rightOption
-        changed.submitKey = Hotkey(0x24)
-        changed.polishDictations = true
-        changed.dictionary = [DictionaryEntry(from: "a", to: "b")]
-        try store.save(changed)
-        #expect(store.load() == changed)
-        try? FileManager.default.removeItem(at: dir)
-    }
-
-    @Test func missingKeysFallBackToDefaults() throws {
-        let json = #"{"engineID":"echo","dictionary":[{"id":"6E36117C-6200-4C7E-BFB8-6FA228542578","from":"a","to":"b","matchCase":false}]}"#
-        let decoded = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
-        #expect(decoded.engineID == EchoEngine.engineID)
-        #expect(decoded.dictionary.count == 1)
-        #expect(decoded.hotkey == .optionSpace)
-        #expect(decoded.submitKey == .keyV)
-        #expect(!decoded.polishDictations)
-        #expect(decoded.polishModel == .appleIntelligence)
-        #expect(decoded.appendTrailingSpace == true)
-        #expect(decoded.appearance == .system)
-        #expect(decoded.overlayStyle == .compact)
-        #expect(decoded.overlayGlass == true)
-        #expect(decoded.overlayAnimationSpeed == .quick)
-    }
-
-    @Test func legacyPolishChordMigratesToTheToggle() throws {
-        let json = #"{"engineID":"echo","polishHotkey":{"keyCodes":[59,31]}}"#
-        let decoded = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
-        #expect(decoded.polishDictations)
-        // The toggle stays off over a legacy chord stored empty.
-        let off = try JSONDecoder().decode(Settings.self, from: Data(#"{"engineID":"echo","polishHotkey":{"keyCodes":[]}}"#.utf8))
-        #expect(!off.polishDictations)
-    }
-
-    @Test func polishModelPersists() throws {
-        var settings = Settings(engineID: EchoEngine.engineID)
-        settings.polishModel = .s1Mini8Bit
-        let decoded = try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(settings))
-        #expect(decoded.polishModel == .s1Mini8Bit)
-    }
-
-    @Test func anUnknownPolishModelFallsBackToApples() throws {
-        // Written by a newer build that knows a model this one does not.
-        let json = #"{"engineID":"echo","polishDictations":true,"polishModel":"someFutureModel"}"#
-        let decoded = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
-        #expect(decoded.polishModel == .appleIntelligence)
-        #expect(decoded.polishDictations)
-    }
-
-    @Test func appearancePersists() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        let url = dir.appendingPathComponent("settings.json")
-        let defaults = Settings(engineID: EchoEngine.engineID)
-        let store = SettingsStore(url: url, defaults: defaults)
-        var changed = defaults
-        changed.appearance = .dark
-        try store.save(changed)
-        #expect(store.load() == changed)
-        try? FileManager.default.removeItem(at: dir)
-    }
-
-    @Test func overlayStylePersists() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        let url = dir.appendingPathComponent("settings.json")
-        let defaults = Settings(engineID: EchoEngine.engineID)
-        let store = SettingsStore(url: url, defaults: defaults)
-        var changed = defaults
-        changed.overlayStyle = .minimal
-        changed.overlayGlass = false
-        try store.save(changed)
-        #expect(store.load() == changed)
-
-        changed.overlayStyle = .liveTranscript
-        try store.save(changed)
-        #expect(store.load() == changed)
-        #expect(store.load().overlayStyle == .liveTranscript)
-        try? FileManager.default.removeItem(at: dir)
-    }
-
-    @Test func overlayAnimationSpeedPersists() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        let url = dir.appendingPathComponent("settings.json")
-        let defaults = Settings(engineID: EchoEngine.engineID)
-        let store = SettingsStore(url: url, defaults: defaults)
-        var changed = defaults
-        changed.overlayAnimationSpeed = .expressive
-        try store.save(changed)
-        #expect(store.load() == changed)
-
-        changed.overlayAnimationSpeed = .instant
-        try store.save(changed)
-        #expect(store.load().overlayAnimationSpeed == .instant)
-        try? FileManager.default.removeItem(at: dir)
-    }
-
-    @Test func unreadableFileIsMovedAsideNotOverwritten() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        let url = dir.appendingPathComponent("settings.json")
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        try Data("not json".utf8).write(to: url)
-        let store = SettingsStore(url: url, defaults: Settings(engineID: EchoEngine.engineID))
-        _ = store.load()
-        #expect(!FileManager.default.fileExists(atPath: url.path))
-        #expect(FileManager.default.fileExists(atPath: url.appendingPathExtension("broken").path))
-        try? FileManager.default.removeItem(at: dir)
     }
 }

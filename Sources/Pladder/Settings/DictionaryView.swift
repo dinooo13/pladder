@@ -192,8 +192,7 @@ struct DictionaryView: View {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             let data = try Data(contentsOf: url)
-            let imported = try JSONDecoder().decode([ImportedEntry].self, from: data)
-            merge(imported.map(\.entry))
+            merge(try JSONDecoder().decode([DictionaryEntry].self, from: data))
         } catch {
             errorMessage = String(localized: "Could not read that file. It should be a JSON array of { from, to, matchCase }.")
         }
@@ -213,55 +212,10 @@ struct DictionaryView: View {
         }
     }
 
-    /// Adds entries, overwriting an existing row with the same key instead of
-    /// creating a duplicate.
-    ///
-    /// A regular rule is keyed by its `from`. A custom word — an empty `from`,
-    /// which is how `CustomWordCorrector` reads its terms — has no `from` to key
-    /// on, so it is keyed by its `to` instead. Without that second key every
-    /// custom word would either be dropped on import or duplicated on every
-    /// re-import. A row with neither is nothing at all and is skipped.
+    /// Adds entries, overwriting an existing row with the same key instead
+    /// of creating a duplicate (see `DictionaryEntry.mergeKey`).
     private func merge(_ incoming: [DictionaryEntry]) {
-        var result = model.settings.dictionary
-        var indexByKey = [String: Int]()
-        for (index, entry) in result.enumerated() {
-            if let key = Self.mergeKey(for: entry) { indexByKey[key] = index }
-        }
-        for var entry in incoming {
-            guard let key = Self.mergeKey(for: entry) else { continue }
-            if let index = indexByKey[key] {
-                // Keep the existing identity so selection and focus survive.
-                entry.id = result[index].id
-                result[index] = entry
-            } else {
-                indexByKey[key] = result.count
-                result.append(entry)
-            }
-        }
-        model.settings.dictionary = result
-    }
-
-    /// `from:` for a replacement rule, `to:` for a custom word, nil for a row
-    /// with neither.
-    private static func mergeKey(for entry: DictionaryEntry) -> String? {
-        let from = entry.from.trimmingCharacters(in: .whitespaces)
-        if !from.isEmpty { return "from:" + from.lowercased() }
-        let to = entry.to.trimmingCharacters(in: .whitespaces)
-        if !to.isEmpty { return "to:" + to.lowercased() }
-        return nil
-    }
-}
-
-/// `DictionaryEntry`'s synthesised decoder requires every key. Files people write
-/// by hand rarely carry an `id`, so import goes through this looser shape.
-private struct ImportedEntry: Decodable {
-    var id: UUID?
-    var from: String
-    var to: String
-    var matchCase: Bool?
-
-    var entry: DictionaryEntry {
-        DictionaryEntry(id: id ?? UUID(), from: from, to: to, matchCase: matchCase ?? false)
+        model.settings.dictionary.merge(incoming)
     }
 }
 

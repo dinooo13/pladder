@@ -5,6 +5,8 @@ import Testing
 
 /// How a chord is spelled out for the user. Space is a fixed name, so none of
 /// this depends on the keyboard layout the test machine happens to use.
+/// Main actor bound like the names: a character key is read from the layout.
+@MainActor
 @Suite struct KeyNamesTests {
     private let leftOption: UInt16 = 0x3A
     private let rightOption: UInt16 = 0x3D

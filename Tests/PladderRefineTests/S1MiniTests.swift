@@ -1,12 +1,13 @@
 import Foundation
 import PladderCore
+import PladderTestSupport
 import Testing
 @testable import PladderRefine
 
-// Nothing here loads a model or touches the network: the downloads come from
-// a file URL, and the polisher is asked about a file that is not there.
+// Nothing here loads a model or touches the network: the polisher is asked
+// about a file that is not there, or given a stand-in for llama.cpp.
 
-@Suite struct S1MiniPromptTests {
+@Suite(.timeLimit(.minutes(1))) struct S1MiniPromptTests {
     @Test func thePromptIsQwensChatFormatWithAnEmptyThinkBlock() {
         // What S1-mini's own chat template renders with enable_thinking=False,
         // taken from its tokenizer: the model was trained on exactly this.
@@ -35,7 +36,7 @@ import Testing
         let sentence = "One two three four five six seven eight nine ten."
         let text = Array(repeating: sentence, count: 50).joined(separator: " ")  // 500 words
         #expect(TranscriptPolisher.chunks(of: text).count == 1)
-        let chunks = TranscriptPolisher.chunks(
+        let chunks = PolishChunking.chunks(
             of: text, threshold: S1MiniPolisher.chunkThreshold, size: S1MiniPolisher.chunkSize)
         #expect(chunks.count == 2)
         #expect(chunks.joined(separator: " ") == text)
@@ -64,57 +65,184 @@ import Testing
     }
 }
 
-@Suite struct ModelFilesTests {
-    private func scratch() throws -> URL {
-        let dir = FileManager.default.temporaryDirectory.appending(path: "ModelFilesTests-" + UUID().uuidString)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir
+/// A loaded model that answers with `answer`, in place of llama.cpp.
+private struct StandInModel: PromptCompleter {
+    let answer: @Sendable (_ suffix: String) async throws -> String
+
+    func complete(suffix: String, maxTokens: Int, deadline: ContinuousClock.Instant) async throws -> String {
+        try await answer(suffix)
+    }
+}
+
+@Suite(.timeLimit(.minutes(1))) struct S1MiniLoadTests {
+    /// A polisher over a file that is there, loaded by `load`.
+    private func polisher(
+        timeout: Duration, load: @escaping S1MiniPolisher.Loader
+    ) throws -> (S1MiniPolisher, URL) {
+        let dir = try scratchDirectory("S1MiniLoadTests")
+        let location = dir.appending(path: "model.gguf")
+        try Data("weights".utf8).write(to: location)
+        let polisher = S1MiniPolisher(
+            file: .s1Mini8Bit, location: location, timeout: timeout, control: S1MiniPolisher.controlLine, load: load)
+        return (polisher, dir)
     }
 
-    private func source(in dir: URL, contents: String) throws -> URL {
-        let url = dir.appending(path: "source.bin")
-        try Data(contents.utf8).write(to: url)
-        return url
-    }
-
-    @Test func aDownloadThatMatchesItsChecksumBecomesReady() async throws {
-        let dir = try scratch()
+    // The first dictation after launch: the load (and on a first launch
+    // Metal's shader compile) is still running when the budget runs out.
+    // Before: the polish waited for the load however long it took, here the
+    // gate's two seconds, and pasted late.
+    @Test func aLoadPastTheBudgetPastesAsDictatedAndTheNextDictationGetsTheModel() async throws {
+        let gate = Gate()
+        let loads = Recorder<Int>()
+        let (polisher, dir) = try polisher(timeout: .milliseconds(40)) { _, _ in
+            loads.append(1)
+            await gate.wait()
+            return StandInModel { _ in "Send it on Friday." }
+        }
         defer { try? FileManager.default.removeItem(at: dir) }
-        let file = ModelFile(
-            fileName: "model.gguf", url: try source(in: dir, contents: "weights"),
-            // SHA-256 of "weights".
-            sha256: "9a129038d9a00aed0cf6a7ea059ca50a813449061ab87848cf1a13eafdf33b2c",
-            byteCount: 7)
-        let files = ModelFiles(directory: dir.appending(path: "models"))
-        #expect(await files.status(of: file) == .missing)
-        await files.ensure(file)
-        #expect(await files.finished(file) == .ready)
-        #expect(try String(contentsOf: files.location(of: file), encoding: .utf8) == "weights")
+
+        let started = ContinuousClock.now
+        let report = await polisher.polish("send it on friday")
+        #expect(report.text == nil)
+        #expect(report.failure == "still loading")
+        #expect(ContinuousClock.now - started < .seconds(1))
+
+        // The load carried on in the background; nothing restarted it.
+        await gate.open()
+        await polisher.prepare()
+        #expect(await polisher.refine("send it on friday") == "Send it on Friday.")
+        #expect(loads.all.count == 1)
     }
 
-    @Test func aDownloadThatDoesNotMatchIsDeletedAndNeverUsed() async throws {
-        let dir = try scratch()
+    @Test func anAnswerCutOffByTheTokenBudgetPastesAsDictated() async throws {
+        let (polisher, dir) = try polisher(timeout: .seconds(5)) { _, _ in
+            StandInModel { _ in throw LlamaModel.Failure.truncated }
+        }
         defer { try? FileManager.default.removeItem(at: dir) }
-        let file = ModelFile(
-            fileName: "model.gguf", url: try source(in: dir, contents: "tampered"),
-            sha256: "9a129038d9a00aed0cf6a7ea059ca50a813449061ab87848cf1a13eafdf33b2c",
-            byteCount: 8)
-        let models = dir.appending(path: "models")
-        let files = ModelFiles(directory: models)
-        await files.ensure(file)
-        #expect(await files.finished(file) == .failed(.checksum))
-        #expect(!FileManager.default.fileExists(atPath: files.location(of: file).path))
-        #expect(try FileManager.default.contentsOfDirectory(atPath: models.path).isEmpty)
+        let report = await polisher.polish("send it on friday and copy anna")
+        #expect(report.text == nil)
+        #expect(report.failure == "answer cut off")
     }
 
-    @Test func aMissingSourceFailsAsADownload() async throws {
-        let dir = try scratch()
+    @Test func aLoadThatFailsPastesAsDictated() async throws {
+        let (polisher, dir) = try polisher(timeout: .seconds(5)) { _, _ in throw LlamaModel.Failure.load }
         defer { try? FileManager.default.removeItem(at: dir) }
-        let file = ModelFile(
-            fileName: "model.gguf", url: dir.appending(path: "nowhere.bin"),
-            sha256: String(repeating: "0", count: 64), byteCount: 1)
-        let files = ModelFiles(directory: dir.appending(path: "models"))
-        await files.ensure(file)
-        #expect(await files.finished(file) == .failed(.download))
+        let report = await polisher.polish("send it on friday")
+        #expect(report.text == nil)
+        #expect(report.failure == "model did not load")
+    }
+
+    @Test func aLoadInterruptedByUnloadIsDropped() async throws {
+        let gate = Gate()
+        let loads = Recorder<Int>()
+        let (polisher, dir) = try polisher(timeout: .milliseconds(40)) { _, _ in
+            loads.append(1)
+            let number = loads.all.count
+            if number == 1 { await gate.wait() }
+            return StandInModel { _ in number == 1 ? "First." : "Second." }
+        }
+        defer { try? FileManager.default.removeItem(at: dir) }
+        _ = await polisher.polish("send it")
+        await polisher.unload()
+        await gate.open()
+        // Time for the first load to finish and try to store its model.
+        // The right answer does not depend on it: either way the next call
+        // starts a load of its own.
+        try await Task.sleep(for: .milliseconds(20))
+        #expect(await polisher.refine("send it") == "Second.")
+    }
+
+    // Before: `unload()` forgot the running load, so polish off and on again
+    // during a load started a second one while the first still read its
+    // weights, and both models were resident at once.
+    @Test func aLoadAfterUnloadWaitsForTheAbandonedOneToBeFreed() async throws {
+        let gate = Gate()
+        let resident = Resident()
+        let loadsStarted = Recorder<Int>()
+        let (polisher, dir) = try polisher(timeout: .milliseconds(40)) { _, _ in
+            // How many models were alive when this load began.
+            loadsStarted.append(resident.count)
+            if loadsStarted.all.count == 1 { await gate.wait() }
+            return CountedModel(resident)
+        }
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        _ = await polisher.polish("send it")
+        await polisher.unload()
+        let second = Task { await polisher.prepare() }
+        try await Task.sleep(for: .milliseconds(30))
+        // The second load waits for the first instead of starting beside it.
+        #expect(loadsStarted.all == [0])
+        await gate.open()
+        await second.value
+        // The first model was dropped and freed before the second was read.
+        #expect(loadsStarted.all == [0, 0])
+        #expect(resident.count == 1)
+        #expect(await polisher.refine("send it") == "Counted.")
+    }
+}
+
+/// Counts the stand-in models alive, the way the weights would be resident.
+private final class Resident: Sendable {
+    private let state = Recorder<Int>()
+    var count: Int { state.all.reduce(0, +) }
+    func add(_ delta: Int) { state.append(delta) }
+}
+
+private final class CountedModel: PromptCompleter {
+    private let resident: Resident
+    init(_ resident: Resident) {
+        self.resident = resident
+        resident.add(1)
+    }
+    deinit { resident.add(-1) }
+    func complete(suffix: String, maxTokens: Int, deadline: ContinuousClock.Instant) async throws -> String {
+        "Counted."
+    }
+}
+
+@Suite(.timeLimit(.minutes(1))) struct LlamaGenerationTests {
+    private let later = ContinuousClock.now + .seconds(60)
+
+    /// Hands out `pieces` one per step, then `.end` when `ends`, and more
+    /// text for as long as it is asked after that.
+    private func steps(_ pieces: [String], ends: Bool) -> () -> LlamaModel.Step {
+        var queue = pieces.map { LlamaModel.Step.piece(Array($0.utf8)) }
+        if ends { queue.append(.end) }
+        return { queue.isEmpty ? .piece(Array(" and more".utf8)) : queue.removeFirst() }
+    }
+
+    @Test func anAnswerThatEndsIsReturnedWhole() throws {
+        let text = try LlamaModel.generate(limit: 10, deadline: later, next: steps(["Send", " it", " Friday."], ends: true))
+        #expect(text == "Send it Friday.")
+    }
+
+    @Test func theEndMayBeTheLastStepTheLimitAllows() throws {
+        let text = try LlamaModel.generate(limit: 4, deadline: later, next: steps(["Send", " it", " Friday."], ends: true))
+        #expect(text == "Send it Friday.")
+    }
+
+    // Before: the loop stopped at the limit and returned "Send it Friday",
+    // which was pasted with the rest of the dictation gone.
+    @Test func anAnswerCutOffByTheLimitIsAFailureNotAShortAnswer() {
+        #expect(throws: LlamaModel.Failure.truncated) {
+            try LlamaModel.generate(limit: 3, deadline: later, next: steps(["Send", " it", " Friday", " and copy Anna."], ends: true))
+        }
+        #expect(throws: LlamaModel.Failure.truncated) {
+            try LlamaModel.generate(limit: 8, deadline: later, next: steps(["Send"], ends: false))
+        }
+    }
+
+    @Test func aCharacterSplitAcrossTwoPiecesIsDecodedWhole() throws {
+        let umlaut = Array("ü".utf8)
+        var queue: [LlamaModel.Step] = [.piece(Array("gr".utf8) + [umlaut[0]]), .piece([umlaut[1]] + Array("n".utf8)), .end]
+        let text = try LlamaModel.generate(limit: 5, deadline: later) { queue.removeFirst() }
+        #expect(text == "grün")
+    }
+
+    @Test func pastTheDeadlineIsATimeout() {
+        #expect(throws: LlamaModel.Failure.timedOut) {
+            try LlamaModel.generate(limit: 5, deadline: .now - .seconds(1), next: steps(["Send"], ends: true))
+        }
     }
 }

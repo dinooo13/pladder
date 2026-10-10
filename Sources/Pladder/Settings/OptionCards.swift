@@ -69,13 +69,7 @@ struct DesktopThumbnail<Content: View>: View {
     private var resolved: ColorScheme { scheme ?? environmentScheme }
 
     var body: some View {
-        LinearGradient(
-            colors: resolved == .dark
-                ? [Color(red: 0.30, green: 0.36, blue: 0.70), Color(red: 0.10, green: 0.12, blue: 0.32)]
-                : [Color(red: 0.62, green: 0.78, blue: 0.97), Color(red: 0.24, green: 0.46, blue: 0.88)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        DesktopWash(scheme: resolved)
         // Overlay rather than ZStack: a scaled-down pill still lays out at
         // its full size, and in a ZStack that would stretch the gradient so
         // the card only shows its middle. The card clips whatever hangs out.
@@ -110,7 +104,7 @@ struct AppearanceThumbnail: View {
 
     private func desktop(_ scheme: ColorScheme) -> some View {
         DesktopThumbnail(scheme: scheme) {
-            OverlayPill(state: .recording(level: 0.55), style: .compact, glass: glass, isPreview: true)
+            OverlayPill(state: .recording, level: 0.55, style: .compact, glass: glass, isPreview: true)
                 .scaleEffect(0.5)
         }
         .overlay(alignment: .top) {
@@ -150,8 +144,6 @@ struct OverlayStyleThumbnail: View {
     let style: OverlayStyle
     let glass: Bool
 
-    @Environment(\.colorScheme) private var scheme
-
     private static let previewLevel: Float = 0.55
 
     var body: some View {
@@ -164,12 +156,12 @@ struct OverlayStyleThumbnail: View {
     private var content: some View {
         switch style {
         case .compact:
-            OverlayPill(state: .recording(level: Self.previewLevel), style: .compact, glass: glass, isPreview: true)
+            OverlayPill(state: .recording, level: Self.previewLevel, style: .compact, glass: glass, isPreview: true)
                 .scaleEffect(0.5)
         case .minimal:
             // The disc is 44 pt; at 0.75 it reads as a disc without turning
             // into a dot.
-            OverlayPill(state: .recording(level: Self.previewLevel), style: .minimal, glass: glass, isPreview: true)
+            OverlayPill(state: .recording, level: Self.previewLevel, style: .minimal, glass: glass, isPreview: true)
                 .scaleEffect(0.75)
         case .menuBar:
             // Nothing on the desktop at all: the wave in the menu bar is the
@@ -181,7 +173,8 @@ struct OverlayStyleThumbnail: View {
             // scaled to about 72 pt: the words are small but read as words,
             // which is what tells this style from Compact.
             OverlayPill(
-                state: .recording(level: Self.previewLevel),
+                state: .recording,
+                level: Self.previewLevel,
                 style: .liveTranscript,
                 glass: glass,
                 isPreview: true,
@@ -204,7 +197,7 @@ struct OverlayStyleThumbnail: View {
             .fill(.white.opacity(0.2))
             .frame(height: 9)
             .overlay(alignment: .trailing) {
-                Image(nsImage: MenuBarIcon.image(for: .recording(level: Self.previewLevel)))
+                Image(nsImage: MenuBarIcon.image(for: .recording, level: Self.previewLevel))
                     .resizable()
                     .renderingMode(.template)
                     .aspectRatio(contentMode: .fit)
@@ -223,7 +216,7 @@ struct BackgroundThumbnail: View {
 
     var body: some View {
         DesktopThumbnail {
-            OverlayPill(state: .recording(level: 0.55), style: .compact, glass: glass, isPreview: true)
+            OverlayPill(state: .recording, level: 0.55, style: .compact, glass: glass, isPreview: true)
                 .scaleEffect(0.5)
         }
     }
@@ -251,5 +244,21 @@ struct AnimationSpeedThumbnail: View {
         case .quick: "hare.fill"
         case .expressive: "tortoise.fill"
         }
+    }
+}
+
+/// The diagonal wash a stand-in desktop is painted with, in the option cards
+/// and the README screenshots alike.
+struct DesktopWash: View {
+    let scheme: ColorScheme
+
+    var body: some View {
+        LinearGradient(
+            colors: scheme == .dark
+                ? [Color(red: 0.30, green: 0.36, blue: 0.70), Color(red: 0.10, green: 0.12, blue: 0.32)]
+                : [Color(red: 0.62, green: 0.78, blue: 0.97), Color(red: 0.24, green: 0.46, blue: 0.88)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
     }
 }

@@ -1,8 +1,8 @@
 import Foundation
 
 /// Turns raw keyboard transitions into presses and releases of a `Hotkey`
-/// chord. `GlobalHotkeyMonitor` feeds it from an event tap; tests feed it
-/// directly. Pure value type, no I/O.
+/// chord. `HotkeyChordSet` runs one per role and feeds them all every event
+/// from the tap; tests feed it directly. Pure value type, no I/O.
 ///
 /// Rules:
 /// - The chord *engages* when one of its keys goes down and, at that moment,
@@ -34,6 +34,18 @@ import Foundation
 ///   pass through to other applications untouched. Arming only happens on a
 ///   press event after engagement — holding the submit key before the hotkey
 ///   does not arm a release that never saw the submit press.
+/// - A *lost key-up* must not leave a regular key held for good. A tap can
+///   miss one: Secure Event Input stops key events reaching it while
+///   `flagsChanged` keeps flowing, and a stale Space would let a lone Option,
+///   an Option-click say, press Option+Space. Two rules cover it. Once the
+///   chord's modifiers stop being held, a regular key of the chord held from
+///   before no longer counts: a chord with a regular key re-engages only on a
+///   fresh key-down of it, never on its modifiers alone. And a key cannot go
+///   down twice, so a non-repeat key-down of a key still counted as
+///   swallowed means its key-up was lost: it is forgotten, so the next Space
+///   typed reaches the app, and taken again only if it is the chord's. The
+///   price is a real Space held across letting go of Option: pressing Option
+///   again does not re-engage, and the Space has to be pressed again.
 ///
 /// Modifier state is passed in as the full set of held modifier key codes with
 /// every event rather than as individual transitions: the flags on each event
@@ -98,7 +110,11 @@ public struct HotkeyChordTracker: Sendable, Equatable {
             return Outcome(event: transition(from: wasEngaged), swallow: swallowedKeys.contains(key))
         }
         heldKeys.insert(key)
-        var swallow = swallowedKeys.contains(key)
+        // Not a repeat, so any key-up still owed for this key was lost (see
+        // the type's comment): the branches below take it again if it is
+        // ours, and otherwise it reaches the app.
+        swallowedKeys.remove(key)
+        var swallow = false
         if isEngaged {
             if submitKey.regularKeyCodes.contains(key) {
                 // Part of the submit chord: swallow it so an app never sees a
@@ -107,7 +123,12 @@ public struct HotkeyChordTracker: Sendable, Equatable {
                 swallowedKeys.insert(key)
                 swallow = true
                 armIfSubmitChordHeld()
-            } else if !hotkey.keyCodes.contains(key) {
+            } else if hotkey.keyCodes.contains(key) {
+                // The chord's own key down again mid-press: its key-up was
+                // lost and the chord is still held. Still the chord's.
+                swallowedKeys.insert(key)
+                swallow = true
+            } else {
                 disengage(interruptedAt: instant)
             }
         } else if hotkey.keyCodes.contains(key), chordIsHeld {
@@ -148,14 +169,23 @@ public struct HotkeyChordTracker: Sendable, Equatable {
 
     private mutating func applyModifiers(_ modifiers: Set<UInt16>, at instant: ContinuousClock.Instant) {
         let pressed = modifiers.subtracting(heldModifiers)
-        heldModifiers = modifiers
         let chordModifiers = matching(hotkey.modifierKeyCodes)
+        let hadChordModifiers = chordModifiers.isSubset(of: matching(heldModifiers))
+        heldModifiers = modifiers
+        let hasChordModifiers = chordModifiers.isSubset(of: matching(modifiers))
+        if hadChordModifiers, !hasChordModifiers {
+            // The lost key-up rule: from here on the regular key counts only
+            // once it goes down again. Still swallowed until its key-up, if
+            // that ever comes. A modifier-less chord never gets here, and so
+            // still engages on its key alone.
+            heldKeys.subtract(hotkey.regularKeyCodes)
+        }
         if isEngaged {
             // The submit key is matched by side, so it is taken out before the
             // rest is folded: the other side of it is a foreign modifier like
             // any other.
             let foreign = pressed.subtracting(submitKey.modifierKeyCodes)
-            if !chordModifiers.isSubset(of: matching(heldModifiers)) {
+            if !hasChordModifiers {
                 // A chord modifier is no longer held: an ordinary release,
                 // whenever it came. Asked of what is still down rather than of
                 // what went up, so letting go of a redundant Left Option while

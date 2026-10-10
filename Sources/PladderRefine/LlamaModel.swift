@@ -18,6 +18,9 @@ final class LlamaModel: @unchecked Sendable {
         case decode(Int32)
         case contextFull
         case timedOut
+        /// The token budget ran out before the model ended its answer: the
+        /// end of the dictation would be missing, so it is not used.
+        case truncated
     }
 
     /// Context length in tokens. The key-value cache is allocated for all of
@@ -35,11 +38,26 @@ final class LlamaModel: @unchecked Sendable {
 
     /// Loads the model onto the GPU and decodes `prefix`. Blocking; call from
     /// `load(path:prefix:)`.
+    ///
+    /// The order matters. `deinit` only runs once every stored property is
+    /// set, so anything that can throw before then frees what is already
+    /// allocated itself: the prefix is tokenized (it needs only the
+    /// vocabulary, which belongs to the model) before the context, with its
+    /// key-value cache on the GPU, exists. From the last assignment on, a
+    /// throw runs `deinit`, which frees all three.
     private init(path: String, prefix: String) throws {
         _ = Self.backend
         var modelParams = llama_model_default_params()
         modelParams.n_gpu_layers = -1
         guard let model = llama_model_load_from_file(path, modelParams) else { throw Failure.load }
+        let vocab: OpaquePointer = llama_model_get_vocab(model)
+        let prefixTokens: [llama_token]
+        do {
+            prefixTokens = try Self.tokenize(prefix, vocab: vocab)
+        } catch {
+            llama_model_free(model)
+            throw error
+        }
         var contextParams = llama_context_default_params()
         contextParams.n_ctx = Self.contextLength
         contextParams.n_batch = Self.contextLength
@@ -48,13 +66,14 @@ final class LlamaModel: @unchecked Sendable {
             llama_model_free(model)
             throw Failure.load
         }
+        let sampler: UnsafeMutablePointer<llama_sampler> = llama_sampler_chain_init(llama_sampler_chain_default_params())
+        llama_sampler_chain_add(sampler, llama_sampler_init_greedy())
         self.model = model
         self.context = context
-        vocab = llama_model_get_vocab(model)
-        sampler = llama_sampler_chain_init(llama_sampler_chain_default_params())
-        llama_sampler_chain_add(sampler, llama_sampler_init_greedy())
-        self.prefix = try Self.tokenize(prefix, vocab: vocab)
-        try decode(self.prefix)
+        self.vocab = vocab
+        self.sampler = sampler
+        self.prefix = prefixTokens
+        try decode(prefixTokens)
     }
 
     deinit {
@@ -73,8 +92,9 @@ final class LlamaModel: @unchecked Sendable {
     }
 
     /// Greedy continuation of the prefix with `suffix`, up to an end-of-turn
-    /// token, `maxTokens` or `deadline`, whichever comes first. The deadline
-    /// is checked between tokens, so an answer can overrun it by one token.
+    /// token. Throws `.truncated` when `maxTokens` (or the room left in the
+    /// context) runs out first, and `.timedOut` past `deadline`, which is
+    /// checked between tokens, so an answer can overrun it by one token.
     func complete(suffix: String, maxTokens: Int, deadline: ContinuousClock.Instant) async throws -> String {
         try await withCheckedThrowingContinuation { continuation in
             queue.async {
@@ -103,22 +123,48 @@ final class LlamaModel: @unchecked Sendable {
         guard ContinuousClock.now < deadline else { throw Failure.timedOut }
         try decode(input)
 
-        var bytes: [CChar] = []
         var piece = [CChar](repeating: 0, count: 256)
-        for _ in 0..<min(maxTokens, room) {
-            guard ContinuousClock.now < deadline else { throw Failure.timedOut }
+        return try Self.generate(limit: min(maxTokens, room), deadline: deadline) {
             var token = llama_sampler_sample(sampler, context, -1)
-            if llama_vocab_is_eog(vocab, token) { break }
+            if llama_vocab_is_eog(vocab, token) { return .end }
             let count = llama_token_to_piece(vocab, token, &piece, Int32(piece.count), 0, false)
-            if count > 0 { bytes.append(contentsOf: piece[0..<Int(count)]) }
+            let bytes = count > 0 ? piece[0..<Int(count)].map { UInt8(bitPattern: $0) } : []
             try withUnsafeMutablePointer(to: &token) { pointer in
                 let status = llama_decode(context, llama_batch_get_one(pointer, 1))
                 if status != 0 { throw Failure.decode(status) }
             }
+            return .piece(bytes)
         }
-        // Pieces are bytes; a multi-byte character may span two of them, so
-        // the text is only decoded once it is whole.
-        return String(decoding: bytes.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+    }
+
+    /// One step of generation as the loop sees it: the end of the answer, or
+    /// the bytes of one more token.
+    enum Step: Equatable {
+        case end
+        case piece([UInt8])
+    }
+
+    /// The generation loop, apart from llama.cpp so the tests can drive it
+    /// with a stand-in: pulls steps from `next` until one is `.end`. Running
+    /// out of `limit` first is a failure, not a short answer, since the cut
+    /// would fall mid-dictation and the coordinator would paste the rest
+    /// away; the text as dictated is the better paste.
+    static func generate(
+        limit: Int, deadline: ContinuousClock.Instant, next: () throws -> Step
+    ) throws -> String {
+        var bytes: [UInt8] = []
+        for _ in 0..<max(limit, 0) {
+            guard ContinuousClock.now < deadline else { throw Failure.timedOut }
+            switch try next() {
+            case .end:
+                // Pieces are bytes; a multi-byte character may span two of
+                // them, so the text is only decoded once it is whole.
+                return String(decoding: bytes, as: UTF8.self)
+            case .piece(let piece):
+                bytes.append(contentsOf: piece)
+            }
+        }
+        throw Failure.truncated
     }
 
     private func decode(_ tokens: [llama_token]) throws {

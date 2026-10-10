@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
-import Observation
 import PladderCore
+import PladderSystem
 
 /// Mirrors the coordinator's state onto the overlay panel and decides when the
 /// pill appears and disappears.
@@ -14,6 +14,8 @@ final class OverlayController {
     private var hideTask: Task<Void, Never>?
     private var presentTask: Task<Void, Never>?
     private var running = false
+    private let stateLoop = ObservationLoop()
+    private let levelLoop = ObservationLoop()
     private var visible = false
     /// The pill is being held up across a polish pass. It leaves by the dive
     /// like a pasted dictation, not by the fade, and that has to hold even
@@ -41,11 +43,14 @@ final class OverlayController {
         guard !running else { return }
         running = true
         observe()
+        observeLevel()
         apply(coordinator.state)
     }
 
     func stop() {
         running = false
+        stateLoop.stop()
+        levelLoop.stop()
         cancelPresent()
         hideTask?.cancel()
         panel.orderOut(nil)
@@ -53,12 +58,11 @@ final class OverlayController {
         holdingDisc = false
     }
 
-    /// Pushes the app's appearance onto the panel. Borderless panels that are
-    /// never key or main do not reliably follow an `NSApp.appearance` change
-    /// after creation, so it is set explicitly.
+    /// Pushes the app's appearance onto the pill's SwiftUI scheme. The panel
+    /// itself takes it at every `show`: a borderless panel that is never key
+    /// or main does not reliably follow an `NSApp.appearance` change.
     func applyAppearance(_ appearance: Appearance) {
         model.appearance = appearance
-        panel.appearance = appearance == .system ? NSApp.appearance : NSAppearance(named: appearance == .dark ? .darkAqua : .aqua)
     }
 
     /// Pushes the overlay style and background choice onto the model, which
@@ -74,20 +78,31 @@ final class OverlayController {
         model.speed = speed
     }
 
-    /// `withObservationTracking` fires once per change, so we re-arm it every
-    /// time. The callback runs *before* the new value is stored, hence the hop
-    /// onto a task to read it.
     private func observe() {
-        withObservationTracking {
+        stateLoop.start { [coordinator] in
             _ = coordinator.state
             // Read so a new partial re-arms this too: between two passes the
             // state stays `.recording` and nothing else would fire.
             _ = coordinator.partialTranscript
         } onChange: { [weak self] in
-            Task { @MainActor [weak self] in
-                guard let self, self.running else { return }
-                self.apply(self.coordinator.state)
-                self.observe()
+            guard let self else { return }
+            self.apply(self.coordinator.state)
+        }
+    }
+
+    /// The meter's level, on its own loop: it changes twenty times a second
+    /// while recording, and only the bars need to hear about it, not the
+    /// presentation logic `apply` runs.
+    private func observeLevel() {
+        levelLoop.start { [coordinator] in
+            _ = coordinator.inputLevel
+        } onChange: { [weak self] in
+            guard let self else { return }
+            // Only while recording: at the release the pill gathers from
+            // the row it was showing, last level included, and the level
+            // dropping to zero would flatten the bars mid-gather.
+            if self.coordinator.state.isRecording {
+                self.model.level = self.coordinator.inputLevel
             }
         }
     }

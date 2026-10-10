@@ -13,13 +13,21 @@ import Foundation
 /// 3. `CorrectionDiff` finds the corrected words.
 /// 4. Pairs already in the dictionary, or dismissed before, are dropped.
 /// 5. `PhoneticGate` drops what does not sound alike.
-/// 6. The reviewer, the on-device model, says yes or no to each survivor.
+/// 6. The reviewer, the on-device model, says yes or no to each survivor,
+///    each question only once `waitUntilQuiet` lets it through.
 /// 7. Each yes is handed to `onProposal`, at most
 ///    `maximumProposalsPerPaste` of them.
 ///
 /// A second paste while the first is still being watched just starts its own
 /// task; the observer finishes the first watch early with what it has, and
 /// both are diffed and reviewed on their own.
+///
+/// The reviewer and the polish share the system's language model, which
+/// answers one request at a time, so a review still running when a polished
+/// dictation is released would eat into that dictation's polish budget.
+/// `waitUntilQuiet` is the app's way to hold reviews while a recording or a
+/// dictation is in flight; it is awaited before every question, never while
+/// one is being answered.
 public final class CorrectionLearner: Sendable {
     public static let maximumProposalsPerPaste = 3
     /// The context the reviewer sees around a pair, in characters.
@@ -30,16 +38,19 @@ public final class CorrectionLearner: Sendable {
     private let dismissed: DismissedCorrections
     private let dictionary: @Sendable () async -> [DictionaryEntry]
     private let log: @Sendable (String) -> Void
+    private let waitUntilQuiet: @Sendable () async -> Void
     private let onProposal: @Sendable (CorrectionProposal) -> Void
 
     /// `log` receives one line per stage, with the words in it; the caller
-    /// decides how private that is.
+    /// decides how private that is. `waitUntilQuiet` returns when the
+    /// language model is free for a review; the default never holds one.
     public init(
         observer: any PastedTextObserver,
         reviewer: any CorrectionReviewer,
         dismissed: DismissedCorrections,
         dictionary: @escaping @Sendable () async -> [DictionaryEntry],
         log: @escaping @Sendable (String) -> Void = { _ in },
+        waitUntilQuiet: @escaping @Sendable () async -> Void = {},
         onProposal: @escaping @Sendable (CorrectionProposal) -> Void
     ) {
         self.observer = observer
@@ -47,6 +58,7 @@ public final class CorrectionLearner: Sendable {
         self.dismissed = dismissed
         self.dictionary = dictionary
         self.log = log
+        self.waitUntilQuiet = waitUntilQuiet
         self.onProposal = onProposal
     }
 
@@ -69,15 +81,12 @@ public final class CorrectionLearner: Sendable {
         log("\(pairs.count) candidates")
         guard !pairs.isEmpty else { return }
 
-        let known = Set(await dictionary().compactMap { entry -> String? in
-            let from = entry.from.trimmingCharacters(in: .whitespaces).lowercased()
-            return from.isEmpty ? nil : from
-        })
+        let rules = await dictionary()
         var seen: Set<String> = []
         var proposed = 0
         for pair in pairs where seen.insert(pair.key).inserted {
             let name = "\(pair.heard) → \(pair.corrected)"
-            if known.contains(pair.heard.lowercased()) {
+            if rules.hasRule(for: pair.heard) {
                 log("in the dictionary \(name)")
                 continue
             }
@@ -89,6 +98,7 @@ public final class CorrectionLearner: Sendable {
                 log("gate dropped \(name)")
                 continue
             }
+            await waitUntilQuiet()
             do {
                 let yes = try await reviewer.isReusableCorrection(
                     heard: pair.heard, corrected: pair.corrected,
@@ -99,9 +109,26 @@ public final class CorrectionLearner: Sendable {
                 proposed += 1
                 if proposed >= Self.maximumProposalsPerPaste { return }
             } catch {
-                log("review failed \(name): \(error)")
+                log("review failed \(name): \(Self.describe(error))")
             }
         }
+    }
+
+    /// The error's type and case, never its payload or description: a
+    /// framework error can quote the prompt, and the prompt is the user's
+    /// words. The same rule as the polisher's log.
+    static func describe(_ error: any Error) -> String {
+        let name = String(describing: type(of: error))
+        if type(of: error) is NSError.Type {
+            let error = error as NSError
+            return "\(name) \(error.domain) \(error.code)"
+        }
+        let mirror = Mirror(reflecting: error)
+        guard mirror.displayStyle == .enum else { return name }
+        // A case with a payload is the label of its one child.
+        if let label = mirror.children.first?.label { return "\(name).\(label)" }
+        // One without carries no data, so its description cannot quote any.
+        return "\(name).\(String(describing: error))"
     }
 
     /// The pasted text, cut to `limit` characters around `heard` when it is

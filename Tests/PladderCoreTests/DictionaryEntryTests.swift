@@ -55,3 +55,48 @@ import Testing
         #expect(replacer.apply(to: "a b claude code") == "a b Claude Code")
     }
 }
+
+@Suite struct DictionaryMergeTests {
+    @Test func aRuleWithTheSameHeardAsOverwritesAndKeepsItsID() {
+        let existing = DictionaryEntry(from: " Clode Code ", to: "claude code", matchCase: true)
+        var entries = [existing]
+        entries.merge([DictionaryEntry(from: "clode code", to: "Claude Code")])
+        #expect(entries.count == 1)
+        #expect(entries[0].id == existing.id)
+        #expect(entries[0].to == "Claude Code")
+        #expect(entries[0].matchCase == false)
+    }
+
+    @Test func aCustomWordIsKeyedByItsReplacement() {
+        var entries = [DictionaryEntry(from: "", to: "Pladder")]
+        entries.merge([DictionaryEntry(from: "", to: "pladder "), DictionaryEntry(from: "", to: "Parakeet")])
+        #expect(entries.map(\.to) == ["pladder ", "Parakeet"])
+    }
+
+    @Test func aRowWithNeitherSideIsSkipped() {
+        var entries: [DictionaryEntry] = []
+        entries.merge([DictionaryEntry(from: "  ", to: "")])
+        #expect(entries.isEmpty)
+    }
+
+    @Test func duplicatesWithinOneImportCollapse() {
+        var entries: [DictionaryEntry] = []
+        entries.merge([DictionaryEntry(from: "a", to: "b"), DictionaryEntry(from: "A", to: "c")])
+        #expect(entries.map(\.to) == ["c"])
+    }
+
+    @Test func hasRuleIgnoresCaseAndSpacesButNotCustomWords() {
+        let entries = [DictionaryEntry(from: " Swift UI", to: "SwiftUI"), DictionaryEntry(from: "", to: "Pladder")]
+        #expect(entries.hasRule(for: "swift ui"))
+        #expect(!entries.hasRule(for: "pladder"))
+        #expect(!entries.hasRule(for: " "))
+    }
+}
+
+@Suite struct DurationTimeIntervalTests {
+    @Test func secondsAndFractionsSurvive() {
+        #expect(Duration.seconds(2).timeInterval == 2)
+        #expect(abs(Duration.milliseconds(1_500).timeInterval - 1.5) < 1e-12)
+        #expect(Duration.zero.timeInterval == 0)
+    }
+}

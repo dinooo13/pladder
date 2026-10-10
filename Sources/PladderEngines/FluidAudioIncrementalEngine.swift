@@ -2,37 +2,42 @@ import FluidAudio
 import Foundation
 import PladderCore
 
-/// The batch engine's own windows, run while the user is still speaking.
+/// FluidAudio's batch windows, run while the user is still speaking.
 ///
-/// `FluidAudioEngine` lays a recording out in ~15 s windows at release and
-/// decodes them all then, so a long dictation waits for several encoder
-/// passes. Those windows do not depend on each other — each starts from a
-/// fresh decoder state, and a window's start is chosen from audio that ends
-/// before the previous window does — so every window but the last can run
-/// while the recording is still going. `IncrementalChunkProcessor` in the
-/// FluidAudio fork does exactly that; at release only the final window and
-/// the merge remain, which is one pass at any length.
+/// FluidAudio's batch path, `AsrManager.transcribe`, lays a recording out in
+/// ~15 s windows and decodes them all in one call, so a long dictation
+/// transcribed at release would wait for several encoder passes. Those
+/// windows do not depend on each other — each starts from a fresh decoder
+/// state, and a window's start is chosen from audio that ends before the
+/// previous window does — so every window but the last can run while the
+/// recording is still going. `IncrementalChunkProcessor` in the FluidAudio
+/// fork does exactly that; at release only the final window and the merge
+/// remain, which is one pass at any length.
 ///
-/// The text is the batch engine's text, not an approximation of it: the same
+/// The text is the batch path's text, not an approximation of it: the same
 /// windows, in the same order, through the same merge. Below 15 s there are no
-/// windows to merge, and `IncrementalChunkProcessor.finish()` hands the buffer
-/// to the same call `FluidAudioEngine` makes, so the two agree there too. That
-/// short path lives in the fork rather than here: a single window over short
-/// audio decodes differently from the whole-buffer pass, so the identity has
-/// to hold inside the processor, not around it.
+/// windows to merge, and `IncrementalChunkProcessor.finish()` makes the same
+/// single padded pass over the buffer that `transcribe(_:)` makes, so the two
+/// agree there too. That short path lives in the fork rather than here: a
+/// single window over short audio decodes differently from the whole-buffer
+/// pass, so the identity has to hold inside the processor, not around it.
 public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
     public static let engineID = EngineID("parakeet-tdt-v3-incremental")
 
     public nonisolated let id = FluidAudioIncrementalEngine.engineID
-    public nonisolated let displayName = "Parakeet TDT v3 (incremental)"
+    /// The catalog's name, so the picker and the CLI's bench header agree.
+    public nonisolated var displayName: String { StandardEngines.parakeet.displayName }
     public private(set) var status: EngineStatus = .unloaded
 
     private let version: AsrModelVersion
-    /// One resident manager, exactly as `FluidAudioEngine` holds: the
-    /// incremental processor borrows it window by window and the warm pass
-    /// and `transcribe` use it directly.
+    /// One resident manager: the incremental processor borrows it window by
+    /// window, and the warm pass, the live pass and `transcribe` use it
+    /// directly.
     private var manager: AsrManager?
-    private var session: IncrementalChunkProcessor?
+    /// The utterance in progress and its windows, from `beginUtterance`
+    /// until it ends or is abandoned. Calls naming any other utterance are
+    /// stale and change nothing.
+    private var slot = UtteranceSlot<IncrementalChunkProcessor>()
     /// Samples fed this utterance, for the transcript's audio duration only.
     private var fedSampleCount = 0
     /// The samples themselves, kept only so `livePass` has something to
@@ -65,8 +70,11 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
                 Task { await self.report(progress) }
             }
             status = .loading
-            // Same configuration as the batch engine, so the two produce the
-            // same text: seam-gap repair off (Step 7).
+            // Seam-gap repair off: FluidAudio's post-merge probe for words
+            // dropped at window seams runs on every recording longer than one
+            // window and costs time at release. The session's merge and
+            // `transcribe` both read the setting from this manager, so the
+            // two paths stay identical.
             let manager = AsrManager(config: ASRConfig(seamGapRepair: false))
             try await manager.loadModels(models)
             self.manager = manager
@@ -171,16 +179,31 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
 
     // MARK: StreamingTranscriptionEngine
 
-    public func beginUtterance() async throws {
+    public func beginUtterance() async throws -> Utterance {
         guard let manager, status.isReady else { throw TranscriptionError.notLoaded }
-        await session?.cancel()
+        // Claimed before the awaits below: the actor is reentrant across
+        // them, and a second `beginUtterance` or an abandon of this one may
+        // arrive in the meantime.
+        let (utterance, replaced) = slot.begin()
         fedSampleCount = 0
         liveAudio.removeAll(keepingCapacity: true)
-        session = try await IncrementalChunkProcessor(manager: manager)
+        await replaced?.cancel()
+        let session: IncrementalChunkProcessor
+        do {
+            session = try await IncrementalChunkProcessor(manager: manager)
+        } catch {
+            slot.release(utterance)
+            throw error
+        }
+        guard slot.install(session, for: utterance) else {
+            await session.cancel()
+            throw CancellationError()
+        }
+        return utterance
     }
 
-    public func feed(_ samples: [Float]) async {
-        guard !samples.isEmpty, let session else { return }
+    public func feed(_ samples: [Float], to utterance: Utterance) async {
+        guard !samples.isEmpty, let session = slot.session(for: utterance) else { return }
         fedSampleCount += samples.count
         liveAudio.append(contentsOf: samples)
         // A window failing mid-recording must not take the dictation down:
@@ -192,29 +215,35 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
     /// Feeds the tail and returns the transcript for the whole utterance.
     /// The timed part is `finish()` alone: the final window plus the merge,
     /// which is all that is left on the release-to-paste path.
-    public func endUtterance(_ tail: [Float]) async throws -> Transcript {
+    public func endUtterance(_ utterance: Utterance, tail: [Float]) async throws -> Transcript {
         guard status.isReady else { throw TranscriptionError.notLoaded }
-        guard let session else { throw TranscriptionError.notLoaded }
+        guard let session = slot.session(for: utterance) else { throw TranscriptionError.notLoaded }
+        // The utterance is over whether `finish()` returns or throws. The
+        // actor is reentrant across the awaits below, so a `beginUtterance`
+        // may already have claimed the slot for the next one; that one is
+        // left be.
+        defer {
+            if slot.release(utterance).wasCurrent { liveAudio.removeAll(keepingCapacity: true) }
+        }
+        fedSampleCount += tail.count
+        let sampleCount = fedSampleCount
         if !tail.isEmpty {
-            fedSampleCount += tail.count
             try await session.append(tail)
         }
         let started = ContinuousClock.now
         let result = try await session.finish()
         let elapsed = ContinuousClock.now - started
-        self.session = nil
-        liveAudio.removeAll(keepingCapacity: true)
         return Transcript(
             text: result.text,
-            audioDuration: Double(fedSampleCount) / CapturedAudio.sampleRate,
-            processingTime: Self.seconds(elapsed),
+            audioDuration: Double(sampleCount) / CapturedAudio.sampleRate,
+            processingTime: elapsed.timeInterval,
             engineID: id
         )
     }
 
-    public func abandonUtterance() async {
-        let session = self.session
-        self.session = nil
+    public func abandonUtterance(_ utterance: Utterance) async {
+        let (wasCurrent, session) = slot.release(utterance)
+        guard wasCurrent else { return }
         fedSampleCount = 0
         liveAudio.removeAll(keepingCapacity: true)
         await session?.cancel()
@@ -241,8 +270,8 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
     /// Before anything has been fed there is nothing to transcribe, so the
     /// first pass of a recording is the plain warm pass; the key-down warm-up
     /// is not lost by going live.
-    public func livePass() async -> String? {
-        guard let manager, status.isReady else { return nil }
+    public func livePass(_ utterance: Utterance) async -> String? {
+        guard let manager, status.isReady, slot.current == utterance else { return nil }
         let window = liveWindow()
         guard !window.isEmpty else {
             await warmPass()
@@ -283,7 +312,7 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
     }
 
     public func unload() async {
-        await abandonUtterance()
+        if let current = slot.current { await abandonUtterance(current) }
         await manager?.cleanup()
         manager = nil
         status = .unloaded
@@ -316,11 +345,6 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
     /// The grid the live window's left edge moves on, 5 s: long enough that
     /// the window still holds 10 s of context at its narrowest.
     private static let windowHopSamples = 80_000
-
-    private static func seconds(_ duration: Duration) -> Double {
-        let parts = duration.components
-        return Double(parts.seconds) + Double(parts.attoseconds) / 1e18
-    }
 
     /// What the menu says under `Model failed:` when the load throws.
     ///

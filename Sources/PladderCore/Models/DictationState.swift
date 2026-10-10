@@ -4,7 +4,10 @@ public enum DictationState: Equatable, Sendable {
     case idle
     /// Engine not ready yet. Hotkey presses are ignored.
     case unavailable(UnavailableReason)
-    case recording(level: Float)
+    /// The microphone is open. The input level is the coordinator's
+    /// `inputLevel`, not part of the state: it changes twenty times a second,
+    /// and everything that reads the state would be redrawn with it.
+    case recording
     case transcribing
     /// The model is cleaning the transcript; only a dictation started with
     /// the refiner gets here.

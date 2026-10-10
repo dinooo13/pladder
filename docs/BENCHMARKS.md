@@ -276,6 +276,18 @@ language hint, dictionary, custom words, whitespace, spoken punctuation),
 median of 31 runs, M1. "Typical" has a filler in every sentence; "worst" adds
 a spoken question mark to every sentence.
 
+```sh
+swift run -c release pladder-cli bench-process bench/fixtures [--runs N]
+```
+
+reads each fixture's script, puts "um," after the first word of every
+sentence for the typical variant and also "question mark" before every
+sentence's full stop for the worst, runs the pipeline `--process` runs, with a
+fresh install's settings, over each variant 31 times by default, and prints
+the median of all but the first run per fixture. `BenchProcess.swift` needs
+nothing else from the CLI but its line in `main.swift`'s dispatch, so it can
+be copied onto an older commit for the before-and-after.
+
 | Fixture | main, typical | spoken punctuation, typical | main, worst | spoken punctuation, worst |
 |---|---|---|---|---|
 | 10s | 1.53 ms | 1.97 ms | 1.51 ms | 1.62 ms |
@@ -291,7 +303,7 @@ What each stage contains:
 
 - `stop` is `AudioCapture.stop()`: removing the tap and collecting the
   captured samples.
-- `engine` is `TranscriptionEngine.transcribe`.
+- `engine` is the engine's call: `endUtterance` for a streaming engine, `transcribe` otherwise. It includes, when a release lands while the feed loop is handing the engine a chunk, the wait for that hand-over, which the call would have waited for anyway.
 - `process` is the processor pipeline run.
 - `paste` is `TextOutput.insert`.
 

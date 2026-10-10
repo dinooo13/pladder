@@ -16,7 +16,7 @@ import os
 /// time budget, an empty answer all return nil and the coordinator pastes
 /// the text as dictated. The model stays loaded from the first `prepare()`
 /// until `unload()`, as the speech engine does.
-public actor S1MiniPolisher: TranscriptRefiner {
+public actor S1MiniPolisher: ReportingRefiner {
     /// S1-mini's system prompt, word for word from its model card; it is
     /// part of the input format the model was trained on.
     static let systemPrompt = "You are a text normalizer for speech-to-text transcripts. The input begins with a control line specifying the styling, structure, and context settings; clean the transcript to match those settings and output only the cleaned text."
@@ -45,16 +45,25 @@ public actor S1MiniPolisher: TranscriptRefiner {
     static let chunkThreshold = 400
     static let chunkSize = 250
 
+    /// Loads the model at a path with a prompt prefix; `LlamaModel.load` in
+    /// the app, a stand-in in the tests.
+    typealias Loader = @Sendable (_ path: String, _ prefix: String) async throws -> any PromptCompleter
+
     public nonisolated let file: ModelFile
     private let location: URL
     private let timeout: Duration
-    private var model: LlamaModel?
-    private var loading: Task<LlamaModel?, Never>?
-    private static let log = Logger(subsystem: "de.dinooo13.pladder", category: "polish")
-
-    /// `location` is where `ModelFiles` keeps `file`.
     /// The control line this polisher sends; the CLI can try another.
     private let control: String
+    private let load: Loader
+    private var model: (any PromptCompleter)?
+    private var loading: Task<(any PromptCompleter)?, Never>?
+    /// A load `unload()` gave up on, still reading weights: llama.cpp does
+    /// not stop for cancellation. The next load waits for it, so two weight
+    /// sets and two key-value caches are never resident at once.
+    private var abandoned: Task<(any PromptCompleter)?, Never>?
+    /// Bumped by `unload()`, so a load it interrupted cannot store its model.
+    private var generation = 0
+    private static let log = Logger(subsystem: "de.dinooo13.pladder", category: "polish")
 
     /// `location` is where `ModelFiles` keeps `file`. `control` is for the
     /// CLI, which judges a style or a fine-tune of S1-mini before it goes in;
@@ -63,16 +72,26 @@ public actor S1MiniPolisher: TranscriptRefiner {
         file: ModelFile, location: URL, timeout: Duration = .seconds(8),
         control: String = S1MiniPolisher.controlLine
     ) {
+        self.init(file: file, location: location, timeout: timeout, control: control) {
+            try await LlamaModel.load(path: $0, prefix: $1)
+        }
+    }
+
+    /// `load` stands in for llama.cpp in the tests.
+    init(file: ModelFile, location: URL, timeout: Duration, control: String, load: @escaping Loader) {
         self.file = file
         self.location = location
         self.timeout = timeout
         self.control = control
+        self.load = load
     }
 
-    /// Loads the model if its file is there. Called at key-down, so a first
-    /// dictation's load happens while the user is still speaking.
+    /// Loads the model if its file is there, however long that takes. Called
+    /// at key-down, so a first dictation's load happens while the user is
+    /// still speaking; the CLI awaits it to time a warm polish.
     public func prepare() async {
-        _ = await loaded()
+        guard model == nil, let task = startLoad() else { return }
+        _ = await task.value
     }
 
     public func refine(_ text: String) async -> String? {
@@ -86,29 +105,42 @@ public actor S1MiniPolisher: TranscriptRefiner {
         await LlamaModel.warmUp()
     }
 
-    /// Frees the model's memory; the next `prepare()` loads it again.
+    /// Frees the model's memory; the next `prepare()` loads it again. A load
+    /// still running is dropped when it finishes, and the next one waits
+    /// for that.
     public func unload() {
-        loading?.cancel()
+        if let loading {
+            loading.cancel()
+            abandoned = loading
+        }
         loading = nil
         model = nil
+        generation += 1
     }
 
     /// `refine` with the numbers kept, for the log and the CLI. One log line
     /// per call, numbers only: the transcript never goes in the log.
-    public func polish(_ text: String) async -> TranscriptPolisher.Report {
+    ///
+    /// The budget starts here and covers the wait for the model as well as
+    /// every chunk. A first dictation after launch can find the load still
+    /// running (seconds of reading weights, and on the first launch after an
+    /// install seven more of Metal compiling its shaders); it pastes as
+    /// dictated at the deadline, and the load carries on for the next one.
+    public func polish(_ text: String) async -> PolishReport {
         let started = ContinuousClock.now
         let deadline = started + timeout
-        let pieces = TranscriptPolisher.chunks(of: text, threshold: Self.chunkThreshold, size: Self.chunkSize)
-        var report = TranscriptPolisher.Report(
-            text: nil, elapsed: .zero, wordsIn: TranscriptPolisher.wordCount(text), wordsOut: 0,
+        let pieces = PolishChunking.chunks(of: text, threshold: Self.chunkThreshold, size: Self.chunkSize)
+        var report = PolishReport(
+            text: nil, elapsed: .zero, wordsIn: PolishChunking.wordCount(text), wordsOut: 0,
             chunks: pieces.count, mode: .completion, failure: nil)
-        if let model = await loaded() {
+        switch await loaded(before: deadline) {
+        case .ready(let model):
             do {
                 var cleaned: [String] = []
                 for piece in pieces {
                     // Room for an answer somewhat longer than the input: a
                     // list adds line breaks and dashes.
-                    let maxTokens = TranscriptPolisher.wordCount(piece) * 3 + 64
+                    let maxTokens = PolishChunking.wordCount(piece) * 3 + 64
                     let answer = try await model.complete(
                         suffix: Self.promptSuffix(for: piece), maxTokens: maxTokens, deadline: deadline)
                     let filtered = PolishPostFilter.clean(answer)
@@ -117,54 +149,87 @@ public actor S1MiniPolisher: TranscriptRefiner {
                 }
                 let joined = cleaned.joined(separator: " ")
                 report.text = joined
-                report.wordsOut = TranscriptPolisher.wordCount(joined)
+                report.wordsOut = PolishChunking.wordCount(joined)
             } catch LlamaModel.Failure.timedOut {
                 report.failure = "timed out"
+            } catch LlamaModel.Failure.truncated {
+                report.failure = "answer cut off"
             } catch is EmptyAnswer {
                 report.failure = "empty answer"
             } catch {
                 report.failure = "model error \(error)"
             }
-        } else {
+        case .stillLoading:
+            report.failure = "still loading"
+        case .noModel:
             report.failure = FileManager.default.fileExists(atPath: location.path) ? "model did not load" : "not downloaded"
         }
         report.elapsed = ContinuousClock.now - started
-        Self.log(report, file: file)
+        Self.log.notice("\(report.logLine(model: self.file.fileName), privacy: .public)")
         return report
     }
 
     private struct EmptyAnswer: Error {}
 
-    /// The loaded model, loading it first if its file is there; nil
-    /// otherwise. Concurrent callers share one load.
-    private func loaded() async -> LlamaModel? {
-        if let model { return model }
-        if let loading { return await loading.value }
+    // MARK: Loading
+
+    private enum Loaded: Sendable {
+        case ready(any PromptCompleter)
+        /// The load is still running at the deadline; it carries on.
+        case stillLoading
+        /// No file, or a load that failed.
+        case noModel
+    }
+
+    /// The loaded model, waiting for a running load (or starting one, if the
+    /// file is there) until `deadline` at most.
+    private func loaded(before deadline: ContinuousClock.Instant) async -> Loaded {
+        if let model { return .ready(model) }
+        guard let task = startLoad() else { return .noModel }
+        // Not a task group: that would wait for the load however long it
+        // took. The waiter left behind ends with the load.
+        guard let model = await firstOf(until: deadline, { await task.value }).value else { return .stillLoading }
+        return model.map(Loaded.ready) ?? .noModel
+    }
+
+    /// The running load, or a new one if the file is there; nil without a
+    /// file. Concurrent callers share one load. The load stores its own
+    /// result, so a caller that stopped waiting at its deadline still leaves
+    /// the model for the next dictation.
+    private func startLoad() -> Task<(any PromptCompleter)?, Never>? {
+        if let loading { return loading }
         guard FileManager.default.fileExists(atPath: location.path) else { return nil }
         let path = location.path
         let prefix = Self.promptPrefix(control: control)
-        let task = Task { try? await LlamaModel.load(path: path, prefix: prefix) }
+        let load = load
+        let generation = generation
+        let previous = abandoned
+        let task = Task {
+            // Its model is dropped, and freed, before this one is read.
+            _ = await previous?.value
+            let model = try? await load(path, prefix)
+            return self.finishLoad(model, generation: generation)
+        }
         loading = task
-        let model = await task.value
-        // `unload()` during the load cancelled this task: drop the result.
-        if loading == task, !task.isCancelled { self.model = model }
-        if loading == task { loading = nil }
-        return self.model
+        return task
     }
 
-    private static func log(_ report: TranscriptPolisher.Report, file: ModelFile) {
-        let secs = String(format: "%.3f", Double(report.elapsed.components.seconds)
-            + Double(report.elapsed.components.attoseconds) / 1e18)
-        if let failure = report.failure {
-            log.notice(
-                "polish (\(file.fileName, privacy: .public)) failed after \(secs, privacy: .public) s, \(report.wordsIn, privacy: .public) words in: \(failure, privacy: .public)")
-        } else {
-            log.notice(
-                """
-                polish (\(file.fileName, privacy: .public)) \(secs, privacy: .public) s, \
-                \(report.wordsIn, privacy: .public) words in, \(report.wordsOut, privacy: .public) out\
-                \(report.chunks > 1 ? ", \(report.chunks) chunks" : "", privacy: .public)
-                """)
-        }
+    /// The model to keep, or nil when `unload()` came during the load: then
+    /// the result is dropped here, so the task does not hold it either.
+    private func finishLoad(_ model: (any PromptCompleter)?, generation: Int) -> (any PromptCompleter)? {
+        guard generation == self.generation else { return nil }
+        self.model = model
+        loading = nil
+        abandoned = nil
+        return model
     }
 }
+
+/// What the polisher needs of a loaded model. `LlamaModel` is the real one;
+/// the tests stand in for it, so the deadline and failure handling run
+/// without a model file.
+protocol PromptCompleter: Sendable {
+    func complete(suffix: String, maxTokens: Int, deadline: ContinuousClock.Instant) async throws -> String
+}
+
+extension LlamaModel: PromptCompleter {}

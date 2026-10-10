@@ -1,12 +1,13 @@
+import PladderTestSupport
 import Testing
 @testable import PladderCore
 
-@Suite struct FillerRemoverTests {
+@Suite(.timeLimit(.minutes(1))) struct FillerRemoverTests {
     private func run(
         _ text: String,
         hint: (@Sendable (String) -> String?)? = nil
     ) async throws -> String {
-        try await FillerRemover(languageHint: hint).process(text)
+        FillerRemover(languageHint: hint).process(text)
     }
 
     // MARK: Real words that must survive without language evidence
@@ -59,6 +60,31 @@ import Testing
 
     @Test func consumesNeighbouringCommasForUniversalFillers() async throws {
         #expect(try await run("we could, uh, ship it") == "we could ship it")
+    }
+
+    @Test func aSentenceMarkAfterAFillerStaysWithTheSentence() async throws {
+        #expect(try await run("I think so, um.", hint: { _ in "en" }) == "I think so.")
+        #expect(try await run("I think so, uh.") == "I think so.")
+        #expect(try await run("Yes, uh. Okay then.") == "Yes. Okay then.")
+        #expect(try await run("Is it ready, uh?") == "Is it ready?")
+    }
+
+    @Test func aFillerThatIsItsOwnSentenceTakesItsMarkWithIt() async throws {
+        #expect(try await run("That works. Uh. Next one.") == "That works. Next one.")
+        #expect(try await run("Uh. Next one.") == "Next one.")
+    }
+
+    @Test func emIsAWordNotAFiller() async throws {
+        let en: @Sendable (String) -> String? = { _ in "en" }
+        #expect(try await run("use an em dash here", hint: en) == "use an em dash here")
+        #expect(try await run("an em-dash, not a hyphen", hint: en) == "an em-dash, not a hyphen")
+        #expect(try await run("let 'em in", hint: en) == "let 'em in")
+        #expect(try await run("so, emm, maybe", hint: en) == "so maybe")
+    }
+
+    @Test func aHyphenatedFillerIsPartOfAWord() async throws {
+        #expect(try await run("uh-oh, that broke") == "uh-oh, that broke")
+        #expect(try await run("she said uh-huh and left") == "she said uh-huh and left")
     }
 
     @Test func removesGermanUniversalFillers() async throws {
@@ -126,21 +152,14 @@ import Testing
     }
 
     @Test func languageHintIsOnlyCalledWhenAGatedTokenIsPresent() async throws {
-        let counter = CallCounter()
-        let hint: @Sendable (String) -> String? = { _ in
-            counter.count += 1
+        let calls = Recorder<String>()
+        let hint: @Sendable (String) -> String? = { text in
+            calls.append(text)
             return "en"
         }
         _ = try await run("we could, uh, ship it", hint: hint)
-        #expect(counter.count == 0)
+        #expect(calls.all.isEmpty)
         _ = try await run("um the meeting is at three", hint: hint)
-        #expect(counter.count == 1)
+        #expect(calls.all.count == 1)
     }
-}
-
-/// A mutable counter, used to assert how many times the language hint
-/// closure fired. Test-only, single-threaded call sites, so `@unchecked`
-/// is safe here.
-private final class CallCounter: @unchecked Sendable {
-    var count = 0
 }

@@ -150,7 +150,7 @@ public struct AudioResampler: Sendable {
 
     // MARK: Level
 
-    /// Perceptual level for a meter: RMS mapped so -50 dBFS is 0 and 0 dBFS is 1.
+    /// Perceptual level for a meter: RMS mapped so -60 dBFS is 0 and 0 dBFS is 1.
     public static func rmsLevel(_ samples: UnsafeBufferPointer<Float>) -> Float {
         guard !samples.isEmpty else { return 0 }
         var sumOfSquares = 0.0

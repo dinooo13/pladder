@@ -1,40 +1,85 @@
 name: CI
 
+# `paths` with negations rather than `paths-ignore`: GitHub documents the `!`
+# re-include only for `paths`, and this is what makes an edit to this file
+# run CI while the rest of .github and the docs do not. Later patterns win.
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - 'docs/**'
-      - '.github/**'
-      - '!.github/**/*.yml'
-      - 'README.md'
-      - 'LICENSE'
-      - '**/*.md'
+    paths:
+      - '**'
+      - '!docs/**'
+      - '!**/*.md'
+      - '!LICENSE'
+      - '!.github/**'
+      - '.github/workflows/*.yml'
   pull_request:
-    paths-ignore:
-      - 'docs/**'
-      - '.github/**'
-      - '!.github/**/*.yml'
-      - 'README.md'
-      - 'LICENSE'
-      - '**/*.md'
+    paths:
+      - '**'
+      - '!docs/**'
+      - '!**/*.md'
+      - '!LICENSE'
+      - '!.github/**'
+      - '.github/workflows/*.yml'
 
 jobs:
   build-and-test:
     # Pladder targets macOS 26 and needs Xcode 26.
     runs-on: macos-26
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - name: Select Xcode 26
-        run: sudo xcode-select -s /Applications/Xcode_26.app || true
+        # The newest Xcode 26 on the runner. No fallback: building with the
+        # runner's default Xcode would test a toolchain Pladder does not use.
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)
+          test -n "$XCODE"
+          sudo xcode-select -s "$XCODE"
       - name: Swift version
         run: swift --version
       - name: Build
-        run: swift build
+        # Warnings in Pladder's own sources fail the build; the dependencies'
+        # are theirs to fix.
+        run: |
+          set -o pipefail
+          swift build 2>&1 | tee build.log
+          if grep -E "^$PWD/Sources/.*warning:" build.log; then exit 1; fi
       - name: Test
-        run: swift test
-      - name: Bundle (ad-hoc signed)
-        run: CODESIGN_IDENTITY=- ./scripts/bundle.sh
+        # The suite takes seconds. If it stalls, the stack of every thread of
+        # the test process goes into the log before it is stopped, so a hang
+        # says where it is instead of holding the runner for an hour.
+        timeout-minutes: 15
+        run: |
+          set +e
+          swift build --build-tests || exit 1
+          swift test --skip-build &
+          TEST=$!
+          for _ in $(seq 1 300); do
+            kill -0 "$TEST" 2>/dev/null || break
+            sleep 1
+          done
+          if kill -0 "$TEST" 2>/dev/null; then
+            echo "::error::swift test still running after 5 minutes; sampling its threads"
+            for pid in $(pgrep -f 'swiftpm-testing-helper|PladderPackageTests'); do
+              sample "$pid" 3 -mayDie -file "sample-$pid.txt"
+              cat "sample-$pid.txt"
+            done
+            pkill -P "$TEST"; kill "$TEST"
+            exit 1
+          fi
+          wait "$TEST"
+      - name: Scripts never stop every Pladder
+        # The developer dictates with a running copy while scripts run; a
+        # bare kill by name would stop it mid-recording (see CLAUDE.md).
+        run: |
+          # Commands only: a comment may name what not to do.
+          if grep -rnE '^[^#]*(pkill -x Pladder|killall Pladder)' scripts; then exit 1; fi
+      - name: Bundle
+        # No CODESIGN_IDENTITY on purpose: the runner has no certificate, so
+        # this runs the auto-detection and its ad-hoc fallback, which once
+        # ended the script silently on a Mac without a certificate.
+        run: ./scripts/bundle.sh
       - uses: actions/upload-artifact@v4
         with:
           name: Pladder.app

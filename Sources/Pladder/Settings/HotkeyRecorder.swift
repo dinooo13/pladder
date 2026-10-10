@@ -16,9 +16,11 @@ import SwiftUI
 /// Escape on its own cancels; Delete on its own clears, where that is allowed.
 struct HotkeyRecorderField: View {
     @Binding var hotkey: Hotkey
-    /// Called with `true` while recording. The caller suspends the global
-    /// monitor so the keys used to define the new chord cannot fire the old one.
-    var onRecordingChanged: (Bool) -> Void
+    /// Called with `true` when a recording starts with no other field
+    /// recording and `false` when the last one ends; recording in another
+    /// field ends this one. The caller suspends the global monitor meanwhile,
+    /// so the keys used to define the new chord cannot fire the old one.
+    var setHotkeySuspended: (Bool) -> Void
     /// Set while Accessibility is missing: a chord is then registered with
     /// Carbon, which needs exactly one regular key, so modifier-only chords
     /// are refused instead of being stored and silently never firing.
@@ -41,7 +43,8 @@ struct HotkeyRecorderField: View {
                     recorder.begin(
                         requiresRegularKey: requiresRegularKey,
                         allowsEmpty: allowsEmpty,
-                        systemShortcuts: systemShortcuts
+                        systemShortcuts: systemShortcuts,
+                        setHotkeySuspended: setHotkeySuspended
                     ) { hotkey = $0 }
                 }
             } label: {
@@ -60,7 +63,6 @@ struct HotkeyRecorderField: View {
                     .frame(maxWidth: 260, alignment: .trailing)
             }
         }
-        .onChange(of: recorder.isRecording) { _, isRecording in onRecordingChanged(isRecording) }
         .onDisappear { recorder.cancel() }
     }
 
@@ -127,13 +129,33 @@ final class HotkeyRecorder {
     /// back whenever a chord notice is cleared.
     private var secureInputNotice: String?
 
+    /// The app's one recording session, shared by every field.
+    private static let slot = HotkeyRecordingSlot<HotkeyRecorder> { $0.cancel() }
+    private let token: HotkeyRecordingSlot<HotkeyRecorder>.Token
+
+    init() {
+        token = Self.slot.makeToken()
+    }
+
+    /// A field torn down mid-recording without `onDisappear`: the monitors
+    /// hold this weakly, so it is freed, and the hotkey comes back here.
+    isolated deinit {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        if let resignObserver { NotificationCenter.default.removeObserver(resignObserver) }
+        Self.slot.release(token)
+    }
+
     func begin(
         requiresRegularKey: Bool = false,
         allowsEmpty: Bool = false,
         systemShortcuts: Set<Hotkey> = [],
+        setHotkeySuspended: @escaping (Bool) -> Void,
         commit: @escaping (Hotkey) -> Void
     ) {
-        cancel()
+        // A restart keeps the session rather than resuming and suspending
+        // the hotkey in between.
+        tearDown()
+        Self.slot.claim(token, by: self, setHotkeySuspended: setHotkeySuspended)
         self.commit = commit
         self.requiresRegularKey = requiresRegularKey
         self.allowsEmpty = allowsEmpty
@@ -148,7 +170,8 @@ final class HotkeyRecorder {
             : nil
         notice = secureInputNotice
         isRecording = true
-        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp, .flagsChanged]) { event in
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp, .flagsChanged]) { [weak self] event in
+            guard let self else { return event }
             // Local monitors run on the main thread, but `NSEvent` is not
             // Sendable, so pull out the plain values before hopping.
             let key = KeyTransition(
@@ -162,8 +185,8 @@ final class HotkeyRecorder {
         // behind that eats the next key press.
         resignObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.didResignKeyNotification, object: nil, queue: .main
-        ) { _ in
-            MainActor.assumeIsolated { self.cancel() }
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.cancel() }
         }
     }
 
@@ -194,9 +217,7 @@ final class HotkeyRecorder {
                 return true
             }
             if allowsEmpty, Int(key.keyCode) == kVK_Delete, heldModifiers.isEmpty, pending == nil {
-                let commit = self.commit
-                end()
-                commit?(Hotkey(keyCodes: []))
+                end(committing: Hotkey(keyCodes: []))
                 return true
             }
             heldKeys.insert(key.keyCode)
@@ -231,9 +252,7 @@ final class HotkeyRecorder {
                     notice = String(localized: "Only \(pending.sideAgnosticDisplayName) reached Pladder. If you pressed a regular key too, macOS or another app owns that shortcut; try a different key, for example Control+Shift+D.")
                     return
                 }
-                let commit = self.commit
-                end()
-                commit?(pending.canonical)
+                end(committing: pending.canonical)
             }
         } else if !held.isSubset(of: pending?.keyCodes ?? []) {
             // A key went down that is not part of the chord so far: the chord
@@ -249,7 +268,18 @@ final class HotkeyRecorder {
         }
     }
 
-    private func end() {
+    /// Ends the recording. A chord to commit is stored before the hotkey is
+    /// given back, so the monitor restarts once, with the new chord, rather
+    /// than with the old one and then again.
+    private func end(committing chord: Hotkey? = nil) {
+        let commit = self.commit
+        tearDown()
+        if let chord { commit?(chord) }
+        Self.slot.release(token)
+    }
+
+    /// Everything but the session: the monitors and what was pressed.
+    private func tearDown() {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
         if let resignObserver { NotificationCenter.default.removeObserver(resignObserver) }

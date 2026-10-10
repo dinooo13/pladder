@@ -30,9 +30,25 @@ import Foundation
 /// - A key of three characters or fewer must match exactly. This is the
 ///   false-positive guard: without it "the" turns into a configured "Tee" or
 ///   "TS", and one wrong word costs the user more than ten missed ones.
+/// - The Soundex bonus lifts the bar to a normalised distance of 0.6, which
+///   on a short key is two edits in four or five letters. Soundex keeps the
+///   first letter and three consonant codes, nearly all of a short word, so
+///   there its agreement says little: "roast" and "Rust" share it. On a key
+///   of five characters or fewer the bonus excuses one edit and no more.
+/// - A single word the lexicon knows ("cloud", "shift", "rest") only ever
+///   matches exactly. The speech model writes real words, so a near miss that
+///   is itself an everyday word is what the speaker said far more often than
+///   it is a mis-hearing: "to the cloud" must not become "to the Claude", and
+///   no distance rule can tell that apart from "clawed", which is further
+///   from "Claude" and should become it. A rarer word is still repaired, and
+///   so is a run of everyday words ("cloud code" → "Claude Code"), which is
+///   the spelled-out case this processor exists for. The lexicon is a closure
+///   so tests can swap it; the default is `CommonWords`, a short built-in list.
 /// - The term is emitted verbatim unless it is entirely lowercase, in which
-///   case the matched text's case pattern is mirrored — the same rule
-///   `DictionaryReplacer.adjustCase` uses, so brand names keep their capitals.
+///   case the matched text's case pattern is mirrored: a capital first letter
+///   carries over, as in `DictionaryReplacer.adjustCase`, and a match in
+///   capitals (two letters or more) comes out in capitals, which the replacer
+///   does not do. Brand names keep their own capitals either way.
 /// - Terms whose key is not pure ASCII are skipped: Soundex is defined over
 ///   the English alphabet and would rank them by accident. They still work
 ///   through the exact replacer.
@@ -49,19 +65,22 @@ public struct CustomWordCorrector: TextProcessor {
     public static let processorID = "customWords"
 
     public let id = CustomWordCorrector.processorID
-    public let displayName = "Custom words"
-    public let detail = "Repairs near misses of the words you list in the Dictionary tab with an empty Heard as."
 
     /// Accept below this normalised distance.
     private static let threshold = 0.18
     /// Multiplier applied when the two Soundex codes agree.
     private static let soundexBonus = 0.3
+    /// Keys this short or shorter get at most `shortKeySoundexEdits` from the
+    /// Soundex bonus.
+    private static let shortKeyLength = 5
+    private static let shortKeySoundexEdits = 1
     /// Keys this short or shorter only ever match exactly.
     private static let exactOnlyLength = 3
     /// Longest n-gram tried at each token position.
     private static let maxNGram = 4
 
     private let terms: [Term]
+    private let isOrdinaryWord: @Sendable (String) -> Bool
 
     /// Every term key bucketed by its length, index = length. The length
     /// prefilter then costs an index range instead of a scan over all the
@@ -84,7 +103,15 @@ public struct CustomWordCorrector: TextProcessor {
         let term: Int
     }
 
-    public init(entries: [DictionaryEntry]) {
+    /// - Parameter isOrdinaryWord: Whether a word, lowercased and reduced to
+    ///   its letters and digits, is an everyday word the speaker most likely
+    ///   said. Such a word is never fuzzily rewritten into a term; an exact
+    ///   key still matches. Defaults to the built-in `isCommonWord`.
+    public init(
+        entries: [DictionaryEntry],
+        isOrdinaryWord: @escaping @Sendable (String) -> Bool = CustomWordCorrector.isCommonWord
+    ) {
+        self.isOrdinaryWord = isOrdinaryWord
         var built: [Term] = []
         var keys: [Key] = []
         for entry in entries {
@@ -104,6 +131,7 @@ public struct CustomWordCorrector: TextProcessor {
             }
         }
         terms = built
+        if !built.isEmpty { CommonWords.prepare() }
 
         let widest = keys.map(\.bytes.count).max() ?? 0
         var buckets = [[Key]](repeating: [], count: widest + 1)
@@ -111,7 +139,13 @@ public struct CustomWordCorrector: TextProcessor {
         keysByLength = buckets
     }
 
-    public func process(_ text: String) async throws -> String {
+    /// The built-in lexicon: a short list of the most common English, German
+    /// and Spanish words. See `CommonWords` for what is on it and why.
+    public static func isCommonWord(_ word: String) -> Bool {
+        CommonWords.all.contains(word)
+    }
+
+    public func process(_ text: String) -> String {
         apply(to: text)
     }
 
@@ -136,6 +170,11 @@ public struct CustomWordCorrector: TextProcessor {
                 guard Self.spanIsUnbroken(tokens, from: index, size: size) else { continue }
                 guard Self.candidateKey(tokens, from: index, size: size, into: &candidate) else { continue }
                 guard let match = bestMatch(for: candidate, rows: &rows) else { continue }
+                // An everyday word on its own is taken as said; see the type's
+                // comment. Checked only once a match is found, which is rare.
+                if size == 1, match.score > 0, isOrdinaryWord(String(decoding: candidate, as: UTF8.self)) {
+                    continue
+                }
                 if best == nil || match.score <= best!.score {
                     best = (match.score, size, match.term)
                 }
@@ -229,7 +268,8 @@ public struct CustomWordCorrector: TextProcessor {
         }
         if a == b { return 0 }
 
-        let factor = (!candidateSoundex.isEmpty && candidateSoundex == key.soundex) ? soundexBonus : 1
+        let soundexAgrees = !candidateSoundex.isEmpty && candidateSoundex == key.soundex
+        let factor = soundexAgrees ? soundexBonus : 1
         // The largest distance that could still clear the threshold. Knowing it
         // up front lets the matrix give up the moment no path can get under it,
         // which is what happens for nearly every pair: two unrelated words of
@@ -237,6 +277,11 @@ public struct CustomWordCorrector: TextProcessor {
         let bound = threshold * Double(longer) / factor
         var limit = Int(bound)
         if Double(limit) >= bound { limit -= 1 }
+        // On a short key Soundex is nearly the whole word, so it buys one edit:
+        // "rost" reaches "Rust", "roast" does not. The key's length decides,
+        // not the longer of the two: a longer candidate must not lift the cap,
+        // or "soviet" becomes "Swift".
+        if soundexAgrees, b.count <= shortKeyLength { limit = min(limit, shortKeySoundexEdits) }
         guard limit >= 1 else { return nil }
 
         guard let distance = levenshtein(a, b, limit: limit, rows: &rows) else { return nil }

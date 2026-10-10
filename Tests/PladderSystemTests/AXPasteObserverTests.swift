@@ -5,13 +5,27 @@ import Testing
 /// Nothing here reads the live focused element: the developer dictates with a
 /// running Pladder while these run, and a test harness launched from a
 /// trusted terminal would be trusted too. The grant is stubbed instead.
-@Suite struct AXPasteObserverTests {
+@Suite(.timeLimit(.minutes(1))) struct AXPasteObserverTests {
     @Test func returnsNilPromptlyWithoutAccessibility() async {
         let observer = AXPasteObserver(isTrusted: { false })
         let started = ContinuousClock.now
         let observation = await observer.observe(pasted: "I tried Claud today")
         #expect(observation == nil)
         #expect(ContinuousClock.now - started < .milliseconds(100))
+    }
+
+    /// Chromium's tree is asked for only where it is missing: no focus at
+    /// all, or a bare web area. An app that already exposes a focus of its
+    /// own (Finder, a terminal, a button) is left as it is.
+    @Test func manualAccessibilityOnlyWhereTheTreeIsMissing() {
+        #expect(AXPasteObserver.wantsManualAccessibility(hasFocus: false, focusedRole: nil))
+        #expect(AXPasteObserver.wantsManualAccessibility(hasFocus: true, focusedRole: "AXWebArea"))
+        #expect(!AXPasteObserver.wantsManualAccessibility(hasFocus: true, focusedRole: "AXList"))
+        #expect(!AXPasteObserver.wantsManualAccessibility(hasFocus: true, focusedRole: "AXOutline"))
+        #expect(!AXPasteObserver.wantsManualAccessibility(hasFocus: true, focusedRole: "AXButton"))
+        #expect(!AXPasteObserver.wantsManualAccessibility(hasFocus: true, focusedRole: nil))
+        // A secure field is a text field's role with a subrole: never asked.
+        #expect(!AXPasteObserver.wantsManualAccessibility(hasFocus: true, focusedRole: "AXTextField"))
     }
 
     @Test func theWindowIsThePastePlusAMargin() {

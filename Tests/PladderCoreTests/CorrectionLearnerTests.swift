@@ -1,4 +1,5 @@
 import Foundation
+import PladderTestSupport
 import Testing
 @testable import PladderCore
 
@@ -29,31 +30,31 @@ final class FakeCorrectionReviewer: CorrectionReviewer, @unchecked Sendable {
     private let lock = NSLock()
     private let verdicts: [String: Bool]
     private let failing: Set<String>
+    private let failure: any Error
     private var _calls: [(heard: String, corrected: String, sentence: String)] = []
 
-    init(available: Bool = true, verdicts: [String: Bool] = [:], failing: Set<String> = []) {
+    init(
+        available: Bool = true, verdicts: [String: Bool] = [:], failing: Set<String> = [],
+        failure: any Error = Failure()
+    ) {
         isAvailable = available
         self.verdicts = verdicts
         self.failing = failing
+        self.failure = failure
     }
 
     var calls: [(heard: String, corrected: String, sentence: String)] { lock.withLock { _calls } }
 
     func isReusableCorrection(heard: String, corrected: String, sentence: String) async throws -> Bool {
         lock.withLock { _calls.append((heard, corrected, sentence)) }
-        if failing.contains(heard) { throw Failure() }
+        if failing.contains(heard) { throw failure }
         return verdicts[heard] ?? true
     }
 }
 
-final class ProposalLog: @unchecked Sendable {
-    private let lock = NSLock()
-    private var _pairs: [CorrectionPair] = []
-    var pairs: [CorrectionPair] { lock.withLock { _pairs } }
-    func append(_ proposal: CorrectionProposal) { lock.withLock { _pairs.append(proposal.pair) } }
-}
+typealias ProposalLog = Recorder<CorrectionPair>
 
-@Suite struct CorrectionLearnerTests {
+@Suite(.timeLimit(.minutes(1))) struct CorrectionLearnerTests {
     private static func temporaryDismissed() -> DismissedCorrections {
         DismissedCorrections(url: FileManager.default.temporaryDirectory
             .appending(path: "pladder-tests-\(UUID().uuidString)/dismissed-corrections.json"))
@@ -68,12 +69,16 @@ final class ProposalLog: @unchecked Sendable {
         reviewer: FakeCorrectionReviewer,
         dismissed: DismissedCorrections = temporaryDismissed(),
         dictionary: [DictionaryEntry] = [],
+        log: @escaping @Sendable (String) -> Void = { _ in },
+        waitUntilQuiet: @escaping @Sendable () async -> Void = {},
         proposals: ProposalLog
     ) -> CorrectionLearner {
         CorrectionLearner(
             observer: observer, reviewer: reviewer, dismissed: dismissed,
             dictionary: { dictionary },
-            onProposal: { proposals.append($0) })
+            log: log,
+            waitUntilQuiet: waitUntilQuiet,
+            onProposal: { proposals.append($0.pair) })
     }
 
     private let claud = CorrectionPair(heard: "Claud", corrected: "Claude")
@@ -84,7 +89,7 @@ final class ProposalLog: @unchecked Sendable {
         await Self.learner(observer: observer, reviewer: FakeCorrectionReviewer(), proposals: proposals)
             .pasted("I tried Claud today").value
         #expect(observer.pasted == ["I tried Claud today"])
-        #expect(proposals.pairs == [claud])
+        #expect(proposals.all == [claud])
     }
 
     @Test func dropsAPairTheReviewerRejects() async {
@@ -94,7 +99,7 @@ final class ProposalLog: @unchecked Sendable {
         await Self.learner(observer: observer, reviewer: reviewer, proposals: proposals)
             .pasted("I tried Claud today").value
         #expect(reviewer.calls.count == 1)
-        #expect(proposals.pairs.isEmpty)
+        #expect(proposals.all.isEmpty)
     }
 
     @Test func theGateRunsBeforeTheReviewer() async {
@@ -104,7 +109,7 @@ final class ProposalLog: @unchecked Sendable {
         await Self.learner(observer: observer, reviewer: reviewer, proposals: proposals)
             .pasted("see you on Friday then").value
         #expect(reviewer.calls.isEmpty)
-        #expect(proposals.pairs.isEmpty)
+        #expect(proposals.all.isEmpty)
     }
 
     @Test func aDismissedPairIsNotProposedAgain() async {
@@ -116,7 +121,7 @@ final class ProposalLog: @unchecked Sendable {
         await Self.learner(observer: observer, reviewer: reviewer, dismissed: dismissed, proposals: proposals)
             .pasted("I tried Claud today").value
         #expect(reviewer.calls.isEmpty)
-        #expect(proposals.pairs.isEmpty)
+        #expect(proposals.all.isEmpty)
     }
 
     @Test func aPairAlreadyInTheDictionaryIsNotProposed() async {
@@ -128,7 +133,7 @@ final class ProposalLog: @unchecked Sendable {
             dictionary: [DictionaryEntry(from: "claud ", to: "Claudia")], proposals: proposals)
             .pasted("I tried Claud today").value
         #expect(reviewer.calls.isEmpty)
-        #expect(proposals.pairs.isEmpty)
+        #expect(proposals.all.isEmpty)
     }
 
     @Test func nothingHappensWhenTheObserverReturnsNil() async {
@@ -139,7 +144,7 @@ final class ProposalLog: @unchecked Sendable {
             .pasted("I tried Claud today").value
         #expect(observer.pasted.count == 1)
         #expect(reviewer.calls.isEmpty)
-        #expect(proposals.pairs.isEmpty)
+        #expect(proposals.all.isEmpty)
     }
 
     @Test func nothingHappensWhenTheModelIsUnavailable() async {
@@ -150,7 +155,7 @@ final class ProposalLog: @unchecked Sendable {
             .pasted("I tried Claud today").value
         #expect(observer.pasted.isEmpty)
         #expect(reviewer.calls.isEmpty)
-        #expect(proposals.pairs.isEmpty)
+        #expect(proposals.all.isEmpty)
     }
 
     @Test func aReviewerErrorDropsOnlyThatCandidate() async {
@@ -161,7 +166,7 @@ final class ProposalLog: @unchecked Sendable {
         await Self.learner(observer: observer, reviewer: reviewer, proposals: proposals)
             .pasted("Claud and get hub and the rest of it stays").value
         #expect(reviewer.calls.count == 2)
-        #expect(proposals.pairs == [CorrectionPair(heard: "get hub", corrected: "GitHub")])
+        #expect(proposals.all == [CorrectionPair(heard: "get hub", corrected: "GitHub")])
     }
 
     @Test func twoPastesAreObservedAndReviewedIndependently() async {
@@ -176,7 +181,7 @@ final class ProposalLog: @unchecked Sendable {
         await first.value
         await second.value
         #expect(observer.pasted.count == 2)
-        #expect(Set(proposals.pairs) == [claud, CorrectionPair(heard: "get hub", corrected: "GitHub")])
+        #expect(Set(proposals.all) == [claud, CorrectionPair(heard: "get hub", corrected: "GitHub")])
     }
 
     @Test func atMostThreeProposalsPerPaste() async {
@@ -188,7 +193,7 @@ final class ProposalLog: @unchecked Sendable {
         let reviewer = FakeCorrectionReviewer()
         let proposals = ProposalLog()
         await Self.learner(observer: observer, reviewer: reviewer, proposals: proposals).pasted(pasted).value
-        #expect(proposals.pairs.count == CorrectionLearner.maximumProposalsPerPaste)
+        #expect(proposals.all.count == CorrectionLearner.maximumProposalsPerPaste)
     }
 
     @Test func theReviewerSeesTheSentence() async {
@@ -199,6 +204,60 @@ final class ProposalLog: @unchecked Sendable {
         #expect(reviewer.calls.first?.sentence == "I tried Claud today")
         #expect(reviewer.calls.first?.heard == "Claud")
         #expect(reviewer.calls.first?.corrected == "Claude")
+    }
+
+    /// A recording or a polished dictation is in flight: the review waits
+    /// for the model to be free rather than eat into the polish budget.
+    @Test func theReviewWaitsUntilTheGateOpens() async {
+        let gate = Gate()
+        let observer = FakePasteObserver([Self.observation("I tried Claud today", "I tried Claude today")])
+        let reviewer = FakeCorrectionReviewer()
+        let proposals = ProposalLog()
+        let task = Self.learner(
+            observer: observer, reviewer: reviewer, waitUntilQuiet: { await gate.wait() }, proposals: proposals)
+            .pasted("I tried Claud today")
+
+        await gate.untilSomeoneWaits()
+        #expect(reviewer.calls.isEmpty)
+        #expect(proposals.all.isEmpty)
+
+        await gate.open()
+        await task.value
+        #expect(reviewer.calls.count == 1)
+        #expect(proposals.all == [claud])
+    }
+
+    @Test func theGateIsNotAskedWhenNothingIsReviewed() async {
+        let gate = Gate()
+        let observer = FakePasteObserver([Self.observation("see you on Friday then", "see you on Monday then")])
+        await Self.learner(
+            observer: observer, reviewer: FakeCorrectionReviewer(), waitUntilQuiet: { await gate.wait() },
+            proposals: ProposalLog())
+            .pasted("see you on Friday then").value
+        #expect(await gate.arrivals == 0)
+    }
+
+    /// A model error can quote the prompt, which is the user's words.
+    @Test func aReviewerErrorIsLoggedByCaseNotByText() async {
+        enum ModelError: Error { case generation(String) }
+        let observer = FakePasteObserver([Self.observation("I tried Claud today", "I tried Claude today")])
+        let reviewer = FakeCorrectionReviewer(
+            failing: ["Claud"], failure: ModelError.generation("HEARD: Claud SENTENCE: I tried Claud today"))
+        let lines = Recorder<String>()
+        await Self.learner(observer: observer, reviewer: reviewer, log: { lines.append($0) }, proposals: ProposalLog())
+            .pasted("I tried Claud today").value
+        let failed = lines.all.first { $0.hasPrefix("review failed") }
+        #expect(failed?.hasSuffix(": ModelError.generation") == true)
+        #expect(failed?.contains("SENTENCE") == false)
+    }
+
+    @Test func errorsAreDescribedByTypeAndCase() {
+        enum Plain: Error { case timedOut }
+        struct Opaque: Error { let words = "secret" }
+        #expect(CorrectionLearner.describe(Plain.timedOut) == "Plain.timedOut")
+        #expect(CorrectionLearner.describe(Opaque()) == "Opaque")
+        let ns = NSError(domain: "FM", code: 7, userInfo: [NSLocalizedDescriptionKey: "secret"])
+        #expect(CorrectionLearner.describe(ns) == "NSError FM 7")
     }
 
     @Test func aLongPasteIsCutAroundThePair() {
