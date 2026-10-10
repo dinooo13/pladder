@@ -7,14 +7,14 @@ file is the map: what runs where, in what order, and what each part relies on.
 
 ## Modules
 
-| Target | Holds | Imports |
+| Target | Holds | Frameworks that matter |
 |---|---|---|
-| `PladderCore` | The coordinator, the hotkey trackers, the processors, the correction learner's logic, the settings, and the protocols every other part implements | Foundation only |
+| `PladderCore` | The coordinator, the hotkey trackers, the processors, the correction learner's logic, the settings, and the protocols every other part implements | Foundation; Observation for the coordinator's state |
 | `PladderAudio` | Microphone capture and resampling | AVFoundation |
 | `PladderEngines` | `FluidAudioIncrementalEngine` and the engine catalog | FluidAudio |
-| `PladderSystem` | Hotkey monitors, paste, the Accessibility observer, output mute, key names, permissions | AppKit, Carbon, CoreAudio |
-| `PladderRefine` | The polish models and the correction reviewer | FoundationModels, llama.cpp |
-| `Pladder` | The app: composition, menu, overlay, settings window, every user-facing sentence | SwiftUI |
+| `PladderSystem` | Hotkey monitors, paste, the Accessibility observer, output mute, key names, permissions, the transcript's language guess, the login item | AppKit, Carbon, CoreAudio, NaturalLanguage, ServiceManagement |
+| `PladderRefine` | The polish models, their downloads and the correction reviewer | FoundationModels, llama.cpp, NaturalLanguage, CryptoKit |
+| `Pladder` | The app: composition, menu, overlay, settings window, every user-facing sentence | SwiftUI, AppKit |
 | `PladderCLI` | `pladder-cli` | Everything but the app |
 | `PladderBench` | Word error rate for the benchmarks | Foundation |
 
@@ -204,8 +204,10 @@ user's clipboard, `KeyPoster` types the keys.
   when the next paste starts goes out before that paste's Cmd+V.
 - **Without Accessibility** the text is copied and stays; no restore, no
   Return.
-- **Quitting** (`flush`) waits for the read as the timer would, but gives up
-  at the 400 ms floor: at most 600 ms.
+- **Quitting** (`flush`) waits as the timer would, for the read and 200 ms
+  after it, no sooner than 400 ms after Cmd+V, but gives up on an app that
+  has not read by that 400 ms floor, since a quit cannot wait out the cap:
+  at most the floor plus the 200 ms settle.
 
 ## Muting the speakers
 
@@ -382,7 +384,7 @@ Errors and progress go to stderr, so stdout holds only results.
 | `bench <dir> --paced` | Feeds each fixture in one-second chunks at real time and times `endUtterance`; also transcribes it whole and reports whether the texts are identical. Skips fixtures under 13 s unless `--all`. `--live` adds the Live Transcript pass every 0.5 s and reports its cost. |
 | `bench-process <dir>` | Times the processor pipeline on the fixtures' scripts, with a filler in every sentence and with a spoken question mark too. `--runs N`, default 31. |
 | `polish <text file \| ->` | Runs a polish model over one transcript, cold and then warm. `--model apple\|s1-mini\|s1-mini-8bit`, `--instructions <file>` (Apple), `--gguf <file>` (any S1-mini-family model), `--control <line>` (S1-mini). |
-| `polish-set <set.json>` | Runs a polish model over a test set after the app's processors: every answer, word error rate per language, exact matches, timings. Same model flags. |
+| `polish-set <set.json>` | Runs a polish model over a test set after the app's processors: every answer, word error rate per language, exact matches, timings. `--model`, `--gguf` and `--control` as for `polish`; no `--instructions`. |
 
 Fixtures are audio files with a sibling `.txt` holding the script, made by
 `scripts/make-fixtures.sh`. The procedures are in
