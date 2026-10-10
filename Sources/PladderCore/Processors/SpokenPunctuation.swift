@@ -22,11 +22,13 @@ import Foundation
 /// article and an adjective that describes a mark ("the Oxford comma", "ein
 /// großes Fragezeichen"). Only such adjectives count, because any other word
 /// there is usually a noun the clause ends on: "to the end comma and then"
-/// is dictated. "this", "that" and the German definite articles count only
-/// with such an adjective, since on their own they end a clause as often as
-/// they start a noun phrase: "What is that question mark", "Was ist das
-/// Fragezeichen". Punctuation between the words ends the noun phrase, so the
-/// speech model's own "book. Full stop." is always a mark.
+/// is dictated. "this", "that", the German definite articles and "ein" count
+/// only with such an adjective, since on their own they end a clause as often
+/// as they start a noun phrase: "What is that question mark", "Was ist das
+/// Fragezeichen", and "ein" is also the separable prefix that ends "Schaltest
+/// du das Licht ein Fragezeichen". Punctuation between the words ends the
+/// noun phrase, so the speech model's own "book. Full stop." is always a
+/// mark.
 ///
 /// Runs after the whitespace step, which would otherwise fold the line
 /// breaks of "new paragraph" back into spaces.
@@ -78,13 +80,14 @@ public struct SpokenPunctuation: TextProcessor {
     /// the letter when it is a capital in mid-sentence ("plan A comma").
     private static let articles: Set<String> = [
         "a", "an", "the",
-        "ein", "eine", "einen", "einem",
+        "eine", "einen", "einem",
         "un", "una", "el", "la", "los", "las",
     ]
 
-    /// Determiners that are pronouns as well, so they count only with one of
-    /// `markAdjectives` after them.
-    private static let demonstratives: Set<String> = ["this", "that", "der", "die", "das", "dem", "den"]
+    /// Determiners that end a clause as well, so they count only with one of
+    /// `markAdjectives` after them: pronouns, and "ein", which is also the
+    /// separable prefix of "einschalten" and "einladen".
+    private static let demonstratives: Set<String> = ["this", "that", "der", "die", "das", "dem", "den", "ein"]
 
     /// Adjectives that describe a punctuation mark. A closed list, because an
     /// open guess would take the noun in "the end comma" for one. German
