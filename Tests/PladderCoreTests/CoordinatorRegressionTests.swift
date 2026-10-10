@@ -215,6 +215,20 @@ import Testing
         #expect(builds.all.count == 2)
     }
 
+    @Test func aCombinedUpdateRestartsTheMonitorOnce() async {
+        let fake = FakeHotkey()
+        let (c, _, _) = makeCoordinator(hotkeyMonitor: fake)
+        await c.startIdle()
+        var settings = c.settings
+        settings.hotkey = .rightOption
+        settings.submitKey = Hotkey(0x0B)
+        settings.toggleHotkey = Hotkey(0x3B, 0x02)
+        settings.dictionary = [DictionaryEntry(from: "a", to: "b")]
+        c.update(settings, hotkeyOverride: .optionSpace)
+        #expect(fake.startCount == 2)
+        #expect(fake.lastChords == [.dictate: .optionSpace, .toggle: Hotkey(0x3B, 0x02)])
+    }
+
     @Test func changesBeforeStartRegisterOnceAtStart() async {
         let first = FakeHotkey()
         let second = FakeHotkey()

@@ -50,10 +50,13 @@ public final class DictationCoordinator {
     public private(set) var inFlight: Task<Void, Never>?
 
     /// The app hands over a new value only when it differs; see
-    /// `DictationSettings`.
+    /// `DictationSettings`. Setting it is `update` with the stand-in left as
+    /// it is.
     public var settings: DictationSettings {
-        didSet { settingsChanged(from: oldValue) }
+        get { currentSettings }
+        set { update(newValue, hotkeyOverride: hotkeyOverride) }
     }
+    private var currentSettings: DictationSettings
 
     /// True while the settings window is recording a new chord. The monitor
     /// is taken down so the keys the user presses to define the new hotkey
@@ -79,26 +82,42 @@ public final class DictationCoordinator {
     /// which is what happens when Accessibility is granted. Nil means "listen
     /// for the stored chord". Applies to the dictate chord only; a toggle
     /// chord equal to the stored chord follows the override, so a stood-in
-    /// hybrid key stays hybrid.
+    /// hybrid key stays hybrid. Setting it is `update` with the settings
+    /// left as they are.
     public var hotkeyOverride: Hotkey? {
-        didSet {
-            guard hotkeyOverride != oldValue else { return }
-            hotkeyConfigurationChanged()
-        }
+        get { currentHotkeyOverride }
+        set { update(settings, hotkeyOverride: newValue) }
     }
+    private var currentHotkeyOverride: Hotkey?
 
-    /// Hands over the settings and the stand-in chord together, so a chord
-    /// change that also changes the stand-in restarts the monitor once, with
-    /// both. Set one after the other, the first restart would register the
-    /// new chord with the old stand-in: without Accessibility a modifier-only
-    /// chord that Carbon refuses, on its way to being stood in for.
-    public func update(_ settings: DictationSettings, hotkeyOverride: Hotkey?) {
-        deferredHotkeyRestart = false
-        if settings != self.settings { self.settings = settings }
-        self.hotkeyOverride = hotkeyOverride
-        let restart = deferredHotkeyRestart == true
-        deferredHotkeyRestart = nil
+    /// Hands over the settings, the stand-in chord and, when it changes, the
+    /// monitor together, so a chord change that also changes the stand-in or
+    /// the monitor restarts the monitor once, with all of them. Set one after
+    /// the other, the first restart would register the new chord with the
+    /// old stand-in or on the old monitor: without Accessibility, or under
+    /// Secure Event Input, a modifier-only chord that Carbon refuses, on its
+    /// way to being stood in for or handed to the tap.
+    public func update(
+        _ settings: DictationSettings, hotkeyOverride: Hotkey?, monitor: (any HotkeyMonitor)? = nil
+    ) {
+        let old = currentSettings
+        // The submit key counts: the restarted monitor would never deliver
+        // the pending release for the old configuration. So does the toggle
+        // key, which may also turn the key hybrid or back.
+        let restart = monitor != nil || hotkeyOverride != currentHotkeyOverride
+            || old.hotkey != settings.hotkey || old.submitKey != settings.submitKey
+            || old.toggleHotkey != settings.toggleHotkey
+        currentSettings = settings
+        currentHotkeyOverride = hotkeyOverride
+        if let monitor {
+            stopHotkey()
+            hotkeyMonitor = monitor
+        }
+        // Rebuilt here so that no processor is constructed on the
+        // release-to-paste path.
+        if old != settings { pipeline = makePipeline(settings) }
         if restart { hotkeyConfigurationChanged() }
+        if old.engineID != settings.engineID { engineChanged() }
     }
 
     /// Minimum recording length worth transcribing. Taps shorter than this are
@@ -165,9 +184,6 @@ public final class DictationCoordinator {
     /// chord change made while the app is still setting up costs nothing,
     /// and `start()` registers what is current by then, once.
     private var isStarted = false
-    /// Non-nil inside `update(_:hotkeyOverride:)`: true once a change there
-    /// needs the monitor restarted, which happens once, at the end.
-    private var deferredHotkeyRestart: Bool?
     private var hotkeyTask: Task<Void, Never>?
     private var levelTask: Task<Void, Never>?
     /// Returns `.error` or `.copied` to idle after its display duration.
@@ -289,7 +305,7 @@ public final class DictationCoordinator {
         clock: any Clock<Duration> = ContinuousClock(),
         onEvent: @escaping @Sendable (Event) -> Void = { _ in }
     ) {
-        self.settings = settings
+        currentSettings = settings
         self.capture = capture
         self.output = output
         self.outputMuter = outputMuter
@@ -344,9 +360,7 @@ public final class DictationCoordinator {
     /// Swaps the hotkey source, for example when Accessibility is granted or
     /// revoked and the app moves between the event tap and Carbon.
     public func replaceHotkeyMonitor(_ monitor: any HotkeyMonitor) {
-        stopHotkey()
-        hotkeyMonitor = monitor
-        hotkeyConfigurationChanged()
+        update(settings, hotkeyOverride: hotkeyOverride, monitor: monitor)
     }
 
     private func setEngineStatus(_ status: EngineStatus) {
@@ -358,20 +372,8 @@ public final class DictationCoordinator {
         }
     }
 
-    private func settingsChanged(from old: DictationSettings) {
-        guard settings != old else { return }
-        // Rebuilt here so that no processor is constructed on the
-        // release-to-paste path. Only dictation settings reach this, and the
-        // app assigns only real changes, so it runs a handful of times a day.
-        pipeline = makePipeline(settings)
-        // The submit key counts: the restarted monitor would never deliver
-        // the pending release for the old configuration. So does the toggle
-        // key, which may also turn the key hybrid or back.
-        if old.hotkey != settings.hotkey || old.submitKey != settings.submitKey
-            || old.toggleHotkey != settings.toggleHotkey {
-            hotkeyConfigurationChanged()
-        }
-        if old.engineID != settings.engineID, let previous = loader.select(settings.engineID) {
+    private func engineChanged() {
+        if let previous = loader.select(settings.engineID) {
             // The replaced engine is unloaded only once nothing is using it:
             // the running cycle transcribes with the engine that was ready at
             // press, and unloading it mid-cycle would lose the dictation.
@@ -401,10 +403,6 @@ public final class DictationCoordinator {
     /// in progress is dropped, and the monitor starts over unless it is
     /// suspended or the coordinator has not started yet.
     private func hotkeyConfigurationChanged() {
-        if deferredHotkeyRestart != nil {
-            deferredHotkeyRestart = true
-            return
-        }
         dropRecording()
         guard isStarted, !isHotkeySuspended else { return }
         startHotkey()
