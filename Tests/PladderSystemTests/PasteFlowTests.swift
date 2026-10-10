@@ -143,6 +143,22 @@ extension PasteboardTests {
             #expect(await h.output.keeper.pendingRestore == nil)
         }
 
+        @Test func aFailedCmdVThatCannotRestoreStillHoldsTheTranscript() async throws {
+            let h = PasteHarness(snapshotLimit: 4)
+            h.userCopies("far too long to keep")
+            h.poster.refuse(PasteHarness.keyV)
+
+            await #expect(throws: RecordingKeyPoster.Refused.self) {
+                try await h.output.insert("transcript", submit: false)
+            }
+            #expect(h.holdsTranscript)
+            #expect(await h.output.keeper.pendingRestore == nil)
+            #expect(await h.output.keeper.leftPromise != nil)
+            let before = await h.output.keeper.snapshotsTaken
+            await h.output.prepare()
+            #expect(await h.output.keeper.snapshotsTaken == before)
+        }
+
         @Test func flushRestoresOnceTheTargetHasRead() async throws {
             let h = PasteHarness(clipboard: "original")
 

@@ -71,6 +71,12 @@ import Testing
         #expect(try await run("I read the book. Full stop.") == "I read the book.")
     }
 
+    @Test func aMarkAfterTheSeparablePrefixEinIsDictated() async throws {
+        #expect(try await run("Schaltest du das Licht ein Fragezeichen") == "Schaltest du das Licht ein?")
+        #expect(try await run("Ich lade dich ein Komma dann reden wir") == "Ich lade dich ein, dann reden wir")
+        #expect(try await run("ein großes Fragezeichen dahinter") == "ein großes Fragezeichen dahinter")
+    }
+
     @Test func spanishComaNeedsSpanishEvidence() async throws {
         #expect(try await run("The patient was in a coma for a week.", hint: { _ in "en" })
             == "The patient was in a coma for a week.")

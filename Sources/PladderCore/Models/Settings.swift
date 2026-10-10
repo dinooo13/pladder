@@ -156,15 +156,12 @@ public final class SettingsStore: Sendable {
     }
 
     // Nothing the user wrote is lost to a load: an unreadable file is moved aside, a
-    // file decoded with something dropped is copied aside.
+    // file decoded with something dropped is copied aside, once per distinct content.
     public func load() -> Settings {
         guard let data = try? Data(contentsOf: url) else { return defaults }
-        let decoder = JSONDecoder()
-        let report = SettingsDecodingReport()
-        decoder.userInfo[SettingsDecodingReport.key] = report
         do {
-            let settings = try decoder.decode(Settings.self, from: data)
-            if !report.droppedKeys.isEmpty {
+            let (settings, dropped) = try Self.decode(data)
+            if !dropped.isEmpty, !hasBackup(of: data) {
                 try? FileManager.default.copyItem(at: url, to: backupURL())
             }
             return settings
@@ -174,15 +171,33 @@ public final class SettingsStore: Sendable {
         }
     }
 
-    // Keeps every key this build does not know: two worktrees' builds share the file,
-    // and a newer build's settings must survive an older one saving.
+    private static func decode(_ data: Data) throws -> (Settings, droppedKeys: [String]) {
+        let decoder = JSONDecoder()
+        let report = SettingsDecodingReport()
+        decoder.userInfo[SettingsDecodingReport.key] = report
+        let settings = try decoder.decode(Settings.self, from: data)
+        return (settings, report.droppedKeys)
+    }
+
+    // Keeps every key this build does not know, and one it could not read while `settings`
+    // still holds the load's stand-in, so a newer build's values survive an older one saving.
+    // See docs/ARCHITECTURE.md, "Settings file".
     public func save(_ settings: Settings) throws {
-        let ours = try JSONEncoder().encode(settings)
+        let encoder = JSONEncoder()
+        let ours = try encoder.encode(settings)
         guard var object = try JSONSerialization.jsonObject(with: ours) as? [String: Any] else { return }
         if let existing = try? Data(contentsOf: url),
            let theirs = try? JSONSerialization.jsonObject(with: existing) as? [String: Any] {
             var kept = theirs.filter { !Settings.retiredKeys.contains($0.key) }
             kept.merge(object) { _, ours in ours }
+            if let (read, dropped) = try? Self.decode(existing), !dropped.isEmpty,
+               let readObject = try? JSONSerialization.jsonObject(with: encoder.encode(read)) as? [String: Any] {
+                for key in Set(dropped) {
+                    guard let raw = theirs[key], let mine = object[key], let loaded = readObject[key],
+                          (mine as AnyObject).isEqual(loaded) else { continue }
+                    kept[key] = raw
+                }
+            }
             object = kept
         }
         let data = try JSONSerialization.data(
@@ -190,6 +205,16 @@ public final class SettingsStore: Sendable {
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: url, options: .atomic)
+    }
+
+    private func hasBackup(of data: Data) -> Bool {
+        let directory = url.deletingLastPathComponent()
+        let prefix = url.deletingPathExtension().lastPathComponent + ".broken-"
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
+        return names.contains { name in
+            name.hasPrefix(prefix) && name.hasSuffix(".json")
+                && (try? Data(contentsOf: directory.appending(path: name))) == data
+        }
     }
 
     private func backupURL() -> URL {

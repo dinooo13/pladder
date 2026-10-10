@@ -48,12 +48,13 @@ public struct SpokenPunctuation: TextProcessor {
     // letter when it is a capital in mid-sentence ("plan A comma").
     private static let articles: Set<String> = [
         "a", "an", "the",
-        "ein", "eine", "einen", "einem",
+        "eine", "einen", "einem",
         "un", "una", "el", "la", "los", "las",
     ]
 
-    // Pronouns as well, so they count only with one of `markAdjectives` after them.
-    private static let demonstratives: Set<String> = ["this", "that", "der", "die", "das", "dem", "den"]
+    // They end a clause as well, so they count only with one of `markAdjectives` after them:
+    // pronouns, and "ein", the separable prefix of "einschalten" and "einladen".
+    private static let demonstratives: Set<String> = ["this", "that", "der", "die", "das", "dem", "den", "ein"]
 
     // A closed list: an open guess would take the noun in "the end comma" for one.
     // German entries are stems, matched with their ending taken off.

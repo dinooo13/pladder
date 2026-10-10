@@ -16,6 +16,8 @@ final class PolishModelController {
     @ObservationIgnored private let files: ModelFiles
     @ObservationIgnored private let statusRelay = MainActorRelay<(ModelFile, ModelFileStatus)>()
     @ObservationIgnored private var chosenFile: ModelFile?
+    // A quick polish off and on must not let its cancel reach `files` after its ensure.
+    @ObservationIgnored private let fileWork = OrderedTasks()
 
     init() {
         refiner = PolishRouter(applePolisher)
@@ -37,7 +39,7 @@ final class PolishModelController {
     func apply(model: PolishModel, polishing: Bool) {
         if let previous = chosenFile, previous != ModelFile(for: model) || !polishing {
             let files = self.files
-            Task { await files.cancel(previous) }
+            fileWork.enqueue { await files.cancel(previous) }
         }
         guard let file = ModelFile(for: model) else {
             chosenFile = nil
@@ -59,7 +61,7 @@ final class PolishModelController {
             Task { await polisher.unload() }
         }
         let files = self.files
-        Task { [weak self] in
+        fileWork.enqueue { [weak self] in
             if polishing { await files.ensure(file) }
             let status = await files.status(of: file)
             guard let self, file == self.chosenFile else { return }
@@ -70,7 +72,7 @@ final class PolishModelController {
     func retryDownload() {
         guard let file = chosenFile else { return }
         let files = self.files
-        Task { await files.ensure(file) }
+        fileWork.enqueue { await files.ensure(file) }
     }
 
     private func releaseS1Mini() {

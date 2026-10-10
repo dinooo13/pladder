@@ -122,6 +122,40 @@ import Testing
         }
     }
 
+    @Test func theSameDroppedFileIsCopiedOnce() throws {
+        try withStore(file: #"{"engineID":"echo","overlayStyle":"newStyle"}"#) { store, url in
+            _ = store.load()
+            _ = store.load()
+            _ = SettingsStore(url: url, defaults: Self.defaults).load()
+            #expect(Self.backups(beside: url).count == 1)
+        }
+    }
+
+    @Test func savingKeepsAValueThisBuildCouldNotRead() throws {
+        try withStore(file: #"{"engineID":"echo","overlayStyle":"newStyle","appearance":"futureCase"}"#) { store, url in
+            var settings = store.load()
+            #expect(settings.overlayStyle == Self.defaults.overlayStyle)
+            settings.playSounds = false
+            settings.appearance = .dark
+            try store.save(settings)
+            let object = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+            #expect(object["overlayStyle"] as? String == "newStyle")
+            #expect(object["appearance"] as? String == "dark")
+            #expect(object["playSounds"] as? Bool == false)
+            #expect(store.load() == settings)
+        }
+    }
+
+    @Test func choosingTheDroppedSettingReplacesIt() throws {
+        try withStore(file: #"{"engineID":"echo","overlayStyle":"newStyle"}"#) { store, url in
+            var settings = store.load()
+            settings.overlayStyle = .minimal
+            try store.save(settings)
+            let object = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+            #expect(object["overlayStyle"] as? String == "minimal")
+        }
+    }
+
     @Test func savingKeepsKeysANewerBuildWrote() throws {
         try withStore(file: #"{"engineID":"echo","someFutureSetting":{"on":true},"playSounds":false}"#) { store, url in
             var settings = store.load()

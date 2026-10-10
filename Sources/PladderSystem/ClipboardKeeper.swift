@@ -123,9 +123,12 @@ actor ClipboardKeeper {
         do {
             try post()
         } catch {
-            // Never leave the user's clipboard holding our transcript.
-            if pending?.changeCount == ourChangeCount { endPending() }
-            snapshot.restore(ifChangeCountIs: ourChangeCount, on: pasteboard)
+            // The same restore as after a paste: a transcript the snapshot cannot replace is
+            // kept in `left`, so the next `prepare()` does not take it for the user's clipboard.
+            if let failed = pending, failed.changeCount == ourChangeCount {
+                endPending()
+                restore(failed)
+            }
             throw error
         }
         let posted = clock.now()

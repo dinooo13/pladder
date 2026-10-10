@@ -102,6 +102,21 @@ final class HotkeyRecorder {
     private var systemShortcuts: Set<Hotkey> = []
     private var secureInputNotice: String?
 
+    private static let slot = HotkeyRecordingSlot<HotkeyRecorder> { $0.cancel() }
+    private let token: HotkeyRecordingSlot<HotkeyRecorder>.Token
+
+    init() {
+        token = Self.slot.makeToken()
+    }
+
+    // A field torn down mid-recording need not get `onDisappear`; the monitors hold this
+    // weakly, so it is freed and gives the hotkey back here.
+    isolated deinit {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        if let resignObserver { NotificationCenter.default.removeObserver(resignObserver) }
+        Self.slot.release(token)
+    }
+
     func begin(
         requiresRegularKey: Bool = false,
         allowsEmpty: Bool = false,
@@ -111,7 +126,7 @@ final class HotkeyRecorder {
     ) {
         // A restart keeps the session rather than resuming and suspending the hotkey between.
         tearDown()
-        RecordingSlot.shared.claim(for: self, setHotkeySuspended: setHotkeySuspended)
+        Self.slot.claim(token, by: self, setHotkeySuspended: setHotkeySuspended)
         self.commit = commit
         self.requiresRegularKey = requiresRegularKey
         self.allowsEmpty = allowsEmpty
@@ -123,7 +138,8 @@ final class HotkeyRecorder {
             : nil
         notice = secureInputNotice
         isRecording = true
-        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp, .flagsChanged]) { event in
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp, .flagsChanged]) { [weak self] event in
+            guard let self else { return event }
             // `NSEvent` is not Sendable, so the plain values are pulled out before hopping.
             let key = KeyTransition(
                 type: event.type, keyCode: event.keyCode,
@@ -136,8 +152,8 @@ final class HotkeyRecorder {
         // next key press.
         resignObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.didResignKeyNotification, object: nil, queue: .main
-        ) { _ in
-            MainActor.assumeIsolated { self.cancel() }
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.cancel() }
         }
     }
 
@@ -215,7 +231,7 @@ final class HotkeyRecorder {
         let commit = self.commit
         tearDown()
         if let chord { commit?(chord) }
-        RecordingSlot.shared.release(by: self)
+        Self.slot.release(token)
     }
 
     private func tearDown() {
@@ -235,33 +251,5 @@ final class HotkeyRecorder {
         heldModifiers = []
         modifierState = ModifierKeyState()
         isRecording = false
-    }
-}
-
-// Keeps the closure that suspended the hotkey: it is the one that resumes it.
-@MainActor
-private final class RecordingSlot {
-    static let shared = RecordingSlot()
-
-    private var session = HotkeyRecordingSession<ObjectIdentifier>()
-    private weak var holder: HotkeyRecorder?
-    private var setHotkeySuspended: ((Bool) -> Void)?
-
-    func claim(for recorder: HotkeyRecorder, setHotkeySuspended: @escaping (Bool) -> Void) {
-        let begin = session.begin(ObjectIdentifier(recorder))
-        let displaced = holder
-        holder = recorder
-        self.setHotkeySuspended = setHotkeySuspended
-        // After the session has moved on, so the displaced recorder's own release is a no-op.
-        if begin.displaced != nil { displaced?.cancel() }
-        if begin.suspends { setHotkeySuspended(true) }
-    }
-
-    func release(by recorder: HotkeyRecorder) {
-        guard session.end(ObjectIdentifier(recorder)) else { return }
-        holder = nil
-        let resume = setHotkeySuspended
-        setHotkeySuspended = nil
-        resume?(false)
     }
 }

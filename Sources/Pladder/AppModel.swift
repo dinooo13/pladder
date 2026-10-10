@@ -147,8 +147,10 @@ final class AppModel {
     // MARK: Settings
 
     private func settingsChanged(from old: Settings) {
-        let dictation = DictationSettings(settings)
-        if dictation != coordinator.settings { coordinator.settings = dictation }
+        if settings.hotkey != old.hotkey {
+            hotkeys.hotkeyChanged(to: settings.hotkey)
+        }
+        coordinator.update(DictationSettings(settings), standInHotkey: hotkeys.standInHotkey)
         if settings.appearance != old.appearance {
             applyAppearance(settings.appearance)
         }
@@ -157,9 +159,6 @@ final class AppModel {
         }
         if settings.overlayAnimationSpeed != old.overlayAnimationSpeed {
             overlay.applySpeed(settings.overlayAnimationSpeed)
-        }
-        if settings.hotkey != old.hotkey {
-            hotkeys.hotkeyChanged(to: settings.hotkey)
         }
         if settings.polishModel != old.polishModel || settings.polishDictations != old.polishDictations {
             polish.apply(model: settings.polishModel, polishing: settings.polishDictations)

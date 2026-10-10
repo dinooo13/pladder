@@ -166,6 +166,12 @@ import Testing
         #expect(c.apply(to: "the rost") == "the Rust")
     }
 
+    @Test func aLongerCandidateDoesNotLiftTheShortKeyCap() {
+        let c = CustomWordCorrector(entries: [DictionaryEntry(from: "", to: "Swift")], isOrdinaryWord: { _ in false })
+        #expect(c.apply(to: "the soviet union") == "the soviet union")
+        #expect(c.apply(to: "the swifft code") == "the Swift code")
+    }
+
     @Test func theLexiconIsWhatKeepsALongerOrdinaryWord() {
         let terms = [DictionaryEntry(from: "", to: "Claude")]
         let open = CustomWordCorrector(entries: terms, isOrdinaryWord: { _ in false })

@@ -193,8 +193,9 @@ public struct CustomWordCorrector: TextProcessor {
         var limit = Int(bound)
         if Double(limit) >= bound { limit -= 1 }
         // On a short key Soundex is nearly the whole word, so it buys one edit:
-        // "rost" reaches "Rust", "roast" does not.
-        if soundexAgrees, longer <= shortKeyLength { limit = min(limit, shortKeySoundexEdits) }
+        // "rost" reaches "Rust", "roast" does not. The key's length decides, so a
+        // longer candidate cannot lift the cap ("soviet" is three edits from "Swift").
+        if soundexAgrees, b.count <= shortKeyLength { limit = min(limit, shortKeySoundexEdits) }
         guard limit >= 1 else { return nil }
 
         guard let distance = levenshtein(a, b, limit: limit, rows: &rows) else { return nil }

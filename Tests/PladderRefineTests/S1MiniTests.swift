@@ -22,7 +22,6 @@ import Testing
 
             </think>
 
-
             """)
     }
 
@@ -140,6 +139,47 @@ private struct StandInModel: PromptCompleter {
         // does not depend on it.
         try await Task.sleep(for: .milliseconds(20))
         #expect(await polisher.refine("send it") == "Second.")
+    }
+
+    @Test func aLoadAfterUnloadWaitsForTheAbandonedOneToBeFreed() async throws {
+        let gate = Gate()
+        let resident = Resident()
+        let loadsStarted = Recorder<Int>()
+        let (polisher, dir) = try polisher(timeout: .milliseconds(40)) { _, _ in
+            loadsStarted.append(resident.count)
+            if loadsStarted.all.count == 1 { await gate.wait() }
+            return CountedModel(resident)
+        }
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        _ = await polisher.polish("send it")
+        await polisher.unload()
+        let second = Task { await polisher.prepare() }
+        try await Task.sleep(for: .milliseconds(30))
+        #expect(loadsStarted.all == [0])
+        await gate.open()
+        await second.value
+        #expect(loadsStarted.all == [0, 0])
+        #expect(resident.count == 1)
+        #expect(await polisher.refine("send it") == "Counted.")
+    }
+}
+
+private final class Resident: Sendable {
+    private let state = Recorder<Int>()
+    var count: Int { state.all.reduce(0, +) }
+    func add(_ delta: Int) { state.append(delta) }
+}
+
+private final class CountedModel: PromptCompleter {
+    private let resident: Resident
+    init(_ resident: Resident) {
+        self.resident = resident
+        resident.add(1)
+    }
+    deinit { resident.add(-1) }
+    func complete(suffix: String, maxTokens: Int, deadline: ContinuousClock.Instant) async throws -> String {
+        "Counted."
     }
 }
 

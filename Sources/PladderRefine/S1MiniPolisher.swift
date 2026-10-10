@@ -37,6 +37,9 @@ public actor S1MiniPolisher: ReportingRefiner {
     private let load: Loader
     private var model: (any PromptCompleter)?
     private var loading: Task<(any PromptCompleter)?, Never>?
+    // llama.cpp ignores cancellation, so a load `unload()` gave up on still reads weights;
+    // the next load waits for it rather than holding two models at once.
+    private var abandoned: Task<(any PromptCompleter)?, Never>?
     // Bumped by `unload()`, so a load it interrupted cannot store its model.
     private var generation = 0
     private static let log = Logger(subsystem: "de.dinooo13.pladder", category: "polish")
@@ -74,7 +77,10 @@ public actor S1MiniPolisher: ReportingRefiner {
     }
 
     public func unload() {
-        loading?.cancel()
+        if let loading {
+            loading.cancel()
+            abandoned = loading
+        }
         loading = nil
         model = nil
         generation += 1
@@ -151,19 +157,23 @@ public actor S1MiniPolisher: ReportingRefiner {
         let prefix = Self.promptPrefix(control: control)
         let load = load
         let generation = generation
+        let previous = abandoned
         let task = Task {
+            _ = await previous?.value
             let model = try? await load(path, prefix)
-            self.finishLoad(model, generation: generation)
-            return model
+            return self.finishLoad(model, generation: generation)
         }
         loading = task
         return task
     }
 
-    private func finishLoad(_ model: (any PromptCompleter)?, generation: Int) {
-        guard generation == self.generation else { return }
+    // A dropped result is released here, so the abandoned task does not keep the model alive.
+    private func finishLoad(_ model: (any PromptCompleter)?, generation: Int) -> (any PromptCompleter)? {
+        guard generation == self.generation else { return nil }
         self.model = model
         loading = nil
+        abandoned = nil
+        return model
     }
 }
 

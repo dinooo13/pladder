@@ -54,7 +54,6 @@ final class HotkeyRouter {
     func hotkeyChanged(to hotkey: Hotkey) {
         guard hotkey != self.hotkey else { return }
         self.hotkey = hotkey
-        applyStandIn()
     }
 
     var standInHotkey: Hotkey? {

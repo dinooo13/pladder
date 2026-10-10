@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
-import Observation
 import PladderCore
+import PladderSystem
 
 // When the pill appears and how it leaves: docs/ARCHITECTURE.md, "The overlay".
 @MainActor
@@ -13,6 +13,8 @@ final class OverlayController {
     private var hideTask: Task<Void, Never>?
     private var presentTask: Task<Void, Never>?
     private var running = false
+    private let stateLoop = ObservationLoop()
+    private let levelLoop = ObservationLoop()
     private var visible = false
     // A pill held up for polish leaves by the dive, even when `.polishing` never comes:
     // a transcript under the polish minimum is pasted straight from `.transcribing`.
@@ -39,6 +41,8 @@ final class OverlayController {
 
     func stop() {
         running = false
+        stateLoop.stop()
+        levelLoop.stop()
         cancelPresent()
         hideTask?.cancel()
         panel.orderOut(nil)
@@ -59,34 +63,27 @@ final class OverlayController {
         model.speed = speed
     }
 
-    // Fires once, and before the new value is stored: re-armed every time, read on a task.
     private func observe() {
-        withObservationTracking {
+        stateLoop.start { [coordinator] in
             _ = coordinator.state
             // Between two live passes the state stays `.recording`, so a new partial must re-arm.
             _ = coordinator.partialTranscript
         } onChange: { [weak self] in
-            Task { @MainActor [weak self] in
-                guard let self, self.running else { return }
-                self.apply(self.coordinator.state)
-                self.observe()
-            }
+            guard let self else { return }
+            self.apply(self.coordinator.state)
         }
     }
 
     // Its own loop: the level changes twenty times a second and only the bars need it.
     private func observeLevel() {
-        withObservationTracking {
+        levelLoop.start { [coordinator] in
             _ = coordinator.inputLevel
         } onChange: { [weak self] in
-            Task { @MainActor [weak self] in
-                guard let self, self.running else { return }
-                // Only while recording: the pill gathers from its last row, and the level dropping
-                // to zero would flatten the bars mid-gather.
-                if self.coordinator.state.isRecording {
-                    self.model.level = self.coordinator.inputLevel
-                }
-                self.observeLevel()
+            guard let self else { return }
+            // Only while recording: the pill gathers from its last row, and the level dropping
+            // to zero would flatten the bars mid-gather.
+            if self.coordinator.state.isRecording {
+                self.model.level = self.coordinator.inputLevel
             }
         }
     }

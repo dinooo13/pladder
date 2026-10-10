@@ -38,6 +38,17 @@ public final class DictationCoordinator {
         }
     }
 
+    // Both at once, one restart: set one after the other, the first restart would register the
+    // new chord with the old stand-in, which without Accessibility can be a chord Carbon refuses.
+    public func update(_ settings: DictationSettings, standInHotkey: Hotkey?) {
+        deferredHotkeyRestart = false
+        if settings != self.settings { self.settings = settings }
+        self.standInHotkey = standInHotkey
+        let restart = deferredHotkeyRestart == true
+        deferredHotkeyRestart = nil
+        if restart { hotkeyConfigurationChanged() }
+    }
+
     public var minimumDuration: TimeInterval = 0.3
     public var minimumPolishWords = 4
     // A key-up can be lost for real, e.g. while Secure Event Input hides keys from the tap.
@@ -68,6 +79,8 @@ public final class DictationCoordinator {
     private let onEvent: @Sendable (Event) -> Void
 
     private var isStarted = false
+    // Non-nil inside `update(_:standInHotkey:)`; true once a restart is owed at its end.
+    private var deferredHotkeyRestart: Bool?
     private var hotkeyTask: Task<Void, Never>?
     private var levelTask: Task<Void, Never>?
     private var transientResetTask: Task<Void, Never>?
@@ -221,6 +234,10 @@ public final class DictationCoordinator {
     // A release from the old configuration never arrives on the new stream, so a
     // recording in progress is dropped.
     private func hotkeyConfigurationChanged() {
+        if deferredHotkeyRestart != nil {
+            deferredHotkeyRestart = true
+            return
+        }
         dropRecording()
         guard isStarted, !isHotkeySuspended else { return }
         startHotkey()
@@ -232,9 +249,14 @@ public final class DictationCoordinator {
         hotkeyMonitor.stop()
     }
 
+    // Ends the recording before the caller starts a new monitor: ended from a task, a press on
+    // the new stream could still find `.recording` and be refused.
     private func dropRecording() {
-        guard state.isRecording else { return }
-        Task { await cancelRecording() }
+        guard let cleanup = beginCancel() else { return }
+        Task {
+            await cleanup.value
+            drainPendingUnloads()
+        }
     }
 
     private func startHotkey() {
@@ -598,7 +620,14 @@ public final class DictationCoordinator {
     }
 
     public func cancelRecording() async {
-        guard state.isRecording else { return }
+        guard let cleanup = beginCancel() else { return }
+        await cleanup.value
+        drainPendingUnloads()
+    }
+
+    // Synchronous, so the state is idle on return; the task stops the microphone.
+    private func beginCancel() -> Task<Void, Never>? {
+        guard state.isRecording else { return nil }
         let feed = endRecording()
         willPolish = false
         becomeIdle()
@@ -612,8 +641,7 @@ public final class DictationCoordinator {
             await engine?.abandonUtterance()
         }
         cancelCleanup = cleanup
-        await cleanup.value
-        drainPendingUnloads()
+        return cleanup
     }
 
     // Before the mic has finished stopping, so the stop sound is not late.
