@@ -102,8 +102,8 @@ import Testing
         let json = #"{"engineID":"echo","appearance":"someFutureCase","dictionary":[\#(Self.entryJSON)]}"#
         try withStore(file: json) { store, url in
             #expect(store.load().dictionary.count == 1)
-            // The original stays where it is; the copy is the safety net for the
-            // next save, which writes the default over the dropped value.
+            // The original stays where it is; the copy is the safety net for a
+            // save after the user changed the dropped setting.
             #expect(FileManager.default.fileExists(atPath: url.path))
             #expect(Self.backups(beside: url).count == 1)
         }
@@ -127,7 +127,47 @@ import Testing
         }
     }
 
+    // Before: every load of a file with something dropped added a copy, so
+    // an older build launched daily against a newer build's file piled them
+    // up without end.
+    @Test func theSameDroppedFileIsCopiedOnce() throws {
+        try withStore(file: #"{"engineID":"echo","overlayStyle":"newStyle"}"#) { store, url in
+            _ = store.load()
+            _ = store.load()
+            _ = SettingsStore(url: url, defaults: Self.defaults).load()
+            #expect(Self.backups(beside: url).count == 1)
+        }
+    }
+
     // MARK: Keys this build does not know
+
+    // Before: the first save in the older build wrote the default over the
+    // newer build's value it could not read.
+    @Test func savingKeepsAValueThisBuildCouldNotRead() throws {
+        try withStore(file: #"{"engineID":"echo","overlayStyle":"newStyle","appearance":"futureCase"}"#) { store, url in
+            var settings = store.load()
+            #expect(settings.overlayStyle == Self.defaults.overlayStyle)
+            settings.playSounds = false
+            // The user does choose an appearance: theirs wins over the file.
+            settings.appearance = .dark
+            try store.save(settings)
+            let object = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+            #expect(object["overlayStyle"] as? String == "newStyle")
+            #expect(object["appearance"] as? String == "dark")
+            #expect(object["playSounds"] as? Bool == false)
+            #expect(store.load() == settings)
+        }
+    }
+
+    @Test func choosingTheDroppedSettingReplacesIt() throws {
+        try withStore(file: #"{"engineID":"echo","overlayStyle":"newStyle"}"#) { store, url in
+            var settings = store.load()
+            settings.overlayStyle = .minimal
+            try store.save(settings)
+            let object = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+            #expect(object["overlayStyle"] as? String == "minimal")
+        }
+    }
 
     @Test func savingKeepsKeysANewerBuildWrote() throws {
         try withStore(file: #"{"engineID":"echo","someFutureSetting":{"on":true},"playSounds":false}"#) { store, url in
