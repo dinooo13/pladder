@@ -74,7 +74,9 @@ release-to-paste log line (`TimingLine.swift`).
 press, a hotkey change and quitting. The microphone goes off first; the
 engine drops the utterance only once the feed loop has exited, so no chunk
 lands after it. A press right after a cancel waits for that cleanup, so the
-old utterance's `abandonUtterance` cannot drop the new one.
+old utterance's `abandonUtterance` cannot drop the new one. A hotkey change
+ends the recording before the new monitor starts, so a press on the new
+stream finds the machine idle and only waits for that cleanup.
 
 **Engines swapped mid-cycle** are unloaded once the cycle ends: the running
 cycle keeps the engine it started with.
@@ -177,7 +179,13 @@ Input change.
 
 Without Accessibility a stored chord Carbon cannot register is stood in for
 by Option+Space (`DictationCoordinator.standInHotkey`); the stored chord is
-never rewritten.
+never rewritten. A chord change hands the coordinator the new chord and its
+stand-in together (`update(_:standInHotkey:)`), in one restart.
+
+While a settings field records a chord the hotkey is suspended.
+`HotkeyRecordingSlot` holds the one recording session: beginning in one
+field ends the other's, and only the field holding the session resumes the
+hotkey, also when the field is freed mid-recording.
 
 ## Paste and clipboard
 
@@ -204,6 +212,10 @@ user's clipboard, `KeyPoster` types the keys.
   when the next paste starts goes out before that paste's Cmd+V.
 - **Without Accessibility** the text is copied and stays; no restore, no
   Return.
+- **A failed Cmd+V** puts the clipboard back at once, through the same
+  restore: when every item of the user's clipboard was too large to keep,
+  the transcript stays and the keeper holds it, so the next snapshot does
+  not take it for the user's clipboard.
 - **Quitting** (`flush`) waits as the timer would, for the read and 200 ms
   after it, no sooner than 400 ms after Cmd+V, but gives up on an app that
   has not read by that 400 ms floor, since a quit cannot wait out the cap:
@@ -243,7 +255,8 @@ transcript is tried as a run of one to four tokens, reduced to lowercase
 ASCII letters and digits, and scored by edit distance over the longer
 length, times 0.3 when the Soundex codes agree; under 0.18 it matches. Keys
 of three characters or fewer must match exactly, Soundex buys at most one
-edit on keys of five or fewer, and a single everyday word
+edit on keys of five or fewer however long the candidate, so "soviet" never
+becomes "Swift", and a single everyday word
 (`CommonWords`) is never rewritten, since the speaker most likely said it. A
 match never crosses punctuation, and a possessive "'s" is kept.
 
@@ -251,8 +264,11 @@ match never crosses punctuation, and a possessive "'s" is kept.
 ("question mark", "Fragezeichen"); "period", "Punkt" and "punto" stay words.
 A phrase after an article ("add a semicolon"), or after an article or
 demonstrative and an adjective describing a mark ("the Oxford comma"), is
-the noun, not a mark. Spanish "coma" needs the language guess. It runs last
-because the whitespace step would fold "new paragraph" back into a space.
+the noun, not a mark. German "ein" counts only with such an adjective ("ein
+großes Fragezeichen"): it is also the separable prefix that ends "Schaltest
+du das Licht ein", where the mark after it is dictated. Spanish "coma"
+needs the language guess. It runs last because the whitespace step would
+fold "new paragraph" back into a space.
 
 ## Polish
 
@@ -275,7 +291,12 @@ model's file and memory.
 - **S1-mini** (`S1MiniPolisher` on `LlamaModel`). llama.cpp on the GPU,
   greedy, with the fixed prompt prefix decoded once at load and its cache
   kept. The model loads at the first key-down after it is chosen and stays
-  loaded until polish is turned off or another model is picked.
+  loaded until polish is turned off or another model is picked. A load
+  still running then is dropped once it finishes, and the next load waits
+  for it, so two models are never resident at once.
+- **The file.** `PolishModelController` downloads it only while polish is
+  on and the model chosen, and cancels the download when either changes,
+  in the order the settings changed.
 
 Neither logs the transcript: log lines carry numbers and error case names.
 
@@ -324,11 +345,15 @@ wrote is lost to a load or a save:
   Only a file that is not a JSON object fails.
 - **Backups.** A file that decoded with something dropped is copied to
   `settings.broken-<time>.json`; one that failed is moved there. Names never
-  collide, so an older backup is never replaced.
+  collide, so an older backup is never replaced, and a file already backed
+  up byte for byte is not copied again: an older build launched every day
+  against a newer build's file would otherwise add a copy per launch.
 - **Unknown keys survive.** A save merges into the existing file, keeping
   keys this build does not know, because two worktrees' builds share it.
-  Keys older versions wrote and nobody reads (`Settings.retiredKeys`) are
-  dropped.
+  A key this build knows but could not read keeps the file's value too, as
+  long as the settings still hold the default the load put in its place;
+  once the user picks a value for it, theirs is written. Keys older
+  versions wrote and nobody reads (`Settings.retiredKeys`) are dropped.
 
 The coordinator sees only `DictationSettings`, and the app assigns a new
 value only when that part changed. `PLADDER_SETTINGS_PATH` points a test copy
