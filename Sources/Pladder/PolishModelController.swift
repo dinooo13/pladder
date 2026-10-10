@@ -33,6 +33,10 @@ final class PolishModelController {
     @ObservationIgnored private let statusRelay = MainActorRelay<(ModelFile, ModelFileStatus)>()
     /// The file the settings name, nil for Apple's model.
     @ObservationIgnored private var chosenFile: ModelFile?
+    /// Every call into `files`, in the order the settings asked for it: a
+    /// cancel and an ensure of the same file from a quick off and on must
+    /// not swap, or the cancel kills the download the ensure wanted.
+    @ObservationIgnored private let fileWork = OrderedTasks()
 
     init() {
         refiner = PolishRouter(applePolisher)
@@ -56,7 +60,7 @@ final class PolishModelController {
         // model, or turned polish off before it finished.
         if let previous = chosenFile, previous != ModelFile(for: model) || !polishing {
             let files = self.files
-            Task { await files.cancel(previous) }
+            fileWork.enqueue { await files.cancel(previous) }
         }
         guard let file = ModelFile(for: model) else {
             chosenFile = nil
@@ -78,7 +82,7 @@ final class PolishModelController {
             Task { await polisher.unload() }
         }
         let files = self.files
-        Task { [weak self] in
+        fileWork.enqueue { [weak self] in
             if polishing { await files.ensure(file) }
             let status = await files.status(of: file)
             guard let self, file == self.chosenFile else { return }
@@ -90,7 +94,7 @@ final class PolishModelController {
     func retryDownload() {
         guard let file = chosenFile else { return }
         let files = self.files
-        Task { await files.ensure(file) }
+        fileWork.enqueue { await files.ensure(file) }
     }
 
     private func releaseS1Mini() {
