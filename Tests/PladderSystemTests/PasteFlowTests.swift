@@ -153,7 +153,7 @@ extension PasteboardTests {
             }
             #expect(h.holdsTranscript)
             #expect(await h.output.keeper.pendingRestore == nil)
-            #expect(await h.output.keeper.leftPromise != nil)
+            #expect(await h.output.keeper.leftBehindPromise != nil)
             let before = await h.output.keeper.snapshotsTaken
             await h.output.prepare()
             #expect(await h.output.keeper.snapshotsTaken == before)
