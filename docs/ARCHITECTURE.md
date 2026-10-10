@@ -14,7 +14,7 @@ file is the map: what runs where, in what order, and what each part relies on.
 | `PladderEngines` | `FluidAudioIncrementalEngine` and the engine catalog | FluidAudio |
 | `PladderSystem` | Hotkey monitors, paste, the Accessibility observer, output mute, key names, permissions, the transcript's language guess, the login item | AppKit, Carbon, CoreAudio, NaturalLanguage, ServiceManagement |
 | `PladderRefine` | The polish models, their downloads and the correction reviewer | FoundationModels, llama.cpp, NaturalLanguage, CryptoKit |
-| `Pladder` | The app: composition, menu, overlay, settings window, every user-facing sentence | SwiftUI, AppKit |
+| `Pladder` | The app: composition, menu, overlay, settings window, every user-facing sentence but the key names, which `PladderSystem` words from `KeyNames.xcstrings` | SwiftUI, AppKit |
 | `PladderCLI` | `pladder-cli` | Everything but the app |
 | `PladderBench` | Word error rate for the benchmarks | Foundation |
 
@@ -28,27 +28,30 @@ Core emits enum cases (`UnavailableReason`, `EngineFailure`,
 and gets every dependency injected, its clock included, so the tests drive
 its timers with `ManualClock`.
 
-**Key-down** (`hotkeyPressed`). The state flips to `.recording` before the
-first `await`, so the overlay reacts at once and a second press cannot start
-the microphone twice. The coordinator then:
+**Key-down** (`hotkeyPressed`). The coordinator, in this order:
 
 1. takes the engine that is ready now as the cycle's engine, and reads the
    polish toggle and the overlay style once, so a settings change
    mid-recording cannot change this cycle;
-2. numbers the recording (`recordingID`); a press that waited for the
-   microphone checks it is still current before going on;
-3. turns Escape into the cancel key, waits for the previous cancel to finish
-   if one is still running, and starts the capture;
+2. flips the state to `.recording`, before the first `await`, so the overlay
+   reacts at once and a second press cannot start the microphone twice, and
+   numbers the recording (`recordingID`). After every wait below the press
+   checks it is still the current recording, and stops if a cancel ended it
+   meanwhile;
+3. turns Escape into the cancel key, waits for every earlier cancel still
+   running, and starts the capture;
 4. arms the output mute and starts the key-down work: the clipboard snapshot
    and the polish model's load;
 5. starts the engine work. A streaming engine begins an utterance and gets a
-   feed loop that hands it captured audio every second. With the Live
-   Transcript style the same loop also asks for the text so far twice a
-   second and publishes it as `partialTranscript`. Otherwise a warm loop
-   transcribes half a second of silence every two seconds, which keeps the
-   Neural Engine from going cold. A batch engine, or a streaming one that
-   could not begin, gets only the warm loop and is transcribed whole at
-   release;
+   feed loop. In the other styles the loop wakes every second and hands the
+   engine the audio captured since. With the Live Transcript style it skips
+   that second: each turn hands over what has been captured, asks for the
+   text so far, publishes it as `partialTranscript` and then waits half a
+   second, so audio goes in on the live-pass cadence. Outside Live
+   Transcript a warm loop transcribes half a second of silence every two
+   seconds, which keeps the Neural Engine from going cold. A batch engine,
+   or a streaming one that could not begin, gets only the warm loop and is
+   transcribed whole at release;
 6. starts the level meter and the 10 minute cap.
 
 **Release** (`hotkeyReleased`). `endRecording()` stops everything the press
@@ -301,8 +304,9 @@ before the paste. `PolishRouter` is the coordinator's one refiner and hands
 each call to the model the settings name; `PolishModelController` owns the
 model's file and memory.
 
-- **The budget.** 8 s from the release, covering the model's load and every
-  chunk; past it, or on any failure, the text is pasted as dictated.
+- **The budget.** 8 s from when the polish starts, after the engine and the
+  processors, covering the model's load and every chunk; past it, or on any
+  failure, the text is pasted as dictated.
 - **Chunks.** Long dictations are cut after sentence ends into windows that
   fit the model's context (about 300 words for Apple's, 250 for S1-mini),
   with a forced cut between words when a sentence runs too long.
