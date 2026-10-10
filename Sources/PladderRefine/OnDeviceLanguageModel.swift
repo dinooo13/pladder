@@ -1,5 +1,6 @@
 import Foundation
 import FoundationModels
+import PladderCore
 import Synchronization
 
 /// Why the model cannot be used right now, as a value; the app words it.

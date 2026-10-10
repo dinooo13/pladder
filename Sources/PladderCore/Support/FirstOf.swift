@@ -1,13 +1,14 @@
 import Foundation
 
 /// Runs `work` against the wall clock: its value, or nil if `deadline` comes
-/// first, and the task that ran it, cancelled either way.
+/// first, and the task that ran it, cancelled either way. The polish models
+/// race their calls with it, and quitting races the coordinator's shutdown.
 ///
 /// Not a task group: that waits for every child before returning, so a
 /// model call that ignores cancellation would still hold the paste. A
 /// one-shot `AsyncStream` lets the loser be abandoned. Both tasks are
 /// detached so neither inherits the caller's actor.
-func firstOf<Value: Sendable>(
+public func firstOf<Value: Sendable>(
     until deadline: ContinuousClock.Instant,
     priority: TaskPriority? = nil,
     _ work: @escaping @Sendable () async -> Value
