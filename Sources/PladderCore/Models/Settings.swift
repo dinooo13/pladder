@@ -220,15 +220,14 @@ public final class SettingsStore: Sendable {
     /// settings at all is moved aside rather than left to be overwritten by
     /// the next save; a file that decoded with something dropped is copied
     /// aside and kept. Each copy gets a name of its own, so an older one is
-    /// never replaced.
+    /// never replaced, and a file already copied is not copied again: an
+    /// older build launched daily against a newer build's file would
+    /// otherwise add a copy per launch.
     public func load() -> Settings {
         guard let data = try? Data(contentsOf: url) else { return defaults }
-        let decoder = JSONDecoder()
-        let report = SettingsDecodingReport()
-        decoder.userInfo[SettingsDecodingReport.key] = report
         do {
-            let settings = try decoder.decode(Settings.self, from: data)
-            if !report.droppedKeys.isEmpty {
+            let (settings, dropped) = try Self.decode(data)
+            if !dropped.isEmpty, !hasBackup(of: data) {
                 try? FileManager.default.copyItem(at: url, to: backupURL())
             }
             return settings
@@ -238,17 +237,40 @@ public final class SettingsStore: Sendable {
         }
     }
 
+    private static func decode(_ data: Data) throws -> (Settings, droppedKeys: [String]) {
+        let decoder = JSONDecoder()
+        let report = SettingsDecodingReport()
+        decoder.userInfo[SettingsDecodingReport.key] = report
+        let settings = try decoder.decode(Settings.self, from: data)
+        return (settings, report.droppedKeys)
+    }
+
     /// Writes `settings`, keeping every key in the existing file that this
     /// build does not know: a newer build's settings must survive an older
     /// one saving over them, which is what happens when two copies of the
-    /// app, or two worktrees, share the file.
+    /// app, or two worktrees, share the file. A key this build knows but
+    /// could not read, a case a newer build added, is kept as well while
+    /// `settings` still holds what the load put in its place; a value the
+    /// user chose since replaces it.
     public func save(_ settings: Settings) throws {
-        let ours = try JSONEncoder().encode(settings)
+        let encoder = JSONEncoder()
+        let ours = try encoder.encode(settings)
         guard var object = try JSONSerialization.jsonObject(with: ours) as? [String: Any] else { return }
         if let existing = try? Data(contentsOf: url),
            let theirs = try? JSONSerialization.jsonObject(with: existing) as? [String: Any] {
             var kept = theirs.filter { !Settings.retiredKeys.contains($0.key) }
             kept.merge(object) { _, ours in ours }
+            // What this build reads from the file, key by key: where it
+            // dropped a value and `settings` still holds the stand-in, the
+            // file's own value stays.
+            if let (read, dropped) = try? Self.decode(existing), !dropped.isEmpty,
+               let readObject = try? JSONSerialization.jsonObject(with: encoder.encode(read)) as? [String: Any] {
+                for key in Set(dropped) {
+                    guard let raw = theirs[key], let mine = object[key], let loaded = readObject[key],
+                          (mine as AnyObject).isEqual(loaded) else { continue }
+                    kept[key] = raw
+                }
+            }
             object = kept
         }
         let data = try JSONSerialization.data(
@@ -256,6 +278,18 @@ public final class SettingsStore: Sendable {
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: url, options: .atomic)
+    }
+
+    /// Whether a `settings.broken-*.json` beside the file already holds
+    /// exactly `data`.
+    private func hasBackup(of data: Data) -> Bool {
+        let directory = url.deletingLastPathComponent()
+        let prefix = url.deletingPathExtension().lastPathComponent + ".broken-"
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
+        return names.contains { name in
+            name.hasPrefix(prefix) && name.hasSuffix(".json")
+                && (try? Data(contentsOf: directory.appending(path: name))) == data
+        }
     }
 
     /// `settings.broken-<time>.json` beside the file, unique to the second
