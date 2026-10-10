@@ -146,8 +146,9 @@ full set of held modifiers, so a missed event cannot leave one stuck.
   ignores modifier sides (Right Option+Space is Option+Space); a
   modifier-only chord does not.
 - It disengages when a chord key goes up or another key goes down. Another
-  key within the interruption window (1 s) of engaging is an interruption:
-  the user typed Cmd+C, not a dictation. Later, it is an ordinary release.
+  key soon after engaging is an interruption (the window and why: the
+  Interrupted press row of CLAUDE.md's Decisions); later, it is an ordinary
+  release.
 - The regular key that completed the chord is swallowed, with its repeats
   and key-up, so the app never sees the Space of Option+Space.
 - The send key, pressed while the chord is engaged, arms the release with
@@ -168,14 +169,13 @@ plain Escape, or Escape with the engaged chord's modifiers, is reported as
 `.escape` and swallowed before the trackers see it; Cmd+Option+Escape passes.
 
 **Gesture tracker.** `HotkeyGestureTracker` decides what a press or release
-means for the recording, with no clock of its own. Each role has a mode:
-hold (stop at release), toggle (latch at release), or hybrid (latch on a tap
-under 400 ms, stop after a longer hold). Any press of any chord ends a
-latched recording. Some Bluetooth keyboards report a held key as released
-and pressed again a few milliseconds apart: a press within 50 ms of the same
-chord's release is a bounce and never acts. The first bounce seen turns on
-`deferReleases`, and from then on every stopping release waits 50 ms first
-and is undone by a bounce inside that wait.
+means for the recording, with no clock of its own. Each role has a mode,
+hold, toggle or hybrid, and there is a bounce rule; what they do and why is
+the Toggle key row of CLAUDE.md's Decisions. In the code, the first bounce
+turns on `deferReleases`; from then on a stopping release comes back as a
+`Settle` with a token, the coordinator arms a timer for it, and a bounce
+inside the window makes the chord held again, so the timer's token then
+matches nothing and its firing is ignored.
 
 **Tap and Carbon.** `HotkeySource.choose` picks the monitor; `HotkeyRouter`
 keeps both alive and swaps them as the Accessibility grant and Secure Event
@@ -228,15 +228,13 @@ user's clipboard, `KeyPoster` types the keys.
 - **The transcript is a promise.** It goes on the pasteboard as
   `TranscriptPromise`, with the nspasteboard.org marker types, so clipboard
   managers skip it and the target app's read is reported back.
-- **When the clipboard comes back.** 400 ms after Cmd+V if the transcript has
-  been read by then; otherwise 200 ms after the last read; after 8 s if
-  nothing reads it. A read never brings it back before 400 ms, because
-  Chromium may read once early and again for the real paste. Back-to-back
+- **When the clipboard comes back** is the Output row of CLAUDE.md's
+  Decisions; `ClipboardKeeper` holds the three durations. Back-to-back
   pastes carry the first snapshot forward; a copy the user made in between
   wins.
-- **Return.** With the send key, Return is posted 50 ms after the target's
-  first read, or at 400 ms if nothing has read by then. A Return still owed
-  when the next paste starts goes out before that paste's Cmd+V.
+- **Return** is the Send key row. The Return still owed is one slot in
+  `PasteboardOutput`, taken by whichever comes first, its own timer or the
+  next paste.
 - **Without Accessibility** the text is copied and stays; no restore, no
   Return.
 - **A failed Cmd+V** puts the clipboard back at once, through the same

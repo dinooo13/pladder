@@ -2,15 +2,12 @@ import AppKit
 import Foundation
 import os
 
-// When the user's clipboard comes back: docs/ARCHITECTURE.md, "Paste and clipboard".
+// When the user's clipboard comes back: the Output row of CLAUDE.md's Decisions, and
+// docs/ARCHITECTURE.md, "Paste and clipboard". Apps read 0 to 25 ms after Cmd+V, a
+// busy web page a second or more.
 actor ClipboardKeeper {
-    // Apps read 0 to 25 ms after Cmd+V, a busy web page a second or more. Chromium may
-    // read once as Cmd+V arrives and again when it pastes, and the second read never
-    // reaches us, so no read brings the clipboard back sooner than this (issue #40).
     nonisolated let restoreFloor = Duration.milliseconds(400)
     nonisolated let readSettle = Duration.milliseconds(200)
-
-    // Nothing read the transcript: it stays on the clipboard, the safe way to be wrong.
     nonisolated let restoreCap = Duration.seconds(8)
 
     private let pasteboard: NSPasteboard
