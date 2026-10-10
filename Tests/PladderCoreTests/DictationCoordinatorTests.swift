@@ -92,9 +92,12 @@ final class FakeHotkey: HotkeyMonitor, @unchecked Sendable {
     private(set) var startCount = 0
     private(set) var lastChords: [HotkeyRole: Hotkey] = [:]
     var lastHotkey: Hotkey? { lastChords[.dictate] }
+    /// The dictate chord of every start, in order.
+    private(set) var startedHotkeys: [Hotkey?] = []
     func start(chords: [HotkeyRole: Hotkey], submitKey: Hotkey) -> AsyncStream<HotkeyMonitorEvent> {
         startCount += 1
         lastChords = chords
+        startedHotkeys.append(chords[.dictate])
         let (stream, cont) = AsyncStream<HotkeyMonitorEvent>.makeStream()
         continuation = cont
         return stream
@@ -410,6 +413,17 @@ func waitUntil(_ timeout: Duration = .seconds(2), _ condition: @MainActor () -> 
     return condition()
 }
 
+/// `waitUntil` for a condition that has to ask an actor: a dropped
+/// recording is idle at once, and its microphone stops on a task after.
+func eventually(_ timeout: Duration = .seconds(2), _ condition: () async -> Bool) async -> Bool {
+    let deadline = ContinuousClock.now + timeout
+    while ContinuousClock.now < deadline {
+        if await condition() { return true }
+        try? await Task.sleep(for: .milliseconds(10))
+    }
+    return await condition()
+}
+
 extension DictationCoordinator {
     func startIdle(sourceLocation: SourceLocation = #_sourceLocation) async {
         start()
@@ -555,7 +569,7 @@ final class EventLog: @unchecked Sendable {
         await c.press(a)
         c.replaceHotkeyMonitor(b)
         #expect(await waitUntil { c.state == .idle })
-        #expect(await capture.stopCount == 1)
+        #expect(await eventually { await capture.stopCount == 1 })
         #expect(output.inserted.isEmpty)
         #expect(b.startCount == 1)
         #expect(b.lastHotkey == c.settings.hotkey)
@@ -605,7 +619,7 @@ final class EventLog: @unchecked Sendable {
         await c.press(fake)
         c.hotkeyOverride = Self.standIn
         #expect(await waitUntil { c.state == .idle })
-        #expect(await capture.stopCount == 1)
+        #expect(await eventually { await capture.stopCount == 1 })
         #expect(output.inserted.isEmpty)
         #expect(fake.startCount == 2)
         #expect(fake.lastHotkey == Self.standIn)
@@ -633,6 +647,53 @@ final class EventLog: @unchecked Sendable {
         // answer must not tear the registration down and build it again.
         c.hotkeyOverride = Self.standIn
         #expect(fake.startCount == 1)
+    }
+
+    // Before: the app set the chord, which restarted the monitor with the
+    // old stand-in, then the stand-in, which restarted it again. Without
+    // Accessibility the first restart handed Carbon a modifier-only chord it
+    // cannot register.
+    @Test func aChordAndItsStandInChangeInOneRestart() async {
+        let fake = FakeHotkey()
+        let (c, _, _) = makeCoordinator(hotkeyMonitor: fake)
+        await c.startIdle()
+        var settings = c.settings
+        settings.hotkey = .rightOption
+        c.update(settings, hotkeyOverride: Self.standIn)
+        #expect(fake.startedHotkeys == [.optionSpace, Self.standIn])
+
+        // And back: a chord Carbon can register clears the stand-in, again
+        // in one restart, never with the modifier-only chord.
+        settings.hotkey = Hotkey(0x3B, 0x02)
+        c.update(settings, hotkeyOverride: nil)
+        #expect(fake.startedHotkeys == [.optionSpace, Self.standIn, Hotkey(0x3B, 0x02)])
+
+        // Nothing that concerns the monitor: no restart.
+        settings.appendTrailingSpace.toggle()
+        c.update(settings, hotkeyOverride: nil)
+        #expect(fake.startCount == 3)
+    }
+
+    // Before: the recording was dropped from a task while the new monitor
+    // started at once, so a press on the new stream that came first found
+    // `.recording` still set and was refused.
+    @Test func aPressRightAfterAMonitorSwapStartsADictation() async {
+        let a = FakeHotkey()
+        let b = FakeHotkey()
+        let (c, _, capture) = makeCoordinator(hotkeyMonitor: a)
+        await capture.setStopDelay(.milliseconds(50))
+        await c.startIdle()
+        await c.press(a)
+        c.replaceHotkeyMonitor(b)
+        // Ended before the new monitor can deliver anything.
+        #expect(c.state == .idle)
+        b.press()
+        // The press waited for the microphone to stop, then started it again.
+        #expect(await waitUntil { c.handledHotkeyEvents == 2 })
+        #expect(c.state.isRecording)
+        #expect(await capture.startCount == 2)
+        #expect(await capture.stopCount == 1)
+        await c.cancelRecording()
     }
 
     @Test func overrideWhileSuspendedStartsOnResume() async {
@@ -704,7 +765,7 @@ final class EventLog: @unchecked Sendable {
             #expect(c.state.isRecording)
             change(&c.settings)
             #expect(await waitUntil { c.state == .idle })
-            #expect(await capture.stopCount == 1)
+            #expect(await eventually { await capture.stopCount == 1 })
             #expect(output.inserted.isEmpty)
         }
     }
@@ -795,7 +856,7 @@ final class EventLog: @unchecked Sendable {
         #expect(c.state.isRecording)
         c.isHotkeySuspended = true
         #expect(await waitUntil { c.state == .idle })
-        #expect(await capture.stopCount == 1)
+        #expect(await eventually { await capture.stopCount == 1 })
         #expect(output.inserted.isEmpty)
         c.isHotkeySuspended = false
         await c.press(hotkey)
