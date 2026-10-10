@@ -129,6 +129,22 @@ final class HotkeyRecorder {
     /// back whenever a chord notice is cleared.
     private var secureInputNotice: String?
 
+    /// The app's one recording session, shared by every field.
+    private static let slot = HotkeyRecordingSlot<HotkeyRecorder> { $0.cancel() }
+    private let token: HotkeyRecordingSlot<HotkeyRecorder>.Token
+
+    init() {
+        token = Self.slot.makeToken()
+    }
+
+    /// A field torn down mid-recording without `onDisappear`: the monitors
+    /// hold this weakly, so it is freed, and the hotkey comes back here.
+    isolated deinit {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        if let resignObserver { NotificationCenter.default.removeObserver(resignObserver) }
+        Self.slot.release(token)
+    }
+
     func begin(
         requiresRegularKey: Bool = false,
         allowsEmpty: Bool = false,
@@ -139,7 +155,7 @@ final class HotkeyRecorder {
         // A restart keeps the session rather than resuming and suspending
         // the hotkey in between.
         tearDown()
-        RecordingSlot.shared.claim(for: self, setHotkeySuspended: setHotkeySuspended)
+        Self.slot.claim(token, by: self, setHotkeySuspended: setHotkeySuspended)
         self.commit = commit
         self.requiresRegularKey = requiresRegularKey
         self.allowsEmpty = allowsEmpty
@@ -154,7 +170,8 @@ final class HotkeyRecorder {
             : nil
         notice = secureInputNotice
         isRecording = true
-        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp, .flagsChanged]) { event in
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp, .flagsChanged]) { [weak self] event in
+            guard let self else { return event }
             // Local monitors run on the main thread, but `NSEvent` is not
             // Sendable, so pull out the plain values before hopping.
             let key = KeyTransition(
@@ -168,8 +185,8 @@ final class HotkeyRecorder {
         // behind that eats the next key press.
         resignObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.didResignKeyNotification, object: nil, queue: .main
-        ) { _ in
-            MainActor.assumeIsolated { self.cancel() }
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.cancel() }
         }
     }
 
@@ -258,7 +275,7 @@ final class HotkeyRecorder {
         let commit = self.commit
         tearDown()
         if let chord { commit?(chord) }
-        RecordingSlot.shared.release(by: self)
+        Self.slot.release(token)
     }
 
     /// Everything but the session: the monitors and what was pressed.
@@ -279,36 +296,5 @@ final class HotkeyRecorder {
         heldModifiers = []
         modifierState = ModifierKeyState()
         isRecording = false
-    }
-}
-
-/// The app's one `HotkeyRecordingSession` and the recorder holding it. The
-/// session decides; this keeps the object to cancel and the closure that
-/// suspended the hotkey, which is the one that resumes it.
-@MainActor
-private final class RecordingSlot {
-    static let shared = RecordingSlot()
-
-    private var session = HotkeyRecordingSession<ObjectIdentifier>()
-    private weak var holder: HotkeyRecorder?
-    private var setHotkeySuspended: ((Bool) -> Void)?
-
-    func claim(for recorder: HotkeyRecorder, setHotkeySuspended: @escaping (Bool) -> Void) {
-        let begin = session.begin(ObjectIdentifier(recorder))
-        let displaced = holder
-        holder = recorder
-        self.setHotkeySuspended = setHotkeySuspended
-        // After the session has moved on, so the displaced recorder's own
-        // `release` is a no-op and the hotkey stays down.
-        if begin.displaced != nil { displaced?.cancel() }
-        if begin.suspends { setHotkeySuspended(true) }
-    }
-
-    func release(by recorder: HotkeyRecorder) {
-        guard session.end(ObjectIdentifier(recorder)) else { return }
-        holder = nil
-        let resume = setHotkeySuspended
-        setHotkeySuspended = nil
-        resume?(false)
     }
 }
