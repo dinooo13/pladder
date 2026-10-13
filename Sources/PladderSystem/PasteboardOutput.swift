@@ -132,6 +132,13 @@ public final class PasteboardOutput: TextOutput {
         await keeper.flush()
     }
 
+    /// Puts `text` on the clipboard to stay, with the markers a paste
+    /// carries, and ends any restore that would put the old clipboard back
+    /// over it.
+    public func copy(_ text: String) async {
+        await keeper.copy(text)
+    }
+
     /// Posts Return once the paste has landed: `submitDelay` after the target
     /// app first reads the transcript, or at `restoreFloor` after Cmd+V if it
     /// has not read it by then, so a target that never reads still gets its

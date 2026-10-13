@@ -172,6 +172,20 @@ extension PasteboardTests {
             #expect(h.poster.keys == [PasteHarness.keyV])
         }
 
+        @Test func copyingTheLastTranscriptCarriesTheMarkersAndEndsThePendingRestore() async throws {
+            let h = PasteHarness(clipboard: "original")
+
+            try await h.output.insert("first", submit: false)
+            let first = try #require(await h.output.keeper.pendingRestore)
+            await h.output.copy("last transcript")
+
+            await first.value
+            h.clock.advance(by: .seconds(60))
+            #expect(await h.output.keeper.pendingRestore == nil)
+            #expect(h.holdsTranscript)
+            #expect(h.clipboard == "last transcript")
+        }
+
         @Test func aFailedCmdVPutsTheClipboardBackAtOnce() async {
             let h = PasteHarness(clipboard: "original")
             h.poster.refuse(PasteHarness.keyV)
