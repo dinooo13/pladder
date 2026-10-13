@@ -37,8 +37,4 @@ enum PolishChunking {
     static func hardLimit(_ size: Int) -> Int {
         size + size / 2
     }
-
-    static func wordCount(_ text: String) -> Int {
-        text.split(whereSeparator: \.isWhitespace).count
-    }
 }

@@ -825,7 +825,7 @@ public final class DictationCoordinator {
             // A refiner that cannot help returns nil and the text goes
             // out as dictated.
             var final = processed
-            if willPolish, let refiner, Self.wordCount(processed) >= minimumPolishWords {
+            if willPolish, let refiner, processed.wordCount >= minimumPolishWords {
                 state = .polishing
                 started = ContinuousClock.now
                 if let polished = await refiner.refine(processed) { final = polished }
@@ -853,10 +853,6 @@ public final class DictationCoordinator {
         } catch {
             fail(DictationFailure(error))
         }
-    }
-
-    private static func wordCount(_ text: String) -> Int {
-        text.split(whereSeparator: \.isWhitespace).count
     }
 
     /// Idle if the engine can take another dictation, otherwise unavailable
