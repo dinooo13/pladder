@@ -159,6 +159,29 @@ import Testing
         }
     }
 
+    // Before: a row without an id got a fresh one at each decode, so the
+    // dictionary never looked unchanged and the first save of anything
+    // dropped the row this build could not read.
+    @Test func savingKeepsADamagedRowBesideRowsWithoutIDs() throws {
+        try withStore(file: #"{"engineID":"echo","dictionary":[{"from":"a","to":"b"},{"from":3}]}"#) { store, url in
+            var settings = store.load()
+            settings.playSounds = false
+            try store.save(settings)
+            var object = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+            var rows = try #require(object["dictionary"] as? [[String: Any]])
+            #expect(rows.count == 2)
+            #expect(rows.first?["to"] as? String == "b")
+            #expect(rows.last?["from"] as? Int == 3)
+            #expect(object["playSounds"] as? Bool == false)
+
+            settings.dictionary.append(DictionaryEntry(from: "c", to: "d"))
+            try store.save(settings)
+            object = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+            rows = try #require(object["dictionary"] as? [[String: Any]])
+            #expect(rows.compactMap { $0["to"] as? String } == ["b", "d"])
+        }
+    }
+
     @Test func choosingTheDroppedSettingReplacesIt() throws {
         try withStore(file: #"{"engineID":"echo","overlayStyle":"newStyle"}"#) { store, url in
             var settings = store.load()

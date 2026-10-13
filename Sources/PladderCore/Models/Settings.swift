@@ -267,7 +267,7 @@ public final class SettingsStore: Sendable {
                let readObject = try? JSONSerialization.jsonObject(with: encoder.encode(read)) as? [String: Any] {
                 for key in Set(dropped) {
                     guard let raw = theirs[key], let mine = object[key], let loaded = readObject[key],
-                          (mine as AnyObject).isEqual(loaded) else { continue }
+                          Self.withoutIDs(mine).isEqual(Self.withoutIDs(loaded)) else { continue }
                     kept[key] = raw
                 }
             }
@@ -278,6 +278,13 @@ public final class SettingsStore: Sendable {
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: url, options: .atomic)
+    }
+
+    /// A dictionary row without an `id` gets a fresh one at every decode, so
+    /// the load's rows and the re-decoded ones never match on it.
+    private static func withoutIDs(_ value: Any) -> AnyObject {
+        guard let rows = value as? [[String: Any]] else { return value as AnyObject }
+        return rows.map { $0.filter { $0.key != "id" } } as AnyObject
     }
 
     /// Whether a `settings.broken-*.json` beside the file already holds
