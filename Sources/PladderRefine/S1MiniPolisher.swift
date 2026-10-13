@@ -131,7 +131,7 @@ public actor S1MiniPolisher: ReportingRefiner {
         let deadline = started + timeout
         let pieces = PolishChunking.chunks(of: text, threshold: Self.chunkThreshold, size: Self.chunkSize)
         var report = PolishReport(
-            text: nil, elapsed: .zero, wordsIn: PolishChunking.wordCount(text), wordsOut: 0,
+            text: nil, elapsed: .zero, wordsIn: text.wordCount, wordsOut: 0,
             chunks: pieces.count, mode: .completion, failure: nil)
         switch await loaded(before: deadline) {
         case .ready(let model):
@@ -140,7 +140,7 @@ public actor S1MiniPolisher: ReportingRefiner {
                 for piece in pieces {
                     // Room for an answer somewhat longer than the input: a
                     // list adds line breaks and dashes.
-                    let maxTokens = PolishChunking.wordCount(piece) * 3 + 64
+                    let maxTokens = piece.wordCount * 3 + 64
                     let answer = try await model.complete(
                         suffix: Self.promptSuffix(for: piece), maxTokens: maxTokens, deadline: deadline)
                     let filtered = PolishPostFilter.clean(answer)
@@ -149,7 +149,7 @@ public actor S1MiniPolisher: ReportingRefiner {
                 }
                 let joined = cleaned.joined(separator: " ")
                 report.text = joined
-                report.wordsOut = PolishChunking.wordCount(joined)
+                report.wordsOut = joined.wordCount
             } catch LlamaModel.Failure.timedOut {
                 report.failure = "timed out"
             } catch LlamaModel.Failure.truncated {

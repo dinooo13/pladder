@@ -99,7 +99,7 @@ public actor TranscriptPolisher: ReportingRefiner {
 
         let pieces = Self.chunks(of: text)
         var report = PolishReport(
-            text: nil, elapsed: .zero, wordsIn: PolishChunking.wordCount(text), wordsOut: 0,
+            text: nil, elapsed: .zero, wordsIn: text.wordCount, wordsOut: 0,
             chunks: pieces.count, mode: .guided, failure: nil)
         var cleaned: [String] = []
         do {
@@ -113,7 +113,7 @@ public actor TranscriptPolisher: ReportingRefiner {
             }
             let joined = cleaned.joined(separator: " ")
             report.text = joined
-            report.wordsOut = PolishChunking.wordCount(joined)
+            report.wordsOut = joined.wordCount
         } catch {
             report.failure = Self.describe(error)
         }

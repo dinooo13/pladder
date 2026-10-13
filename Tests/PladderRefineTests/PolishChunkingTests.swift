@@ -1,4 +1,5 @@
 import Foundation
+import PladderCore
 import Testing
 @testable import PladderRefine
 
@@ -18,7 +19,7 @@ import Testing
         ] {
             let chunks = PolishChunking.chunks(of: text, threshold: threshold, size: size)
             #expect(chunks.count > 1)
-            #expect(chunks.allSatisfy { PolishChunking.wordCount($0) <= size * 3 / 2 })
+            #expect(chunks.allSatisfy { $0.wordCount <= size * 3 / 2 })
             #expect(chunks.joined(separator: " ") == text)
         }
     }
