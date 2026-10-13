@@ -136,6 +136,9 @@ public struct OnDeviceLanguageModel: Sendable {
         guard ContinuousClock.now < deadline else { throw OnDeviceModelError.timedOut }
         let (outcome, call) = await firstOf(until: deadline, priority: .userInitiated) {
             await Self.drain()
+            // The drain ignores cancellation, so a call that timed out while
+            // draining would otherwise start a generation nobody waits for.
+            guard !Task.isCancelled else { return Result<Value, OnDeviceModelError>.failure(.timedOut) }
             do {
                 return Result<Value, OnDeviceModelError>.success(try await work())
             } catch {

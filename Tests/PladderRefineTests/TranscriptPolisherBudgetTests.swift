@@ -150,6 +150,27 @@ private let longTranscript = Array(repeating: "one two three four five six seven
         }
     }
 
+    @Test func aCallThatTimesOutWhileDrainingNeverStartsItsWork() async throws {
+        let firstCall = Gate()
+        await #expect(throws: OnDeviceModelError.timedOut) {
+            try await OnDeviceLanguageModel.race(until: .now + .milliseconds(30)) { () async throws -> String in
+                await firstCall.wait()
+                return "first"
+            }
+        }
+        let started = Recorder<Bool>()
+        await #expect(throws: OnDeviceModelError.timedOut) {
+            try await OnDeviceLanguageModel.race(until: .now + .milliseconds(30)) { () async throws -> String in
+                started.append(true)
+                return "second"
+            }
+        }
+        await firstCall.open()
+        // Drains the second call, so it has run its course when this returns.
+        _ = try await OnDeviceLanguageModel.race(until: .now + .seconds(5)) { () async throws -> String in "third" }
+        #expect(started.all.isEmpty)
+    }
+
     @Test func aDeadlineAlreadyPastStartsNothing() async {
         let started = Recorder<Bool>()
         await #expect(throws: OnDeviceModelError.timedOut) {
