@@ -597,7 +597,7 @@ final class EventLog: @unchecked Sendable {
         let (c, output, capture) = makeCoordinator(hotkeyMonitor: a)
         await c.startIdle()
         await c.press(a)
-        c.replaceHotkeyMonitor(b)
+        c.update(c.settings, hotkeyOverride: c.hotkeyOverride, monitor: b)
         #expect(await waitUntil { c.state == .idle })
         #expect(await eventually { await capture.stopCount == 1 })
         #expect(output.inserted.isEmpty)
@@ -616,7 +616,7 @@ final class EventLog: @unchecked Sendable {
         let (c, _, _) = makeCoordinator(hotkeyMonitor: a)
         await c.startIdle()
         c.isHotkeySuspended = true
-        c.replaceHotkeyMonitor(b)
+        c.update(c.settings, hotkeyOverride: c.hotkeyOverride, monitor: b)
         #expect(b.startCount == 0)
         c.isHotkeySuspended = false
         #expect(b.startCount == 1)
@@ -714,7 +714,7 @@ final class EventLog: @unchecked Sendable {
         await capture.setStopDelay(.milliseconds(50))
         await c.startIdle()
         await c.press(a)
-        c.replaceHotkeyMonitor(b)
+        c.update(c.settings, hotkeyOverride: c.hotkeyOverride, monitor: b)
         // Ended before the new monitor can deliver anything.
         #expect(c.state == .idle)
         b.press()

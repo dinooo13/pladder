@@ -65,20 +65,16 @@ final class HotkeyRouter {
         if trusted != accessibilityTrusted { accessibilityTrusted = trusted }
         secureInputSustained = secureInput.observe(secureInputEnabled)
         let flipped = chooseMonitor()
-        if let flipped {
-            // A recording in progress is dropped by the coordinator, since the
-            // old monitor's release can no longer arrive.
-            coordinator?.replaceHotkeyMonitor(flipped)
+        guard flipped != nil || !didApplyStandIn else { return }
+        didApplyStandIn = true
+        // One update: set one after the other, the new monitor would first be
+        // started with the old stand-in, which Carbon may refuse. A recording
+        // in progress is dropped, since the old monitor's release can no
+        // longer arrive.
+        if let coordinator {
+            coordinator.update(coordinator.settings, hotkeyOverride: standInHotkey, monitor: flipped)
         }
-        // After the swap: the new monitor is started with the old stand-in and
-        // then, if it changed, once more with the new one. The other order
-        // would make the Carbon monitor log a failure for a modifier-only
-        // chord on the way to being replaced by the tap.
-        if flipped != nil || !didApplyStandIn {
-            didApplyStandIn = true
-            applyStandIn()
-            refreshSystemShortcuts()
-        }
+        refreshSystemShortcuts()
     }
 
     /// A chord with a regular key no longer needs a stand-in, and a
@@ -129,9 +125,5 @@ final class HotkeyRouter {
     func refreshSystemShortcuts() {
         let shortcuts = SystemShortcuts.enabled()
         if shortcuts != systemShortcuts { systemShortcuts = shortcuts }
-    }
-
-    private func applyStandIn() {
-        coordinator?.hotkeyOverride = standInHotkey
     }
 }

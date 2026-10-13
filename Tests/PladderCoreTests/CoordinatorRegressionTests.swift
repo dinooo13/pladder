@@ -254,12 +254,31 @@ import Testing
         #expect(tap.startedHotkeys == [.rightCommand])
     }
 
+    // Before: a grant flip swapped the monitor with the old stand-in and then
+    // set the new one, so Carbon was started with a stored Right Command it
+    // cannot register, and the recording was dropped twice.
+    @Test func aGrantFlipStartsTheNewMonitorOnceWithTheNewStandIn() async {
+        let tap = FakeHotkey()
+        let carbon = FakeHotkey()
+        let (c, _, capture) = makeCoordinator(hotkeyMonitor: tap)
+        var settings = c.settings
+        settings.hotkey = .rightCommand
+        c.settings = settings
+        await c.startIdle()
+        await c.press(tap)
+        c.update(c.settings, hotkeyOverride: .optionSpace, monitor: carbon)
+        #expect(carbon.startedHotkeys == [.optionSpace])
+        #expect(tap.startedHotkeys == [.rightCommand])
+        #expect(await eventually { await capture.stopCount == 1 })
+        #expect(c.state == .idle)
+    }
+
     @Test func changesBeforeStartRegisterOnceAtStart() async {
         let first = FakeHotkey()
         let second = FakeHotkey()
         let (c, _, _) = makeCoordinator(hotkeyMonitor: first)
         c.hotkeyOverride = .rightOption
-        c.replaceHotkeyMonitor(second)
+        c.update(c.settings, hotkeyOverride: c.hotkeyOverride, monitor: second)
         c.settings.toggleHotkey = Hotkey(0x31)
         #expect(first.startCount == 0)
         #expect(second.startCount == 0)
