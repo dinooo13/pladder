@@ -36,6 +36,7 @@ final class AppModel {
 
     @ObservationIgnored private let store: SettingsStore
     @ObservationIgnored private let overlay: OverlayController
+    @ObservationIgnored private let output: PasteboardOutput
     @ObservationIgnored private let events = MainActorRelay<(DictationCoordinator.Event, ContinuousClock.Instant)>()
 
     /// When the hotkey was released, for the release-to-paste measurement.
@@ -113,12 +114,14 @@ final class AppModel {
         let polish = PolishModelController()
         self.polish = polish
 
+        let output = PasteboardOutput()
+        self.output = output
         let events = self.events
         let coordinator = DictationCoordinator(
             settings: DictationSettings(initial),
             registry: registry,
             capture: AVAudioEngineCapture(),
-            output: PasteboardOutput(),
+            output: output,
             outputMuter: OutputMuteController(
                 control: CoreAudioOutputMute(),
                 log: { Self.muteLog.info("\($0, privacy: .public)") }),
@@ -306,8 +309,7 @@ final class AppModel {
     /// The menu's "Last: …" line puts the whole transcript on the clipboard.
     func copyLastTranscript() {
         guard let text = coordinator.lastTranscript?.text else { return }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
+        Task { await output.copy(text) }
     }
 
     var canRetryEngine: Bool {
