@@ -62,13 +62,14 @@ final class FakeOutput: TextOutput, @unchecked Sendable {
     var submitted: [Bool] { lock.withLock { _submitted } }
     var prepareCount: Int { lock.withLock { _prepareCount } }
     var shouldFail = false
+    var failure: any Error = NSError(domain: "fake", code: 1, userInfo: [NSLocalizedDescriptionKey: "paste failed"])
     /// What `insert` reports back: `.copied` stands in for an untrusted
     /// `PasteboardOutput`, which leaves the text on the clipboard.
     var result: InsertResult = .pasted
 
     @discardableResult
     func insert(_ text: String, submit: Bool) async throws -> InsertResult {
-        if shouldFail { throw NSError(domain: "fake", code: 1, userInfo: [NSLocalizedDescriptionKey: "paste failed"]) }
+        if shouldFail { throw failure }
         lock.withLock {
             _inserted.append(text)
             _submitted.append(submit)
@@ -544,6 +545,19 @@ final class EventLog: @unchecked Sendable {
         #expect(c.state == .idle)
         #expect(await capture.stopCount == 1)
         #expect(output.inserted == ["Hello, World! "])
+        #expect(c.lastTranscript?.text == "Hello, World!")
+    }
+
+    @Test func aFailedPasteLeavesTheProcessedTextAsTheLastTranscript() async {
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
+        settings.dictionary = [DictionaryEntry(from: "hello world", to: "Hello, World!")]
+        let output = FakeOutput()
+        output.shouldFail = true
+        output.failure = OutputError.eventCreationFailed
+        let (c, _, _) = makeCoordinator(settings: settings, output: output)
+        await c.startIdle()
+        await c.dictate()
+        #expect(c.state == .error(.pasteKeystroke))
         #expect(c.lastTranscript?.text == "Hello, World!")
     }
 

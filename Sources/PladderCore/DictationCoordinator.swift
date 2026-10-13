@@ -814,7 +814,6 @@ public final class DictationCoordinator {
             if transcript.audioDuration == 0 {
                 transcript.audioDuration = totalDuration
             }
-            lastTranscript = transcript
             started = ContinuousClock.now
             let processed = pipeline.run(transcript.text, disabled: settings.disabledProcessors)
             timing.processing = ContinuousClock.now - started
@@ -840,11 +839,13 @@ public final class DictationCoordinator {
             // separator, so appending another makes a double space.
             let needsSpace = settings.appendTrailingSpace && final.last?.isWhitespace != true
             let toInsert = needsSpace ? final + " " : final
+            // Before the insert, so a paste that fails leaves the menu's
+            // copy of it processed, which is when the user needs it.
+            transcript.text = final
+            lastTranscript = transcript
             started = ContinuousClock.now
             let result = try await output.insert(toInsert, submit: submit)
             timing.insert = ContinuousClock.now - started
-            transcript.text = final
-            lastTranscript = transcript
             onEvent(.inserted(Insertion(
                 transcript: transcript, timing: timing, result: result,
                 submitted: submit && result == .pasted)))
