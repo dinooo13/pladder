@@ -105,6 +105,28 @@ extension PasteboardTests {
             #expect(h.clipboard == "original")
         }
 
+        // Before: a restore task woken at its due instant but not yet inside
+        // the keeper was not stopped by a read in that window, and restored at
+        // the old instant: Chromium's second read got the old clipboard.
+        @Test func aRestoreThatWokeBeforeALaterReadDoesNothing() async throws {
+            let h = PasteHarness(clipboard: "original")
+
+            try await h.output.insert("transcript", submit: false)
+            h.clock.advance(to: .milliseconds(100))
+            await h.targetReads()
+            let stale = try #require(await h.output.keeper.pendingRestoreID)
+            h.clock.advance(to: .milliseconds(399))
+            await h.targetReads()
+
+            await h.output.keeper.completeRestore(stale)
+            #expect(h.holdsTranscript)
+            #expect(await h.clock.waitForSleeper(at: .milliseconds(599)))
+            let restore = await h.output.keeper.pendingRestore
+            h.clock.advance(to: .milliseconds(599))
+            await restore?.value
+            #expect(h.clipboard == "original")
+        }
+
         @Test func aPromptReadRestoresAtTheFloor() async throws {
             let h = PasteHarness(clipboard: "original")
 

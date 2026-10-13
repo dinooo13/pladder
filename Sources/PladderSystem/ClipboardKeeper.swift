@@ -75,9 +75,14 @@ actor ClipboardKeeper {
         /// The detached task waiting for the restore to fall due. Nil while
         /// the paste is still being posted.
         var task: Task<Void, Never>?
+        /// Which scheduling of the restore `task` is. A task already woken
+        /// and waiting to enter the actor is past its cancellation check, so
+        /// only this tells it that a later read moved the restore.
+        var restoreID = 0
     }
 
     private var pending: Pending?
+    private var nextRestoreID = 0
 
     /// A transcript a restore had to leave on the pasteboard, because every
     /// item of the user's clipboard was too large to keep. Held so its promise
@@ -280,7 +285,9 @@ actor ClipboardKeeper {
         current.task?.cancel()
         let due = Self.restoreDue(
             posted: posted, lastRead: current.lastRead, floor: restoreFloor, settle: readSettle, cap: restoreCap)
-        pending?.task = restoreTask(for: current.promise, at: due)
+        nextRestoreID += 1
+        pending?.restoreID = nextRestoreID
+        pending?.task = restoreTask(nextRestoreID, at: due)
     }
 
     /// The target app read the transcript. Called from the main thread, where
@@ -305,18 +312,18 @@ actor ClipboardKeeper {
     /// back to the actor to do it. Detached so the caller's cancellation
     /// cannot make the restore fire early, which would give the target app
     /// the user's old clipboard instead of the transcript.
-    private func restoreTask(for promise: TranscriptPromise, at due: ContinuousClock.Instant) -> Task<Void, Never> {
+    private func restoreTask(_ id: Int, at due: ContinuousClock.Instant) -> Task<Void, Never> {
         Task.detached(priority: .utility) { [clock] in
             // A read that moves the deadline, or a *newer* paste, cancels this
             // task; the newer paste takes ownership of the snapshot, so there
             // is nothing left to restore.
             guard (try? await clock.sleep(due)) != nil, !Task.isCancelled else { return }
-            await self.completeRestore(promise)
+            await self.completeRestore(id)
         }
     }
 
-    private func completeRestore(_ promise: TranscriptPromise) {
-        guard let pending, pending.promise === promise else { return }
+    func completeRestore(_ id: Int) {
+        guard let pending, pending.restoreID == id else { return }
         endPending()
         if pending.lastRead == nil {
             Self.log.notice("clipboard not read within \(self.restoreCap.components.seconds) s of Cmd+V; restoring")
@@ -379,6 +386,7 @@ actor ClipboardKeeper {
 
     var pendingRestore: Task<Void, Never>? { pending?.task }
     var pendingPromise: TranscriptPromise? { pending?.promise }
+    var pendingRestoreID: Int? { pending?.restoreID }
     var leftPromise: TranscriptPromise? { left?.promise }
 }
 
