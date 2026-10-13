@@ -58,4 +58,39 @@ import Testing
         await settle()
         #expect(calls == 0)
     }
+
+    @Test func aWaitForAConditionThatHoldsReturnsAtOnce() async {
+        let meter = Meter()
+        meter.level = 1
+        await ObservationLoop.wait { meter.level > 0.5 }
+    }
+
+    @Test func aWaitResumesOnTheChangeThatMakesItHoldAndNotBefore() async {
+        let meter = Meter()
+        let finished = Finished()
+        let waiter = Task { @MainActor in
+            await ObservationLoop.wait { meter.level > 0.5 }
+            finished.value = true
+        }
+        await settle()
+        meter.level = 0.3
+        await settle()
+        #expect(!finished.value)
+        meter.level = 0.8
+        await waiter.value
+        #expect(finished.value)
+    }
+
+    @Test func aCancelledWaitReturns() async {
+        let meter = Meter()
+        let waiter = Task { @MainActor in await ObservationLoop.wait { meter.level > 0.5 } }
+        await settle()
+        waiter.cancel()
+        await waiter.value
+        #expect(meter.level == 0)
+    }
+}
+
+@MainActor private final class Finished {
+    var value = false
 }

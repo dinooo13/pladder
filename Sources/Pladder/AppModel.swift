@@ -141,7 +141,9 @@ final class AppModel {
         events.handler = { [weak self] in self?.handle($0.0, at: $0.1) }
         corrections.dictionary = { [weak self] in self?.settings.dictionary ?? [] }
         corrections.addRules = { [weak self] rules in self?.settings.dictionary.merge(rules) }
-        corrections.isQuiet = { [weak self] in self?.coordinator.state.isBusy != true }
+        corrections.waitUntilQuiet = { [weak coordinator] in
+            await ObservationLoop.wait { coordinator?.state.isBusy != true }
+        }
         permissions.onRefresh = { [weak self] in self?.permissionsRefreshed() }
     }
 
