@@ -61,7 +61,7 @@ public enum ModelFileFailure: Error, Sendable, Equatable {
     case download
     /// The file arrived but is not the one pinned: never used, deleted.
     case checksum
-    /// It could not be written, usually a full disk.
+    /// It could not be written, usually a full disk, or not read back.
     case disk
 }
 
@@ -217,7 +217,8 @@ public actor ModelFiles {
         }
         guard isCurrent(file, id), digest == file.sha256 else {
             try? FileManager.default.removeItem(at: staging)
-            if isCurrent(file, id) { set(file, .failed(.checksum)) }
+            // No digest is a read that failed, not a file that is wrong.
+            if isCurrent(file, id) { set(file, .failed(digest == nil ? .disk : .checksum)) }
             return
         }
         do {
@@ -256,13 +257,21 @@ public actor ModelFiles {
         set(file, .downloading(fraction: min(1, Double(received) / Double(max(file.byteCount, 1)))))
     }
 
-    /// Streamed, so a 1.5 GB file never sits in memory. Nil when the task
-    /// running it is cancelled, which it checks between chunks.
+    /// Streamed, so a 1.5 GB file never sits in memory. Nil when a read
+    /// fails, or when the task running it is cancelled, which it checks
+    /// between chunks.
     static func sha256(of url: URL, chunkSize: Int = 16 << 20) -> String? {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
         defer { try? handle.close() }
+        return sha256(reading: handle, chunkSize: chunkSize)
+    }
+
+    static func sha256(reading handle: FileHandle, chunkSize: Int = 16 << 20) -> String? {
         var hasher = SHA256()
-        while let chunk = try? handle.read(upToCount: chunkSize), !chunk.isEmpty {
+        while true {
+            let chunk: Data?
+            do { chunk = try handle.read(upToCount: chunkSize) } catch { return nil }
+            guard let chunk, !chunk.isEmpty else { break }
             if Task.isCancelled { return nil }
             hasher.update(data: chunk)
         }
