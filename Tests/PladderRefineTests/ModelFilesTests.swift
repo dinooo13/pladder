@@ -187,6 +187,31 @@ private actor StandInTransport: ModelFileTransport {
         #expect(try contents(of: models).isEmpty)
     }
 
+    // Before: a read that failed ended the loop like the end of the file, so
+    // a partial hash was compared and the download thrown away as corrupt.
+    @Test func aReadThatFailsGivesNoChecksum() throws {
+        let dir = try scratchDirectory("ModelFilesTests")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appending(path: "abc")
+        try Data("abc".utf8).write(to: url)
+        // Open for writing only, so every read fails with EBADF.
+        let handle = try FileHandle(forWritingTo: url)
+        defer { try? handle.close() }
+        #expect(ModelFiles.sha256(reading: handle) == nil)
+    }
+
+    @Test func aChecksumThatCannotReadTheFileFailsAsTheDisk() async throws {
+        let dir = try scratchDirectory("ModelFilesTests")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = weights(in: dir)
+        let models = dir.appending(path: "models")
+        let transport = StandInTransport { _, _, staging in try Data("weights".utf8).write(to: staging) }
+        let files = ModelFiles(directory: models, transport: transport, hash: { _ in nil })
+        await files.ensure(file)
+        #expect(await files.finished(file) == .failed(.disk))
+        #expect(try contents(of: models).isEmpty)
+    }
+
     @Test func theChecksumStopsBetweenChunksWhenCancelled() async throws {
         let dir = try scratchDirectory("ModelFilesTests")
         defer { try? FileManager.default.removeItem(at: dir) }
