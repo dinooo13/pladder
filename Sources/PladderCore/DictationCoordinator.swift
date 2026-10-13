@@ -361,12 +361,6 @@ public final class DictationCoordinator {
         loader.load()
     }
 
-    /// Swaps the hotkey source, for example when Accessibility is granted or
-    /// revoked and the app moves between the event tap and Carbon.
-    public func replaceHotkeyMonitor(_ monitor: any HotkeyMonitor) {
-        update(settings, hotkeyOverride: hotkeyOverride, monitor: monitor)
-    }
-
     private func setEngineStatus(_ status: EngineStatus) {
         engineStatus = status
         if status.isReady {
