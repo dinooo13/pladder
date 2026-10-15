@@ -2,20 +2,11 @@ import AppKit
 import SwiftUI
 import PladderCore
 
-/// Borderless floating panel that shows dictation status without ever taking
-/// focus away from the app the user is typing into.
-///
-/// The combination that makes this work: `.nonactivatingPanel` so ordering the
-/// window front does not activate Pladder, `canBecomeKey == false` so it never
-/// becomes the key window, and `ignoresMouseEvents` so clicks fall through to
-/// whatever is underneath.
+// Never takes focus from the app being typed into: non-activating, never key, and
+// click-through.
 final class OverlayPanel: NSPanel {
-    /// Includes room around the capsule for its soft shadow and for the
-    /// widest error message; the window itself draws nothing, so nothing is
-    /// clipped and the pill sizes itself to its content inside this box. A
-    /// smaller pill (Minimal) just centres in the invisible box, and every
-    /// style has to fit the error row, so only the live transcript — which
-    /// needs room for its text — asks for more.
+    // Room for the shadow and the widest error message, which every style must fit;
+    // only the live transcript needs more.
     private static func size(for style: OverlayStyle) -> NSSize {
         switch style {
         case .liveTranscript: NSSize(width: 480, height: 140)
@@ -23,22 +14,16 @@ final class OverlayPanel: NSPanel {
         }
     }
 
-    /// How long the pill takes to fade out when it does not fly. Flightless
-    /// hides — the clipboard hint, an error — use the plain fade; the
-    /// controller waits it out before it resets the model, so the last
-    /// content stays on screen for the whole fade.
+    // The controller waits this out before it resets the model, so the content stays
+    // for the whole fade.
     static let fadeOutDuration: TimeInterval = 0.25
 
-    /// How far below its resting frame the panel starts (and dives back to),
-    /// so the pill enters and leaves through the screen's bottom edge. The
-    /// pill never sits higher than the panel's top, which is 64 pt above the
-    /// screen bottom, and it draws its own shadow.
+    // Far enough below the resting frame to start and end behind the screen's bottom edge.
     private static func flightDistance(for height: CGFloat) -> CGFloat { height + 80 }
 
     private let model: OverlayModel
 
-    /// Bumped on every show/hide so a fade-out that is superseded by a new
-    /// show does not order the window out afterwards.
+    // So a fade-out superseded by a new show does not order the window out afterwards.
     private var generation = 0
 
     init(model: OverlayModel) {
@@ -58,9 +43,7 @@ final class OverlayPanel: NSPanel {
         isMovableByWindowBackground = false
         backgroundColor = .clear
         isOpaque = false
-        // The capsule draws its own shadow. A window shadow on a transparent
-        // panel is computed from the window's rectangle and shows up as a faint
-        // box around the pill.
+        // A window shadow on a transparent panel shows as a faint box around the pill.
         hasShadow = false
         ignoresMouseEvents = true
         isReleasedWhenClosed = false
@@ -80,20 +63,14 @@ final class OverlayPanel: NSPanel {
     func show(flight: Bool, onArrival: (@MainActor @Sendable () -> Void)? = nil) {
         generation &+= 1
         let token = generation
-        // A borderless panel that is never key or main does not reliably
-        // inherit an appearance changed through `NSApp.appearance` after it
-        // was created, so re-sync on every show. The settings window restyles
-        // itself; the panel only exists between its appearances.
+        // A borderless panel that is never key or main does not reliably follow an
+        // `NSApp.appearance` change, so it is re-synced on every show.
         appearance = NSApp.appearance
         let final = targetFrame()
         alphaValue = 1
-        // `orderFrontRegardless` avoids requiring Pladder to be active, which
-        // an accessory app never is.
+        // `orderFrontRegardless`: an accessory app is never active.
         if flight {
-            // Start fully below the bottom edge — the window is clipped
-            // there, so nothing flashes — and slide up to rest. The pill is
-            // always opaque; the disc-to-style morph is SwiftUI's job once
-            // the slide lands.
+            // Below the bottom edge the window is clipped, so nothing flashes on the way up.
             setFrame(final.offsetBy(dx: 0, dy: -Self.flightDistance(for: final.height)), display: false)
             orderFrontRegardless()
             NSAnimationContext.runAnimationGroup({ context in
@@ -107,11 +84,8 @@ final class OverlayPanel: NSPanel {
                 }
             })
         } else {
-            // A dive that is still running keeps driving the frame after a
-            // plain `setFrame`, so the panel would finish below the screen
-            // edge with the hint on it. Only an animated frame supersedes
-            // it: the clipboard hint or an error arriving mid-dive brings the
-            // pill back up inside the fade.
+            // A running dive keeps driving the frame after a plain `setFrame`, and the panel
+            // would end below the edge with the hint on it; only an animated frame supersedes it.
             let diving = isVisible && frame != final
             if !diving { setFrame(final, display: false) }
             orderFrontRegardless()
@@ -155,16 +129,13 @@ final class OverlayPanel: NSPanel {
         }
     }
 
-    /// Bottom-centre of whichever screen the pointer is on, so the pill shows up
-    /// where the user is looking on a multi-display setup.
+    // The screen the pointer is on, where the user is looking.
     private func targetFrame() -> NSRect {
         let mouse = NSEvent.mouseLocation
         let screen = NSScreen.screens.first { $0.frame.contains(mouse) }
             ?? NSScreen.main
             ?? NSScreen.screens.first
         guard let frame = screen?.frame else { return self.frame }
-        // The style can change between showings; the hosting view's
-        // autoresizing mask follows `setFrame`.
         let size = Self.size(for: model.style)
         return NSRect(
             x: frame.midX - size.width / 2,

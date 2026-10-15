@@ -11,8 +11,6 @@ import Testing
         CarbonHotkeySession.hotKeyID(generation: generation, role: role)
     }
 
-    // MARK: IDs
-
     @Test func idsPackTheGenerationOverTheRole() {
         #expect(id(5, .dictate) == 5 << 3 | 0)
         #expect(id(5, .toggle) == 5 << 3 | 1)
@@ -29,11 +27,9 @@ import Testing
     }
 
     @Test func onlyTheLow29BitsOfTheGenerationFit() {
-        // A generation past 2^29 wraps; the documented, unreachable limit.
+        // A generation past 2^29 wraps: the documented, unreachable limit.
         #expect(id(5 + (1 << 29), .dictate) == id(5, .dictate))
     }
-
-    // MARK: The generation filter
 
     @Test func anOldSessionsHotKeyMeansNothing() {
         var s = session(6)
@@ -47,12 +43,9 @@ import Testing
         #expect(s.event(id: id(5, .toggle), isPress: true, cancelKeyRegistered: false) == nil)
     }
 
-    // MARK: De-duplication
-
     @Test func pressAndReleaseAlternate() {
         var s = session()
         #expect(s.event(id: id(5, .dictate), isPress: true, cancelKeyRegistered: false) == .chord(.dictate, .pressed))
-        // Carbon's repeat of a held key.
         #expect(s.event(id: id(5, .dictate), isPress: true, cancelKeyRegistered: false) == nil)
         #expect(s.event(id: id(5, .dictate), isPress: false, cancelKeyRegistered: false) == .chord(.dictate, .released(submit: false)))
         #expect(s.event(id: id(5, .dictate), isPress: false, cancelKeyRegistered: false) == nil)
@@ -72,14 +65,11 @@ import Testing
         #expect(s.event(id: id(5, .toggle), isPress: false, cancelKeyRegistered: false) == .chord(.toggle, .released(submit: false)))
     }
 
-    // MARK: The cancel key
-
     @Test func escapeCountsOnlyAsAPressWhileRegistered() {
         var s = session()
         let escape = s.cancelKeyID
         #expect(s.event(id: escape, isPress: true, cancelKeyRegistered: true) == .escape)
         #expect(s.event(id: escape, isPress: false, cancelKeyRegistered: true) == nil)
-        // Let go of between the event being queued and handled.
         #expect(s.event(id: escape, isPress: true, cancelKeyRegistered: false) == nil)
     }
 }

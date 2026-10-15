@@ -2,10 +2,6 @@ import AppKit
 import SwiftUI
 import PladderCore
 
-/// A System-Settings-style picker cell: a picture of the choice with its name
-/// under it and an accent ring when it is the current one. Used instead of a
-/// segmented control where the choice is visual and a word alone does not say
-/// what it looks like.
 struct OptionCard<Thumbnail: View>: View {
     let title: String
     let isSelected: Bool
@@ -13,9 +9,7 @@ struct OptionCard<Thumbnail: View>: View {
     let action: @MainActor () -> Void
     @ViewBuilder let thumbnail: Thumbnail
 
-    /// Thumbnails are laid out at this size and then scaled, so the mini
-    /// windows and pills keep their proportions whatever the card size.
-    /// (Computed, since a generic type cannot hold static stored values.)
+    // Computed, since a generic type cannot hold static stored values.
     private static var designSize: CGSize { CGSize(width: 88, height: 56) }
     private static var scale: CGFloat { 2 / 3 }
     private static var cardSize: CGSize {
@@ -28,13 +22,11 @@ struct OptionCard<Thumbnail: View>: View {
                 thumbnail
                     .frame(width: Self.designSize.width, height: Self.designSize.height)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
-                    // A hairline edge, mostly for dark mode, where a dark
-                    // desktop otherwise sinks into the window behind it.
+                    // A hairline edge, mostly for dark mode, where a dark desktop sinks into the window.
                     .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.primary.opacity(0.2), lineWidth: 1.5))
                     .scaleEffect(Self.scale)
                     .frame(width: Self.cardSize.width, height: Self.cardSize.height)
-                    // The ring sits in the padding, so selecting a card does
-                    // not move the picture or reflow the row.
+                    // The ring sits in the padding, so selecting a card does not reflow the row.
                     .padding(3)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
@@ -55,12 +47,8 @@ struct OptionCard<Thumbnail: View>: View {
     }
 }
 
-/// A stand-in desktop for a card: the same diagonal blue wash the stock
-/// wallpapers use, light or dark, with whatever the card is illustrating
-/// centred on top.
 struct DesktopThumbnail<Content: View>: View {
-    /// `nil` follows the settings window's own scheme; the Appearance cards
-    /// force theirs so both can be shown side by side.
+    // The Appearance cards force theirs, so light and dark can be shown side by side.
     var scheme: ColorScheme?
     @ViewBuilder let content: Content
 
@@ -70,9 +58,8 @@ struct DesktopThumbnail<Content: View>: View {
 
     var body: some View {
         DesktopWash(scheme: resolved)
-        // Overlay rather than ZStack: a scaled-down pill still lays out at
-        // its full size, and in a ZStack that would stretch the gradient so
-        // the card only shows its middle. The card clips whatever hangs out.
+        // Overlay rather than ZStack: a scaled-down pill still lays out at full size, and in a
+        // ZStack that would stretch the gradient so the card only shows its middle.
         .overlay {
             content
                 .environment(\.colorScheme, resolved)
@@ -80,9 +67,6 @@ struct DesktopThumbnail<Content: View>: View {
     }
 }
 
-/// Light, Dark and Auto, shown on the Compact pill (the default overlay) so
-/// the card previews the thing the setting most visibly changes. Auto splits
-/// the card along the diagonal, the way System Settings does.
 struct AppearanceThumbnail: View {
     let appearance: Appearance
     let glass: Bool
@@ -108,7 +92,6 @@ struct AppearanceThumbnail: View {
                 .scaleEffect(0.5)
         }
         .overlay(alignment: .top) {
-            // The menu bar, just enough of it to read as "a Mac".
             Rectangle()
                 .fill(.white.opacity(0.2))
                 .frame(height: 2)
@@ -116,8 +99,6 @@ struct AppearanceThumbnail: View {
     }
 }
 
-/// Half the card, split by the diagonal that runs from the top-right corner to
-/// the bottom-left one.
 private struct DiagonalHalf: Shape {
     let leading: Bool
 
@@ -137,9 +118,7 @@ private struct DiagonalHalf: Shape {
     }
 }
 
-/// One overlay style, shown as it actually looks: the cards render the real
-/// `OverlayPill` scaled down rather than a hand-drawn imitation, so they can
-/// never drift from the pill itself.
+// The real `OverlayPill` scaled down, so the cards can never drift from it.
 struct OverlayStyleThumbnail: View {
     let style: OverlayStyle
     let glass: Bool
@@ -159,19 +138,13 @@ struct OverlayStyleThumbnail: View {
             OverlayPill(state: .recording, level: Self.previewLevel, style: .compact, glass: glass, isPreview: true)
                 .scaleEffect(0.5)
         case .minimal:
-            // The disc is 44 pt; at 0.75 it reads as a disc without turning
-            // into a dot.
+            // The disc is 44 pt; at 0.75 it still reads as a disc, not a dot.
             OverlayPill(state: .recording, level: Self.previewLevel, style: .minimal, glass: glass, isPreview: true)
                 .scaleEffect(0.75)
         case .menuBar:
-            // Nothing on the desktop at all: the wave in the menu bar is the
-            // whole of this style.
             menuBar
         case .liveTranscript:
-            // The live row hugs a two-line sample in a preview. The card's
-            // design box is 88 pt wide, so the pill, 171 pt at full size, is
-            // scaled to about 72 pt: the words are small but read as words,
-            // which is what tells this style from Compact.
+            // Scaled to about 72 pt of the card's 88: small, but the words read as words.
             OverlayPill(
                 state: .recording,
                 level: Self.previewLevel,
@@ -181,18 +154,16 @@ struct OverlayStyleThumbnail: View {
                 partial: String(localized: "see it as you speak"),
                 hugsContent: true
             )
-            // The card is narrower than the pill; proposed at the card's
-            // width the glass shrinks but the row does not, and the dot ends
-            // up outside the capsule. The pill takes its own size instead.
+            // Proposed at the card's width the glass shrinks but the row does not, and the dot
+            // ends up outside the capsule.
             .fixedSize()
             .scaleEffect(0.42)
         }
     }
 
     private var menuBar: some View {
-        // The same strip the Appearance cards draw, tall enough to hold the
-        // wave glyph. The image is resized, not scaled: `scaleEffect` keeps
-        // the 22×16 layout and would push the strip to the icon's height.
+        // Resized, not scaled: `scaleEffect` keeps the 22×16 layout and would push the strip
+        // to the icon's height.
         Rectangle()
             .fill(.white.opacity(0.2))
             .frame(height: 9)
@@ -209,8 +180,6 @@ struct OverlayStyleThumbnail: View {
     }
 }
 
-/// Glass or flat, shown on the Compact pill since that is where the difference
-/// is easiest to see.
 struct BackgroundThumbnail: View {
     let glass: Bool
 
@@ -222,9 +191,6 @@ struct BackgroundThumbnail: View {
     }
 }
 
-/// A speed for the fly-in/fly-out. An animation cannot be captured in a
-/// still picture, so each card says it with a speed instead: lightning for
-/// almost instant, a hare for quick, a tortoise for the long expressive one.
 struct AnimationSpeedThumbnail: View {
     let speed: OverlayAnimationSpeed
 
@@ -247,8 +213,6 @@ struct AnimationSpeedThumbnail: View {
     }
 }
 
-/// The diagonal wash a stand-in desktop is painted with, in the option cards
-/// and the README screenshots alike.
 struct DesktopWash: View {
     let scheme: ColorScheme
 

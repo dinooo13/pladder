@@ -1,60 +1,9 @@
 import Foundation
 
-/// Turns raw keyboard transitions into presses and releases of a `Hotkey`
-/// chord. `HotkeyChordSet` runs one per role and feeds them all every event
-/// from the tap; tests feed it directly. Pure value type, no I/O.
-///
-/// Rules:
-/// - The chord *engages* when one of its keys goes down and, at that moment,
-///   exactly the chord's modifier keys and at least the chord's regular keys are
-///   held. "Exactly" is what keeps ordinary shortcuts working: Shift+Right
-///   Option is not Right Option. Exactly for a modifier-only chord, that is; a
-///   chord with a regular key ignores which side a modifier is on, so Right
-///   Option+Space is Option+Space.
-/// - It *disengages* when any chord key goes up, or when any other key goes
-///   down (the user has started a different shortcut, so stop listening). It
-///   only re-engages once one of its keys is pressed again.
-/// - A disengage caused by another key going down within `interruptionWindow`
-///   of the chord engaging is an *interruption*: the user was typing Cmd+C or
-///   Cmd+Tab, not dictating, and the outcome is `.cancelled` rather than
-///   `.released`. The same key pressed after the window is an ordinary
-///   release, so a long hold that ends on a stray key still transcribes.
-///   Interruptions need a clock, so every event takes the instant it
-///   happened at; a key *up* never interrupts.
-/// - A regular key whose key-down completed the chord is *swallowed*, and so are
-///   its auto-repeats and its key-up, so the frontmost app never sees the Space
-///   in Control+Space. Modifier events are never swallowed.
-/// - The *submit key* is a second chord that may be pressed at any point while
-///   the hotkey chord is engaged, and is always matched by side, however the
-///   hotkey chord is matched. Doing so *arms* the release: the resulting
-///   `.released(submit: true)` asks for Return after the pasted text. The
-///   submit keys themselves are swallowed (and their repeats and key-up with
-///   them) so an app never sees a stray Return inside the dictation, and they
-///   do not disengage the chord. When the chord is not engaged, submit keys
-///   pass through to other applications untouched. Arming only happens on a
-///   press event after engagement — holding the submit key before the hotkey
-///   does not arm a release that never saw the submit press.
-/// - A *lost key-up* must not leave a regular key held for good. A tap can
-///   miss one: Secure Event Input stops key events reaching it while
-///   `flagsChanged` keeps flowing, and a stale Space would let a lone Option,
-///   an Option-click say, press Option+Space. Two rules cover it. Once the
-///   chord's modifiers stop being held, a regular key of the chord held from
-///   before no longer counts: a chord with a regular key re-engages only on a
-///   fresh key-down of it, never on its modifiers alone. And a key cannot go
-///   down twice, so a non-repeat key-down of a key still counted as
-///   swallowed means its key-up was lost: it is forgotten, so the next Space
-///   typed reaches the app, and taken again only if it is the chord's. The
-///   price is a real Space held across letting go of Option: pressing Option
-///   again does not re-engage, and the Space has to be pressed again.
-///
-/// Modifier state is passed in as the full set of held modifier key codes with
-/// every event rather than as individual transitions: the flags on each event
-/// are authoritative, which keeps a missed event from leaving a modifier stuck.
+// The matching rules are in docs/ARCHITECTURE.md, "Hotkeys".
 public struct HotkeyChordTracker: Sendable, Equatable {
     public struct Outcome: Sendable, Equatable {
-        /// The chord transition this event caused, if any.
         public var event: HotkeyEvent?
-        /// True when the event must not reach other applications.
         public var swallow: Bool
 
         public init(event: HotkeyEvent? = nil, swallow: Bool = false) {
@@ -64,28 +13,17 @@ public struct HotkeyChordTracker: Sendable, Equatable {
     }
 
     public let hotkey: Hotkey
-    /// The chord that, pressed while the hotkey chord is engaged, arms the
-    /// release with `submit: true`. An empty chord means the feature is off.
     public let submitKey: Hotkey
-    /// How soon after the chord engages another key still counts as an
-    /// interruption. Long enough to cover a shortcut typed at speed, short
-    /// enough that a deliberate hold is never mistaken for one.
     public let interruptionWindow: Duration
     public private(set) var isEngaged = false
-    /// True once the submit chord has gone down during the current engagement.
-    /// Reported on `.released`, then cleared.
     public private(set) var isSubmitArmed = false
 
     private var heldModifiers: Set<UInt16> = []
     private var heldKeys: Set<UInt16> = []
-    /// Regular keys whose key-down we swallowed. Their repeats and key-up are
-    /// swallowed too, even after the chord has disengaged, so an app never sees
-    /// a key-up without its key-down.
+    // Their repeats and key-up stay swallowed after the chord disengages: an app must
+    // never see a key-up without its key-down.
     private var swallowedKeys: Set<UInt16> = []
-    /// When the current engagement began, for the interruption window.
     private var engagedAt: ContinuousClock.Instant?
-    /// Set when the disengage now in progress was an interruption. Read and
-    /// cleared by `transition(from:)`.
     private var wasInterrupted = false
 
     public init(
@@ -110,22 +48,17 @@ public struct HotkeyChordTracker: Sendable, Equatable {
             return Outcome(event: transition(from: wasEngaged), swallow: swallowedKeys.contains(key))
         }
         heldKeys.insert(key)
-        // Not a repeat, so any key-up still owed for this key was lost (see
-        // the type's comment): the branches below take it again if it is
-        // ours, and otherwise it reaches the app.
+        // Not a repeat, so a key-up still owed for this key was lost: it is taken again
+        // below only if it is ours, and otherwise reaches the app.
         swallowedKeys.remove(key)
         var swallow = false
         if isEngaged {
             if submitKey.regularKeyCodes.contains(key) {
-                // Part of the submit chord: swallow it so an app never sees a
-                // stray Return inside the dictation, and arm if the whole
-                // submit chord is now held.
                 swallowedKeys.insert(key)
                 swallow = true
                 armIfSubmitChordHeld()
             } else if hotkey.keyCodes.contains(key) {
-                // The chord's own key down again mid-press: its key-up was
-                // lost and the chord is still held. Still the chord's.
+                // The chord's own key down again mid-press: its key-up was lost.
                 swallowedKeys.insert(key)
                 swallow = true
             } else {
@@ -158,9 +91,6 @@ public struct HotkeyChordTracker: Sendable, Equatable {
         return Outcome(event: transition(from: wasEngaged))
     }
 
-    /// Forgets all held keys, releasing the chord if it was engaged. For when the
-    /// event source restarts and transitions may have been missed. Events were
-    /// lost, so the release never reports submit.
     public mutating func reset() -> HotkeyEvent? {
         let wasEngaged = isEngaged
         self = Self(hotkey: hotkey, submitKey: submitKey, interruptionWindow: interruptionWindow)
@@ -174,25 +104,19 @@ public struct HotkeyChordTracker: Sendable, Equatable {
         heldModifiers = modifiers
         let hasChordModifiers = chordModifiers.isSubset(of: matching(modifiers))
         if hadChordModifiers, !hasChordModifiers {
-            // The lost key-up rule: from here on the regular key counts only
-            // once it goes down again. Still swallowed until its key-up, if
-            // that ever comes. A modifier-less chord never gets here, and so
-            // still engages on its key alone.
+            // A lost key-up: from here on the regular key counts only once it goes down again.
+            // A modifier-less chord never gets here, so it still engages on its key alone.
             heldKeys.subtract(hotkey.regularKeyCodes)
         }
         if isEngaged {
-            // The submit key is matched by side, so it is taken out before the
-            // rest is folded: the other side of it is a foreign modifier like
-            // any other.
+            // The submit key is matched by side, so it is taken out before the rest is
+            // folded: its other side is a foreign modifier like any other.
             let foreign = pressed.subtracting(submitKey.modifierKeyCodes)
             if !hasChordModifiers {
-                // A chord modifier is no longer held: an ordinary release,
-                // whenever it came. Asked of what is still down rather than of
-                // what went up, so letting go of a redundant Left Option while
-                // Right Option holds Option+Space keeps the chord engaged.
+                // Asked of what is still down, not what went up, so letting go of a redundant
+                // Left Option while Right Option holds Option+Space keeps the chord engaged.
                 isEngaged = false
             } else if !matching(foreign).isSubset(of: chordModifiers) {
-                // A foreign modifier went down: Shift for Cmd+Shift+4, say.
                 disengage(interruptedAt: instant)
             } else if !pressed.isEmpty {
                 armIfSubmitChordHeld()
@@ -209,15 +133,11 @@ public struct HotkeyChordTracker: Sendable, Equatable {
         engagedAt = instant
     }
 
-    /// Disengages because another key went down. Inside the window that is an
-    /// interruption and the press is cancelled rather than released.
     private mutating func disengage(interruptedAt instant: ContinuousClock.Instant) {
         isEngaged = false
         if let engagedAt, instant - engagedAt <= interruptionWindow { wasInterrupted = true }
     }
 
-    /// Held modifiers as the chord compares them: sides folded for a chord
-    /// with a regular key, exact for a modifier-only chord.
     private func matching(_ modifiers: Set<UInt16>) -> Set<UInt16> {
         hotkey.isModifierOnly ? modifiers : Hotkey.collapsingSides(modifiers)
     }
@@ -227,7 +147,6 @@ public struct HotkeyChordTracker: Sendable, Equatable {
             && hotkey.regularKeyCodes.isSubset(of: heldKeys)
     }
 
-    /// The whole submit chord is held once every one of its keys is down.
     private var submitChordIsHeld: Bool {
         !submitKey.isEmpty && submitKey.keyCodes.isSubset(of: heldModifiers.union(heldKeys))
     }
@@ -246,7 +165,7 @@ public struct HotkeyChordTracker: Sendable, Equatable {
             engagedAt = nil
             if wasInterrupted {
                 wasInterrupted = false
-                return .cancelled
+                return .interrupted
             }
             return .released(submit: submit)
         }

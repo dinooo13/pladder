@@ -3,8 +3,6 @@ import PladderTestSupport
 import Testing
 @testable import PladderCore
 
-/// Hands out scripted observations, one per call, and records what it was
-/// asked to watch.
 final class FakePasteObserver: PastedTextObserver, @unchecked Sendable {
     private let lock = NSLock()
     private var script: [PasteObservation?]
@@ -22,7 +20,6 @@ final class FakePasteObserver: PastedTextObserver, @unchecked Sendable {
     }
 }
 
-/// Answers per pair, yes by default, and records every question.
 final class FakeCorrectionReviewer: CorrectionReviewer, @unchecked Sendable {
     struct Failure: Error {}
 
@@ -185,8 +182,6 @@ typealias ProposalLog = Recorder<CorrectionPair>
     }
 
     @Test func atMostThreeProposalsPerPaste() async {
-        // Three hunks is the diff's own limit, so the cap is reached exactly;
-        // a fourth would make the diff call it a rewrite.
         let pasted = "Claud and get hub and kubernetties are all words in this longer sentence here"
         let final = "Claude and GitHub and Kubernetes are all words in this longer sentence here"
         let observer = FakePasteObserver([Self.observation(pasted, final)])
@@ -206,8 +201,6 @@ typealias ProposalLog = Recorder<CorrectionPair>
         #expect(reviewer.calls.first?.corrected == "Claude")
     }
 
-    /// A recording or a polished dictation is in flight: the review waits
-    /// for the model to be free rather than eat into the polish budget.
     @Test func theReviewWaitsUntilTheGateOpens() async {
         let gate = Gate()
         let observer = FakePasteObserver([Self.observation("I tried Claud today", "I tried Claude today")])
@@ -237,7 +230,6 @@ typealias ProposalLog = Recorder<CorrectionPair>
         #expect(await gate.arrivals == 0)
     }
 
-    /// A model error can quote the prompt, which is the user's words.
     @Test func aReviewerErrorIsLoggedByCaseNotByText() async {
         enum ModelError: Error { case generation(String) }
         let observer = FakePasteObserver([Self.observation("I tried Claud today", "I tried Claude today")])

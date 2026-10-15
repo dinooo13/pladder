@@ -48,15 +48,12 @@ import Testing
         #expect(r.apply(to: "I like c++, really") == "I like C++, really")
         #expect(r.apply(to: "I like c++.") == "I like C++.")
         #expect(r.apply(to: "\u{201c}c++\u{201d}") == "\u{201c}C++\u{201d}")
-        // Still whole words only: a symbol, letter or digit carries the word on.
         #expect(r.apply(to: "c+++ and c++x and c++2") == "c+++ and c++x and c++2")
         let net = replacer([(".net", ".NET")])
         #expect(net.apply(to: "asp.net or (.net)") == "asp.net or (.NET)")
     }
 
     @Test func aCycleThroughAPunctuationEdgeIsFound() {
-        // "c++." holds "c++" now that a full stop may follow it, so the two
-        // rules undo each other and both are dropped.
         let a = DictionaryEntry(from: "c++", to: "cpp")
         let b = DictionaryEntry(from: "cpp", to: "c++.")
         #expect(DictionaryEntry.cyclicIDs(in: [a, b]) == [a.id, b.id])
@@ -66,8 +63,6 @@ import Testing
         let r = replacer([("", "x"), ("  ", "y")])
         #expect(r.apply(to: "nothing changes") == "nothing changes")
     }
-
-    // MARK: Unicode word boundaries
 
     @Test func umlautEdgeIsAWordBoundary() {
         let r = replacer([("ärger", "Ärger")])

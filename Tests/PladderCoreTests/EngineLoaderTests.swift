@@ -45,9 +45,6 @@ import Testing
         #expect(await waitUntil { loader.status == .ready })
     }
 
-    /// A switch while the first engine is still loading: the first load
-    /// finishing later must neither report its status nor stop the poll that
-    /// carries the second engine's.
     @Test func aSupersededLoadLeavesTheNextEngineAlone() async {
         let first = GatedEngine(id: EngineID("first"), progress: 0.25)
         let second = GatedEngine(id: EngineID("second"), progress: 0.5)
@@ -66,12 +63,11 @@ import Testing
 
         await first.open()
         #expect(await first.waitUntilLoaded())
-        // Give the superseded load task time to resume on the main actor.
+        // Time for the superseded load task to resume on the main actor.
         try? await Task.sleep(for: .milliseconds(50))
         #expect(loader.engine.id == second.id)
         #expect(loader.status == .downloading(progress: 0.5))
 
-        // The second engine's poll is still running.
         await second.report(progress: 0.75)
         #expect(await waitUntil { loader.status == .downloading(progress: 0.75) })
         await second.open()
@@ -79,8 +75,6 @@ import Testing
     }
 }
 
-/// Loads only when the test opens it, reporting a download fraction until
-/// then, so a load can be left in flight across a `select`.
 private actor GatedEngine: TranscriptionEngine {
     nonisolated let id: EngineID
     nonisolated let displayName = "Gated"
@@ -102,7 +96,6 @@ private actor GatedEngine: TranscriptionEngine {
         status = .ready
     }
 
-    /// Whether `load()` got past the gate within a second.
     func waitUntilLoaded() async -> Bool {
         for _ in 0..<100 {
             if status == .ready { return true }

@@ -1,21 +1,12 @@
 import Foundation
 
-/// Where the app keeps its files.
-///
-/// `live` is the user's configuration, unless `PLADDER_SETTINGS_PATH` points
-/// a copy launched for testing at a file of its own, so it neither reads nor
-/// writes the configuration of the copy in daily use. `scratch` is a
-/// throwaway directory for the overlay demo and the screenshots, which must
-/// never read, move aside or write anything real.
+// `PLADDER_SETTINGS_PATH` gives a copy launched for testing a file of its own.
+// `scratch` is for the overlay demo and the screenshots, which must touch nothing real.
 struct SettingsLocation {
     let settingsURL: URL
-    /// Whether the pre-rename settings are copied across when there are none
-    /// yet. Only for the real configuration: a test copy starts from the
-    /// defaults, not from an old install.
+    // A test copy starts from the defaults, not from an old install.
     let migratesLegacySettings: Bool
 
-    /// The corrections the user dismissed, beside the settings but not in
-    /// them (see `DismissedCorrections`).
     var dismissedCorrectionsURL: URL {
         settingsURL.deletingLastPathComponent().appending(path: "dismissed-corrections.json")
     }
@@ -38,10 +29,7 @@ struct SettingsLocation {
         FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Application Support")
     }
 
-    /// One-time migration from the pre-rename location. The dictionary and
-    /// hotkey settings were kept in `~/Library/Application Support/SpeakUp/`
-    /// before the app was called Pladder; copy them across exactly once, only
-    /// when the new file does not exist yet. The old file is left in place.
+    // `SpeakUp` was the app's name before Pladder. Copied once; the old file stays.
     func migrateLegacySettingsIfNeeded() {
         guard migratesLegacySettings, !FileManager.default.fileExists(atPath: settingsURL.path) else { return }
         let legacy = Self.applicationSupport.appending(path: "SpeakUp/settings.json")

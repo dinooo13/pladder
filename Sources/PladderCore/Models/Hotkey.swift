@@ -1,14 +1,7 @@
 import Foundation
 
-/// The push-to-talk chord: one or more physical keys that must be held together.
-///
-/// Keys are macOS virtual key codes (Carbon `kVK_*`). Modifier keys are ordinary
-/// members of the chord under their own key codes, so Right Option (0x3D) and
-/// Left Option (0x3A) are different keys, and a chord can be a lone modifier,
-/// several modifiers, or modifiers plus a regular key. Matching is exact on the
-/// sides for a modifier-only chord, which is what lets a lone Right Command be
-/// a hotkey; a chord with a regular key ignores which side a modifier is on
-/// (see `HotkeyChordTracker`).
+// macOS virtual key codes (`kVK_*`). Modifiers are members under their own codes,
+// so Left and Right Option are different keys.
 public struct Hotkey: Codable, Sendable, Hashable {
     public var keyCodes: Set<UInt16>
 
@@ -22,8 +15,7 @@ public struct Hotkey: Codable, Sendable, Hashable {
 
     // MARK: Modifier keys
 
-    /// Left and Right Command, Shift, Option, Control, plus Fn. Caps Lock is a
-    /// latch rather than a key you hold, so it is deliberately not here.
+    // Caps Lock is a latch, not a key you hold, so it is deliberately not here.
     public static let allModifierKeyCodes: Set<UInt16> = [
         0x37, 0x36, // Command, Right Command
         0x38, 0x3C, // Shift, Right Shift
@@ -40,35 +32,24 @@ public struct Hotkey: Codable, Sendable, Hashable {
     public var regularKeyCodes: Set<UInt16> { keyCodes.filter { !Self.isModifierKeyCode($0) } }
     public var isModifierOnly: Bool { !keyCodes.isEmpty && regularKeyCodes.isEmpty }
 
-    /// True when the chord can be registered as a system-wide hotkey without
-    /// Accessibility (Carbon `RegisterEventHotKey`): exactly one regular key,
-    /// any modifiers, no Fn. Sides are collapsed by that API, so Left and
-    /// Right Shift are the same chord to it.
     public var canBeRegisteredWithoutAccessibility: Bool {
         regularKeyCodes.count == 1 && !keyCodes.contains(0x3F)
     }
 
-    /// A chord with no keys never fires. Used to turn the submit key off.
     public var isEmpty: Bool { keyCodes.isEmpty }
 
-    /// The form a chord is stored in. A chord with a regular key ignores the
-    /// modifiers' sides, so it keeps the left-hand codes; a modifier-only
-    /// chord is matched by side and is kept as pressed.
+    // The form a chord is stored and compared in.
     public var canonical: Hotkey {
         isModifierOnly ? self : Hotkey(keyCodes: regularKeyCodes.union(collapsedModifierKeyCodes))
     }
 
     // MARK: Carbon's side-agnostic view of a chord
 
-    /// The modifiers with each right-hand key folded onto its left-hand code,
-    /// which is all Carbon's modifier mask can express. Fn has no side and no
-    /// bit, so it is left alone and simply never matches anything Carbon owns.
+    // Fn has no side and no Carbon bit: it is left alone and never matches.
     public var collapsedModifierKeyCodes: Set<UInt16> {
         Self.collapsingSides(modifierKeyCodes)
     }
 
-    /// The same folding for a loose set of key codes, which is how the tracker
-    /// compares held modifiers against a chord with a regular key.
     public static func collapsingSides(_ codes: Set<UInt16>) -> Set<UInt16> {
         Set(codes.map { code in carbonModifiers.first { $0.right == code }?.left ?? code })
     }
@@ -80,10 +61,7 @@ public struct Hotkey: Codable, Sendable, Hashable {
         (0x3B, 0x3E, 0x1000), // Control, controlKey
     ]
 
-    /// Carbon's modifier mask for this chord, as `RegisterEventHotKey` and the
-    /// symbolic hot key list both spell it. The four constants are written out
-    /// rather than imported so `PladderCore` stays Foundation-only, and so the
-    /// conversion is unit-testable without Carbon.
+    // Carbon's constants are written out so `PladderCore` stays Foundation-only.
     public var carbonModifierMask: UInt32 {
         let collapsed = collapsedModifierKeyCodes
         return Self.carbonModifiers.reduce(0) { mask, modifier in
@@ -91,14 +69,8 @@ public struct Hotkey: Codable, Sendable, Hashable {
         }
     }
 
-    /// The chord a Carbon key code and modifier mask stand for. A mask cannot
-    /// say which side was meant, so the left keys are used, the same reading
-    /// the legacy settings decoder takes.
-    ///
-    /// Nil for `0xFFFF`, which is how the symbolic hot key list spells "this
-    /// shortcut has no key". Bits outside the four modifier ones are ignored:
-    /// macOS sets a private bit for the function-key shortcuts and nothing
-    /// here needs to understand it.
+    // 0xFFFF is the symbolic hot key list's "no key". Bits outside the four modifiers
+    // are ignored: macOS sets a private one for the function-key shortcuts.
     public init?(keyCode: UInt16, carbonModifierMask mask: UInt32) {
         guard keyCode != 0xFFFF else { return nil }
         var codes: Set<UInt16> = [keyCode]
@@ -108,23 +80,13 @@ public struct Hotkey: Codable, Sendable, Hashable {
 
     // MARK: macOS shortcuts
 
-    /// The enabled macOS keyboard shortcut that swallows this chord, if any.
-    ///
-    /// Equality is not the rule. On a Mac with two input sources Control+Space
-    /// and Control+Option+Space are enabled, and Control+Shift+Space never
-    /// reaches the front app either: the same handling eats a chord whose
-    /// modifiers *contain* an enabled shortcut's. So a shortcut owns a chord
-    /// when it uses the same regular key and its modifiers are a subset of the
-    /// chord's, sides collapsed. Conservative in the right direction: it may
-    /// warn about a chord that would in fact have worked, never the reverse.
-    ///
-    /// The owner is returned rather than a Bool so the UI can name it.
+    // Equality is not the rule: with two input sources Control+Space is enabled and
+    // Control+Shift+Space never reaches the app either. A shortcut owns a chord when it
+    // has the same regular key and a subset of its modifiers, sides collapsed.
     public func systemShortcutConflict(in shortcuts: Set<Hotkey>) -> Hotkey? {
         let keys = regularKeyCodes
         guard !keys.isEmpty else { return nil }
         let modifiers = collapsedModifierKeyCodes
-        // Sorted so the name shown does not depend on the set's iteration
-        // order when more than one shortcut matches.
         return shortcuts
             .filter { $0.regularKeyCodes == keys && $0.collapsedModifierKeyCodes.isSubset(of: modifiers) }
             .min { $0.keyCodes.sorted().lexicographicallyPrecedes($1.keyCodes.sorted()) }
@@ -132,25 +94,11 @@ public struct Hotkey: Codable, Sendable, Hashable {
 
     // MARK: Well-known chords
 
-    /// Option + Space (kVK_Option, kVK_Space). The default: no macOS shortcut
-    /// owns it with one or several input sources, and Carbon registers it, so
-    /// it works with and without Accessibility.
     public static let optionSpace = Hotkey(0x3A, 0x31)
-    /// Right Command (kVK_RightCommand = 0x36). The default before
-    /// Option+Space; still the usual modifier-only choice, and the tests'.
     public static let rightCommand = Hotkey(0x36)
-    /// Right Option (kVK_RightOption = 0x3D). The send key before V; kept
-    /// for the tests, which use it as a lone modifier chord.
     public static let rightOption = Hotkey(0x3D)
-    /// V (kVK_ANSI_V = 0x09). The default send key: the index finger of the
-    /// hand holding Option+Space rests on it, so the other hand can stay on
-    /// the mouse. A key position, so it is in the same place on every layout;
-    /// the recorder names it after what it types there.
     public static let keyV = Hotkey(0x09)
 
-    /// The chord that stands in for this one without Accessibility, or nil
-    /// when Carbon can register this one itself. Only a chord without exactly
-    /// one regular key, or with Fn, needs it; the default always registers.
     public var standInWithoutAccessibility: Hotkey? {
         canBeRegisteredWithoutAccessibility ? nil : .optionSpace
     }
@@ -158,8 +106,7 @@ public struct Hotkey: Codable, Sendable, Hashable {
     // MARK: Codable
 
     // Version 1 stored `{"kind": "modifier"|"key", "keyCode": n, "modifiers": mask}`
-    // with the side-agnostic `NSEvent.ModifierFlags` mask. Those files are still
-    // read; everything is written in the chord form.
+    // with the side-agnostic `NSEvent.ModifierFlags` mask. Still read, never written.
     private enum CodingKeys: String, CodingKey {
         case keyCodes
         case kind, keyCode, modifiers
@@ -173,8 +120,7 @@ public struct Hotkey: Codable, Sendable, Hashable {
         }
         var codes: Set<UInt16> = [try c.decode(UInt16.self, forKey: .keyCode)]
         if try c.decodeIfPresent(String.self, forKey: .kind) != "modifier" {
-            // A mask cannot say which side was meant; the left keys are the
-            // conventional reading of "Control+Space".
+            // A mask cannot say which side was meant; the left keys are the usual reading.
             let mask = try c.decodeIfPresent(UInt.self, forKey: .modifiers) ?? 0
             if mask & (1 << 17) != 0 { codes.insert(0x38) } // shift
             if mask & (1 << 18) != 0 { codes.insert(0x3B) } // control
@@ -187,7 +133,6 @@ public struct Hotkey: Codable, Sendable, Hashable {
 
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
-        // Sorted so the settings file is stable across saves.
         try c.encode(keyCodes.sorted(), forKey: .keyCodes)
     }
 }

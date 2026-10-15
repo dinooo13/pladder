@@ -3,19 +3,8 @@ import PladderCore
 import PladderEngines
 import PladderSystem
 
-/// `pladder-cli bench-process <fixtures dir> [--runs N]`: what the processor
-/// pipeline costs on the fixtures' text (see "Processors" in
-/// docs/BENCHMARKS.md).
-///
-/// Every fixture's `.txt`, the script `scripts/make-fixtures.sh` wrote beside
-/// its audio, is read as one line of transcript and run through the pipeline
-/// `--process` runs, built from a fresh install's settings, in two variants:
-/// "typical" has the filler "um," after the first word of every sentence,
-/// "worst" also says "question mark" at the end of every sentence. Each
-/// variant runs `runs` times; the first is discarded and the median of the
-/// rest reported.
+// What the processor pipeline costs: "Processors" in docs/BENCHMARKS.md.
 enum ProcessorBench {
-    /// Parses what follows `bench-process` on the command line and runs it.
     static func run(arguments: [String]) {
         var runs = 31
         var directory: String?
@@ -62,8 +51,6 @@ enum ProcessorBench {
                 var times: [Double] = []
                 for attempt in 1...runs {
                     let started = clock.now
-                    // `await` whether or not `run` is async, so this file
-                    // builds against either.
                     _ = pipeline.run(variant)
                     let elapsed = clock.now - started
                     if attempt > 1 { times.append(elapsed / .milliseconds(1)) }
@@ -75,7 +62,6 @@ enum ProcessorBench {
         }
     }
 
-    /// Every `.txt` in `directory` with its name, shortest first.
     private static func loadScripts(in directory: String) -> [(name: String, script: String)] {
         let url = URL(fileURLWithPath: directory)
         guard let files = try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil) else {
@@ -91,9 +77,7 @@ enum ProcessorBench {
         return scripts.sorted { $0.script.count < $1.script.count }
     }
 
-    /// The script's sentences, each with its closing mark, line breaks read
-    /// as spaces: the fixtures hold one sentence per line, and the engine
-    /// writes one line.
+    // The fixtures hold one sentence per line; the engine writes one line.
     static func sentences(in script: String) -> [String] {
         var sentences: [String] = []
         var current = ""
@@ -109,7 +93,6 @@ enum ProcessorBench {
         return sentences.filter { !$0.isEmpty }
     }
 
-    /// "um," after the first word of every sentence.
     static func typical(_ sentences: [String]) -> String {
         sentences.map { sentence in
             var words = sentence.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
@@ -118,8 +101,6 @@ enum ProcessorBench {
         }.joined(separator: " ")
     }
 
-    /// The typical variant with "question mark" spoken before every
-    /// sentence's closing mark.
     static func worst(_ sentences: [String]) -> String {
         typical(sentences.map { sentence in
             guard let last = sentence.last, ".!?".contains(last) else { return sentence + " question mark" }

@@ -2,8 +2,7 @@ import Foundation
 import Testing
 @testable import PladderRefine
 
-// Nothing here calls the model: these run on a Mac without Apple
-// Intelligence and keep `swift test` well under a second.
+// Nothing here calls the model.
 
 @Suite struct CorrectionReviewPromptTests {
     @Test func parsesYesAndNoCaseInsensitively() {

@@ -1,17 +1,7 @@
 import Foundation
 
-/// The pairs the user answered Dismiss to, so they are never proposed again.
-///
-/// Its own file, `dismissed-corrections.json` beside `settings.json`, and not
-/// a field of `Settings`: every settings assignment is compared, saved and
-/// pushed into the coordinator, which rebuilds the processor pipeline, and a
-/// memory the app writes to itself does not belong in that value. And
-/// `SettingsStore` moves an undecodable file aside, so a bug here could cost
-/// the user their dictionary; this file can only ever cost itself.
-///
-/// Matching is case-insensitive on both sides. Loaded on first use; an
-/// unreadable file counts as empty and is left where it is until the next
-/// Dismiss rewrites it. Deleting the file is the whole reset.
+// Its own file, not part of `Settings`: a bug here can only ever cost this file,
+// never the dictionary.
 public actor DismissedCorrections {
     private let url: URL
     private var pairs: [CorrectionPair] = []

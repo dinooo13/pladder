@@ -4,10 +4,9 @@ import PladderTestSupport
 import Testing
 @testable import PladderRefine
 
-// Nothing here calls the model: Apple's calls are stood in for by sleeps run
-// under the real wall-clock race, so the budget is the one the app enforces.
+// Nothing here calls the model: sleeps stand in for Apple's calls, raced against the
+// real wall clock, so the budget is the one the app enforces.
 
-/// The polish's two calls, each a stand-in.
 private struct StandInCalls: PolishCalls {
     typealias Call = @Sendable (_ prompt: String, _ deadline: ContinuousClock.Instant) async throws -> String
 
@@ -26,8 +25,6 @@ private struct StandInCalls: PolishCalls {
     }
 }
 
-/// A model call that takes `duration` and then answers or throws, raced
-/// against `deadline` the way `OnDeviceLanguageModel` races Apple's.
 private func slowCall(
     _ duration: Duration, answer: String = "Cleaned.", throwing error: (any Error)? = nil,
     deadlines: Recorder<ContinuousClock.Instant>? = nil
@@ -42,16 +39,12 @@ private func slowCall(
     }
 }
 
-/// 700 words in sentences of seven: three chunks for Apple's model.
 private let longTranscript = Array(repeating: "one two three four five six seven.", count: 100).joined(separator: " ")
 
 @Suite(.timeLimit(.minutes(1))) struct TranscriptPolisherBudgetTests {
-    // Before: every chunk got eight seconds of its own, so a dictation near
-    // the 10 min cap could hold the paste for most of a minute.
     @Test func oneBudgetCoversEveryChunk() async {
         #expect(TranscriptPolisher.chunks(of: longTranscript).count == 3)
         let deadlines = Recorder<ContinuousClock.Instant>()
-        // Each chunk alone is well inside the budget; three are not.
         let polisher = TranscriptPolisher(
             timeout: .milliseconds(60), calls: StandInCalls(guidedCall: slowCall(.milliseconds(25), deadlines: deadlines)))
         let started = ContinuousClock.now
@@ -71,8 +64,6 @@ private let longTranscript = Array(repeating: "one two three four five six seven
         #expect(report.mode == .guided)
     }
 
-    // Before: the plain fallback started a fresh eight seconds after the
-    // guided call had used up its own.
     @Test func thePlainFallbackSharesTheBudget() async {
         let polisher = TranscriptPolisher(
             timeout: .milliseconds(60),
@@ -116,8 +107,6 @@ private let longTranscript = Array(repeating: "one two three four five six seven
         #expect(OnDeviceLanguageModel.modelError(from: GenerationError.unsupportedGuide(context)) == .unsupportedGuide)
     }
 
-    // The debug description is where the user's words can turn up; the log
-    // line that carries this is public.
     @Test func anyOtherErrorKeepsItsNameAndNeverItsText() {
         let context = GenerationError.Context(debugDescription: "send it on friday")
         #expect(OnDeviceLanguageModel.modelError(from: GenerationError.guardrailViolation(context)) == .generation("guardrailViolation"))
@@ -127,9 +116,6 @@ private let longTranscript = Array(repeating: "one two three four five six seven
     }
 
     #if compiler(>=6.4)
-    // The macOS 27 SDK's replacements for the same two failures. Neither
-    // their text nor, on macOS 27, the old cases' text holds the case name
-    // the old string match looked for.
     @Test func macOS27sErrorsMapToTheSameCases() {
         guard #available(macOS 27, *) else { return }
         let parsing = GeneratedContent.ParsingError(rawContent: "send it on friday", debugDescription: "send it on friday")

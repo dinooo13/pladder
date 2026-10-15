@@ -2,6 +2,8 @@
 
 Push-to-talk dictation for macOS 26 on Apple Silicon. Hold a key, speak, release, and the words are pasted where the cursor is. Everything runs on the Mac.
 
+How the code fits together — the dictation flow, the hotkey pipeline, the clipboard timing, the settings file, the polish and the correction learner — is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 ## What the project optimises for
 
 1. **Speed of the release-to-paste path.** This is the metric. The path runs from the hotkey release to the paste: capture stop, engine, processors, output. In code it is everything between the coordinator's `recordingStopped` and `inserted` events. Nothing goes on that path without a before-and-after benchmark.
@@ -62,7 +64,7 @@ swift run -c release pladder-cli polish-set docs/polish-set.json --model s1-mini
 
 ## Pluggability rules
 
-- `PladderCore` imports Foundation only. It never imports FluidAudio, AVFoundation or AppKit, so tests compile fast and engines are truly swappable.
+- `PladderCore` imports Foundation and Observation only. It never imports FluidAudio, AVFoundation or AppKit, so tests compile fast and engines are truly swappable.
 - Adding an engine: implement `TranscriptionEngine` in its own file under `PladderEngines`, add an entry to `StandardEngines.entries`. One file plus one catalog line; the app's registry, the settings picker and `pladder-cli` read the catalog. The engine lifecycle — building, loading, status polling and swapping — lives in `EngineLoader`. An engine that transcribes while the key is held also implements `StreamingTranscriptionEngine`: `beginUtterance` returns an `Utterance` handle, every later call names it, and a call naming one that is no longer current does nothing, so a cancelled recording's late feed or abandon cannot reach the next one. `UtteranceSlot` in Core keeps that bookkeeping.
 - Adding a processor: implement `TextProcessor` in its own file — synchronous, unable to fail (one that cannot do its job returns its input), and without user-facing text — append an `Entry` to `StandardProcessors.entries` in `PladderSystem`, which the app and `pladder-cli --process` both build from, and word it in `ProcessorText` in `StatusText.swift`. The pipeline is rebuilt when `DictationSettings` change, never per dictation. A processor sits on the critical path, so the benchmark rule applies; `pladder-cli bench-process` measures it.
 - Adding a polish model: a `PolishModel` case in `Settings`, a `ModelFile` pinned to a commit with its SHA-256 if it downloads, a `TranscriptRefiner` in `PladderRefine`, and a branch in `PolishModelController.apply`; `PolishRouter` hands it the calls, the picker and `polish-set` read the enum. Judge it with `pladder-cli polish-set` before it goes in.
@@ -72,6 +74,14 @@ swift run -c release pladder-cli polish-set docs/polish-set.json --model s1-mini
 - Adding a language: add a `<code>` localization to both catalogs; nothing else. Adding a *string*: the key is the exact English text, and `PladderCore` never holds one — it emits an enum case and `Sources/Pladder/StatusText.swift` words it.
 - Engine and capture are actors. The coordinator is `@MainActor` because it drives UI. It owns the state machine and nothing else; every dependency is injected, its clock included, so tests run it with in-memory fakes and fire its timers with `ManualClock`. It sees `DictationSettings`, the part of `Settings` it acts on, and the app hands it a new value only when that part changed.
 - The app target is split by job: `AppModel` is the composition root and owns the settings; `HotkeyRouter` picks the tap or Carbon (the rule itself is `HotkeySource.choose` in Core); `PermissionMonitor` polls the grants; `PolishModelController` owns the polish model and its file; `CorrectionInbox` the learned corrections; `SettingsLocation` the files. Decisions worth testing go to Core as values (`HotkeyWarning`, `HotkeySource`, the timing line) and the app words them in `StatusText.swift`. Views talk to `AppModel` and its parts, not to the coordinator.
+
+## Code style
+
+- A comment stays in code only when it says something the code cannot say and a reader would otherwise get wrong: a constraint from outside the code (macOS, AppKit, a framework, a model), a measured number and where it comes from, or a trap — an ordering, a race or an invariant that looks removable but is not. One to three lines, at the one place it applies.
+- No doc comment that restates a name or a signature, no narration of what the next lines do, no history ("used to", "the fix for"), nothing CLAUDE.md already says (a measured number may stand again beside the constant it sets), and no explanation repeated in a second file. Where a comment would only explain what something is, rename it instead.
+- Design explanations too long for a comment go in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); the code points there with one line, `// See docs/ARCHITECTURE.md, "<section>".` Keep the section names stable.
+- Tests need almost no comments: the test's name says what it checks. Keep only what a reader would get wrong, such as why a test sleeps in real time or that it never touches the general pasteboard.
+- `// MARK:` lines are fine in source files; tests do without them.
 
 ## Risks
 

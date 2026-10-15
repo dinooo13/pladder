@@ -6,11 +6,7 @@ import Testing
         SpokenPunctuation(languageHint: hint).process(text)
     }
 
-    // MARK: What the speech model leaves behind
-
     @Test func absorbsTheSpeechModelsOwnPunctuation() async throws {
-        // Parakeet's output for "…verschieben Fragezeichen" and "…to three
-        // question mark": its mark and the spoken one become one.
         #expect(try await run("Können wir den Termin auf drei verschieben? Fragezeichen.")
             == "Können wir den Termin auf drei verschieben?")
         #expect(try await run("Can we push the call to three question mark?") == "Can we push the call to three?")
@@ -45,8 +41,6 @@ import Testing
         #expect(try await run("fueron 3 coma 5 grados", hint: { _ in "es" }) == "fueron 3,5 grados")
     }
 
-    // MARK: What stays a word
-
     @Test func leavesAmbiguousWordsAlone() async throws {
         let texts = [
             "The trial period ends on Friday.",
@@ -70,25 +64,16 @@ import Testing
     }
 
     @Test func aMarkAfterANounOrAPronounIsStillDictated() async throws {
-        // "end" is no adjective, so "the end" is a whole noun phrase and the
-        // comma after it is dictated.
         #expect(try await run("read it to the end comma and then stop") == "read it to the end, and then stop")
-        // "that" and "das" end a question as often as they start a noun
-        // phrase, so on their own they are no evidence.
         #expect(try await run("What is that question mark") == "What is that?")
         #expect(try await run("Was ist das Fragezeichen") == "Was ist das?")
-        // A capital A in mid-sentence is the letter, not the article.
         #expect(try await run("take plan A comma not plan B") == "take plan A, not plan B")
-        // The speech model's own mark ends the noun phrase.
         #expect(try await run("I read the book. Full stop.") == "I read the book.")
     }
 
-    // Before: "ein" counted as an article, so the mark after a separable
-    // verb's prefix was kept as a noun and pasted as the words.
     @Test func aMarkAfterTheSeparablePrefixEinIsDictated() async throws {
         #expect(try await run("Schaltest du das Licht ein Fragezeichen") == "Schaltest du das Licht ein?")
         #expect(try await run("Ich lade dich ein Komma dann reden wir") == "Ich lade dich ein, dann reden wir")
-        // With an adjective that describes a mark it is still the noun.
         #expect(try await run("ein großes Fragezeichen dahinter") == "ein großes Fragezeichen dahinter")
     }
 

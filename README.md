@@ -97,7 +97,7 @@ Yes. `pladder-cli` transcribes an audio file and prints only the text. [docs/HER
 
 ## Contributing
 
-Issues and pull requests are welcome. The [CLAUDE.md](CLAUDE.md) file states what the project optimises for and the rule that every change on the release-to-paste path ships with a benchmark. [docs/BENCHMARKS.md](docs/BENCHMARKS.md) has the procedure.
+Issues and pull requests are welcome. The [CLAUDE.md](CLAUDE.md) file states what the project optimises for and the rule that every change on the release-to-paste path ships with a benchmark. [docs/BENCHMARKS.md](docs/BENCHMARKS.md) has the procedure. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains how the code fits together.
 
 ## The name
 

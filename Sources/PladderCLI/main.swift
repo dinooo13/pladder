@@ -1,60 +1,8 @@
 import Foundation
 import PladderCore
 
-// Developer tool.
-//
-//   pladder-cli <audio file>              load Parakeet, print the transcript and nothing else,
-//                                         so a script or another program's STT hook can read
-//                                         stdout. Errors go to stderr with exit status 1.
-//       [--process]                       run the app's processors over it with the app's
-//                                         dictionary and toggles, read from its settings file
-//                                         (or PLADDER_SETTINGS_PATH), which is never written.
-//       [--verbose]                       also print the load and processing times.
-//   pladder-cli bench <fixtures dir>      run the benchmark (see docs/BENCHMARKS.md)
-//       [--runs N]                        runs per fixture, default 6; the first is discarded.
-//                                         Use 11 to settle a result near the noise line.
-//       [--pause S]                       idle seconds before every run, default 10
-//       [--paced]                         push fixtures in one-second chunks paced at real
-//                                         time, as a live recording arrives, and time
-//                                         `endUtterance` instead. Also transcribes each
-//                                         fixture whole and reports whether the two texts
-//                                         are identical, which is the gate on the
-//                                         incremental path.
-//                                         Fixtures under 13 s are skipped unless --all.
-//       [--all]                           paced bench only: keep the short fixtures too.
-//       [--live]                          paced bench only: run the Live Transcript style's
-//                                         pass over the audio so far every 0.5 s while the
-//                                         fixture is paced, as the overlay does, and report
-//                                         how many there were and what they cost. The
-//                                         `identical:` column then also proves the live
-//                                         passes leave the release's windows alone.
-//   pladder-cli bench-process <fixtures dir>
-//                                         time the processor pipeline on the fixtures' text,
-//                                         with a filler in every sentence and with a spoken
-//                                         question mark as well (see docs/BENCHMARKS.md).
-//       [--runs N]                        runs per variant, default 31; the first is discarded.
-//   pladder-cli polish <text file | ->    run the polisher over a transcript: once cold,
-//                                         once after prepare() and a two-second wait, the
-//                                         way a real press warms it. Prints both timings.
-//       [--model <name>]                  apple (default), s1-mini or s1-mini-8bit. An S1-mini
-//                                         file is downloaded first if the app has not yet.
-//       [--instructions <file>]           Apple only: try another system prompt before
-//                                         committing it.
-//       [--gguf <file>]                   instead of --model: any S1-mini-family GGUF, such as a
-//                                         fine-tune being judged before it goes in the picker.
-//       [--control <line>]                S1-mini only: another control line than the app's.
-//   pladder-cli polish-set <set.json>     run a polish model over a test set (docs/polish-set.json)
-//       [--model <name>]                  after the app's processors, warm, and print each
-//                                         answer, the word error rate against the expected
-//                                         text per language, exact matches and timings.
-//       [--gguf <file>] [--control <line>] as for polish.
-//
-// Fixtures are audio files with a sibling .txt holding the spoken script, as
-// produced by scripts/make-fixtures.sh.
-//
-// This file parses the command line and dispatches; each command lives in a
-// file of its own: Transcribe.swift, Bench.swift (whole-buffer and paced),
-// BenchProcess.swift and Polish.swift, with the shared helpers in Support.swift.
+// Developer tool. Commands and flags: docs/ARCHITECTURE.md, "pladder-cli". Each
+// command lives in a file of its own; shared helpers are in Support.swift.
 
 func usage() -> Never {
     eprint("""

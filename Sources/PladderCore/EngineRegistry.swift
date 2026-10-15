@@ -1,7 +1,5 @@
 import Foundation
 
-/// Maps engine IDs to factories. The app registers every available engine at
-/// launch and the settings picker lists `available`.
 public struct EngineRegistry: Sendable {
     public struct Entry: Sendable, Identifiable {
         public var id: EngineID
@@ -37,8 +35,7 @@ public struct EngineRegistry: Sendable {
         available.first { $0.id == id }
     }
 
-    /// Builds the requested engine, or the first registered one if the ID is
-    /// unknown (for example after an engine was removed in an update).
+    // Falls back to the first engine for an unknown ID, e.g. one removed in an update.
     public func make(_ id: EngineID) -> (any TranscriptionEngine)? {
         (entry(for: id) ?? available.first)?.make()
     }

@@ -3,8 +3,6 @@ import PladderTestSupport
 import Testing
 @testable import PladderCore
 
-/// The shape of `ModelFiles`: `ensure` returns at once while a download is
-/// running, and `cancel` takes it back.
 private actor Downloads {
     private(set) var running = false
     func ensure() { running = true }
@@ -17,9 +15,6 @@ private actor Downloads {
 
 @MainActor
 @Suite(.timeLimit(.minutes(1))) struct OrderedTasksTests {
-    // Before: polish off and on within one run-loop turn fired the cancel
-    // and the ensure as two tasks, and when the ensure reached the actor
-    // first, the cancel then killed the download it had kept.
     @Test func aCancelThenEnsureLeavesTheDownloadRunning() async {
         for _ in 0..<50 {
             let downloads = Downloads()
