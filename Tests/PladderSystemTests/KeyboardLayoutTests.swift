@@ -4,9 +4,7 @@ import Foundation
 import Testing
 @testable import PladderSystem
 
-// Main-actor bound: Text Input Sources is not thread-safe, so every call into
-// it — including the test helper that reads a layout by id — belongs on the
-// main thread.
+// Main actor: Text Input Sources is not thread-safe.
 @MainActor
 @Suite struct KeyboardLayoutTests {
     private static let keyboardType = UInt32(LMGetKbdType())
@@ -24,7 +22,6 @@ import Testing
         let key = KeyboardLayout.keyCode(
             producing: "v", withCommand: true, in: layout, keyboardType: Self.keyboardType
         )
-        // Dvorak's "v" sits where QWERTY has the full stop.
         #expect(key == 0x2F)  // kVK_ANSI_Period
     }
 
@@ -36,8 +33,6 @@ import Testing
         #expect(key == nil)
     }
 
-    // MARK: Naming a key after what it types
-
     @Test func aLetterIsNamedUpperCased() throws {
         let us = try #require(KeyboardLayout.layoutData(inputSourceID: "com.apple.keylayout.US"))
         #expect(KeyboardLayout.displayCharacter(for: 0x00, in: us, keyboardType: Self.keyboardType) == "A")
@@ -45,7 +40,6 @@ import Testing
     }
 
     @Test func theNameFollowsTheLayout() throws {
-        // kVK_ANSI_S types "o" on Dvorak.
         let us = try #require(KeyboardLayout.layoutData(inputSourceID: "com.apple.keylayout.US"))
         let dvorak = try #require(KeyboardLayout.layoutData(inputSourceID: "com.apple.keylayout.Dvorak"))
         #expect(KeyboardLayout.displayCharacter(for: 0x01, in: us, keyboardType: Self.keyboardType) == "S")
@@ -60,8 +54,8 @@ import Testing
     }
 
     @Test func currentLayoutResolvesSomething() {
-        // Nil is legitimate under a Chinese or Japanese input method, which
-        // carries no `uchr` table; the machine running the tests uses a layout.
+        // Nil is legitimate under a Chinese or Japanese input method; the test machine
+        // uses a layout.
         #expect(KeyboardLayout.commandVKeyCode() != nil)
     }
 

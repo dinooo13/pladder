@@ -1,45 +1,9 @@
 import Foundation
 
-/// One `HotkeyChordTracker` per role, fed the same keyboard transitions.
-/// `GlobalHotkeyMonitor` keeps one per session behind its lock; tests drive
-/// it directly. Pure value type, no I/O.
-///
-/// Every tracker sees every event and decides on its own, exactly as a lone
-/// tracker does; an event is swallowed when any tracker swallows it.
-///
-/// **Order.** A keystroke that moves two trackers reports every end
-/// (`.released`, `.cancelled`) before any `.pressed`, and role order breaks
-/// the tie inside each group. The gesture tracker relies on it: it ignores a
-/// press while another chord is held, because the held chord's end has
-/// always been heard first.
-///
-/// Two chords that nest, Right Command and Right Command + Right Option say,
-/// hand over from one tracker to the other the way one tracker treats a
-/// foreign modifier: pressing Right Option while Right Command is held makes
-/// the first report `.cancelled` (inside the interruption window) or
-/// `.released` (after it), and the second `.pressed`, in that order whichever
-/// role is the shorter chord. Inside the window the first recording is
-/// discarded and the second starts. After it the first ends as any release
-/// does: a held one stops and the second press finds the cycle busy, a
-/// toggle one latches and the second press, the next press of any chord,
-/// ends it; either way the first is transcribed and nothing is left running.
-/// Role order alone got the second case wrong: with toggle the shorter chord
-/// the dictate press came first and was ignored, then the cancel dropped
-/// the recording or the release latched it under a chord no longer held.
-///
-/// **The cancel key.** While `cancelKeyEnabled`, a plain Escape is reported
-/// as `.escape` and swallowed, and so are its repeats and its key-up, even
-/// once the cancel key has been turned off again: an app must never see a
-/// key-up without its key-down. It is checked before the trackers see the
-/// key, so the interruption rule never turns it into a `.cancelled` as well.
-/// "Plain" allows the modifiers of an engaged chord, so Escape while
-/// Option+Space is still held counts, and nothing else: Cmd+Option+Escape is
-/// Force Quit and passes through. A chord or send key that contains Escape
-/// keeps it as its own key.
+// See docs/ARCHITECTURE.md, "Hotkeys".
 public struct HotkeyChordSet: Sendable, Equatable {
     public struct Outcome: Sendable, Equatable {
         public var events: [HotkeyMonitorEvent]
-        /// True when the event must not reach other applications.
         public var swallow: Bool
 
         public init(events: [HotkeyMonitorEvent] = [], swallow: Bool = false) {
@@ -48,18 +12,13 @@ public struct HotkeyChordSet: Sendable, Equatable {
         }
     }
 
-    /// Parallel arrays, sorted by role, so the order of events is stable and
-    /// the type stays `Equatable` without a hand-written `==`.
+    // Parallel arrays sorted by role: a stable event order, and a synthesised `==`.
     private let roles: [HotkeyRole]
     private var trackers: [HotkeyChordTracker]
-
-    /// Set by the monitor from `setCancelKeyEnabled`; kept across `reset()`.
     public var cancelKeyEnabled = false
-    /// From a swallowed Escape key-down until its key-up.
     private var isSwallowingCancelKey = false
     private static let cancelKey: UInt16 = 0x35 // kVK_Escape
 
-    /// Empty chords are dropped: they never fire.
     public init(
         chords: [HotkeyRole: Hotkey],
         submitKey: Hotkey = Hotkey(keyCodes: []),
@@ -94,18 +53,16 @@ public struct HotkeyChordSet: Sendable, Equatable {
         return fanOut { $0.keyUp(key, modifiers: modifiers, at: instant) }
     }
 
-    /// Nil when this Escape is not the cancel key and goes to the trackers
-    /// like any other key.
     private mutating func cancelKeyDown(isRepeat: Bool, modifiers: Set<UInt16>) -> Outcome? {
         if isRepeat { return isSwallowingCancelKey ? Outcome(swallow: true) : nil }
-        // A fresh key-down: if a swallowed Escape's key-up was still owed,
-        // it was lost, and this one's key-up belongs to whoever gets this.
+        // A fresh key-down: a swallowed Escape's key-up still owed was lost.
         isSwallowingCancelKey = false
         guard cancelKeyEnabled else { return nil }
         let ownedByAChord = trackers.contains {
             $0.hotkey.keyCodes.contains(Self.cancelKey) || $0.submitKey.keyCodes.contains(Self.cancelKey)
         }
         guard !ownedByAChord else { return nil }
+        // Only an engaged chord's modifiers: Cmd+Option+Escape is Force Quit and passes.
         let allowed = Hotkey.collapsingSides(
             Set(trackers.filter(\.isEngaged).flatMap(\.hotkey.modifierKeyCodes)))
         guard Hotkey.collapsingSides(modifiers).isSubset(of: allowed) else { return nil }
@@ -119,7 +76,6 @@ public struct HotkeyChordSet: Sendable, Equatable {
         fanOut { $0.flagsChanged(modifiers: modifiers, at: instant) }
     }
 
-    /// Every engaged chord is released; events were lost, so none says submit.
     public mutating func reset() -> [HotkeyMonitorEvent] {
         isSwallowingCancelKey = false
         var events: [HotkeyMonitorEvent] = []
@@ -131,7 +87,8 @@ public struct HotkeyChordSet: Sendable, Equatable {
         return events
     }
 
-    /// Ends before presses, each in role order (see the type's comment).
+    // Every end before any press, each in role order: the gesture tracker ignores a
+    // press while another chord is held, so it must hear the held chord's end first.
     private mutating func fanOut(
         _ step: (inout HotkeyChordTracker) -> HotkeyChordTracker.Outcome
     ) -> Outcome {

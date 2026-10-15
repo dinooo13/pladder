@@ -3,25 +3,14 @@ import Foundation
 import PladderCore
 
 public extension Hotkey {
-    /// "Right Option", "Option + Space", "Fn + F5". Sides are named only for a
-    /// modifier-only chord, the only kind matched by side. Character keys are
-    /// named after what they type in the current keyboard layout, which is
-    /// why this is main actor bound (see `KeyboardLayout`).
     @MainActor
     var displayName: String { KeyNames.name(for: self, collapsingSides: !isModifierOnly) }
 
-    /// The same name without the sides: "Control + Shift + Space".
-    ///
-    /// For anything Carbon matches — the stored chord while Accessibility is
-    /// missing, a macOS shortcut — where the modifier mask genuinely cannot
-    /// tell Left from Right, so naming a side would promise a precision the
-    /// matching does not have.
+    // For anything Carbon matches: its mask cannot tell Left from Right.
     @MainActor
     var sideAgnosticDisplayName: String { KeyNames.name(for: self, collapsingSides: true) }
 }
 
-/// Human-readable names for virtual key codes. Main actor bound wherever a
-/// name can come from the keyboard layout; every caller is UI code.
 public enum KeyNames {
     @MainActor
     public static func name(for hotkey: Hotkey, collapsingSides: Bool = false) -> String {
@@ -36,27 +25,18 @@ public enum KeyNames {
     public static func name(forKeyCode code: UInt16, collapsingSides: Bool = false) -> String {
         if collapsingSides, let sideless = sidelessNames[code] { return localized(sideless) }
         if let fixed = fixedNames[code] { return localized(fixed) }
-        // What the key types in the current layout, which is already the
-        // user's own language by definition.
+        // What the key types in the current layout is already in the user's language.
         if let character = KeyboardLayout.displayCharacter(for: code) { return character }
         return String(localized: "Key \(Int(code))", table: "KeyNames")
     }
 
-    /// The dictionaries below stay English, because the English name is the
-    /// catalog key. A key with no German entry — F1 to F20, Eisu, Kana — is
-    /// returned as it stands, which is the right answer for all of them.
-    ///
-    /// Outside `Pladder.app` there is no catalog at all and this returns the
-    /// key too, so `swift run` and the tests need no bundle.
-    ///
-    /// Called by the settings recorder and the menu; never by the
-    /// coordinator, so no lookup is on the release-to-paste path.
+    // The English name is the catalog key. Outside `Pladder.app` there is no catalog and
+    // the key comes back as it is, so `swift run` and the tests need no bundle.
     private static func localized(_ key: String) -> String {
         String(localized: String.LocalizationValue(key), table: "KeyNames")
     }
 
-    /// Modifiers first, in the order macOS prints them (Control, Option,
-    /// Shift, Command), then Fn, then everything else by key code.
+    // Modifiers in the order macOS prints them, then Fn, then the rest by key code.
     private static func rank(_ code: UInt16) -> Int {
         switch Int(code) {
         case kVK_Control, kVK_RightControl: 0
@@ -68,9 +48,6 @@ public enum KeyNames {
         }
     }
 
-    /// Modifier names with the side dropped, for chords matched by Carbon.
-    /// `rank` is unchanged, so "Control + Shift + Space" still comes out in
-    /// the order macOS prints modifiers.
     private static let sidelessNames: [UInt16: String] = {
         let entries: [(Int, String)] = [
             (kVK_Command, "Command"), (kVK_RightCommand, "Command"),
@@ -81,7 +58,6 @@ public enum KeyNames {
         return Dictionary(uniqueKeysWithValues: entries.map { (UInt16($0.0), $0.1) })
     }()
 
-    /// Keys whose name does not depend on the layout.
     private static let fixedNames: [UInt16: String] = {
         let entries: [(Int, String)] = [
             (kVK_Command, "Left Command"), (kVK_RightCommand, "Right Command"),

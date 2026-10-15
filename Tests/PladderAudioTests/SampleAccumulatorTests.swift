@@ -4,8 +4,6 @@ import Testing
 
 @testable import PladderAudio
 
-/// The capture's sample hand-off, without a microphone: these append what a
-/// tap block would and drain the way the capture actor does.
 @Suite("SampleAccumulator", .timeLimit(.minutes(1)))
 struct SampleAccumulatorTests {
     private func ramp(_ range: Range<Int>) -> [Float] {
@@ -41,8 +39,6 @@ struct SampleAccumulatorTests {
         let drained = accumulator.drain()
         #expect(drained.count == 600)
         #expect(accumulator.capacity >= 1_000)
-        // The drained copy is the caller's own, so emptying and refilling the
-        // accumulator leaves it as it was.
         accumulator.append(ramp(600..<900))
         #expect(drained == ramp(0..<600))
         #expect(accumulator.drain() == ramp(600..<900))
@@ -67,7 +63,6 @@ struct SampleAccumulatorTests {
             await Task.yield()
         }
         await producer.value
-        // The drain at stop, after the last buffer.
         collected.append(contentsOf: accumulator.drain())
         #expect(collected.count == chunks * chunkSize)
         #expect(collected == ramp(0..<chunks * chunkSize))

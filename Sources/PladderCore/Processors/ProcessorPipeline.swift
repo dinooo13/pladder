@@ -1,6 +1,5 @@
 import Foundation
 
-/// Runs an ordered list of processors, skipping any the settings disable.
 public struct ProcessorPipeline: Sendable {
     public let processors: [any TextProcessor]
 

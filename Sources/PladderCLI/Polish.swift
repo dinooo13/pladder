@@ -6,8 +6,7 @@ import PladderRefine
 import PladderSystem
 
 extension PolishModel {
-    /// The name `--model` takes for this model. A `switch` without a
-    /// `default`, so a new case does not compile until it has a name here.
+    // No `default`, so a new case does not compile until it has a name here.
     var cliName: String {
         switch self {
         case .appleIntelligence: "apple"
@@ -16,7 +15,6 @@ extension PolishModel {
         }
     }
 
-    /// Every `--model` name, as the usage line lists them.
     static var cliNames: String {
         allCases.map(\.cliName).joined(separator: "|")
     }
@@ -27,10 +25,7 @@ extension PolishModel {
     }
 }
 
-/// Runs `TranscriptPolisher` over one transcript twice and prints what the
-/// polish toggle would paste. The first run is cold (no `prepare()`), the second
-/// warm, which is what a real press gets: the session is made and prewarmed
-/// at key-down, seconds before the release.
+// Cold, then warm: a real press prewarms the session at key-down, before release.
 func runPolish(_ path: String, model: PolishModel, options: PolishOptions) async throws {
     let text: String
     if path == "-" {
@@ -64,16 +59,12 @@ func runPolish(_ path: String, model: PolishModel, options: PolishOptions) async
     show("warm", await polisher.polish(transcript))
 }
 
-/// What the command line changes about a polisher; nil is the app's own.
 struct PolishOptions {
     var instructionsPath: String?
     var gguf: String?
     var control: String?
 }
 
-/// The polisher the app would use for `model`, downloading an S1-mini file
-/// into the app's own model directory first if it is not there yet. With
-/// `--gguf`, an S1-mini polisher over that file instead.
 func makePolisher(_ model: PolishModel, options: PolishOptions = PolishOptions()) async throws -> any ReportingRefiner {
     let instructionsPath = options.instructionsPath
     let file: ModelFile
@@ -111,8 +102,6 @@ func makePolisher(_ model: PolishModel, options: PolishOptions = PolishOptions()
     return S1MiniPolisher(file: file, location: location, control: options.control ?? S1MiniPolisher.controlLine)
 }
 
-/// One case of a polish test set: what the speech model heard and what
-/// should be pasted.
 struct PolishCase: Decodable {
     let id: String
     let lang: String
@@ -120,22 +109,17 @@ struct PolishCase: Decodable {
     let expected: String
 }
 
-/// Runs `model` over a test set the way the app would: the app's processors
-/// first, then the polish, warm. Prints every answer, then per-language word
-/// error rates against the expected text (case and punctuation ignored),
-/// exact matches (everything counts) and the polish time.
 func runPolishSet(_ path: String, model: PolishModel, options: PolishOptions) async throws {
     let cases = try JSONDecoder().decode([PolishCase].self, from: Data(contentsOf: URL(fileURLWithPath: path)))
     guard !cases.isEmpty else {
         eprint("pladder-cli: \(path): the test set has no cases")
         exit(1)
     }
-    // The processors `--process` runs, with a fresh install's settings: no
-    // dictionary, so the set means the same on every machine.
+    // A fresh install's settings: no dictionary, so the set means the same everywhere.
     let pipeline = StandardProcessors.pipeline(for: DictationSettings(engineID: StandardEngines.defaultEntry.id))
     let polisher = try await makePolisher(model, options: options)
     await polisher.prepare()
-    // The first call pays for whatever prepare() could not warm.
+    // The first call pays for whatever `prepare()` could not warm.
     _ = await polisher.polish("Warm up.")
 
     var rates: [String: [Double]] = [:]

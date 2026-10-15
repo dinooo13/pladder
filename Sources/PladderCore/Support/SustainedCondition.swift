@@ -1,29 +1,18 @@
 import Foundation
 
-/// Reports whether something polled has been true continuously for long
-/// enough to act on, so a momentary flicker does not flap whatever reacts.
-///
-/// Used for Secure Event Input, which a password field turns on for as long as
-/// it has focus: swapping the hotkey monitor on the first positive poll would
-/// mean swapping back a second later. Pure value type with no clock of its
-/// own — the caller passes the instant — so the behaviour is unit-testable.
+// For Secure Event Input, which a password field turns on while it has focus:
+// swapping monitors on the first positive poll would swap back a second later.
 public struct SustainedCondition: Sendable, Equatable {
-    /// How long the condition has to hold before `observe` starts returning
-    /// true, timed from the first positive. With the default three seconds
-    /// and a two-second poll that is three positives in a row, about four
-    /// seconds in: the second comes at two, short of the threshold.
+    // With the default and a two-second poll: three positives in a row, about 4 s in.
     public let threshold: Duration
-    /// When the current run of true observations started, if any.
     private var trueSince: ContinuousClock.Instant?
 
     public init(threshold: Duration = .seconds(3)) {
         self.threshold = threshold
     }
 
-    /// Records one observation and returns whether the condition now counts as
-    /// sustained. False resets the run, so the answer drops on the first
-    /// negative observation: leaving a state that stops the app working should
-    /// be immediate, entering it should not.
+    // Drops on the first negative: leaving a state that stops the app working should
+    // be immediate, entering it should not.
     public mutating func observe(_ value: Bool, at instant: ContinuousClock.Instant = .now) -> Bool {
         guard value else {
             trueSince = nil

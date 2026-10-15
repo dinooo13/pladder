@@ -7,7 +7,6 @@ import Testing
         #expect(PhoneticGate.soundex(PhoneticGate.key("Robert")) == "R163")
         #expect(PhoneticGate.soundex(PhoneticGate.key("Ashcraft")) == "A261")
         #expect(PhoneticGate.isClose("Claud", "Claude"))
-        // Distance three, but the codes agree.
         #expect(PhoneticGate.isClose("Robert", "Rupert"))
     }
 

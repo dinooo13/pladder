@@ -2,14 +2,10 @@ import AppKit
 import SwiftUI
 import PladderCore
 
-/// `Pladder --screenshots <dir>` renders the pictures the README shows into
-/// `<dir>` and quits: the real overlay pill on a stand-in desktop, in light
-/// and dark, plus the social preview card. It never starts the hotkey, the
-/// microphone or the engine, so it can run beside a copy of Pladder that is
-/// in use. `scripts/make-screenshots.sh` wraps it.
+// `--screenshots <dir>`: the README's pictures. Never starts the hotkey, the microphone
+// or the engine, so it can run beside a copy in use; `scripts/make-screenshots.sh` wraps it.
 @MainActor
 enum Screenshots {
-    /// The output directory when the flag is present, nil for a normal launch.
     static var directory: URL? {
         let args = CommandLine.arguments
         guard let index = args.firstIndex(of: "--screenshots"), index + 1 < args.count else { return nil }
@@ -21,8 +17,7 @@ enum Screenshots {
 
         for scheme in [ColorScheme.light, .dark] {
             let suffix = scheme == .dark ? "dark" : "light"
-            // Four tiles of 290 pt with 24 pt between them and 16 pt of
-            // padding either side.
+            // Four tiles of 290 pt, 24 pt between them and 16 pt of padding either side.
             await capture(StylesFigure(), size: CGSize(width: 1264, height: 250), scheme: scheme,
                           to: directory.appending(path: "styles-\(suffix).png"))
         }
@@ -32,7 +27,6 @@ enum Screenshots {
         NSApp.terminate(nil)
     }
 
-    /// Shows `figure` in a transparent borderless window and captures it.
     private static func capture<Figure: View>(_ figure: Figure, size: CGSize, scheme: ColorScheme, to url: URL) async {
         let window = NSWindow(
             contentRect: NSRect(origin: .zero, size: size),
@@ -59,10 +53,8 @@ enum Screenshots {
         window.orderOut(nil)
     }
 
-    /// `screencapture -l` grabs one window at its backing scale. The child
-    /// inherits the Screen Recording grant of the terminal that launched
-    /// Pladder, which is why the script runs the binary directly rather
-    /// than through `open`.
+    // The child inherits the Screen Recording grant of the terminal that launched
+    // Pladder, which is why the script runs the binary directly, not through `open`.
     private static func capture(window: NSWindow, to url: URL) {
         let process = Process()
         process.executableURL = URL(filePath: "/usr/sbin/screencapture")
@@ -79,8 +71,6 @@ enum Screenshots {
 
 // MARK: - Views
 
-/// A stand-in desktop: the diagonal wash the option cards use, with a few
-/// soft blobs so the glass has something to refract.
 private struct Wallpaper: View {
     @Environment(\.colorScheme) private var scheme
 
@@ -107,20 +97,17 @@ private struct Wallpaper: View {
     }
 }
 
-/// A pill exactly as the overlay shows it, shadow included.
 private struct Pill: View {
     let state: DictationState
     var level: Float = 0
     var style: OverlayStyle = .compact
     var scale: CGFloat = 1
-    /// The words so far, for the Live Transcript pill.
     var partial: String?
 
     var body: some View {
         OverlayPill(state: state, level: level, style: style, glass: true, isPreview: true, partial: partial)
-            // A tile is narrower than the live row, and the proposed size
-            // would squeeze the glass but not the row inside it; the pill
-            // takes its own size and is scaled to fit instead.
+            // The proposed size would squeeze the glass but not the row inside it, so the pill
+            // takes its own size and is scaled to fit.
             .fixedSize()
             .compositingGroup()
             .shadow(color: .black.opacity(0.16), radius: 8, y: 3)
@@ -128,7 +115,6 @@ private struct Pill: View {
     }
 }
 
-/// The four overlay styles side by side, each on its own desktop.
 private struct StylesFigure: View {
     @Environment(\.colorScheme) private var scheme
 
@@ -141,8 +127,7 @@ private struct StylesFigure: View {
                 Pill(state: .recording, level: 0.6, style: .minimal, scale: 1.15)
             }
             tile("Live") {
-                // The real live row, at its real width: 440 pt of capsule
-                // scaled to fit the tile.
+                // The real live row at its real width, scaled to fit the tile.
                 Pill(
                     state: .recording,
                     level: 0.6,
@@ -171,7 +156,6 @@ private struct StylesFigure: View {
         }
     }
 
-    /// A slice of menu bar with the live wave glyph where Pladder sits.
     private var menuBar: some View {
         HStack(spacing: 14) {
             Spacer()
@@ -190,7 +174,6 @@ private struct StylesFigure: View {
     }
 }
 
-/// The 1280×640 card GitHub shows when the repository is shared.
 private struct SocialFigure: View {
     var body: some View {
         Wallpaper()

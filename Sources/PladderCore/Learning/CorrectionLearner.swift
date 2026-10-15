@@ -1,36 +1,10 @@
 import Foundation
 
-/// Turns the user's hand corrections of a pasted dictation into proposed
-/// dictionary rules.
-///
-/// Runs strictly after the paste and never on the release-to-paste path:
-/// `pasted` returns at once and everything else happens on a detached
-/// utility task. Per paste, in this order, each step cheaper than the next:
-///
-/// 1. The reviewer must be available; otherwise the field is not even
-///    watched, and the feature is absent.
-/// 2. The observer watches the field and returns what it saw.
-/// 3. `CorrectionDiff` finds the corrected words.
-/// 4. Pairs already in the dictionary, or dismissed before, are dropped.
-/// 5. `PhoneticGate` drops what does not sound alike.
-/// 6. The reviewer, the on-device model, says yes or no to each survivor,
-///    each question only once `waitUntilQuiet` lets it through.
-/// 7. Each yes is handed to `onProposal`, at most
-///    `maximumProposalsPerPaste` of them.
-///
-/// A second paste while the first is still being watched just starts its own
-/// task; the observer finishes the first watch early with what it has, and
-/// both are diffed and reviewed on their own.
-///
-/// The reviewer and the polish share the system's language model, which
-/// answers one request at a time, so a review still running when a polished
-/// dictation is released would eat into that dictation's polish budget.
-/// `waitUntilQuiet` is the app's way to hold reviews while a recording or a
-/// dictation is in flight; it is awaited before every question, never while
-/// one is being answered.
+// See docs/ARCHITECTURE.md, "Learned corrections". The reviewer shares the system's
+// language model with the polish, and it answers one request at a time, so
+// `waitUntilQuiet` is awaited before every question, never while one is answered.
 public final class CorrectionLearner: Sendable {
     public static let maximumProposalsPerPaste = 3
-    /// The context the reviewer sees around a pair, in characters.
     static let sentenceLimit = 400
 
     private let observer: any PastedTextObserver
@@ -41,9 +15,8 @@ public final class CorrectionLearner: Sendable {
     private let waitUntilQuiet: @Sendable () async -> Void
     private let onProposal: @Sendable (CorrectionProposal) -> Void
 
-    /// `log` receives one line per stage, with the words in it; the caller
-    /// decides how private that is. `waitUntilQuiet` returns when the
-    /// language model is free for a review; the default never holds one.
+    // `log` gets one line per stage, with the words in it; the caller decides how
+    // private that is.
     public init(
         observer: any PastedTextObserver,
         reviewer: any CorrectionReviewer,
@@ -62,8 +35,6 @@ public final class CorrectionLearner: Sendable {
         self.onProposal = onProposal
     }
 
-    /// Non-blocking. Called once per paste with the text that was pasted.
-    /// The task is returned for tests; the app drops it.
     @discardableResult
     public func pasted(_ text: String) -> Task<Void, Never> {
         Task.detached(priority: .utility) { [self] in
@@ -114,9 +85,8 @@ public final class CorrectionLearner: Sendable {
         }
     }
 
-    /// The error's type and case, never its payload or description: a
-    /// framework error can quote the prompt, and the prompt is the user's
-    /// words. The same rule as the polisher's log.
+    // The type and case, never the payload or description: a framework error can quote
+    // the prompt, and the prompt is the user's words.
     static func describe(_ error: any Error) -> String {
         let name = String(describing: type(of: error))
         if type(of: error) is NSError.Type {
@@ -131,8 +101,6 @@ public final class CorrectionLearner: Sendable {
         return "\(name).\(String(describing: error))"
     }
 
-    /// The pasted text, cut to `limit` characters around `heard` when it is
-    /// longer, so the model sees the word in its sentence and not a page.
     static func sentence(around heard: String, in pasted: String, limit: Int = sentenceLimit) -> String {
         let text = pasted.trimmingCharacters(in: .whitespacesAndNewlines)
         guard text.count > limit else { return text }

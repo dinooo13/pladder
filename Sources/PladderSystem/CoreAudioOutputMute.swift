@@ -2,32 +2,17 @@ import CoreAudio
 import Foundation
 import PladderCore
 
-/// `OutputMuteControl` on top of CoreAudio's HAL.
-///
-/// Two properties do the whole job: `kAudioHardwarePropertyDefaultOutputDevice`
-/// on the system object says which device to touch, and
-/// `kAudioDevicePropertyMute` on that device in the output scope is the switch.
-/// No `osascript`: shelling out to AppleScript to set the system volume takes
-/// tens of milliseconds and changes the volume rather than the mute flag, so
-/// it cannot be restored exactly.
-///
-/// The element is the wrinkle. Most devices carry a master mute on
-/// `kAudioObjectPropertyElementMain`; some aggregate and USB devices carry one
-/// per channel instead, on elements 1 and 2. Both are handled, each element
-/// read and written on its own, and a device with no mute control at all
-/// (plenty of them, including some HDMI outputs) reports nil so the
-/// controller leaves it alone.
+// Not `osascript`: setting the volume through AppleScript takes tens of milliseconds
+// and changes the volume, not the mute flag, so it cannot be restored exactly. Some
+// aggregate and USB devices mute per channel; some, HDMI ones among them, not at all.
 public struct CoreAudioOutputMute: OutputMuteControl {
     public init() {}
 
-    /// Which elements of a device carry a mute control. Empty means the
-    /// device has none.
     private static func muteElements(_ device: AudioObjectID) -> [AudioObjectPropertyElement] {
         var address = muteAddress(kAudioObjectPropertyElementMain)
         if AudioObjectHasProperty(device, &address) {
             return [kAudioObjectPropertyElementMain]
         }
-        // Per-channel mute: stereo devices without a master control.
         return [1, 2].filter { element in
             var perChannel = muteAddress(element)
             return AudioObjectHasProperty(device, &perChannel)
@@ -52,11 +37,7 @@ public struct CoreAudioOutputMute: OutputMuteControl {
         return device
     }
 
-    /// Each element on its own, never one answer for the device: a stereo
-    /// device with one channel muted by the user reads as partly muted, the
-    /// controller mutes only the other channel, and the end turns only that
-    /// one back off, so the user's channel stays as they left it. An element
-    /// that cannot be read is left out, so it is never written either.
+    // An element that cannot be read is left out, so it is never written either.
     public func muteState(of device: UInt32) -> MuteState? {
         var elements: [UInt32: Bool] = [:]
         for element in Self.muteElements(device) {
@@ -72,8 +53,7 @@ public struct CoreAudioOutputMute: OutputMuteControl {
 
     public func apply(_ state: MuteState, to device: UInt32) throws {
         var firstFailure: MuteError?
-        // In element order, so a log of a half-applied state reads the same
-        // every time.
+        // In element order, so the log of a half-applied state reads the same every time.
         for (element, muted) in state.elements.sorted(by: { $0.key < $1.key }) {
             do {
                 try Self.set(muted, element: element, on: device)
@@ -99,8 +79,6 @@ public struct CoreAudioOutputMute: OutputMuteControl {
         }
     }
 
-    /// Named rather than bare OSStatus: these end up in the log, and the
-    /// whole point of logging them is diagnosing a stuck mute.
     public enum MuteError: LocalizedError {
         case notSettable(device: UInt32, element: UInt32, status: OSStatus)
         case setFailed(device: UInt32, element: UInt32, status: OSStatus)

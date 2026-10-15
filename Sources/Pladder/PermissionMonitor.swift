@@ -3,22 +3,13 @@ import Foundation
 import Observation
 import PladderSystem
 
-/// Mirrors the grants Pladder depends on, polled because neither API offers
-/// a change notification: Accessibility, the microphone, and Secure Event
-/// Input, which is not a grant but turns the event tap deaf in the same way.
-///
-/// The poll runs every two seconds for the app's life. It used to stop once
-/// both permissions were granted; a later revoke has to be picked up too,
-/// and a few cheap status reads every two seconds cost nothing. Everything
-/// that reacts to a change — the hotkey source, the stand-in chord, the
-/// polish availability — hangs off `onRefresh`, which runs after every poll.
+// Polled because none of these notifies a change, and for the app's life, so a
+// later revoke is picked up too. Secure Event Input is no grant but deafens the tap.
 @MainActor
 @Observable
 final class PermissionMonitor {
     private(set) var accessibilityTrusted = Permissions.isAccessibilityTrusted
     private(set) var microphoneStatus = Permissions.microphoneStatus
-    /// Read with the grants: the hotkey router decides from a sustained
-    /// reading, not from this one.
     private(set) var secureInputEnabled = SecureInput.isEnabled
 
     @ObservationIgnored var onRefresh: () -> Void = {}
@@ -29,8 +20,6 @@ final class PermissionMonitor {
     var needsMicrophone: Bool { microphoneStatus != .authorized }
     var needsAnyPermission: Bool { needsAccessibility || needsMicrophone }
 
-    /// Prompts for Accessibility once per launch when it is missing, and
-    /// starts polling.
     func start() {
         startPolling()
         if !accessibilityTrusted { Permissions.requestAccessibility() }
@@ -41,8 +30,7 @@ final class PermissionMonitor {
         pollTask = nil
     }
 
-    /// Assigns only what changed, so views reading one grant are not redrawn
-    /// for every poll.
+    // Assigns only what changed, so views reading one grant are not redrawn every poll.
     func refresh() {
         let trusted = Permissions.isAccessibilityTrusted
         if trusted != accessibilityTrusted { accessibilityTrusted = trusted }
@@ -70,8 +58,7 @@ final class PermissionMonitor {
         }
     }
 
-    /// Refreshes now and restarts the two-second cadence from here, so a
-    /// grant the user just gave shows without waiting out the old timer.
+    // Restarts the cadence, so a grant just given shows without waiting out the timer.
     private func startPolling() {
         refresh()
         pollTask?.cancel()

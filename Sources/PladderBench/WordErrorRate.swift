@@ -1,12 +1,6 @@
 import Foundation
 
-/// Word error rate between a reference script and a transcript, for the
-/// benchmark. Both texts are normalised first (lowercased, punctuation
-/// removed) so casing and punctuation choices the engine makes do not count
-/// as errors; only the words do.
 public enum WordErrorRate {
-    /// Lowercases, drops punctuation and collapses whitespace so two texts
-    /// that differ only in presentation compare equal word for word.
     public static func normalize(_ text: String) -> [String] {
         text.lowercased()
             .replacingOccurrences(of: "[’']", with: "", options: .regularExpression)
@@ -14,9 +8,6 @@ public enum WordErrorRate {
             .map(String.init)
     }
 
-    /// Substitutions + deletions + insertions, divided by the reference word
-    /// count. 0 means a perfect match; can exceed 1 when the hypothesis has
-    /// many extra words. Returns 0 for an empty reference and empty hypothesis.
     public static func compute(reference: String, hypothesis: String) -> Double {
         let ref = normalize(reference)
         let hyp = normalize(hypothesis)
@@ -24,7 +15,6 @@ public enum WordErrorRate {
         return Double(editDistance(ref, hyp)) / Double(ref.count)
     }
 
-    /// Levenshtein distance over word arrays, two rows of memory.
     static func editDistance(_ a: [String], _ b: [String]) -> Int {
         if a.isEmpty { return b.count }
         if b.isEmpty { return a.count }

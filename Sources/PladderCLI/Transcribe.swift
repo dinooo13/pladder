@@ -3,9 +3,8 @@ import PladderCore
 import PladderEngines
 import PladderSystem
 
-/// The app's settings, for `--process`. Decoded here rather than through
-/// `SettingsStore.load()`, which moves a file it cannot decode aside: a CLI
-/// built from another branch must never touch the live configuration.
+// Not `SettingsStore.load()`, which moves a file it cannot decode aside: a CLI built
+// from another branch must never touch the live configuration.
 func appSettings() -> Settings {
     let url = ProcessInfo.processInfo.environment["PLADDER_SETTINGS_PATH"].flatMap { $0.isEmpty ? nil : URL(filePath: $0) }
         ?? FileManager.default.homeDirectoryForCurrentUser
@@ -42,8 +41,7 @@ func transcribeFile(_ path: String, process: Bool, verbose: Bool) async {
             print(text)
         }
     } catch {
-        // A file Core Audio cannot open (WebM, say) is the likely failure; a
-        // message and a status rather than a trap, for whatever called us.
+        // A file Core Audio cannot open (WebM, say): a message and a status, not a trap.
         eprint("pladder-cli: \(path): \(error)")
         exit(1)
     }

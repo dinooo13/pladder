@@ -1,24 +1,6 @@
 import Foundation
 
-/// The cheap check before the model: does the correction sound like what was
-/// heard? A misrecognition does ("Claud" → "Claude", "get hub" → "GitHub");
-/// a change of mind does not ("Friday" → "Monday"). Dropping those here keeps
-/// the model for the pairs worth asking about.
-///
-/// Both sides are reduced to a key, lowercased with everything but letters
-/// and digits removed, so "get hub" keys as "gethub". Then:
-///
-/// - Keys of three characters or fewer pass only at an edit distance of at
-///   most one: Soundex agrees on "the" and "tea", and so would the gate. The
-///   custom-word corrector has the same guard.
-/// - Longer keys pass when their Soundex codes agree (both ASCII), or at an
-///   edit distance of at most two. Keys with umlauts or ß skip Soundex, which
-///   is defined over the English alphabet, and rely on the distance:
-///   "Muller" → "Müller" is one, "Strasse" → "Straße" two.
-///
-/// Metaphone, which the issue names as an alternative, is not implemented:
-/// Soundex plus the distance already catches the misrecognitions the tests
-/// hold, and the model does the fine judgement after this.
+// Short keys need an edit distance of one: Soundex agrees on "the" and "tea".
 public enum PhoneticGate {
     static let shortKeyLength = 3
     static let shortKeyDistance = 1
@@ -35,19 +17,12 @@ public enum PhoneticGate {
         return false
     }
 
-    /// Lowercased letters and digits, in order.
     static func key(_ text: String) -> [Character] {
         text.lowercased().filter { $0.isLetter || $0.isNumber }.map { $0 }
     }
 
-    /// American Soundex over an ASCII key: the first letter and three digits,
-    /// same-coded neighbours collapsed, "h" and "w" transparent, vowels
-    /// separating. Nil when the key holds anything but ASCII letters and
-    /// digits, or no letter at all.
-    ///
-    /// The same algorithm as `CustomWordCorrector`'s, written again here
-    /// rather than shared: that one sits on the release-to-paste path and is
-    /// left untouched by a feature that runs after it.
+    // Nil for a non-ASCII key: Soundex is defined over the English alphabet. Written
+    // again rather than shared with `CustomWordCorrector`, which is on the release path.
     static func soundex(_ key: [Character]) -> String? {
         guard key.allSatisfy(\.isASCII) else { return nil }
         var out = ""
@@ -82,7 +57,6 @@ public enum PhoneticGate {
         }
     }
 
-    /// Plain two-row Levenshtein over characters.
     static func levenshtein(_ a: [Character], _ b: [Character]) -> Int {
         if a.isEmpty { return b.count }
         if b.isEmpty { return a.count }

@@ -3,15 +3,9 @@ import Testing
 
 @testable import PladderAudio
 
-/// Conversion and metering tests. Everything is synthesised, so these run with no
-/// microphone, no permission prompt and no audio hardware.
 @Suite("AudioResampler")
 struct AudioResamplerTests {
 
-    // MARK: Helpers
-
-    /// A deinterleaved Float32 buffer holding `duration` seconds of a sine, the same
-    /// signal on every channel.
     static func sineBuffer(
         frequency: Double,
         sampleRate: Double,
@@ -36,8 +30,6 @@ struct AudioResamplerTests {
         return buffer
     }
 
-    /// Number of sign changes in the signal. A pure `f` Hz tone lasting one second
-    /// crosses zero `2 * f` times.
     static func zeroCrossings(_ samples: [Float]) -> Int {
         var count = 0
         var previous: Float = 0
@@ -49,8 +41,6 @@ struct AudioResamplerTests {
         }
         return count
     }
-
-    // MARK: Conversion
 
     @Test("48 kHz stereo converts to 16 kHz mono with the right length")
     func downsampleLength() throws {
@@ -70,8 +60,7 @@ struct AudioResamplerTests {
         let output = try AudioResampler.convert(input, to: target)
         let peak = output.map(abs).max() ?? 0
 
-        // The resampling filter can ring a hair above full scale on a unit sine, so
-        // allow a 1% overshoot on the upper bound.
+        // The resampling filter can ring a hair above full scale on a unit sine.
         #expect(peak >= 0.9 && peak <= 1.01, "peak was \(peak)")
     }
 
@@ -105,7 +94,6 @@ struct AudioResamplerTests {
         let converter = try AudioResampler.makeConverter(from: format, to: target)
 
         var total = 0
-        // Ten 2048-frame buffers, the same shape the microphone tap delivers.
         for _ in 0..<10 {
             let buffer = try Self.sineBuffer(frequency: 440, sampleRate: 48_000, channels: 2, duration: 2048.0 / 48_000)
             total += try AudioResampler.convertChunk(buffer, using: converter, to: target).count
@@ -127,8 +115,6 @@ struct AudioResamplerTests {
         #expect(try AudioResampler.convert(buffer, to: target).isEmpty)
     }
 
-    // MARK: Level
-
     @Test("Silence meters as zero")
     func silenceLevel() {
         #expect(AudioResampler.rmsLevel([Float](repeating: 0, count: 1024)) == 0)
@@ -143,8 +129,8 @@ struct AudioResamplerTests {
 
     @Test("A -20 dBFS sine meters at about 0.82")
     func quietSineLevel() {
-        // -20 dBFS means an RMS of 0.1, so a sine needs a peak of 0.1 * sqrt(2).
-        // (-20 + 60) / 60 = 0.667, square root = 0.816.
+        // -20 dBFS is an RMS of 0.1, a sine peak of 0.1 * sqrt(2); (-20 + 60) / 60 = 0.667,
+        // whose square root is 0.816.
         let amplitude = Float(0.1 * 2.0.squareRoot())
         let sine = (0..<16_000).map { amplitude * Float(sin(2 * Double.pi * 440 * Double($0) / 16_000)) }
 

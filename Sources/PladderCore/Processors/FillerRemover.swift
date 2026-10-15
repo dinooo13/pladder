@@ -1,45 +1,14 @@
 import Foundation
 
-/// Removes hesitation sounds ("uh", "um", German "äh"/"ähm", Spanish "eh", …)
-/// from the transcript.
-///
-/// Two tiers, so a real word never gets mistaken for a filler:
-///
-/// - Universal tier: tokens that are not a word in English, German or
-///   Spanish under any spelling — "uh", "uhm", "umm" (two or more m after
-///   u, distinct from the gated single-m "um"), "ehm", "ahm", "erm", "hm",
-///   "mh"/"mhm", "äh"/"ähm", "öh"/"öhm" — with elongation. Always removed.
-///   "mm" alone is dropped from the list entirely: it is the unit
-///   millimetre as often as it is a hum.
-/// - Gated tier: tokens that collide with a real word in some language and
-///   are only removed when the caller's language evidence says so. English:
-///   "um", "emm", "eh", "ah". "er" is deliberately excluded, since it is the
-///   German pronoun "he", and so is a single-m "em", an English word (see
-///   `gatedTokens`). Spanish: "eh". German adds nothing on top of the
-///   universal tier, since "äh"/"ähm" already cover it and bare "um"/"eh"
-///   are real German words ("um acht Uhr", "das ist eh egal").
-///
-/// The evidence is a closure the app injects (`languageHint`), backed by
-/// `NLLanguageRecognizer` outside `PladderCore`. It runs only when a gated
-/// token is actually present, and nil — no opinion, or a language the
-/// caller does not trust — means only the universal tier applies.
-///
-/// The filler is deleted together with a comma on either side and an
-/// ellipsis after it, so "I, um, think" becomes "I think" and the space runs
-/// that deletion leaves behind are collapsed. A full stop, question or
-/// exclamation mark, colon or semicolon after it is not the filler's: it
-/// ends the sentence the filler sat at the end of, so "I think so, um." keeps
-/// its full stop. Only a filler that is a sentence of its own ("Done. Uh.
-/// Next") takes its mark with it. A filler that opens the transcript carries
-/// its capitalisation over to the next word. A token joined to a word by a
-/// hyphen ("uh-oh", "uh-huh") is part of that word and stays.
+// Two tiers, so a real word is never taken for a filler: docs/ARCHITECTURE.md,
+// "Processors".
 public struct FillerRemover: TextProcessor {
     public static let processorID = "fillers"
 
     public let id = FillerRemover.processorID
 
-    /// Never a word in English, German or Spanish, so no language evidence
-    /// is required.
+    // Never a word in English, German or Spanish. "mm" is not here: it is millimetres
+    // as often as a hum.
     private static let universalTokens = [
         "u+h+m*",    // uh, uhh, uhhh, uhm
         "u+m{2,}",   // umm, ummm — two or more m distinguishes this from
@@ -53,13 +22,9 @@ public struct FillerRemover: TextProcessor {
         "ö+h+m*",    // öh, öhm
     ]
 
-    /// Only removed when `languageHint` names the language on the left.
-    ///
-    /// English "em" takes two m or more. A single-m "em" is an English word
-    /// in every position a filler could sit: "an em dash", "1.5 em" in type,
-    /// "let 'em in" for "them". No rule on its neighbours tells those from a
-    /// hesitation, and the speech model writes that hesitation as "um" or
-    /// "erm" far more often, so the bare form is left alone.
+    // Words in some language, removed only when `languageHint` names this one. Left out:
+    // "er" (German "he"), a single-m "em" ("an em dash", "let 'em in"), and German "um"
+    // and "eh", which are words ("um acht Uhr").
     private static let gatedTokens: [String: [String]] = [
         "en": ["u+m+", "e+m{2,}", "e+h+", "a+h+"],
         "es": ["e+h+"],
@@ -67,30 +32,22 @@ public struct FillerRemover: TextProcessor {
 
     private static let spaceRunPattern = "\\s{2,}"
 
-    /// A comma before the filler, the filler, and a comma run or an ellipsis
-    /// after it. A single full stop is left for `apply`, which knows whether
-    /// it ends a sentence or only the filler. The hyphen lookarounds keep
-    /// "uh-oh" whole, since `\b` sees a boundary at the hyphen. The one
-    /// behind sits after the `\b`, not before it: the same check, but tried
-    /// only where a word starts, so the scan costs what it did without it.
+    // A single full stop is left for `apply`, which knows whether it ends a sentence.
+    // `\b` sees a boundary at a hyphen, so the lookarounds keep "uh-oh" whole; the one
+    // behind sits after the `\b`, so it is tried only where a word starts.
     private static func fillerPattern(_ tokens: [String]) -> String {
         "(?:,\\s*)?\\b(?<!-)(?:\(tokens.joined(separator: "|")))\\b(?!-)(?:\\s*(?:,+|\\.{2,}|…))?\\s*"
     }
 
     private let universal: NSRegularExpression
     private let gated: [String: NSRegularExpression]
-    /// Cheap pre-check: the union of every gated token, across every
-    /// language. When this does not match, `languageHint` is never called.
+    // When this does not match, `languageHint` is never called.
     private let gatedCandidate: NSRegularExpression
     private let spaceRun: NSRegularExpression
     private let languageHint: (@Sendable (String) -> String?)?
 
-    /// - Parameter languageHint: Returns a lowercase ISO 639-1 code ("en",
-    ///   "de", "es", …) for the dominant language of the text passed in,
-    ///   only when confident, or nil otherwise. Nil — either the parameter
-    ///   itself or the closure's return value — means only the universal
-    ///   tier is applied: failing closed keeps a real word intact rather
-    ///   than risk deleting one.
+    // `languageHint` returns an ISO 639-1 code only when confident. Nil applies only the
+    // universal tier: failing closed keeps a real word intact.
     public init(languageHint: (@Sendable (String) -> String?)? = nil) {
         self.languageHint = languageHint
         universal = try! NSRegularExpression(
@@ -136,9 +93,8 @@ public struct FillerRemover: TextProcessor {
         var out = ""
         out.reserveCapacity(text.count)
         var cursor = 0
-        // Set by a filler that opened a sentence, and spent on the first
-        // letter that follows it: "Test. Ähm, beim Timeout" keeps "Beim"
-        // a sentence start, as a filler opening the transcript always did.
+        // Set by a filler that opened a sentence, spent on the next letter: "Test. Ähm, beim
+        // Timeout" keeps "Beim" a sentence start.
         var capitalizeNext = false
         func append(_ segment: String) {
             guard capitalizeNext, let letter = segment.firstIndex(where: { !$0.isWhitespace }) else {
@@ -156,9 +112,8 @@ public struct FillerRemover: TextProcessor {
             let opensSentence = capitalizeNext || Self.endsSentence(out)
             capitalizeNext = opensSentence
             cursor = match.range.upperBound
-            // The mark after the filler ends the sentence it sat in, so it
-            // moves up to the word before: "Yes, uh. Okay" is "Yes. Okay". A
-            // filler that is a sentence of its own takes its mark with it.
+            // The mark after the filler ends the sentence it sat in, so it moves up to the word
+            // before: "Yes, uh. Okay" is "Yes. Okay". A filler alone in its sentence takes it along.
             let marks = Self.sentenceMarks(in: ns, from: cursor)
             if marks > cursor {
                 if !opensSentence {
@@ -178,9 +133,7 @@ public struct FillerRemover: TextProcessor {
             .trimmingCharacters(in: .whitespaces)
     }
 
-    /// The end of the run of sentence marks starting at `index`, or `index`
-    /// when there is none. A run with a letter or digit straight after it is
-    /// not one: ".5" is a number.
+    // A run with a letter or digit straight after it is not one: ".5" is a number.
     private static func sentenceMarks(in ns: NSString, from index: Int) -> Int {
         var end = index
         while end < ns.length, ".?!;:".utf16.contains(ns.character(at: end)) { end += 1 }
@@ -190,11 +143,8 @@ public struct FillerRemover: TextProcessor {
         return end
     }
 
-    /// Whether text ends where a sentence may start: nothing yet, or a full
-    /// stop, question or exclamation mark. An ellipsis trails off rather
-    /// than ending one.
+    // An ellipsis trails off rather than ending a sentence.
     private static func endsSentence(_ text: String) -> Bool {
-        // From the end, since this runs once per filler on the text so far.
         var end = text.endIndex
         while end > text.startIndex, text[text.index(before: end)].isWhitespace {
             end = text.index(before: end)

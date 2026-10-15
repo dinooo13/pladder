@@ -3,9 +3,6 @@ import PladderCore
 import Testing
 @testable import PladderSystem
 
-/// How a chord is spelled out for the user. Space is a fixed name, so none of
-/// this depends on the keyboard layout the test machine happens to use.
-/// Main actor bound like the names: a character key is read from the layout.
 @MainActor
 @Suite struct KeyNamesTests {
     private let leftOption: UInt16 = 0x3A
@@ -13,8 +10,6 @@ import Testing
     private let space: UInt16 = 0x31
 
     @Test func aChordWithARegularKeyIsNamedWithoutSides() {
-        // Either Option fires the chord, so naming one would be a promise the
-        // matching does not keep.
         #expect(Hotkey(rightOption, space).displayName == "Option + Space")
         #expect(Hotkey(leftOption, space).displayName == "Option + Space")
     }

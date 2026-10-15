@@ -3,8 +3,6 @@ import SwiftUI
 import UniformTypeIdentifiers
 import PladderCore
 
-/// Identifies one editable text cell, so the toolbar can move focus into a row
-/// it just created and each field knows when it lost focus.
 private struct DictionaryCell: Hashable {
     enum Column: Hashable { case from, to }
     var id: DictionaryEntry.ID
@@ -21,10 +19,8 @@ struct DictionaryView: View {
 
     private var entries: [DictionaryEntry] { model.settings.dictionary }
 
-    /// Recomputed from the current entries whenever the table redraws, so
-    /// typing a new rule that closes a cycle is reflected without any extra
-    /// wiring. Cheap: the dictionary is small and this is not on the
-    /// release-to-paste path.
+    // Recomputed on every redraw, so a rule that closes a cycle shows at once; cheap,
+    // and nowhere near the release path.
     private var cyclicIDs: Set<DictionaryEntry.ID> { DictionaryEntry.cyclicIDs(in: entries) }
 
     var body: some View {
@@ -96,8 +92,7 @@ struct DictionaryView: View {
             }
             .width(76)
         }
-        // Without this an empty table paints a stack of striped placeholder
-        // rows, which reads as broken when the dictionary is empty.
+        // An empty table otherwise paints striped placeholder rows, which reads as broken.
         .alternatingRowBackgrounds(.disabled)
         .frame(minHeight: 220)
         .onDeleteCommand(perform: removeSelected)
@@ -148,8 +143,7 @@ struct DictionaryView: View {
         }
     }
 
-    /// Runs the same two processors the pipeline runs, in the same order, so
-    /// the preview cannot drift from the real behaviour.
+    // The same two processors the pipeline runs, in its order, so this cannot drift.
     private var testResult: String {
         let replaced = DictionaryReplacer(entries: entries).apply(to: sample)
         return CustomWordCorrector(entries: entries).apply(to: replaced)
@@ -161,8 +155,7 @@ struct DictionaryView: View {
         let entry = DictionaryEntry(from: "", to: "")
         model.settings.dictionary.append(entry)
         selection = [entry.id]
-        // The row does not exist in the view tree until the next update, so
-        // focus has to wait a turn.
+        // The row is not in the view tree until the next update, so focus waits a turn.
         Task { focusedCell = DictionaryCell(id: entry.id, column: .from) }
     }
 
@@ -212,15 +205,13 @@ struct DictionaryView: View {
         }
     }
 
-    /// Adds entries, overwriting an existing row with the same key instead
-    /// of creating a duplicate (see `DictionaryEntry.mergeKey`).
     private func merge(_ incoming: [DictionaryEntry]) {
         model.settings.dictionary.merge(incoming)
     }
 }
 
-/// A table cell that edits a draft and writes back on submit or focus loss, so
-/// typing does not persist settings on every keystroke.
+// Edits a draft and writes back on submit or focus loss, so typing does not save
+// the settings on every keystroke.
 private struct DictionaryField: View {
     @Binding var text: String
     let prompt: LocalizedStringKey
@@ -230,8 +221,7 @@ private struct DictionaryField: View {
     @State private var draft = ""
 
     var body: some View {
-        // Inside a grouped Form a TextField renders its title as a label, so
-        // pass the placeholder as `prompt` and hide the label.
+        // Inside a grouped Form a TextField's title renders as a label.
         TextField("", text: $draft, prompt: Text(prompt))
             .labelsHidden()
             .textFieldStyle(.plain)
@@ -239,8 +229,7 @@ private struct DictionaryField: View {
             .onAppear { draft = text }
             .onSubmit { commit() }
             .onChange(of: text) { _, new in
-                // An import or a reset happened elsewhere; adopt it unless the
-                // user is mid-edit in this very cell.
+                // An import or a reset elsewhere; adopted unless the user is editing this very cell.
                 if focus.wrappedValue != cell { draft = new }
             }
             .onChange(of: focus.wrappedValue) { old, new in

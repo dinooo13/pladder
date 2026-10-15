@@ -2,15 +2,9 @@ import Foundation
 import Observation
 import Synchronization
 
-/// Calls `onChange` after every change to what `track` reads, from `start`
-/// until `stop`.
-///
-/// `withObservationTracking` fires once per change, so the loop re-arms it
-/// from its own callback. That callback runs before the new value is stored,
-/// hence the hop onto a task to act on it. Each `start` begins a generation
-/// of its own, and a callback armed by an older one ends there: one left
-/// pending by a `stop` would otherwise re-arm after the next `start`, and two
-/// chains would fire for every change from then on.
+// `withObservationTracking` fires once, before the new value is stored, so the loop re-arms from a
+// task. A callback from an older generation ends there: one pending at `stop()` would otherwise
+// re-arm after the next `start()`, and two chains would fire for every change.
 @MainActor
 public final class ObservationLoop {
     private var generation = 0
@@ -45,8 +39,7 @@ public final class ObservationLoop {
 }
 
 extension ObservationLoop {
-    /// Returns once `condition` holds, looking again on each change to what it
-    /// reads rather than on a timer, or when the waiting task is cancelled.
+    // Looks again on each change to what `condition` reads, not on a timer; a cancel ends the wait.
     public static func wait(until condition: @escaping @MainActor () -> Bool) async {
         while !Task.isCancelled {
             let resume = ResumeOnce()
@@ -59,16 +52,15 @@ extension ObservationLoop {
             } onCancel: {
                 resume(true)
             }
-            // A change resumes this from `willSet`, before the value is
-            // stored; it is stored by the time this runs on the main actor.
+            // A change resumes this from `willSet`, before the value is stored; it is stored by
+            // the time this runs on the main actor.
             if holds { return }
         }
     }
 }
 
-/// A continuation the tracking callback, the condition and a cancel may all
-/// try to resume; the first one does. A cancel can come before the
-/// continuation exists, and is then kept for it.
+// The tracking callback, the condition and a cancel may all resume it; the first one does. A
+// cancel can come before the continuation exists, and is then kept for it.
 private final class ResumeOnce: Sendable {
     private let state = Mutex<(continuation: CheckedContinuation<Bool, Never>?, early: Bool?)>((nil, nil))
 

@@ -1,33 +1,15 @@
 import Foundation
 
-/// Builds the Unicode-aware whole-word regex shared by `DictionaryReplacer`
-/// (which applies a rule) and `DictionaryEntry.cyclicIDs` (which checks
-/// whether one rule's replacement contains another rule's trigger), so the
-/// two agree on what counts as a word boundary.
+// Shared by `DictionaryReplacer` and `DictionaryEntry.cyclicIDs`, so the two agree
+// on what a word boundary is.
 enum WholeWordPattern {
-    /// A regex matching `word` as a whole word inside arbitrary text, or nil
-    /// if `word` is empty (after trimming) or fails to compile.
-    ///
-    /// Han, Hiragana, Katakana, Hangul and Thai are written without spaces
-    /// between words, so a `word` containing any of those scripts gets no
-    /// boundary assertion at all: "東京" must match inside "私は東京に行く"
-    /// with nothing on either side. Everything else asserts directly on the
-    /// Unicode categories that make up a word (`\p{L}\p{M}\p{N}`). ICU's
-    /// `\b` already treats umlauts and accented letters as word characters;
-    /// spelling the class out makes the rule explicit and keeps it the same
-    /// in the cycle check.
-    ///
-    /// An edge of `word` that is punctuation or a symbol ("c++", ".net") has
-    /// a rule of its own: the neighbour must be whitespace, punctuation or
-    /// nothing, so "c++," and "(c++)" match. A letter, digit or symbol beside
-    /// it carries the word on, so "c++" stays out of "c+++" and "c++x", and
-    /// ".net" out of "asp.net".
+    // Han, Kana, Hangul and Thai are written without spaces, so a word in them gets no
+    // boundary at all. A punctuation edge ("c++", ".net") needs whitespace, punctuation
+    // or nothing beside it, so "c++," matches and "c+++" and "asp.net" do not.
     static func regex(for word: String, caseInsensitive: Bool = true) -> NSRegularExpression? {
         let trimmed = word.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return nil }
 
-        // Collapse runs of whitespace in the pattern so "claude  code" and
-        // "claude code" both match.
         let words = trimmed.split(whereSeparator: { $0.isWhitespace })
             .map { NSRegularExpression.escapedPattern(for: String($0)) }
         let body = words.joined(separator: "\\s+")
@@ -51,8 +33,6 @@ enum WholeWordPattern {
         return try? NSRegularExpression(pattern: leading + body + trailing, options: options)
     }
 
-    /// True when `text` contains a character from a script conventionally
-    /// written without spaces between words.
     static func containsUnspacedScript(_ text: String) -> Bool {
         text.unicodeScalars.contains { scalar in
             switch scalar.value {

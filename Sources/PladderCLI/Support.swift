@@ -5,14 +5,11 @@ import PladderAudio
 import PladderCore
 import PladderEngines
 
-/// Writes to stderr, so nothing but results ever reaches stdout: a script
-/// reading a transcript from `pladder-cli <file>` sees the transcript alone.
+// Nothing but results reaches stdout: a script reading a transcript sees it alone.
 func eprint(_ message: String, terminator: String = "\n") {
     FileHandle.standardError.write(Data((message + terminator).utf8))
 }
 
-/// The engine the app runs by default, built from the catalog the app builds
-/// its registry from.
 func makeEngine() -> any TranscriptionEngine {
     StandardEngines.defaultEntry.make()
 }
@@ -26,8 +23,6 @@ func loadSamples(_ url: URL) throws -> [Float] {
     return try AudioResampler.convert(input, to: target)
 }
 
-/// Loads the engine, printing download progress, and returns the wall-clock
-/// load time. In a fresh process this is the cold start the app pays at launch.
 func loadEngine(_ engine: any TranscriptionEngine) async throws -> Duration {
     let clock = ContinuousClock()
     let started = clock.now
@@ -36,7 +31,6 @@ func loadEngine(_ engine: any TranscriptionEngine) async throws -> Duration {
         while !Task.isCancelled {
             if case .downloading(let p) = await engine.status, let p {
                 let pct = Int(p * 100)
-                // stderr, so a first run's download never lands in a transcript.
                 if pct != lastPrinted {
                     eprint("downloading \(pct)%")
                     lastPrinted = pct
@@ -49,12 +43,8 @@ func loadEngine(_ engine: any TranscriptionEngine) async throws -> Duration {
     do {
         try await engine.load()
     } catch {
-        // The engine's own wording for the failure — the line the menu shows —
-        // rather than a top-level trap printing the raw error, so a download
-        // that never finished can be diagnosed from the terminal.
+        // The engine's own diagnosis, rather than a trap printing the raw error.
         if case .failed(let failure) = await engine.status {
-            // A developer tool: the enum's own shape is the diagnosis, and
-            // the wording that reaches users lives in the app.
             eprint("model failed: \(failure)")
             exit(1)
         }
@@ -79,8 +69,7 @@ func sysctlString(_ name: String) -> String? {
     return String(decoding: buffer.prefix(size).prefix { $0 != 0 }, as: UTF8.self)
 }
 
-/// Physical memory footprint of this process, the number Activity Monitor
-/// shows in its Memory column.
+// The number Activity Monitor shows in its Memory column.
 func physicalFootprintBytes() -> UInt64? {
     var info = task_vm_info_data_t()
     var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size)
@@ -92,14 +81,11 @@ func physicalFootprintBytes() -> UInt64? {
     return result == KERN_SUCCESS ? info.phys_footprint : nil
 }
 
-/// One-minute load average, so the conditions of a run are on the record.
 func loadAverage() -> Double {
     var loads = [Double](repeating: 0, count: 3)
     return getloadavg(&loads, 3) > 0 ? loads[0] : 0
 }
 
-/// Empty when the chip is at its normal thermal state, else a tag for the
-/// run line, because a throttled run is not comparable.
 func thermalTag() -> String {
     switch ProcessInfo.processInfo.thermalState {
     case .nominal: return ""
