@@ -83,6 +83,7 @@ private actor GatedEngine: TranscriptionEngine {
     private var progress: Double
     private var isOpen = false
     private var waiters: [CheckedContinuation<Void, Never>] = []
+    private let loaded = Gate()
 
     init(id: EngineID, progress: Double) {
         self.id = id
@@ -95,13 +96,11 @@ private actor GatedEngine: TranscriptionEngine {
             await withCheckedContinuation { waiters.append($0) }
         }
         status = .ready
+        await loaded.open()
     }
 
     func waitUntilLoaded() async -> Bool {
-        for _ in 0..<100 {
-            if status == .ready { return true }
-            try? await Task.sleep(for: .milliseconds(10))
-        }
+        await loaded.wait()
         return status == .ready
     }
 
