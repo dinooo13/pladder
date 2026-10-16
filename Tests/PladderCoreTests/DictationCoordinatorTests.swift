@@ -511,6 +511,21 @@ final class EventLog: @unchecked Sendable {
         #expect(c.lastTranscript?.text == "Hello, World!")
     }
 
+    @Test func aDictationTheProcessorsEmptyLeavesTheLastTranscriptAlone() async {
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
+        settings.dictionary = [DictionaryEntry(from: "hello world", to: "first")]
+        let (c, output, _) = makeCoordinator(settings: settings)
+        await c.startIdle()
+        await c.dictate()
+        #expect(c.lastTranscript?.text == "first")
+
+        c.settings.dictionary = [DictionaryEntry(from: "hello world", to: "")]
+        await c.dictate()
+        #expect(c.state == .idle)
+        #expect(output.inserted == ["first "])
+        #expect(c.lastTranscript?.text == "first")
+    }
+
     @Test func noTrailingSpaceWhenDisabled() async {
         var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.appendTrailingSpace = false
