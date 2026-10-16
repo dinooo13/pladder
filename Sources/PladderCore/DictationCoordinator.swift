@@ -525,6 +525,10 @@ public final class DictationCoordinator {
         onEvent(.recordingStopped)
         let engine = cycleEngine ?? loader.engine
         cycleEngine = nil
+        let finish = DictationFinish(
+            pipeline: pipeline, disabledProcessors: settings.disabledProcessors,
+            appendTrailingSpace: settings.appendTrailingSpace, willPolish: willPolish, refiner: refiner,
+            minimumDuration: minimumDuration, minimumPolishWords: minimumPolishWords, output: output)
         inFlight = Task { [weak self] in
             guard let self else { return }
             // The feed loop finishes handing over a chunk drained before the release. What
@@ -535,78 +539,42 @@ public final class DictationCoordinator {
             let feedWait = stopped - handover
             let audio = await self.capture.stop()
             let captureStop = ContinuousClock.now - stopped
-            await self.finish(
-                audio, stream: stream, fedSamples: fed ?? 0, with: engine, submit: submit,
-                captureStop: captureStop, feedWait: feedWait)
+            let source: DictationFinish.Source = if let stream {
+                .utterance(stream.engine, stream.utterance)
+            } else {
+                .whole(engine)
+            }
+            let outcome = await finish.run(
+                DictationFinish.Input(
+                    audio: audio, fedSamples: fed ?? 0, source: source, submit: submit,
+                    captureStop: captureStop, feedWait: feedWait),
+                onStage: { self.enter($0) })
+            self.finished(outcome)
         }
     }
 
-    private func finish(
-        _ audio: CapturedAudio,
-        stream: Stream?,
-        fedSamples: Int,
-        with engine: any TranscriptionEngine,
-        submit: Bool,
-        captureStop: Duration,
-        feedWait: Duration
-    ) async {
-        defer {
-            drainPendingUnloads()
-            willPolish = false
-        }
-        // A streaming engine was fed `fedSamples` while recording; only the tail came
-        // from `stop()`.
-        let totalDuration = Double(fedSamples + audio.samples.count) / CapturedAudio.sampleRate
-        guard totalDuration >= minimumDuration else {
-            if let stream { await stream.engine.abandonUtterance(stream.utterance) }
-            becomeIdle()
-            return
-        }
-        do {
-            var timing = CycleTiming(captureStop: captureStop, engine: .zero, processing: .zero, insert: .zero)
-            var started = ContinuousClock.now
-            var transcript = if let stream {
-                try await stream.engine.endUtterance(stream.utterance, tail: audio.samples)
-            } else {
-                try await engine.transcribe(audio.samples)
-            }
-            timing.engine = feedWait + (ContinuousClock.now - started)
-            if transcript.audioDuration == 0 {
-                transcript.audioDuration = totalDuration
-            }
-            started = ContinuousClock.now
-            let processed = pipeline.run(transcript.text, disabled: settings.disabledProcessors)
-            timing.processing = ContinuousClock.now - started
-            guard !processed.isEmpty else {
-                becomeIdle()
-                return
-            }
-            var final = processed
-            if willPolish, let refiner, processed.wordCount >= minimumPolishWords {
-                state = .polishing
-                started = ContinuousClock.now
-                if let polished = await refiner.refine(processed) { final = polished }
-                timing.polish = ContinuousClock.now - started
-            } else if willPolish {
-                timing.polish = .zero
-            }
+    private func enter(_ stage: DictationFinish.Stage) {
+        switch stage {
+        case .polishing:
+            state = .polishing
+        case .inserting(let transcript):
             state = .inserting
-            let needsSpace = settings.appendTrailingSpace && final.last?.isWhitespace != true
-            let toInsert = needsSpace ? final + " " : final
-            // Before the insert, so a paste that fails leaves the menu's
-            // copy of it processed, which is when the user needs it.
-            transcript.text = final
             lastTranscript = transcript
-            started = ContinuousClock.now
-            let result = try await output.insert(toInsert, submit: submit)
-            timing.insert = ContinuousClock.now - started
-            onEvent(.inserted(Insertion(
-                transcript: transcript, timing: timing, result: result,
-                submitted: submit && result == .pasted)))
-            if result == .copied { showCopied() } else { becomeIdle() }
-        } catch {
-            fail(DictationFailure(error))
         }
+    }
+
+    private func finished(_ outcome: DictationFinish.Outcome) {
+        switch outcome {
+        case .tooShort, .empty:
+            becomeIdle()
+        case .inserted(let insertion):
+            onEvent(.inserted(insertion))
+            if insertion.result == .copied { showCopied() } else { becomeIdle() }
+        case .failed(let failure):
+            fail(failure)
+        }
+        drainPendingUnloads()
+        willPolish = false
     }
 
     private func becomeIdle() {
