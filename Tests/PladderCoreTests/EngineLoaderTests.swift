@@ -64,7 +64,8 @@ import Testing
 
         await first.open()
         #expect(await first.waitUntilLoaded())
-        // Time for the superseded load task to resume on the main actor.
+        // Negative path: a superseded load leaves nothing to wait for, so this gives its task
+        // time to resume on the main actor.
         try? await Task.sleep(for: .milliseconds(50))
         #expect(loader.engine.id == second.id)
         #expect(loader.status == .downloading(progress: 0.5))

@@ -42,6 +42,7 @@ private actor Downloads {
         }
         tasks.enqueue { order.append("second") }
         await gate.untilSomeoneWaits()
+        // Gives a wrongly started second piece time to show.
         try? await Task.sleep(for: .milliseconds(10))
         #expect(order.all.isEmpty)
         await gate.open()
