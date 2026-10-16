@@ -287,6 +287,42 @@ import Testing
         #expect(output.inserted == ["hello world "])
         #expect(output.flushCount == 1)
     }
+
+    @Test func aSecondRecordingsRestoreWaitsForTheFirst() async {
+        let gate = Gate()
+        let muter = GatedOutputMuter(holdingTheEndOf: 1, on: gate)
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
+        settings.muteOutputWhileDictating = true
+        let (c, _, _) = makeCoordinator(settings: settings, outputMuter: muter)
+        await c.startIdle()
+        await c.dictate()
+        await gate.untilSomeoneWaits()
+        await c.dictate()
+        #expect(muter.ended.isEmpty)
+        await gate.open()
+        #expect(await waitUntil { muter.ended.count == 2 })
+        #expect(muter.ended == [1, 2])
+    }
+}
+
+private final class GatedOutputMuter: OutputMuter, @unchecked Sendable {
+    private let lock = NSLock()
+    private let held: Int
+    private let gate: Gate
+    private var _ended: [Int] = []
+    var ended: [Int] { lock.withLock { _ended } }
+
+    init(holdingTheEndOf held: Int, on gate: Gate) {
+        self.held = held
+        self.gate = gate
+    }
+
+    func recordingStarted(session: Int) async {}
+
+    func recordingEnded(session: Int) async {
+        if session == held { await gate.wait() }
+        lock.withLock { _ended.append(session) }
+    }
 }
 
 @MainActor
