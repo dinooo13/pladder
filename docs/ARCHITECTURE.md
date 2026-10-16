@@ -35,9 +35,9 @@ its timers with `ManualClock`.
    mid-recording cannot change this cycle;
 2. flips the state to `.recording`, before the first `await`, so the overlay
    reacts at once and a second press cannot start the microphone twice, and
-   numbers the recording (`recordingID`). After every wait below the press
-   checks it is still the current recording, and stops if a cancel ended it
-   meanwhile;
+   numbers the recording (`recording`, a `Generation`). After every wait
+   below the press checks it is still the current recording, and stops if a
+   cancel ended it meanwhile;
 3. turns Escape into the cancel key, waits for every earlier cancel still
    running, and starts the capture;
 4. arms the output mute and starts the key-down work: the clipboard snapshot
@@ -440,6 +440,58 @@ wrote is lost to a load or a save:
 The coordinator sees only `DictationSettings`, and the app assigns a new
 value only when that part changed. `PLADDER_SETTINGS_PATH` points a test copy
 at a file of its own.
+
+## Superseded work
+
+Most of the races the reviews found had one shape: work that outlives what it
+was started for (a timer, a detached task, a callback on another thread, an
+engine call that cannot be aborted) finishes after something newer has taken
+its place, and acts on the newer one. The rule everywhere: such work takes a
+number or an identity when it starts and compares it against the current one
+before it acts; a mismatch means it was superseded and does nothing.
+Cancelling alone is not enough: a task past its last cancellation check, or a
+call into an actor waiting its turn, runs on regardless. `Generation` in Core
+is the counter for the plain case: `next()` when the new work starts,
+`isCurrent(_:)` when the old work wakes.
+
+| Where | What is compared | What it keeps out |
+|---|---|---|
+| `DictationCoordinator`, `recording` | The recording's `Generation`, after every wait in `hotkeyPressed` (`isCurrent`) | A press cancelled while it waited starting the microphone or the engine for a recording that is over |
+| `UtteranceSlot` | The `Utterance` handle | A cancelled recording's late feed, live pass or abandon reaching the next utterance |
+| `RecordingEngineSession` | Whether it has ended, when its utterance has begun | An utterance begun after its recording ended being fed or left open |
+| `OutputMuteController`, `generation` and `latestSession` | The arm's `Generation` when its delay ends; the session number of every start and end | A mute landing after its recording ended; an older recording's end unmuting a newer one |
+| `ClipboardKeeper`, `restoreID` | The number of the latest restore scheduling | A restore that woke at its old instant putting the old clipboard back after a later read moved it |
+| `ClipboardKeeper`, read waiters | The waiter's number | A read timer resolving a waiter that a read already resolved |
+| `ClipboardKeeper`, `TranscriptPromise` | The promise's identity (`===`) | A read or restore of an earlier paste acting on the current one |
+| `ClipboardKeeper`, the pasteboard's `changeCount` | The count after the transcript went on | A restore overwriting a copy the user made in between |
+| `PasteboardOutput`, `owedReturn` | The owed Return's identity | A send's Return posted twice, by its timer and by the next paste |
+| `HotkeyMonitorLifecycle`, `generation` | The session's number, also packed into `CarbonHotkeySession`'s hot key IDs | A tap or Carbon handler made after its session ended being adopted; an old session's hot key events being found |
+| `HotkeyRecordingSlot` | The recorder's token | A freed recorder ending the session of the field that took over |
+| `ObservationLoop`, `generation` | The loop's number in each re-armed callback | A callback pending at `stop()` re-arming the loop |
+| `EngineLoader` | `engine === self.engine` | A superseded load's status reaching the engine that replaced it |
+| `ModelFiles`, `isCurrent(file, id)` | The download's ID | A cancelled download or checksum writing its status over the next one |
+| `S1MiniPolisher`, `generation` | The load's number | A load finishing after an unload or a switch keeping its model resident |
+| `OnDeviceLanguageModel`, `leftover` | The abandoned call's task identity | A drain clearing the slot of a call abandoned after it |
+| `OverlayPanel`, `generation` | The animation's number | A hide's or show's completion handler acting on the next one |
+
+**Tests.** Every detached task has a test that supersedes or cancels it while
+it runs, on `ManualClock` where it sleeps on a clock and on a `Gate` where it
+waits on other work:
+
+| Detached task | Test |
+|---|---|
+| The warm loop (`RecordingEngineSession`) | `theWarmLoopRunsOnTheClockAndStopsAtRelease`, `endCancelsTheWarmLoopBeforeReturning` |
+| The speakers' restore (`DictationCoordinator.restoreOutputDevice`) | `aSecondRecordingsRestoreWaitsForTheFirst` |
+| The owed Return (`PasteboardOutput`) | `aSendStillWaitingPostsItsReturnBeforeTheNextPaste` |
+| The clipboard restore (`ClipboardKeeper`) | `aRestoreThatWokeBeforeALaterReadDoesNothing`, `aNewerPasteTakesOverThePendingRestore` |
+| The read waiter's timer (`ClipboardKeeper.firstRead`) | `returnWaitsForTheReadPlusTheSubmitDelay`, `returnWithoutAReadComesAtTheFloor` |
+| `firstOf`'s work and timer | `theDeadlineWinsOverWorkThatIgnoresCancellation` |
+| The checksum (`ModelFiles`) | `cancelReachesTheChecksum`, `theChecksumStopsBetweenChunksWhenCancelled` |
+
+Exempt are the fire-and-forget calls that are idempotent and leave nothing
+to supersede: `refiner.prepare()` at key-down, `S1MiniPolisher.warmUpRuntime`,
+`session.prewarm()` in `OnDeviceLanguageModel`, and `CorrectionLearner.pasted`,
+whose watch a new paste ends through the observer.
 
 ## The app
 
