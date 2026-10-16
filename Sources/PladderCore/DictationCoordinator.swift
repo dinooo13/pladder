@@ -101,7 +101,7 @@ public final class DictationCoordinator {
 
     private var engineSession: RecordingEngineSession?
 
-    private var recordingID = 0
+    private var recording = Generation()
     private var cancelCleanup: Task<Void, Never>?
     private var muteRestoreTask: Task<Void, Never>?
 
@@ -347,8 +347,7 @@ public final class DictationCoordinator {
         // concurrent press cannot start capture twice.
         state = .recording
         inputLevel = 0
-        recordingID += 1
-        let mine = recordingID
+        let mine = recording.next()
         hotkeyMonitor.setCancelKeyEnabled(true)
         // Waits for every earlier cancel to stop its microphone and drop its utterance.
         await cancelCleanup?.value
@@ -408,12 +407,12 @@ public final class DictationCoordinator {
     }
 
     private func isCurrent(_ id: Int) -> Bool {
-        state.isRecording && recordingID == id
+        state.isRecording && recording.isCurrent(id)
     }
 
     private func armOutputMute() {
         guard settings.muteOutputWhileDictating, let outputMuter else { return }
-        let session = recordingID
+        let session = recording.current
         Task { await outputMuter.recordingStarted(session: session) }
     }
 
@@ -421,7 +420,7 @@ public final class DictationCoordinator {
     // device. Detached so the paste never waits on CoreAudio.
     private func restoreOutputDevice() {
         guard let outputMuter else { return }
-        let session = recordingID
+        let session = recording.current
         let previous = muteRestoreTask
         muteRestoreTask = Task.detached(priority: .utility) {
             await previous?.value

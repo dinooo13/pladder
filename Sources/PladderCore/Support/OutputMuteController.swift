@@ -8,7 +8,7 @@ public actor OutputMuteController: OutputMuter {
     private let log: @Sendable (String) -> Void
 
     // A pending arm that wakes to find this changed belongs to a session already over.
-    private var generation = 0
+    private var generation = Generation()
     private var latestSession: Int?
     private var restore: (device: UInt32, state: MuteState)?
 
@@ -22,15 +22,14 @@ public actor OutputMuteController: OutputMuter {
         self.log = log
     }
 
-    var armedGeneration: Int { generation }
+    var armedGeneration: Int { generation.current }
 
     public func recordingStarted(session: Int) async {
         if let latestSession, session <= latestSession { return }
         latestSession = session
-        generation += 1
-        let mine = generation
+        let mine = generation.next()
         try? await Task.sleep(for: delay)
-        guard generation == mine else { return }
+        guard generation.isCurrent(mine) else { return }
         guard restore == nil else {
             // An earlier session muted it and its end has not come; this session's end restores it.
             log("output still muted from the previous recording")
@@ -68,7 +67,7 @@ public actor OutputMuteController: OutputMuter {
         if let latestSession, session < latestSession { return }
         latestSession = session
         // Also disarms a mute that has not landed yet.
-        generation += 1
+        generation.next()
         guard let restore else { return }
         self.restore = nil
         do {
