@@ -121,6 +121,7 @@ private actor StandInTransport: ModelFileTransport {
             if call == 1 {
                 try Data("wei".utf8).write(to: staging)
                 await started.open()
+                // A cancellable sleep stands in for the download; the test is that cancel interrupts it.
                 try await Task.sleep(for: .seconds(3))
             }
             try Data("weights".utf8).write(to: staging)

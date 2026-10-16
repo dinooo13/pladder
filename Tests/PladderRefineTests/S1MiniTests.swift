@@ -154,6 +154,7 @@ private struct StandInModel: PromptCompleter {
         _ = await polisher.polish("send it")
         await polisher.unload()
         let second = Task { await polisher.prepare() }
+        // Negative path: gives a second load that wrongly skipped the wait time to start.
         try await Task.sleep(for: .milliseconds(30))
         #expect(loadsStarted.all == [0])
         await gate.open()
