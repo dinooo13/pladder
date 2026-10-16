@@ -17,7 +17,7 @@ actor FakeCapture: AudioCapture {
     var startCount = 0
     var stopCount = 0
     var levelContinuation: AsyncStream<Float>.Continuation?
-    var stopDelay: Duration = .zero
+    var stopGate: Gate?
 
     func start() async throws -> AsyncStream<Float> {
         startCount += 1
@@ -33,7 +33,7 @@ actor FakeCapture: AudioCapture {
     func stop() async -> CapturedAudio {
         stopCount += 1
         levelContinuation?.finish()
-        if stopDelay > .zero { try? await Task.sleep(for: stopDelay) }
+        await stopGate?.wait()
         return CapturedAudio(samples: samplesToReturn)
     }
 
@@ -41,7 +41,7 @@ actor FakeCapture: AudioCapture {
 
     func setSamples(_ s: [Float]) { samplesToReturn = s }
     func setDrainSamples(_ s: [Float]) { drainSamples = s }
-    func setStopDelay(_ d: Duration) { stopDelay = d }
+    func setStopGate(_ gate: Gate) { stopGate = gate }
     func emitLevel(_ l: Float) { levelContinuation?.yield(l) }
 }
 
@@ -126,20 +126,20 @@ final class FakeRefiner: TranscriptRefiner, @unchecked Sendable {
     private var _calls: [String] = []
     private var _prepareCount = 0
     private let result: String?
-    private let delay: Duration
+    private let gate: Gate?
     var calls: [String] { lock.withLock { _calls } }
     var prepareCount: Int { lock.withLock { _prepareCount } }
 
-    init(result: String? = "polished", delay: Duration = .zero) {
+    init(result: String? = "polished", gate: Gate? = nil) {
         self.result = result
-        self.delay = delay
+        self.gate = gate
     }
 
     func prepare() async { lock.withLock { _prepareCount += 1 } }
 
     func refine(_ text: String) async -> String? {
         lock.withLock { _calls.append(text) }
-        if delay > .zero { try? await Task.sleep(for: delay) }
+        await gate?.wait()
         return result
     }
 }
@@ -184,15 +184,15 @@ actor CountingEngine: TranscriptionEngine {
     nonisolated let displayName = "Counting"
     private(set) var status: EngineStatus = .unloaded
     private let recorder = Recorder<Int>()
-    private let delay: Duration
+    private let warmGate: Gate?
 
-    init(delay: Duration = .zero) { self.delay = delay }
+    init(warmGate: Gate? = nil) { self.warmGate = warmGate }
     nonisolated var calls: [Int] { recorder.all }
 
     func load() async throws { status = .ready }
     func transcribe(_ samples: [Float]) async throws -> Transcript {
         recorder.append(samples.count)
-        if delay > .zero { try? await Task.sleep(for: delay) }
+        if samples.count == 8_000 { await warmGate?.wait() }
         return Transcript(text: "counted", audioDuration: Double(samples.count) / CapturedAudio.sampleRate, processingTime: 0, engineID: id)
     }
     func unload() { status = .unloaded }
@@ -357,10 +357,10 @@ extension EngineRegistry.Entry {
 
 @MainActor
 func makeCountingCoordinator(
-    engineDelay: Duration = .zero,
+    warmGate: Gate? = nil,
     clock: any Clock<Duration> = ContinuousClock()
 ) -> (DictationCoordinator, FakeOutput, FakeCapture, CountingEngine) {
-    let engine = CountingEngine(delay: engineDelay)
+    let engine = CountingEngine(warmGate: warmGate)
     var settings = DictationSettings(engineID: CountingEngine.engineID)
     settings.appendTrailingSpace = false
     let (coordinator, output, capture) = makeCoordinator(engines: [.serving(engine)], settings: settings, clock: clock)
@@ -647,12 +647,15 @@ final class EventLog: @unchecked Sendable {
         let a = FakeHotkey()
         let b = FakeHotkey()
         let (c, _, capture) = makeCoordinator(hotkeyMonitor: a)
-        await capture.setStopDelay(.milliseconds(50))
+        let stopGate = Gate()
+        await capture.setStopGate(stopGate)
         await c.startIdle()
         await c.press(a)
         c.update(c.settings, standInHotkey: c.standInHotkey, monitor: b)
         #expect(c.state == .idle)
         b.press()
+        #expect(await waitUntil { c.state.isRecording })
+        await stopGate.open()
         #expect(await waitUntil { c.handledHotkeyEvents == 2 })
         #expect(c.state.isRecording)
         #expect(await capture.startCount == 2)
@@ -846,9 +849,14 @@ final class EventLog: @unchecked Sendable {
     }
 
     @Test func releaseDuringWarmupStillInserts() async {
-        let (c, output, _, _) = makeCountingCoordinator(engineDelay: .milliseconds(200))
+        let warmGate = Gate()
+        let (c, output, _, engine) = makeCountingCoordinator(warmGate: warmGate)
         await c.startIdle()
-        await c.dictate()
+        await c.hotkeyPressed()
+        #expect(await waitUntil { engine.calls == [8_000] })
+        c.hotkeyReleased()
+        await warmGate.open()
+        await c.inFlight?.value
         #expect(output.inserted.count == 1)
         #expect(c.state == .idle)
     }
@@ -1085,7 +1093,8 @@ final class EventLog: @unchecked Sendable {
     }
 
     @Test func polishingStateIsPublishedWhileTheModelRuns() async {
-        let refiner = FakeRefiner(delay: .milliseconds(200))
+        let gate = Gate()
+        let refiner = FakeRefiner(gate: gate)
         let (c, output, _) = makeCoordinator(engineText: Self.sentence, settings: Self.settings(), refiner: refiner)
         await c.startIdle()
         await c.hotkeyPressed()
@@ -1094,6 +1103,7 @@ final class EventLog: @unchecked Sendable {
         #expect(await waitUntil { c.state == .polishing })
         #expect(c.willPolish)
         #expect(output.inserted.isEmpty)
+        await gate.open()
         await c.inFlight?.value
         #expect(c.state == .idle)
         #expect(!c.willPolish)
