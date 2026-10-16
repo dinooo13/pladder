@@ -483,6 +483,7 @@ Errors and progress go to stderr, so stdout holds only results.
 | `bench <fixtures dir>` | The whole-buffer benchmark. `--runs N` (default 6, first discarded; 11 to settle a result near the noise line), `--pause S` (idle seconds before every run, default 10). |
 | `bench <dir> --paced` | Feeds each fixture in one-second chunks at real time and times `endUtterance`; also transcribes it whole and reports whether the texts are identical. Skips fixtures under 13 s unless `--all`. `--live` adds the Live Transcript pass every 0.5 s and reports its cost. |
 | `bench-process <dir>` | Times the processor pipeline on the fixtures' scripts, with a filler in every sentence and with a spoken question mark too. `--runs N`, default 31. |
+| `bench-coordinator` | Drives the real coordinator and processors with stand-ins of fixed latency for the engine, microphone, paste and polish, and reports what release-to-paste costs beyond them. `--runs N` (default 21, first discarded), `--hold S` (1.5), `--engine-latency MS` (150), `--paste-latency MS` (0), `--polish` (a 300 ms stand-in), `--live`. |
 | `polish <text file \| ->` | Runs a polish model over one transcript, cold and then warm. `--model apple\|s1-mini\|s1-mini-8bit`, `--instructions <file>` (Apple), `--gguf <file>` (any S1-mini-family model), `--control <line>` (S1-mini). |
 | `polish-set <set.json>` | Runs a polish model over a test set after the app's processors: every answer, word error rate per language, exact matches, timings. `--model`, `--gguf` and `--control` as for `polish`; no `--instructions`. |
 
