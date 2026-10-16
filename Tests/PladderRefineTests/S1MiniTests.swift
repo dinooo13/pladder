@@ -136,9 +136,7 @@ private struct StandInModel: PromptCompleter {
         _ = await polisher.polish("send it")
         await polisher.unload()
         await gate.open()
-        // Time for the first load to finish and try to store its model; the right answer
-        // does not depend on it.
-        try await Task.sleep(for: .milliseconds(20))
+        _ = await polisher.abandoned?.value
         #expect(await polisher.refine("send it") == "Second.")
     }
 
