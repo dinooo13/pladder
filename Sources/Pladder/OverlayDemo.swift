@@ -153,6 +153,7 @@ private final class DemoOutput: TextOutput, @unchecked Sendable {
     init(result: InsertResult) { self.result = result }
     func insert(_ text: String, submit: Bool) async throws -> InsertResult { result }
     func prepare() async {}
+    func copy(_ text: String) async {}
 }
 
 // About as long as the on-device model takes for a short dictation.

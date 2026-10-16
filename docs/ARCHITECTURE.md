@@ -271,7 +271,8 @@ user's clipboard, `KeyPoster` types the keys.
   next paste.
 - **Without Accessibility** the text is copied and stays; no restore, no
   Return. The menu's copy of the last transcript takes the same path,
-  `PasteboardOutput.copy`: the marker types, and the end of any restore
+  `DictationCoordinator.copyLastTranscript` through `TextOutput.copy`, which
+  `PasteboardOutput` serves: the marker types, and the end of any restore
   still pending, which would otherwise put the old clipboard back over it.
 - **A failed Cmd+V** puts the clipboard back at once, through the same
   restore: when every item of the user's clipboard was too large to keep,
