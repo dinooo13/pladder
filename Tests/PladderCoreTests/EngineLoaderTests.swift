@@ -1,4 +1,5 @@
 import Foundation
+import PladderTestSupport
 import Testing
 @testable import PladderCore
 
@@ -63,7 +64,8 @@ import Testing
 
         await first.open()
         #expect(await first.waitUntilLoaded())
-        // Time for the superseded load task to resume on the main actor.
+        // Negative path: a superseded load leaves nothing to wait for, so this gives its task
+        // time to resume on the main actor.
         try? await Task.sleep(for: .milliseconds(50))
         #expect(loader.engine.id == second.id)
         #expect(loader.status == .downloading(progress: 0.5))
@@ -82,6 +84,7 @@ private actor GatedEngine: TranscriptionEngine {
     private var progress: Double
     private var isOpen = false
     private var waiters: [CheckedContinuation<Void, Never>] = []
+    private let loaded = Gate()
 
     init(id: EngineID, progress: Double) {
         self.id = id
@@ -94,13 +97,11 @@ private actor GatedEngine: TranscriptionEngine {
             await withCheckedContinuation { waiters.append($0) }
         }
         status = .ready
+        await loaded.open()
     }
 
     func waitUntilLoaded() async -> Bool {
-        for _ in 0..<100 {
-            if status == .ready { return true }
-            try? await Task.sleep(for: .milliseconds(10))
-        }
+        await loaded.wait()
         return status == .ready
     }
 

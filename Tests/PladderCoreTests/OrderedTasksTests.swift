@@ -5,26 +5,31 @@ import Testing
 
 private actor Downloads {
     private(set) var running = false
+    private let windDown: Gate
+
+    init(windDown: Gate) { self.windDown = windDown }
+
     func ensure() { running = true }
+    // Winding down, as a cancelled URLSession task does, and only then marked stopped.
     func cancel() async {
+        await windDown.wait()
         running = false
-        // Winding down, as a cancelled URLSession task does.
-        try? await Task.sleep(for: .milliseconds(5))
     }
 }
 
 @MainActor
 @Suite(.timeLimit(.minutes(1))) struct OrderedTasksTests {
     @Test func aCancelThenEnsureLeavesTheDownloadRunning() async {
-        for _ in 0..<50 {
-            let downloads = Downloads()
-            await downloads.ensure()
-            let tasks = OrderedTasks()
-            tasks.enqueue { await downloads.cancel() }
-            tasks.enqueue { await downloads.ensure() }
-            await tasks.drained()
-            #expect(await downloads.running)
-        }
+        let windDown = Gate()
+        let downloads = Downloads(windDown: windDown)
+        await downloads.ensure()
+        let tasks = OrderedTasks()
+        tasks.enqueue { await downloads.cancel() }
+        tasks.enqueue { await downloads.ensure() }
+        await windDown.untilSomeoneWaits()
+        await windDown.open()
+        await tasks.drained()
+        #expect(await downloads.running)
     }
 
     @Test func eachPieceStartsAfterThePreviousOneFinished() async {
@@ -37,6 +42,7 @@ private actor Downloads {
         }
         tasks.enqueue { order.append("second") }
         await gate.untilSomeoneWaits()
+        // Gives a wrongly started second piece time to show.
         try? await Task.sleep(for: .milliseconds(10))
         #expect(order.all.isEmpty)
         await gate.open()

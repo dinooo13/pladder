@@ -136,9 +136,7 @@ private struct StandInModel: PromptCompleter {
         _ = await polisher.polish("send it")
         await polisher.unload()
         await gate.open()
-        // Time for the first load to finish and try to store its model; the right answer
-        // does not depend on it.
-        try await Task.sleep(for: .milliseconds(20))
+        _ = await polisher.abandoned?.value
         #expect(await polisher.refine("send it") == "Second.")
     }
 
@@ -156,6 +154,7 @@ private struct StandInModel: PromptCompleter {
         _ = await polisher.polish("send it")
         await polisher.unload()
         let second = Task { await polisher.prepare() }
+        // Negative path: gives a second load that wrongly skipped the wait time to start.
         try await Task.sleep(for: .milliseconds(30))
         #expect(loadsStarted.all == [0])
         await gate.open()

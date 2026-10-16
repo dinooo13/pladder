@@ -61,36 +61,33 @@ private final class FakeMuteControl: OutputMuteControl, @unchecked Sendable {
     }
 }
 
-// Short enough to keep the tests fast, long enough that a "before the delay" call
-// really lands before it.
+// Short, so the tests that let it pass in real time stay fast.
 private let testDelay = Duration.milliseconds(10)
 
 private func makeController(
     _ control: FakeMuteControl,
     delay: Duration = testDelay,
+    clock: any Clock<Duration> = ContinuousClock(),
     log: @escaping @Sendable (String) -> Void = { _ in }
 ) -> OutputMuteController {
-    OutputMuteController(control: control, delay: delay, log: log)
+    OutputMuteController(control: control, delay: delay, clock: clock, log: log)
 }
 
 private func waitForGeneration(_ muter: OutputMuteController, _ target: Int) async {
     while await muter.armedGeneration < target { await Task.yield() }
 }
 
-private func pastTheDelay() async {
-    try? await Task.sleep(for: testDelay * 4)
-}
-
 @Suite(.timeLimit(.minutes(1))) struct OutputMuteControllerTests {
     @Test func tapAndReleaseBeforeTheDelayNeverMutes() async {
         let control = FakeMuteControl()
-        let muter = makeController(control)
+        let clock = ManualClock()
+        let muter = makeController(control, clock: clock)
 
         let started = Task { await muter.recordingStarted(session: 1) }
-        await waitForGeneration(muter, 1)
+        #expect(await clock.waitForSleeper(at: testDelay))
         await muter.recordingEnded(session: 1)
+        clock.advance(by: testDelay)
         await started.value
-        await pastTheDelay()
 
         #expect(control.setCalls.isEmpty)
         #expect(control.state(of: 1) == false)
@@ -186,16 +183,17 @@ private func pastTheDelay() async {
 
     @Test func aRestartInsideTheDelayStillEndsUpMuted() async {
         let control = FakeMuteControl()
-        let muter = makeController(control)
+        let clock = ManualClock()
+        let muter = makeController(control, clock: clock)
 
         let first = Task { await muter.recordingStarted(session: 1) }
-        await waitForGeneration(muter, 1)
+        #expect(await clock.waitForSleepers(1))
         await muter.recordingEnded(session: 1)
         let second = Task { await muter.recordingStarted(session: 2) }
-        await waitForGeneration(muter, 3)
+        #expect(await clock.waitForSleepers(2))
+        clock.advance(by: testDelay)
         await first.value
         await second.value
-        await pastTheDelay()
 
         #expect(control.state(of: 1) == true)
         #expect(control.setCalls == [.mute(1)])

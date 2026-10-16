@@ -5,6 +5,7 @@ import Foundation
 public actor OutputMuteController: OutputMuter {
     private let control: any OutputMuteControl
     private let delay: Duration
+    private let clock: any Clock<Duration>
     private let log: @Sendable (String) -> Void
 
     // A pending arm that wakes to find this changed belongs to a session already over.
@@ -15,10 +16,12 @@ public actor OutputMuteController: OutputMuter {
     public init(
         control: any OutputMuteControl,
         delay: Duration = .milliseconds(200),
+        clock: any Clock<Duration> = ContinuousClock(),
         log: @escaping @Sendable (String) -> Void = { _ in }
     ) {
         self.control = control
         self.delay = delay
+        self.clock = clock
         self.log = log
     }
 
@@ -29,7 +32,7 @@ public actor OutputMuteController: OutputMuter {
         latestSession = session
         generation += 1
         let mine = generation
-        try? await Task.sleep(for: delay)
+        try? await clock.sleep(for: delay)
         guard generation == mine else { return }
         guard restore == nil else {
             // An earlier session muted it and its end has not come; this session's end restores it.

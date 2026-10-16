@@ -39,7 +39,7 @@ public actor S1MiniPolisher: ReportingRefiner {
     private var loading: Task<(any PromptCompleter)?, Never>?
     // llama.cpp ignores cancellation, so a load `unload()` gave up on still reads weights;
     // the next load waits for it rather than holding two models at once.
-    private var abandoned: Task<(any PromptCompleter)?, Never>?
+    private(set) var abandoned: Task<(any PromptCompleter)?, Never>?
     // Bumped by `unload()`, so a load it interrupted cannot store its model.
     private var generation = 0
     private static let log = Logger(subsystem: "de.dinooo13.pladder", category: "polish")
