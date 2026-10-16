@@ -61,3 +61,24 @@ public func scratchDirectory(_ name: String) throws -> URL {
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     return dir
 }
+
+// Polls in real time: the fakes' counters are not observable.
+@MainActor
+public func waitUntil(_ timeout: Duration = .seconds(2), _ condition: @MainActor () -> Bool) async -> Bool {
+    let deadline = ContinuousClock.now + timeout
+    while ContinuousClock.now < deadline {
+        if condition() { return true }
+        try? await Task.sleep(for: .milliseconds(10))
+    }
+    return condition()
+}
+
+// Polls in real time, a millisecond at a time for up to about two seconds, for what a
+// detached task does on its own schedule.
+public func eventually(_ condition: @Sendable () async -> Bool) async -> Bool {
+    for _ in 0..<2_000 {
+        if await condition() { return true }
+        try? await Task.sleep(for: .milliseconds(1))
+    }
+    return await condition()
+}
