@@ -389,26 +389,6 @@ func makeStreamingCoordinator(
     return (coordinator, output, capture, engine)
 }
 
-@MainActor
-func waitUntil(_ timeout: Duration = .seconds(2), _ condition: @MainActor () -> Bool) async -> Bool {
-    let deadline = ContinuousClock.now + timeout
-    while ContinuousClock.now < deadline {
-        if condition() { return true }
-        try? await Task.sleep(for: .milliseconds(10))
-    }
-    return condition()
-}
-
-// A dropped recording is idle at once; its microphone stops on a task after.
-func eventually(_ timeout: Duration = .seconds(2), _ condition: () async -> Bool) async -> Bool {
-    let deadline = ContinuousClock.now + timeout
-    while ContinuousClock.now < deadline {
-        if await condition() { return true }
-        try? await Task.sleep(for: .milliseconds(10))
-    }
-    return await condition()
-}
-
 extension DictationCoordinator {
     func startIdle(sourceLocation: SourceLocation = #_sourceLocation) async {
         start()
@@ -1342,7 +1322,7 @@ final class EventLog: @unchecked Sendable {
         await c.press(hotkey)
         hotkey.release()
         #expect(await waitUntil { c.isLatched })
-        #expect(await waitUntil { clock.sleeperCount >= 2 })
+        #expect(await clock.waitForSleepers(2))
         clock.advance(by: c.maximumDuration)
         await c.cycleFinished()
         #expect(output.inserted.count == 1)
@@ -1479,7 +1459,7 @@ final class EventLog: @unchecked Sendable {
         #expect(await waitUntil { c.state == .idle })
         #expect(hotkey.cancelKeyEnabled == [true, false, true, false])
         await c.hotkeyPressed()
-        #expect(await waitUntil { clock.sleeperCount >= 2 })
+        #expect(await clock.waitForSleepers(2))
         clock.advance(by: c.maximumDuration)
         #expect(await waitUntil { !c.state.isRecording })
         await c.inFlight?.value

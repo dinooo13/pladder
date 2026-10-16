@@ -290,7 +290,7 @@ import Testing
         let (c, output, _) = makeCoordinator(clock: clock)
         await c.startIdle()
         await c.hotkeyPressed()
-        #expect(await waitUntil { clock.sleeperCount >= 2 })
+        #expect(await clock.waitForSleepers(2))
         clock.advance(by: c.maximumDuration - .seconds(1))
         #expect(c.state.isRecording)
         clock.advance(by: .seconds(1))
@@ -354,7 +354,7 @@ import Testing
         await c.hotkeyPressed()
         #expect(await waitUntil { warmPasses() == 1 })
         for expected in 2...4 {
-            #expect(await waitUntil { clock.sleeperCount >= 2 })
+            #expect(await clock.waitForSleepers(2))
             clock.advance(by: c.warmupInterval)
             #expect(await waitUntil { warmPasses() == expected })
         }

@@ -10,11 +10,31 @@ public final class ManualClock: Clock, Sendable {
         let continuation: CheckedContinuation<Void, any Error>
     }
 
+    private struct Watcher {
+        let id: Int
+        let isMet: @Sendable ([Instant]) -> Bool
+        let continuation: CheckedContinuation<Bool, Never>
+    }
+
     private struct State {
         var now: Instant
         var nextID = 0
         var sleepers: [Sleeper] = []
         var cancelled: Set<Int> = []
+        var watchers: [Watcher] = []
+        var expired: Set<Int> = []
+
+        mutating func takeID() -> Int {
+            defer { nextID += 1 }
+            return nextID
+        }
+
+        mutating func takeMetWatchers() -> [Watcher] {
+            let deadlines = sleepers.map(\.deadline)
+            let met = watchers.filter { $0.isMet(deadlines) }
+            watchers.removeAll { watcher in met.contains { $0.id == watcher.id } }
+            return met
+        }
     }
 
     private let state: Mutex<State>
@@ -47,18 +67,16 @@ public final class ManualClock: Clock, Sendable {
     }
 
     public func sleep(until deadline: Instant, tolerance: Duration? = nil) async throws {
-        let id = state.withLock { state -> Int in
-            defer { state.nextID += 1 }
-            return state.nextID
-        }
+        let id = state.withLock { $0.takeID() }
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
-                let early = state.withLock { state -> Result<Void, any Error>? in
-                    if state.cancelled.remove(id) != nil || Task.isCancelled { return .failure(CancellationError()) }
-                    if deadline <= state.now { return .success(()) }
+                let (early, met) = state.withLock { state -> (Result<Void, any Error>?, [Watcher]) in
+                    if state.cancelled.remove(id) != nil || Task.isCancelled { return (.failure(CancellationError()), []) }
+                    if deadline <= state.now { return (.success(()), []) }
                     state.sleepers.append(Sleeper(id: id, deadline: deadline, continuation: continuation))
-                    return nil
+                    return (nil, state.takeMetWatchers())
                 }
+                for watcher in met { watcher.continuation.resume(returning: true) }
                 if let early { continuation.resume(with: early) }
             }
         } onCancel: {
@@ -73,19 +91,42 @@ public final class ManualClock: Clock, Sendable {
         }
     }
 
-    // Waits in real time, but briefly, until a detached task has reached its sleep.
     public func waitForSleeper(at offset: Duration) async -> Bool {
         let deadline = start + offset
-        return await eventually { self.deadlines.contains(deadline) }
+        return await waitFor { $0.contains(deadline) }
     }
-}
 
-// Polls in real time, a millisecond at a time for up to about two seconds, for what a
-// detached task does on its own schedule.
-public func eventually(_ condition: @Sendable () async -> Bool) async -> Bool {
-    for _ in 0..<2_000 {
-        if await condition() { return true }
-        try? await Task.sleep(for: .milliseconds(1))
+    public func waitForSleepers(_ count: Int) async -> Bool {
+        await waitFor { $0.count >= count }
     }
-    return await condition()
+
+    private func waitFor(_ isMet: @escaping @Sendable ([Instant]) -> Bool) async -> Bool {
+        let id = state.withLock { $0.takeID() }
+        // Ends the wait after two seconds, as a `Gate` does, so a regression fails rather than hangs.
+        let timeout = Task {
+            guard (try? await Task.sleep(for: .seconds(2))) != nil else { return }
+            self.expire(id)
+        }
+        defer { timeout.cancel() }
+        return await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+            let early = state.withLock { state -> Bool? in
+                if state.expired.remove(id) != nil { return false }
+                if isMet(state.sleepers.map(\.deadline)) { return true }
+                state.watchers.append(Watcher(id: id, isMet: isMet, continuation: continuation))
+                return nil
+            }
+            if let early { continuation.resume(returning: early) }
+        }
+    }
+
+    private func expire(_ id: Int) {
+        let watcher = state.withLock { state -> Watcher? in
+            if let index = state.watchers.firstIndex(where: { $0.id == id }) {
+                return state.watchers.remove(at: index)
+            }
+            state.expired.insert(id)
+            return nil
+        }
+        watcher?.continuation.resume(returning: false)
+    }
 }
