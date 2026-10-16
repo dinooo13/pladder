@@ -51,8 +51,10 @@ final class FakeOutput: TextOutput, @unchecked Sendable {
     private var _submitted: [Bool] = []
     private var _prepareCount = 0
     private var _flushCount = 0
+    private var _copied: [String] = []
     var inserted: [String] { lock.withLock { _inserted } }
     var flushCount: Int { lock.withLock { _flushCount } }
+    var copied: [String] { lock.withLock { _copied } }
     var submitted: [Bool] { lock.withLock { _submitted } }
     var prepareCount: Int { lock.withLock { _prepareCount } }
     var shouldFail = false
@@ -75,6 +77,10 @@ final class FakeOutput: TextOutput, @unchecked Sendable {
 
     func flush() async {
         lock.withLock { _flushCount += 1 }
+    }
+
+    func copy(_ text: String) async {
+        lock.withLock { _copied.append(text) }
     }
 }
 
@@ -509,6 +515,24 @@ final class EventLog: @unchecked Sendable {
         await c.dictate()
         #expect(c.state == .error(.pasteKeystroke))
         #expect(c.lastTranscript?.text == "Hello, World!")
+    }
+
+    @Test func copyingTheLastTranscriptGoesThroughTheOutput() async {
+        var settings = DictationSettings(engineID: EchoEngine.engineID)
+        settings.dictionary = [DictionaryEntry(from: "hello world", to: "Hello, World!")]
+        let (c, output, _) = makeCoordinator(settings: settings)
+        await c.startIdle()
+        await c.dictate()
+        await c.copyLastTranscript()
+        #expect(output.copied == ["Hello, World!"])
+        #expect(output.inserted == ["Hello, World! "])
+    }
+
+    @Test func copyingWithNoLastTranscriptDoesNothing() async {
+        let (c, output, _) = makeCoordinator()
+        await c.startIdle()
+        await c.copyLastTranscript()
+        #expect(output.copied.isEmpty)
     }
 
     @Test func noTrailingSpaceWhenDisabled() async {
