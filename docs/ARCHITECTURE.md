@@ -183,9 +183,11 @@ turns on `deferReleases`; from then on a stopping release comes back as a
 inside the window makes the chord held again, so the timer's token then
 matches nothing and its firing is ignored.
 
-**Tap and Carbon.** `HotkeySource.choose` picks the monitor; `HotkeyRouter`
-keeps both alive and swaps them as the Accessibility grant and Secure Event
-Input change.
+**Tap and Carbon.** `HotkeySource.choose` is the rule for one reading;
+`HotkeyRouting`, a value in Core, applies it as the Accessibility grant,
+Secure Event Input and the chord change, and says what the coordinator must
+be handed. `HotkeyRouter` in the app keeps both monitors alive and passes
+each change on.
 
 - `GlobalHotkeyMonitor` is an active `CGEvent` tap on its own run-loop
   thread. It matches any chord, swallows keys, and supports the send key and
@@ -206,7 +208,7 @@ Input change.
 
 Without Accessibility a stored chord Carbon cannot register is stood in for
 by Option+Space (`DictationCoordinator.standInHotkey`); the stored chord is
-never rewritten. A chord change runs `HotkeySource.choose` again at once,
+never rewritten. A chord change (`HotkeyRouting.hotkeyChanged`) chooses again at once,
 with the last Secure Event Input reading, and hands the coordinator the new
 chord, its stand-in and, when it changed, the other monitor together
 (`update(_:standInHotkey:monitor:)`), in one restart. Left to the next
@@ -215,8 +217,10 @@ under Secure Event Input would sit on Carbon, which cannot register it, for
 up to two seconds. `settings` and `standInHotkey` both go through `update`,
 which works out once whether the monitor restarts. A permission flip, or a
 sustained Secure Event Input, swaps the monitor the same way:
-`HotkeyRouter.update` hands the coordinator the new monitor and the stand-in
-it needs in one `update`. Set one after the other, the new monitor would
+`HotkeyRouting.observe` returns one `Change` with the new source and the
+stand-in it needs, and `HotkeyRouter.update` hands both to the coordinator
+in one `update`. The first observation returns a `Change` without a flip, so
+the stand-in is applied at launch; a poll with nothing new returns none. Set one after the other, the new monitor would
 first be started with the old stand-in, and Carbon would be handed a stored
 modifier-only chord it refuses, with the recording dropped twice.
 
@@ -437,7 +441,8 @@ settings store, the coordinator and the parts around it, owns the settings,
 and turns the coordinator's events into sounds, log lines and learning. The
 parts split off it:
 
-- `HotkeyRouter` picks the tap or Carbon and applies the stand-in chord.
+- `HotkeyRouter` holds both monitors and applies what `HotkeyRouting`
+  decides: the tap or Carbon, and the stand-in chord.
 - `PermissionMonitor` polls Accessibility, the microphone and Secure Event
   Input every two seconds for the app's life.
 - `PolishModelController` owns the polish model, its download and its memory.

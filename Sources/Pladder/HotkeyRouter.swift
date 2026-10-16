@@ -3,77 +3,62 @@ import Observation
 import PladderCore
 import PladderSystem
 
-// Both monitors live for the app's life, so switching costs nothing. The rule is
-// `HotkeySource.choose`; see docs/ARCHITECTURE.md, "Hotkeys".
+// Both monitors live for the app's life, so switching costs nothing. The decision is
+// `HotkeyRouting`; see docs/ARCHITECTURE.md, "Hotkeys".
 @MainActor
 @Observable
 final class HotkeyRouter {
-    private(set) var usesTap: Bool
-    private(set) var accessibilityTrusted: Bool
+    // Written only when it changed, so a poll with nothing new invalidates no view.
+    private var routing: HotkeyRouting
     // `CopySymbolicHotKeys` is main-thread work linear in the shortcut count: read at launch,
     // a permission flip and settings opening, never on a key press.
     private(set) var systemShortcuts: Set<Hotkey> = []
-    private(set) var hotkey: Hotkey
 
     @ObservationIgnored private let tap = GlobalHotkeyMonitor()
     @ObservationIgnored private let carbon = CarbonHotkeyMonitor()
-    @ObservationIgnored private var secureInput = SustainedCondition()
-    @ObservationIgnored private var secureInputSustained = false
     @ObservationIgnored private weak var coordinator: DictationCoordinator?
-    // So the first `update` applies the stand-in even though nothing flipped.
-    @ObservationIgnored private var didApplyStandIn = false
 
     init(accessibilityTrusted: Bool, hotkey: Hotkey) {
-        self.accessibilityTrusted = accessibilityTrusted
-        self.hotkey = hotkey
-        usesTap = accessibilityTrusted
+        routing = HotkeyRouting(accessibilityTrusted: accessibilityTrusted, hotkey: hotkey)
     }
 
-    var initialMonitor: any HotkeyMonitor { usesTap ? tap : carbon }
+    var initialMonitor: any HotkeyMonitor { monitor(for: routing.source) }
 
     func attach(_ coordinator: DictationCoordinator) {
         self.coordinator = coordinator
     }
 
-    func update(accessibilityTrusted trusted: Bool, secureInputEnabled: Bool) {
-        if trusted != accessibilityTrusted { accessibilityTrusted = trusted }
-        secureInputSustained = secureInput.observe(secureInputEnabled)
-        let flipped = chooseMonitor()
-        guard flipped != nil || !didApplyStandIn else { return }
-        didApplyStandIn = true
-        // One update: the new monitor started first with the old stand-in
-        // would have Carbon refuse a modifier-only chord.
+    func update(accessibilityTrusted: Bool, secureInputEnabled: Bool) {
+        var next = routing
+        let change = next.observe(accessibilityTrusted: accessibilityTrusted, secureInputEnabled: secureInputEnabled)
+        if next != routing { routing = next }
+        guard let change else { return }
         if let coordinator {
-            coordinator.update(coordinator.settings, standInHotkey: standInHotkey, monitor: flipped)
+            coordinator.update(
+                coordinator.settings, standInHotkey: change.standInHotkey, monitor: change.source.map(monitor(for:)))
         }
         refreshSystemShortcuts()
     }
 
     func hotkeyChanged(to hotkey: Hotkey) -> (any HotkeyMonitor)? {
-        guard hotkey != self.hotkey else { return nil }
-        self.hotkey = hotkey
-        return chooseMonitor()
+        guard hotkey != routing.hotkey else { return nil }
+        return routing.hotkeyChanged(to: hotkey).map(monitor(for:))
     }
 
-    private func chooseMonitor() -> (any HotkeyMonitor)? {
-        let wantsTap = HotkeySource.choose(
-            accessibilityTrusted: accessibilityTrusted, secureInputSustained: secureInputSustained,
-            hotkey: hotkey) == .tap
-        guard wantsTap != usesTap else { return nil }
-        usesTap = wantsTap
-        return wantsTap ? tap : carbon
+    private func monitor(for source: HotkeySource) -> any HotkeyMonitor {
+        switch source {
+        case .tap: tap
+        case .carbon: carbon
+        }
     }
 
-    var standInHotkey: Hotkey? {
-        accessibilityTrusted ? nil : hotkey.standInWithoutAccessibility
-    }
-
-    var usesCarbonForSecureInput: Bool { accessibilityTrusted && !usesTap }
-    var hotkeyNeedsRegularKey: Bool { !accessibilityTrusted }
+    var standInHotkey: Hotkey? { routing.standInHotkey }
+    var usesCarbonForSecureInput: Bool { routing.accessibilityTrusted && routing.source == .carbon }
+    var hotkeyNeedsRegularKey: Bool { !routing.accessibilityTrusted }
 
     // Named as the matching monitor sees it: the tap tells Left from Right, Carbon cannot.
     func displayName(of chord: Hotkey) -> String {
-        usesTap ? chord.displayName : chord.sideAgnosticDisplayName
+        routing.source == .tap ? chord.displayName : chord.sideAgnosticDisplayName
     }
 
     func refreshSystemShortcuts() {
