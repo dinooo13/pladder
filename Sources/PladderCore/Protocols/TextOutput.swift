@@ -23,6 +23,9 @@ public protocol TextOutput: Sendable {
     // Does now what would otherwise wait on a timer, the clipboard restore: called
     // when the app quits and a detached timer would die with it.
     func flush() async
+
+    // Leaves the text on the clipboard, nothing pasted and nothing restored over it.
+    func copy(_ text: String) async
 }
 
 extension TextOutput {

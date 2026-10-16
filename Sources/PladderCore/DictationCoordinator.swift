@@ -203,6 +203,11 @@ public final class DictationCoordinator {
         loader.load()
     }
 
+    public func copyLastTranscript() async {
+        guard let text = lastTranscript?.text else { return }
+        await output.copy(text)
+    }
+
     private func setEngineStatus(_ status: EngineStatus) {
         engineStatus = status
         if status.isReady {

@@ -25,7 +25,6 @@ final class AppModel {
 
     @ObservationIgnored private let store: SettingsStore
     @ObservationIgnored private let overlay: OverlayController
-    @ObservationIgnored private let output: PasteboardOutput
     @ObservationIgnored private let events = MainActorRelay<(DictationCoordinator.Event, ContinuousClock.Instant)>()
     @ObservationIgnored private var releaseInstant: ContinuousClock.Instant?
     private static let timingLog = Logger(subsystem: "de.dinooo13.pladder", category: "timing")
@@ -85,14 +84,12 @@ final class AppModel {
         let polish = PolishModelController()
         self.polish = polish
 
-        let output = PasteboardOutput()
-        self.output = output
         let events = self.events
         let coordinator = DictationCoordinator(
             settings: DictationSettings(initial),
             registry: registry,
             capture: AVAudioEngineCapture(),
-            output: output,
+            output: PasteboardOutput(),
             outputMuter: OutputMuteController(
                 control: CoreAudioOutputMute(),
                 log: { Self.muteLog.info("\($0, privacy: .public)") }),
@@ -259,8 +256,7 @@ final class AppModel {
     }
 
     func copyLastTranscript() {
-        guard let text = coordinator.lastTranscript?.text else { return }
-        Task { await output.copy(text) }
+        Task { await coordinator.copyLastTranscript() }
     }
 
     var canRetryEngine: Bool {
