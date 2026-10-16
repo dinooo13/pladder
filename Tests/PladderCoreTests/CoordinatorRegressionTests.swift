@@ -53,12 +53,16 @@ import Testing
     @Test func aPressRightAfterACancelKeepsItsUtterance() async {
         let engine = FakeStreamingEngine()
         let (c, output, capture, _) = await makeStreamingCoordinator(style: .compact, engine: engine)
-        await capture.setStopDelay(.milliseconds(150))
+        let stopGate = Gate()
+        await capture.setStopGate(stopGate)
         await c.startIdle()
         await c.hotkeyPressed()
         let cancel = Task { await c.cancelRecording() }
         #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
+        let press = Task { await c.hotkeyPressed() }
+        #expect(await waitUntil { c.state.isRecording })
+        await stopGate.open()
+        await press.value
         #expect(c.state.isRecording)
         await cancel.value
         c.hotkeyReleased()
@@ -92,7 +96,8 @@ import Testing
 
     @Test func aPressCancelledWhileItWaitsLeavesTheMicrophoneAlone() async {
         let (c, _, capture) = makeCoordinator()
-        await capture.setStopDelay(.milliseconds(150))
+        let stopGate = Gate()
+        await capture.setStopGate(stopGate)
         await c.startIdle()
         await c.hotkeyPressed()
         let cancel = Task { await c.cancelRecording() }
@@ -103,6 +108,7 @@ import Testing
         #expect(await waitUntil { c.state == .idle })
         let press = Task { await c.hotkeyPressed() }
         #expect(await waitUntil { c.state.isRecording })
+        await stopGate.open()
         _ = await (cancel.value, cancelledPress.value, cancelPress.value, press.value)
         #expect(c.state.isRecording)
         #expect(await capture.startCount == 2)
