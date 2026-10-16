@@ -99,24 +99,11 @@ public final class DictationCoordinator {
     private var pendingUnloads: [any TranscriptionEngine] = []
     private var cycleEngine: (any TranscriptionEngine)?
 
-    // Cancelling cannot abort a CoreML call already started, so a release landing in
-    // a warm pass waits for it; the log shows that as `engine` above `engine-time`.
-    private var warmupTask: Task<Void, Never>?
-    private var stream: Stream?
-
-    private struct Stream {
-        let engine: any StreamingTranscriptionEngine
-        let utterance: Utterance
-        let feed: Task<Int, Never>
-    }
+    private var engineSession: RecordingEngineSession?
 
     private var recordingID = 0
     private var cancelCleanup: Task<Void, Never>?
     private var muteRestoreTask: Task<Void, Never>?
-
-    // Every utterance is padded to the model's full window, so half a second of
-    // silence costs the same encoder pass as a real call.
-    private static let warmupSamples = [Float](repeating: 0, count: 8_000)
 
     @ObservationIgnored private(set) var handledHotkeyEvents = 0
 
@@ -387,8 +374,16 @@ public final class DictationCoordinator {
         onEvent(.recordingStarted)
         armOutputMute()
         startKeyDownWork()
-        await startEngineWork(live: live, recordingID: mine)
-        guard isCurrent(mine) else { return }
+        if let engine = cycleEngine {
+            let session = RecordingEngineSession(
+                engine: engine, capture: capture, clock: clock,
+                intervals: .init(feed: feedInterval, livePass: livePassInterval, warmup: warmupInterval),
+                live: live, onPartial: { [weak self] in self?.partialTranscript = $0 })
+            engineSession = session
+            await session.begin()
+            guard isCurrent(mine) else { return }
+            session.startLoops()
+        }
         levelTask = Task { [weak self] in
             for await level in levels {
                 guard let self, self.state.isRecording else { return }
@@ -416,62 +411,6 @@ public final class DictationCoordinator {
         state.isRecording && recordingID == id
     }
 
-    // A streaming engine that cannot begin an utterance is used like a batch engine:
-    // transcribed whole at release, slower but not lost.
-    private func startEngineWork(live: Bool, recordingID id: Int) async {
-        if let streaming = cycleEngine as? (any StreamingTranscriptionEngine),
-           let utterance = try? await streaming.beginUtterance() {
-            guard isCurrent(id) else {
-                await streaming.abandonUtterance(utterance)
-                return
-            }
-            startStreamingFeed(streaming, utterance: utterance, live: live)
-            // The live loop's pass is the warm pass; a second loop would only compete with it.
-            if !live { startWarmupLoop { await streaming.warmPass() } }
-        } else if let engine = cycleEngine {
-            startWarmupLoop { [warmupSamples = Self.warmupSamples] in
-                _ = try? await engine.transcribe(warmupSamples)
-            }
-        }
-    }
-
-    // One loop for feed and live passes, so they never drain against each other. At
-    // release the loop is cancelled and awaited: a chunk drained just before is still
-    // fed, so every sample reaches the engine once and in order.
-    private func startStreamingFeed(_ engine: any StreamingTranscriptionEngine, utterance: Utterance, live: Bool) {
-        let feed = Task { [weak self, clock, feedInterval, livePassInterval] in
-            var fed = 0
-            while !Task.isCancelled {
-                if !live { try? await clock.sleep(for: feedInterval) }
-                guard let self, !Task.isCancelled, self.state.isRecording else { return fed }
-                let chunk = await self.capture.drain()
-                if !chunk.isEmpty {
-                    fed += chunk.count
-                    await engine.feed(chunk, to: utterance)
-                }
-                guard live, !Task.isCancelled else { continue }
-                let text = await engine.livePass(utterance)
-                // A pass finishing after the release would put stale text back on screen.
-                guard !Task.isCancelled, self.state.isRecording else { return fed }
-                self.partialTranscript = text
-                try? await clock.sleep(for: livePassInterval)
-            }
-            return fed
-        }
-        stream = Stream(engine: engine, utterance: utterance, feed: feed)
-    }
-
-    private func startWarmupLoop(_ warm: @escaping @Sendable () async -> Void) {
-        warmupTask?.cancel()
-        warmupTask = Task.detached(priority: .utility) { [clock, interval = warmupInterval] in
-            while !Task.isCancelled {
-                await warm()
-                if Task.isCancelled { return }
-                try? await clock.sleep(for: interval)
-            }
-        }
-    }
-
     private func armOutputMute() {
         guard settings.muteOutputWhileDictating, let outputMuter else { return }
         let session = recordingID
@@ -493,7 +432,7 @@ public final class DictationCoordinator {
     // Synchronous, and every call only flips a flag, cancels a task or spawns one,
     // so on the release path this costs nothing before `recordingStopped`.
     @discardableResult
-    private func endRecording() -> Stream? {
+    private func endRecording() -> RecordingEngineSession.Ending? {
         settleTask?.cancel()
         settleTask = nil
         gesture.reset()
@@ -504,20 +443,17 @@ public final class DictationCoordinator {
         inputLevel = 0
         maxDurationTask?.cancel()
         maxDurationTask = nil
-        let ended = stream
-        ended?.feed.cancel()
-        stream = nil
         // Before the state flip, so no further pass is queued ahead of the real call.
-        warmupTask?.cancel()
-        warmupTask = nil
+        let ending = engineSession?.end()
+        engineSession = nil
         partialTranscript = nil
         restoreOutputDevice()
-        return ended
+        return ending
     }
 
     public func hotkeyReleased(submit: Bool = false) {
         guard state.isRecording else { return }
-        let stream = endRecording()
+        let ending = endRecording()
         state = .transcribing
         // Snapshots anything copied while speaking now, beside the engine pass, not in
         // the paste.
@@ -534,19 +470,14 @@ public final class DictationCoordinator {
             // The feed loop finishes handing over a chunk drained before the release. What
             // it waits for is engine work `endUtterance` would wait for anyway: engine time.
             let handover = ContinuousClock.now
-            let fed = await stream?.feed.value
+            let fed = await ending?.feed?.value
             let stopped = ContinuousClock.now
             let feedWait = stopped - handover
             let audio = await self.capture.stop()
             let captureStop = ContinuousClock.now - stopped
-            let source: DictationFinish.Source = if let stream {
-                .utterance(stream.engine, stream.utterance)
-            } else {
-                .whole(engine)
-            }
             let outcome = await finish.run(
                 DictationFinish.Input(
-                    audio: audio, fedSamples: fed ?? 0, source: source, submit: submit,
+                    audio: audio, fedSamples: fed ?? 0, source: ending?.source ?? .whole(engine), submit: submit,
                     captureStop: captureStop, feedWait: feedWait),
                 onStage: { self.enter($0) })
             self.finished(outcome)
@@ -594,19 +525,15 @@ public final class DictationCoordinator {
     // Synchronous, so the state is idle on return; the task stops the microphone.
     private func beginCancel() -> Task<Void, Never>? {
         guard state.isRecording else { return nil }
-        let stream = endRecording()
+        let ending = endRecording()
         willPolish = false
         becomeIdle()
         cycleEngine = nil
-        // The mic goes off first; the engine drops the utterance only once the feed has
-        // exited, so no chunk lands after it. Then it waits for the cancel before it.
+        // The mic goes off first, then the utterance; then it waits for the cancel before it.
         let previous = cancelCleanup
         let cleanup = Task { [capture] in
             _ = await capture.stop()
-            if let stream {
-                _ = await stream.feed.value
-                await stream.engine.abandonUtterance(stream.utterance)
-            }
+            await ending?.abandon()
             await previous?.value
         }
         cancelCleanup = cleanup
