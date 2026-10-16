@@ -16,6 +16,8 @@ final class PermissionMonitor {
 
     @ObservationIgnored private var pollTask: Task<Void, Never>?
 
+    private static let pollInterval: Duration = .seconds(2)
+
     var needsAccessibility: Bool { !accessibilityTrusted }
     var needsMicrophone: Bool { microphoneStatus != .authorized }
     var needsAnyPermission: Bool { needsAccessibility || needsMicrophone }
@@ -64,7 +66,7 @@ final class PermissionMonitor {
         pollTask?.cancel()
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(2))
+                try? await Task.sleep(for: Self.pollInterval)
                 guard let self else { return }
                 self.refresh()
             }
