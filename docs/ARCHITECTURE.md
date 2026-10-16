@@ -42,9 +42,10 @@ its timers with `ManualClock`.
    running, and starts the capture;
 4. arms the output mute and starts the key-down work: the clipboard snapshot
    and the polish model's load;
-5. starts the engine work. A streaming engine begins an utterance and gets a
-   feed loop. In the other styles the loop wakes every second and hands the
-   engine the audio captured since. With the Live Transcript style it skips
+5. starts the engine work, a `RecordingEngineSession` on the coordinator's
+   clock. A streaming engine begins an utterance and gets a feed loop. In
+   the other styles the loop wakes every second and hands the engine the
+   audio captured since. With the Live Transcript style it skips
    that second: each turn hands over what has been captured, asks for the
    text so far, publishes it as `partialTranscript` and then waits half a
    second, so audio goes in on the live-pass cadence. Outside Live
@@ -53,7 +54,10 @@ its timers with `ManualClock`.
    Neural Engine from going cold; in Live Transcript the live passes keep it
    warm instead. A batch engine, or a streaming one that could not begin,
    gets the warm loop in every style, and nothing else, and is transcribed
-   whole at release;
+   whole at release. A session ended while its utterance was still beginning
+   drops that utterance itself and starts no loop. At release or cancel the
+   session hands the coordinator what it ended with: the utterance or the
+   whole buffer to transcribe, and the feed loop to wait for;
 6. starts the level meter and the 10 minute cap.
 
 **Release** (`hotkeyReleased`). `endRecording()` stops everything the press
