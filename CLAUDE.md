@@ -28,6 +28,7 @@ swift run -c release pladder-cli <audio file> [--process] [--verbose] # transcri
 ./scripts/make-fixtures.sh                    # synthesise benchmark fixtures into bench/fixtures (gitignored)
 swift run -c release pladder-cli bench bench/fixtures            # whole-buffer benchmark
 swift run -c release pladder-cli bench bench/fixtures --paced     # feed at real time, time endUtterance, check identity
+swift run -c release pladder-cli bench-coordinator [--polish] [--live]   # the coordinator's own share of release-to-paste, stand-ins of fixed latency
 swift run -c release pladder-cli polish <text file> [--model apple|s1-mini|s1-mini-8bit]   # one transcript, cold and warm
 swift run -c release pladder-cli polish-set docs/polish-set.json --model s1-mini-8bit    # a polish model over the test set: error rate, exact matches, timings
 ./scripts/overlay-demo.sh [dir] [--style …] [--speed …]  # play every overlay path with stand-ins, record the screen, cut contact sheets
