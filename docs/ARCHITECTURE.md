@@ -67,14 +67,21 @@ the rest runs in `inFlight`:
    release is still handed over, so every sample reaches the engine once and
    in order. This wait counts as engine time;
 2. stop the capture, which returns only the samples after the last drain;
-3. `finish`: drop a recording under 0.3 s, then `endUtterance` with the tail
-   (or `transcribe` the whole buffer), run the processor pipeline, polish if
-   the cycle asked for it and the text has four words or more, append the
-   trailing space, and `insert`. Words are counted by `String.wordCount` in
-   Core, the count the polishers cut their chunks by. `lastTranscript`, the
-   menu's "Last" line and its copy, is set to the processed text just before
-   `insert`, so a paste that fails leaves that text there, not the engine's;
-   a dictation the processors empty pastes nothing and leaves it as it was.
+3. `DictationFinish.run`: drop a recording under 0.3 s, then `endUtterance`
+   with the tail (or `transcribe` the whole buffer), run the processor
+   pipeline, polish if the cycle asked for it and the text has four words or
+   more, append the trailing space, and `insert`. Words are counted by
+   `String.wordCount` in Core, the count the polishers cut their chunks by.
+   The finish is built at release, so the pipeline, the processors switched
+   off and the trailing space are the ones set then. It owns no state: it
+   reports the polishing and inserting stages as it reaches them, and the
+   coordinator flips its state on each, and it returns an outcome (too short,
+   empty, inserted with its timing, or failed) that the coordinator turns
+   into the event and the state after. `lastTranscript`, the menu's "Last"
+   line and its copy, is set to the processed text at the inserting stage,
+   before `insert`, so a paste that fails leaves that text there, not the
+   engine's; a dictation the processors empty pastes nothing and leaves it as
+   it was.
 
 `inserted` carries the timing of every stage; the app turns it into the
 release-to-paste log line (`TimingLine.swift`).
