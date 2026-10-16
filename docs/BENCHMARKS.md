@@ -123,6 +123,53 @@ without them. Run it beside a plain `--paced` run and compare the
 `endUtterance` medians: the difference is what a release that lands next to a
 live pass costs.
 
+### The coordinator's share
+
+The engine benchmarks time the engine; the app's log line times a whole
+dictation. What sits between them, the coordinator's own work on the
+release-to-paste path (the feed hand-over, `endRecording`, the hops between
+stages on the main actor), has a number of its own here:
+
+```sh
+swift run -c release pladder-cli bench-coordinator [--runs N] [--hold S] [--engine-latency MS] [--paste-latency MS] [--polish] [--live]
+```
+
+It builds the real `DictationCoordinator` with the app's processors on a
+fresh install's settings, and stand-ins for the rest: a streaming engine whose
+`endUtterance`, warm pass and live pass each take `--engine-latency` (150 ms by
+default) and ignore cancellation, as a CoreML pass does; a microphone that
+hands out silence at the real rate; a paste of `--paste-latency` (0); and with
+`--polish` a 300 ms polish model. Each run presses, holds for `--hold` seconds
+(1.5), releases and waits for the paste. It touches no microphone, pasteboard
+or hotkey, so it can run beside a copy of Pladder in use.
+
+Per run, `total` is `inserted` minus `recordingStopped`, as in the app's log
+line. `share` is the total minus the stages the `inserted` event reports
+(stop, engine, process, polish, paste): the time spent between them.
+`engine excess` is the engine stage minus the stand-in's latency: the feed
+hand-over and the actor hops around `endUtterance`, plus the stand-in timer's
+own overshoot, which the header prints. 21 runs by default, the first
+discarded.
+
+Use it before and after a change to the coordinator, beside the paced bench:
+the paced bench says what the engine costs, this what the coordinator adds.
+
+First numbers, Apple M1, 16 GB, macOS 27.0, October 2026, 21 runs each,
+load average about 2:
+
+| Variant | Total (median) | Share (median / p90 / max) | Engine excess (median) |
+|---|---:|---:|---:|
+| default | 153 ms | 0.02 / 0.02 / 0.03 ms | 0.15 ms |
+| `--polish` | 453 ms | 0.04 / 0.04 / 0.04 ms | 0.15 ms |
+| `--live` | 153 ms | 0.02 / 0.07 / 0.09 ms | 0.14 ms |
+
+The stand-in timer overshot by 0.1 ms, so the coordinator's hand-over and
+hops come to a few hundredths of a millisecond, and the rest of the total
+above the stand-ins' latencies is the processors' 2 to 3 ms. Two 51-run
+passes gave medians of 156 and 153 ms total and 0.05 and 0.02 ms share. A
+release that lands in a warm or live pass waits for it, as in the app; at
+the default 1.5 s hold none does.
+
 ## Baseline
 
 Reference machine: Apple M1, 16 GB, macOS 26.6.2 (25G83), FluidAudio 0.15.6,
@@ -140,6 +187,11 @@ after the download, or after a macOS update invalidates the cache, compiles
 the models and takes far longer; that is a one-time cost and not what this
 number tracks. The weights run on the Neural Engine and are held outside the
 process, so the footprint understates total memory use.
+
+During the benchmarking for #70 the M1 logged `ANECCompile() FAILED (11)` on
+the first run of each new build, and both builds measured about 0.45 s slower
+than the table below. A pass that logs it is not comparable; the table wants
+re-running on a quiet day (numbers to follow).
 
 | Fixture | Audio | Engine (median) | Spread | Realtime | WER |
 |---|---:|---:|---:|---:|---:|

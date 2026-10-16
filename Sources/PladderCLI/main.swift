@@ -10,6 +10,7 @@ func usage() -> Never {
            pladder-cli bench <fixtures dir> [--runs N] [--pause S]
            pladder-cli bench <fixtures dir> --paced [--runs N] [--pause S] [--all] [--live]
            pladder-cli bench-process <fixtures dir> [--runs N]
+           pladder-cli bench-coordinator [--runs N] [--hold S] [--engine-latency MS] [--paste-latency MS] [--polish] [--live]
            pladder-cli polish <text file | -> [--model \(PolishModel.cliNames) | --gguf <file>] [--control <line>] [--instructions <file>]
            pladder-cli polish-set <set.json> [--model \(PolishModel.cliNames) | --gguf <file>] [--control <line>]
     """)
@@ -63,6 +64,9 @@ case "bench":
 case "bench-process":
     arguments.removeFirst()
     ProcessorBench.run(arguments: arguments)
+case "bench-coordinator":
+    arguments.removeFirst()
+    await CoordinatorBench.run(arguments: arguments)
 case "polish", "polish-set":
     let command = arguments.removeFirst()
     var options = PolishOptions()
