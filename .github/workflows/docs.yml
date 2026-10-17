@@ -1,0 +1,27 @@
+name: Docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'Sources/**'
+      - 'Tests/**'
+      - 'scripts/check-doc-pointers.sh'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'Sources/**'
+      - 'Tests/**'
+      - 'scripts/check-doc-pointers.sh'
+      - '.github/workflows/docs.yml'
+
+jobs:
+  doc-pointers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Comments point at headings that exist
+        run: ./scripts/check-doc-pointers.sh

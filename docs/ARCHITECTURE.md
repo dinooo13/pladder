@@ -5,6 +5,10 @@ made is in the Decisions table of [CLAUDE.md](../CLAUDE.md#decisions); why the
 release-to-paste path is fast is in [PERFORMANCE.md](PERFORMANCE.md). This
 file is the map: what runs where, in what order, and what each part relies on.
 
+Comments in the code point at its sections by name, and
+`scripts/check-doc-pointers.sh` fails CI when a pointer names a heading
+that does not exist. Rename a section together with its pointers.
+
 ## Modules
 
 | Target | Holds | Frameworks that matter |
@@ -485,3 +489,64 @@ Errors and progress go to stderr, so stdout holds only results.
 Fixtures are audio files with a sibling `.txt` holding the script, made by
 `scripts/make-fixtures.sh`. The procedures are in
 [BENCHMARKS.md](BENCHMARKS.md).
+
+## Where the numbers live
+
+The timings and limits this file and CLAUDE.md quote, and the constant each
+comes from. A change to a constant updates its row here and the prose that
+quotes it. Where an initialiser's default is the constant, the app relies on
+that default.
+
+| Number | What | Constant | File |
+|---|---|---|---|
+| 0.3 s | Shortest recording that is transcribed | `DictationCoordinator.minimumDuration` | `PladderCore/DictationCoordinator.swift` |
+| 4 words | Shortest dictation that is polished | `DictationCoordinator.minimumPolishWords` | `PladderCore/DictationCoordinator.swift` |
+| 10 min | Recording cap | `DictationCoordinator.maximumDuration` | `PladderCore/DictationCoordinator.swift` |
+| 1 s | Feed loop cadence | `DictationCoordinator.feedInterval` | `PladderCore/DictationCoordinator.swift` |
+| 500 ms | Live pass cadence (Live Transcript) | `DictationCoordinator.livePassInterval` | `PladderCore/DictationCoordinator.swift` |
+| 2 s | Warm loop cadence | `DictationCoordinator.warmupInterval` | `PladderCore/DictationCoordinator.swift` |
+| 0.5 s | Length of a warm pass, 8,000 samples at 16 kHz | `DictationCoordinator.warmupSamples` (batch engine), `FluidAudioIncrementalEngine.warmupSamples` (streaming) | `PladderCore/DictationCoordinator.swift`, `PladderEngines/FluidAudioIncrementalEngine.swift` |
+| 2 s | How long an error shows before the state goes idle | `DictationCoordinator.errorDisplayDuration` | `PladderCore/DictationCoordinator.swift` |
+| 3 s | Quit waits this long for `shutdown()` | `AppDelegate.shutdownDeadline` | `Pladder/PladderApp.swift` |
+| 5 s | SIGTERM ends the process after this | `AppDelegate.signalExitDeadline` | `Pladder/PladderApp.swift` |
+| 5 s | Grid a live pass's window is cut on, 80,000 samples | `FluidAudioIncrementalEngine.windowHopSamples` | `PladderEngines/FluidAudioIncrementalEngine.swift` |
+| 250 ms | Engine status poll while loading | `EngineLoader.init(pollInterval:)` | `PladderCore/EngineLoader.swift` |
+| 400 ms | A shorter press of a hybrid key latches | `DictationCoordinator.holdThreshold`, handed to `HotkeyGestureTracker` | `PladderCore/DictationCoordinator.swift` |
+| 50 ms | Bounce window, and the settle after it | `DictationCoordinator.bounceWindow`, handed to `HotkeyGestureTracker` | `PladderCore/DictationCoordinator.swift` |
+| 1 s | Interrupted press window | `HotkeyChordSet.init(interruptionWindow:)`, handed to each `HotkeyChordTracker` | `PladderCore/HotkeyChordSet.swift` |
+| 3 s | Secure Event Input sustained before Carbon takes over | `SustainedCondition.init(threshold:)` | `PladderCore/Support/SustainedCondition.swift` |
+| 2 s | Retry of a tap that could not be installed | `GlobalHotkeyMonitor.retryInterval` | `PladderSystem/GlobalHotkeyMonitor.swift` |
+| 2 s | Permission and Secure Event Input poll | `PermissionMonitor.pollInterval` | `Pladder/PermissionMonitor.swift` |
+| 64 MB | Largest clipboard item the snapshot keeps | `ClipboardSnapshot.maximumItemBytes` | `PladderSystem/ClipboardSnapshot.swift` |
+| 400 ms | Earliest restore after Cmd+V; also when an owed Return goes out if nothing reads | `ClipboardKeeper.restoreFloor` | `PladderSystem/ClipboardKeeper.swift` |
+| 200 ms | Restore after the target app's last read | `ClipboardKeeper.readSettle` | `PladderSystem/ClipboardKeeper.swift` |
+| 8 s | Restore when nothing reads | `ClipboardKeeper.restoreCap` | `PladderSystem/ClipboardKeeper.swift` |
+| 50 ms | Return after the target app reads the paste | `PasteboardOutput.init(submitDelay:)` | `PladderSystem/PasteboardOutput.swift` |
+| 200 ms | Mute lands this long after key-down | `OutputMuteController.init(delay:)` | `PladderCore/Support/OutputMuteController.swift` |
+| 150 ms | The pill appears this long into a recording | `OverlayController.presentDelay` | `Pladder/Overlay/OverlayController.swift` |
+| 0.18 | Custom-word match: edit distance over the longer length must be under this | `CustomWordCorrector.threshold` | `PladderCore/Processors/CustomWordCorrector.swift` |
+| 0.3 | Factor on the score when the Soundex codes agree | `CustomWordCorrector.soundexBonus` | `PladderCore/Processors/CustomWordCorrector.swift` |
+| 4 tokens | Longest run tried as one custom word | `CustomWordCorrector.maxNGram` | `PladderCore/Processors/CustomWordCorrector.swift` |
+| 3 characters | Key or candidate this short must match exactly | `CustomWordCorrector.exactOnlyLength` | `PladderCore/Processors/CustomWordCorrector.swift` |
+| 1 edit, 5 characters | Soundex buys at most one edit on keys this short | `CustomWordCorrector.shortKeySoundexEdits`, `shortKeyLength` | `PladderCore/Processors/CustomWordCorrector.swift` |
+| 8 s | Polish budget | `TranscriptPolisher.init(timeout:)`, `S1MiniPolisher.init(timeout:)` | `PladderRefine/TranscriptPolisher.swift`, `PladderRefine/S1MiniPolisher.swift` |
+| 300 / 250 words | Polish chunk size, Apple's model / S1-mini | `TranscriptPolisher.chunkSize`, `S1MiniPolisher.chunkSize` | `PladderRefine/TranscriptPolisher.swift`, `PladderRefine/S1MiniPolisher.swift` |
+| 600 / 400 words | A dictation longer than this is chunked | `TranscriptPolisher.chunkThreshold`, `S1MiniPolisher.chunkThreshold` | `PladderRefine/TranscriptPolisher.swift`, `PladderRefine/S1MiniPolisher.swift` |
+| 1.5 × chunk size | Forced cut between words | `PolishChunking.hardLimit` | `PladderRefine/PolishChunking.swift` |
+| 16 MB | Checksum read size, and how often a cancel is checked | `ModelFiles.sha256(chunkSize:)` | `PladderRefine/ModelFiles.swift` |
+| 60 s | How long a pasted field is watched | `AXPasteObserver.init(observationWindow:)` | `PladderSystem/AXPasteObserver.swift` |
+| 8 × 125 ms | Retries to find the paste in the field | `AXPasteObserver.init(anchorRetries:anchorRetryInterval:)` | `PladderSystem/AXPasteObserver.swift` |
+| 2 words | Most words on either side of a correction | `CorrectionDiff.maximumWordsPerSide` | `PladderCore/Learning/CorrectionDiff.swift` |
+| 3 spans | More changed spans is a rewrite | `CorrectionDiff.maximumHunks` | `PladderCore/Learning/CorrectionDiff.swift` |
+| half, at least 2 words | More changed words of the paste is a rewrite | `CorrectionDiff.rewriteFraction`, `rewriteAllowance` | `PladderCore/Learning/CorrectionDiff.swift` |
+| 60 % | Share of the window a reading must still hold to be diffed | `CorrectionDiff.anchorCoverage` | `PladderCore/Learning/CorrectionDiff.swift` |
+| 2 edits, 1 up to 3 letters | Phonetic gate: largest edit distance, and for words this short | `PhoneticGate.maximumDistance`, `shortKeyDistance`, `shortKeyLength` | `PladderCore/Learning/PhoneticGate.swift` |
+| 3 | Proposals per paste | `CorrectionLearner.maximumProposalsPerPaste` | `PladderCore/Learning/CorrectionLearner.swift` |
+| 400 characters | Sentence around the correction the reviewer sees | `CorrectionLearner.sentenceLimit` | `PladderCore/Learning/CorrectionLearner.swift` |
+| 10 s | Correction review budget | `FoundationModelsCorrectionReviewer.init(timeout:)` | `PladderRefine/FoundationModelsCorrectionReviewer.swift` |
+
+Some numbers are measurements, not constants, and change only with a new
+measurement: the cold encoder pass costing about 110 ms more than a warm one
+([PERFORMANCE.md](PERFORMANCE.md#what-is-still-slow), 0.114 s on an M1),
+apps reading the pasteboard 0 to 25 ms after Cmd+V, and Universal Clipboard
+reading an unmarked write within about 15 ms.
