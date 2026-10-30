@@ -555,7 +555,7 @@ which the pill renders in an `OverlayPanel` that never takes focus.
 
 A developer tool; the user-facing part is in [INSTALL.md](../INSTALL.md).
 Errors and progress go to stderr, so stdout holds only results. The
-commands that transcribe, the first three below, take `--engine <id>` to run
+commands that transcribe, the first three below and `bench-release`, take `--engine <id>` to run
 an engine other than the catalog's first, for example
 `--engine parakeet-tdt-v3-incremental`; the usage text lists the IDs.
 
@@ -566,6 +566,7 @@ an engine other than the catalog's first, for example
 | `bench <dir> --paced` | Feeds each fixture in one-second chunks at real time and times `endUtterance`; also transcribes it whole and reports whether the texts are identical. Skips fixtures under 13 s unless `--all`. `--live` adds the Live Transcript pass every 0.5 s and reports its cost. |
 | `bench-process <dir>` | Times the processor pipeline on the fixtures' scripts, with a filler in every sentence and with a spoken question mark too. `--runs N`, default 31. |
 | `bench-coordinator` | Drives the real coordinator and processors with stand-ins of fixed latency for the engine, microphone, paste and polish, and reports what release-to-paste costs beyond them. `--runs N` (default 21, first discarded), `--hold S` (1.5), `--engine-latency MS` (150), `--paste-latency MS` (0), `--polish` (a 300 ms stand-in), `--live`. |
+| `bench-release <audio file>` | Drives the real coordinator and engine with the file played in at real time, releases at chosen instants and reports what each release waited for and what was running. `--at S,S,…`, `--uniform FROM-TO:COUNT` (a fixed spread, the same in every build), `--runs N` (3), `--pause S` (3), `--feed-interval MS`. |
 | `polish <text file \| ->` | Runs a polish model over one transcript, cold and then warm. `--model apple\|s1-mini\|s1-mini-8bit`, `--instructions <file>` (Apple), `--gguf <file>` (any S1-mini-family model), `--control <line>` (S1-mini). |
 | `polish-set <set.json>` | Runs a polish model over a test set after the app's processors: every answer, word error rate per language, exact matches, timings. `--model`, `--gguf` and `--control` as for `polish`; no `--instructions`. |
 
