@@ -9,7 +9,7 @@ import Testing
         EngineLoader(
             registry: EngineRegistry([
                 .init(id: EngineID("flaky"), displayName: "Flaky", detail: "") { FlakyEngine(failures: failures) },
-                .init(id: EngineID("echo"), displayName: "Echo", detail: "") { EchoEngine(delay: .milliseconds(5)) },
+                .init(id: EngineID("echo"), displayName: "Echo", detail: "") { EchoEngine(delay: .zero) },
             ]),
             engineID: id)
     }

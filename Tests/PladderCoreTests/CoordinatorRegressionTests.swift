@@ -6,12 +6,16 @@ import Testing
 @MainActor
 @Suite(.timeLimit(.minutes(1))) struct CoordinatorHandOverTests {
     @Test func aChunkInFlightAtTheReleaseReachesTheEngineBeforeTheEnd() async {
-        let engine = FakeStreamingEngine(feedDelay: .milliseconds(150))
+        let feed = Gate()
+        let engine = FakeStreamingEngine(feedGate: feed)
         let (c, output, _, _) = await makeStreamingCoordinator(style: .compact, engine: engine)
         await c.startIdle()
         await c.hotkeyPressed()
         #expect(await waitUntil { engine.isFeeding })
         c.hotkeyReleased()
+        // Negative path: gives an end that wrongly skips the feed time to arrive.
+        try? await Task.sleep(for: .milliseconds(20))
+        await feed.open()
         await c.inFlight?.value
         #expect(output.inserted == ["final"])
         let log = engine.log.filter { $0 == "fed" || $0 == "end" }
@@ -21,7 +25,8 @@ import Testing
     }
 
     @Test func theFedCountIncludesTheChunkInFlightAtTheRelease() async {
-        let engine = FakeStreamingEngine(feedDelay: .milliseconds(150))
+        let feed = Gate()
+        let engine = FakeStreamingEngine(feedGate: feed)
         let (c, _, capture, _) = await makeStreamingCoordinator(style: .compact, engine: engine)
         // A tail under the minimum: only the fed audio carries the recording past it, so a
         // chunk missing from the count drops it.
@@ -31,6 +36,7 @@ import Testing
         await c.hotkeyPressed()
         #expect(await waitUntil { engine.isFeeding })
         c.hotkeyReleased()
+        await feed.open()
         await c.inFlight?.value
         let fed = engine.feedCounts.reduce(0, +)
         #expect(fed == 8_000)
@@ -38,13 +44,15 @@ import Testing
     }
 
     @Test func noLivePassStartsAfterTheRelease() async {
-        let engine = FakeStreamingEngine(feedDelay: .milliseconds(150))
+        let feed = Gate()
+        let engine = FakeStreamingEngine(feedGate: feed)
         let (c, output, _, _) = await makeStreamingCoordinator(style: .liveTranscript, engine: engine)
         await c.startIdle()
         await c.hotkeyPressed()
         #expect(await waitUntil { engine.isFeeding })
         let passesAtRelease = engine.livePassCount
         c.hotkeyReleased()
+        await feed.open()
         await c.inFlight?.value
         #expect(engine.livePassCount == passesAtRelease)
         #expect(output.inserted == ["final"])
@@ -73,7 +81,8 @@ import Testing
     }
 
     @Test func aPressWaitsForEveryEarlierCancel() async {
-        let engine = FakeStreamingEngine(feedDelay: .milliseconds(300))
+        let feed = Gate()
+        let engine = FakeStreamingEngine(feedGate: feed)
         let (c, output, _, _) = await makeStreamingCoordinator(style: .compact, engine: engine)
         await c.startIdle()
         await c.hotkeyPressed()
@@ -84,7 +93,12 @@ import Testing
         #expect(await waitUntil { c.state.isRecording })
         let secondCancel = Task { await c.cancelRecording() }
         #expect(await waitUntil { c.state == .idle })
-        await c.hotkeyPressed()
+        let third = Task { await c.hotkeyPressed() }
+        #expect(await waitUntil { c.state.isRecording })
+        // Negative path: gives a press that wrongly skips the first cancel time to begin.
+        try? await Task.sleep(for: .milliseconds(20))
+        await feed.open()
+        await third.value
         #expect(c.state.isRecording)
         c.hotkeyReleased()
         await c.inFlight?.value
@@ -116,15 +130,19 @@ import Testing
     }
 
     @Test func aLateAbandonOfACancelledUtteranceLeavesTheNextOne() async {
-        let engine = FakeStreamingEngine(beginDelay: .milliseconds(100), abandonDelay: .milliseconds(300))
+        let begin = Gate()
+        let abandon = Gate()
+        let engine = FakeStreamingEngine(beginGate: begin, abandonGate: abandon)
         let (c, output, _, _) = await makeStreamingCoordinator(style: .compact, engine: engine)
         await c.startIdle()
         let cancelled = Task { await c.hotkeyPressed() }
         #expect(await waitUntil { engine.log.contains("begin") })
         await c.cancelRecording()
+        await begin.open()
         #expect(await waitUntil { engine.abandonCalls == 1 })
         await c.hotkeyPressed()
         #expect(c.state.isRecording)
+        await abandon.open()
         #expect(await waitUntil { engine.log.contains("stale abandon") })
         c.hotkeyReleased()
         await c.inFlight?.value
