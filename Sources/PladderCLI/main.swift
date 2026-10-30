@@ -1,18 +1,20 @@
 import Foundation
 import PladderCore
+import PladderEngines
 
 // Developer tool. Commands and flags: docs/ARCHITECTURE.md, "pladder-cli". Each
 // command lives in a file of its own; shared helpers are in Support.swift.
 
 func usage() -> Never {
     eprint("""
-    usage: pladder-cli <audio file> [--process] [--verbose]
-           pladder-cli bench <fixtures dir> [--runs N] [--pause S]
-           pladder-cli bench <fixtures dir> --paced [--runs N] [--pause S] [--all] [--live]
+    usage: pladder-cli <audio file> [--process] [--verbose] [--engine <id>]
+           pladder-cli bench <fixtures dir> [--runs N] [--pause S] [--engine <id>]
+           pladder-cli bench <fixtures dir> --paced [--runs N] [--pause S] [--all] [--live] [--engine <id>]
            pladder-cli bench-process <fixtures dir> [--runs N]
            pladder-cli bench-coordinator [--runs N] [--hold S] [--engine-latency MS] [--paste-latency MS] [--polish] [--live]
            pladder-cli polish <text file | -> [--model \(PolishModel.cliNames) | --gguf <file>] [--control <line>] [--instructions <file>]
            pladder-cli polish-set <set.json> [--model \(PolishModel.cliNames) | --gguf <file>] [--control <line>]
+    engines: \(StandardEngines.entries.map(\.id.rawValue).joined(separator: ", ")); the first is the default
     """)
     exit(2)
 }
@@ -20,6 +22,13 @@ func usage() -> Never {
 // MARK: - Entry
 
 var arguments = Array(CommandLine.arguments.dropFirst())
+if let flag = arguments.firstIndex(of: "--engine") {
+    guard flag + 1 < arguments.count,
+        let entry = StandardEngines.entries.first(where: { $0.id.rawValue == arguments[flag + 1] })
+    else { usage() }
+    selectedEngine = entry
+    arguments.removeSubrange(flag...(flag + 1))
+}
 switch arguments.first {
 case nil, "-h", "--help":
     usage()

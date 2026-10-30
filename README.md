@@ -107,4 +107,4 @@ Issues and pull requests are welcome. The [CLAUDE.md](CLAUDE.md) file states wha
 
 MIT. See [LICENSE](LICENSE).
 
-Parakeet TDT is by NVIDIA (CC-BY-4.0). FluidAudio is by FluidInference (Apache-2.0).
+Parakeet TDT is by NVIDIA (CC-BY-4.0); Parakeet Ultra, its post-training, is by Moondream (CC-BY-4.0). FluidAudio is by FluidInference (Apache-2.0).

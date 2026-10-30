@@ -6,13 +6,54 @@ import PladderCore
 // while the user speaks, and the text is the batch path's: the same windows, order and
 // merge. See docs/ARCHITECTURE.md, "Engine".
 public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
-    public static let engineID = EngineID("parakeet-tdt-v3-incremental")
+    // `IncrementalChunkProcessor` reproduces the batch path for the v3 family only.
+    public enum Model: Sendable {
+        case v3
+        case ultra
 
-    public nonisolated let id = FluidAudioIncrementalEngine.engineID
-    public nonisolated var displayName: String { StandardEngines.parakeet.displayName }
+        var engineID: EngineID {
+            switch self {
+            case .v3: return EngineID("parakeet-tdt-v3-incremental")
+            case .ultra: return EngineID("parakeet-ultra-incremental")
+            }
+        }
+
+        var version: AsrModelVersion {
+            switch self {
+            case .v3: return .v3
+            case .ultra: return .ultra
+            }
+        }
+
+        // `AsrModelVersion.repo` makes the same mapping but is not public.
+        var repository: Repo {
+            switch self {
+            case .v3: return .parakeetV3
+            case .ultra: return .parakeetUltra
+            }
+        }
+
+        // `AsrModels.download` passes the encoder precision as the variant for v3 only,
+        // `.int8` by default; asking for anything else would fetch a second encoder.
+        var encoderVariant: String? {
+            switch self {
+            case .v3: return ParakeetEncoderPrecision.int8.rawValue
+            case .ultra: return nil
+            }
+        }
+    }
+
+    public static let engineID = Model.v3.engineID
+    public static let ultraEngineID = Model.ultra.engineID
+
+    public nonisolated let id: EngineID
+    public nonisolated var displayName: String {
+        StandardEngines.entries.first { $0.id == id }?.displayName ?? id.rawValue
+    }
     public private(set) var status: EngineStatus = .unloaded
 
-    private let version: AsrModelVersion
+    private let model: Model
+    private var version: AsrModelVersion { model.version }
     private var manager: AsrManager?
     private var slot = UtteranceSlot<IncrementalChunkProcessor>()
     private var fedSampleCount = 0
@@ -21,8 +62,9 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
     private var liveAudio: [Float] = []
     private var loadTask: Task<Void, Error>?
 
-    public init(version: AsrModelVersion = .v3) {
-        self.version = version
+    public init(model: Model = .v3) {
+        self.model = model
+        self.id = model.engineID
     }
 
     public func load() async throws {
@@ -63,9 +105,9 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
         guard Self.hasPartialDownload(under: cacheDirectory) else { return }
         do {
             try await ModelHub.download(
-                Self.repository(for: version),
+                model.repository,
                 to: cacheDirectory.deletingLastPathComponent(),
-                variant: Self.encoderVariant(for: version),
+                variant: model.encoderVariant,
                 progressHandler: { [weak self] progress in
                     guard let self else { return }
                     Task { await self.report(progress) }
@@ -89,25 +131,6 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
             return true
         }
         return false
-    }
-
-    // `AsrModelVersion.repo` makes the same mapping but is not public.
-    private static func repository(for version: AsrModelVersion) -> Repo {
-        switch version {
-        case .v2: return .parakeetV2
-        case .v3: return .parakeetV3
-        case .tdtCtc110m: return .parakeetTdtCtc110m
-        case .tdtJa: return .parakeetJa
-        }
-    }
-
-    // `AsrModels.download` passes the encoder precision as the variant for v3 only,
-    // `.int8` by default; asking for anything else would fetch a second encoder.
-    private static func encoderVariant(for version: AsrModelVersion) -> String? {
-        switch version {
-        case .v3: return ParakeetEncoderPrecision.int8.rawValue
-        case .v2, .tdtCtc110m, .tdtJa: return nil
-        }
     }
 
     private func report(_ progress: DownloadProgress) {

@@ -1,5 +1,5 @@
 {
-  "originHash" : "478aa9315c07c49c8f542d09510f85405cc306c2f032fe55f44db047ba2bf2e5",
+  "originHash" : "b55f6f9ccbc064b339ace56d90e5149520ff9e6bad7a16503b50f10094f554d0",
   "pins" : [
     {
       "identity" : "fluidaudio",
@@ -7,7 +7,7 @@
       "location" : "https://github.com/dinooo13/FluidAudio.git",
       "state" : {
         "branch" : "incremental-chunks",
-        "revision" : "e0f4e111080f74bac6f19882da50382ce0e11d29"
+        "revision" : "22eea42362d25d28699672d0c943342b7c695183"
       }
     }
   ],

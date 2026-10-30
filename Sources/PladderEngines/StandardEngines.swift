@@ -7,9 +7,16 @@ public enum StandardEngines {
         id: FluidAudioIncrementalEngine.engineID,
         displayName: "Parakeet TDT v3",
         detail: "NVIDIA Parakeet via FluidAudio, runs on the Neural Engine. ~700 MB download on first use.",
-        make: { FluidAudioIncrementalEngine() }
+        make: { FluidAudioIncrementalEngine(model: .v3) }
     )
 
-    public static let entries: [EngineRegistry.Entry] = [parakeet]
+    public static let parakeetUltra = EngineRegistry.Entry(
+        id: FluidAudioIncrementalEngine.ultraEngineID,
+        displayName: "Parakeet Ultra",
+        detail: "Moondream's post-training of Parakeet TDT v3 via FluidAudio: fewer misheard words at the same speed, runs on the Neural Engine. ~600 MB download on first use.",
+        make: { FluidAudioIncrementalEngine(model: .ultra) }
+    )
+
+    public static let entries: [EngineRegistry.Entry] = [parakeet, parakeetUltra]
     public static var defaultEntry: EngineRegistry.Entry { entries[0] }
 }
