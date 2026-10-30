@@ -190,8 +190,13 @@ process, so the footprint understates total memory use.
 
 During the benchmarking for #70 the M1 logged `ANECCompile() FAILED (11)` on
 the first run of each new build, and both builds measured about 0.45 s slower
-than the table below. A pass that logs it is not comparable; the table wants
-re-running on a quiet day (numbers to follow).
+than the table below. A pass that logs it is not comparable. A six-run pass on
+2026-10-30 (macOS 27.2, 26B123; `main` at 30eeb82; on AC, load average 3.7 at
+the start and 3.1 at the end) logged no such error and gave 0.255, 0.425,
+0.576, 0.926, 1.984 and 3.619 s: within eight percent of the table on the
+10 s and 30 s fixtures and within two percent everywhere else, so the table
+stands. The fixtures, regenerated on macOS 27.2, differ from these lengths by
+up to two percent.
 
 | Fixture | Audio | Engine (median) | Spread | Realtime | WER |
 |---|---:|---:|---:|---:|---:|
