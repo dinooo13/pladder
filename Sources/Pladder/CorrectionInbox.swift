@@ -21,12 +21,16 @@ final class CorrectionInbox {
     // The stages quote the user's words, so the text is `.private`.
     private nonisolated static let log = Logger(subsystem: "de.dinooo13.pladder", category: "learning")
 
-    init(dismissedURL: URL) {
+    init(
+        dismissedURL: URL,
+        observer: any PastedTextObserver = AXPasteObserver(),
+        reviewer: any CorrectionReviewer = FoundationModelsCorrectionReviewer()
+    ) {
         dismissed = DismissedCorrections(url: dismissedURL)
         let relay = self.relay
         learner = CorrectionLearner(
-            observer: AXPasteObserver(),
-            reviewer: FoundationModelsCorrectionReviewer(),
+            observer: observer,
+            reviewer: reviewer,
             dismissed: dismissed,
             dictionary: { [weak self] in await self?.currentDictionary() ?? [] },
             log: { Self.log.info("\($0, privacy: .private)") },

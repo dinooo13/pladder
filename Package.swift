@@ -85,11 +85,13 @@ let package = Package(
             dependencies: ["PladderCore", "PladderEngines", "PladderAudio", "PladderBench", "PladderRefine", "PladderSystem"]
         ),
 
-        .target(name: "PladderTestSupport", path: "Tests/PladderTestSupport"),
+        .target(name: "PladderTestSupport", dependencies: ["PladderCore"], path: "Tests/PladderTestSupport"),
         .testTarget(name: "PladderCoreTests", dependencies: ["PladderCore", "PladderTestSupport"]),
         .testTarget(name: "PladderAudioTests", dependencies: ["PladderAudio"]),
         .testTarget(name: "PladderBenchTests", dependencies: ["PladderBench"]),
         .testTarget(name: "PladderSystemTests", dependencies: ["PladderSystem", "PladderTestSupport"]),
         .testTarget(name: "PladderRefineTests", dependencies: ["PladderRefine", "PladderTestSupport"]),
+        // SwiftPM tests an executable target by renaming its entry point.
+        .testTarget(name: "PladderTests", dependencies: ["Pladder", "PladderCore", "PladderSystem", "PladderRefine", "PladderTestSupport"]),
     ]
 )

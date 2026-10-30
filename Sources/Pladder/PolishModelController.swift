@@ -14,17 +14,23 @@ final class PolishModelController {
     @ObservationIgnored private let applePolisher = TranscriptPolisher()
     @ObservationIgnored private var s1MiniPolisher: S1MiniPolisher?
     @ObservationIgnored private let files: ModelFiles
+    @ObservationIgnored private let warmUpRuntime: @Sendable () async -> Void
     @ObservationIgnored private let statusRelay = MainActorRelay<(ModelFile, ModelFileStatus)>()
     @ObservationIgnored private var chosenFile: ModelFile?
     // A quick polish off and on must not let its cancel reach `files` after its ensure.
     @ObservationIgnored private let fileWork = OrderedTasks()
 
-    init() {
+    // Injected so the tests neither download nor start Metal.
+    init(
+        makeFiles: (@escaping @Sendable (ModelFile, ModelFileStatus) -> Void) -> ModelFiles = {
+            ModelFiles(directory: ModelFiles.defaultDirectory, onChange: $0)
+        },
+        warmUpRuntime: @escaping @Sendable () async -> Void = { await S1MiniPolisher.warmUpRuntime() }
+    ) {
         refiner = PolishRouter(applePolisher)
         let relay = statusRelay
-        files = ModelFiles(directory: ModelFiles.defaultDirectory) { file, status in
-            relay.send((file, status))
-        }
+        files = makeFiles { file, status in relay.send((file, status)) }
+        self.warmUpRuntime = warmUpRuntime
         statusRelay.handler = { [weak self] update in
             guard let self, update.0 == self.chosenFile else { return }
             self.status = update.1
@@ -56,7 +62,7 @@ final class PolishModelController {
             refiner.use(polisher)
         }
         if polishing {
-            Task.detached(priority: .utility) { await S1MiniPolisher.warmUpRuntime() }
+            Task.detached(priority: .utility) { [warmUpRuntime] in await warmUpRuntime() }
         } else if let polisher = s1MiniPolisher {
             Task { await polisher.unload() }
         }

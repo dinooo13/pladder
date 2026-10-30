@@ -508,8 +508,9 @@ whose watch a new paste ends through the observer.
 
 `AppModel` is the composition root. It builds the engine registry, the
 settings store, the coordinator and the parts around it, owns the settings,
-and turns the coordinator's events into sounds, log lines and learning. The
-parts split off it:
+and turns the coordinator's events into sounds, log lines and learning. After
+a settings edit, `SettingsChange` in Core says which of its reactions to
+redo. The parts split off it:
 
 - `HotkeyRouter` holds both monitors and applies what `HotkeyRouting`
   decides: the tap or Carbon, and the stand-in chord.
@@ -523,6 +524,13 @@ parts split off it:
 - `StatusText.swift` holds every sentence the menu, overlay and settings show.
 
 Views talk to `AppModel` and its parts, never to the coordinator.
+
+`PladderTests` tests the router, the polish controller and the inbox with
+their system parts swapped for fakes: the router's monitors (beside a real
+coordinator), the controller's model files and Metal warm-up, the inbox's
+Accessibility observer and reviewer. `AppModel` and the overlay need a
+running `NSApplication`, so what they decide is a Core value instead:
+`HotkeyRouting` and `SettingsChange`.
 
 ## The overlay
 
