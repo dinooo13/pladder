@@ -73,7 +73,11 @@ public final class DictationCoordinator {
     // back to back: more than the capture stop, the processors and the paste together.
     public var warmupInterval: Duration = .seconds(2)
     public var livePassInterval: Duration = .milliseconds(500)
-    public var feedInterval: Duration = .seconds(1)
+    // A window can start only at a feed, so a release between its audio existing and the
+    // next feed runs the whole pass at release: at 1 s, 195 ms of mean wait just past
+    // 15 s on an M1, at 100 ms 52 ms (docs/BENCHMARKS.md, "The release wait").
+    public var feedInterval: Duration = DictationCoordinator.defaultFeedInterval
+    public nonisolated static let defaultFeedInterval: Duration = .milliseconds(100)
 
     private let loader: EngineLoader
     private let capture: any AudioCapture

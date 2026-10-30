@@ -48,9 +48,10 @@ its timers with `ManualClock`.
    and the polish model's load;
 5. starts the engine work, a `RecordingEngineSession` on the coordinator's
    clock. A streaming engine begins an utterance and gets a feed loop. In
-   the other styles the loop wakes every second and hands the engine the
-   audio captured since. With the Live Transcript style it skips
-   that second: each turn hands over what has been captured, asks for the
+   the other styles the loop wakes every 100 ms and hands the engine the
+   audio captured since, so a window starts as soon as its audio exists
+   rather than up to a second later. With the Live Transcript style it skips
+   that wait: each turn hands over what has been captured, asks for the
    text so far, publishes it as `partialTranscript` and then waits half a
    second, so audio goes in on the live-pass cadence. Outside Live
    Transcript the streaming engine also gets a warm loop, which
@@ -567,7 +568,7 @@ an engine other than the catalog's first, for example
 |---|---|
 | `pladder-cli <audio file>` | Prints the transcript and nothing else. `--process` runs the app's processors with the app's dictionary and toggles (read from its settings file or `PLADDER_SETTINGS_PATH`, never written); `--verbose` adds load and processing times. |
 | `bench <fixtures dir>` | The whole-buffer benchmark. `--runs N` (default 6, first discarded; 11 to settle a result near the noise line), `--pause S` (idle seconds before every run, default 10). |
-| `bench <dir> --paced` | Feeds each fixture in one-second chunks at real time and times `endUtterance`; also transcribes it whole and reports whether the texts are identical. Skips fixtures under 13 s unless `--all`. `--live` adds the Live Transcript pass every 0.5 s and reports its cost. |
+| `bench <dir> --paced` | Feeds each fixture in the feed loop's chunks at real time and times `endUtterance`; also transcribes it whole and reports whether the texts are identical. Skips fixtures under 13 s unless `--all`. `--live` adds the Live Transcript pass every 0.5 s and reports its cost. |
 | `bench-process <dir>` | Times the processor pipeline on the fixtures' scripts, with a filler in every sentence and with a spoken question mark too. `--runs N`, default 31. |
 | `bench-coordinator` | Drives the real coordinator and processors with stand-ins of fixed latency for the engine, microphone, paste and polish, and reports what release-to-paste costs beyond them. `--runs N` (default 21, first discarded), `--hold S` (1.5), `--engine-latency MS` (150), `--paste-latency MS` (0), `--polish` (a 300 ms stand-in), `--live`. |
 | `bench-release <audio file>` | Drives the real coordinator and engine with the file played in at real time, releases at chosen instants and reports what each release waited for and what was running. `--at S,S,…`, `--uniform FROM-TO:COUNT` (a fixed spread, the same in every build), `--runs N` (3), `--pause S` (3), `--feed-interval MS`. |
@@ -591,7 +592,7 @@ that default.
 | 4 words | Shortest dictation that is polished | `DictationCoordinator.minimumPolishWords` | `PladderCore/DictationCoordinator.swift` |
 | 10 words | Longest sentence pasted without its capital and period | `ShortSentence.maximumWords` | `PladderCore/Support/ShortSentence.swift` |
 | 10 min | Recording cap | `DictationCoordinator.maximumDuration` | `PladderCore/DictationCoordinator.swift` |
-| 1 s | Feed loop cadence | `DictationCoordinator.feedInterval` | `PladderCore/DictationCoordinator.swift` |
+| 100 ms | Feed loop cadence, and the chunk the paced bench feeds | `DictationCoordinator.defaultFeedInterval` | `PladderCore/DictationCoordinator.swift` |
 | 500 ms | Live pass cadence (Live Transcript) | `DictationCoordinator.livePassInterval` | `PladderCore/DictationCoordinator.swift` |
 | 2 s | Warm loop cadence | `DictationCoordinator.warmupInterval` | `PladderCore/DictationCoordinator.swift` |
 | 0.5 s | Length of a warm pass, 8,000 samples at 16 kHz | `DictationCoordinator.warmupSamples` (batch engine), `FluidAudioIncrementalEngine.warmupSamples` (streaming) | `PladderCore/DictationCoordinator.swift`, `PladderEngines/FluidAudioIncrementalEngine.swift` |

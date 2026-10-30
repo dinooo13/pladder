@@ -227,12 +227,15 @@ func runPacedBench(dir: String, runs: Int, pause: Double, includeShort: Bool, li
                     try? await Task.sleep(for: .milliseconds(500))
                 }
             } : nil
+            // The coordinator's chunks, on a fixed grid so a window pass does not slow the pace.
             var offset = 0
-            let oneSecond = Int(CapturedAudio.sampleRate)
-            while offset + oneSecond < fixture.samples.count {
-                await engine.feed(Array(fixture.samples[offset..<offset + oneSecond]), to: utterance)
-                try await Task.sleep(for: .seconds(1))
-                offset += oneSecond
+            let interval = DictationCoordinator.defaultFeedInterval
+            let chunk = Int(CapturedAudio.sampleRate * interval.timeInterval)
+            let paced = clock.now
+            while offset + chunk < fixture.samples.count {
+                await engine.feed(Array(fixture.samples[offset..<offset + chunk]), to: utterance)
+                offset += chunk
+                try await Task.sleep(until: paced + interval * (offset / chunk), clock: .continuous)
             }
             let tail = Array(fixture.samples[offset...])
             // Cancelled and not awaited, as the release does: a pass already inside CoreML
