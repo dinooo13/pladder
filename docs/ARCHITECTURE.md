@@ -78,10 +78,12 @@ the rest runs in `inFlight`:
 3. `DictationFinish.run`: drop a recording under 0.3 s, then `endUtterance`
    with the tail (or `transcribe` the whole buffer), run the processor
    pipeline, polish if the cycle asked for it and the text has four words or
-   more, append the trailing space, and `insert`. Words are counted by
+   more, drop the final period and the first capital of one short sentence,
+   each if its setting is on (`ShortSentence`, after polish, which would put
+   them back), append the trailing space, and `insert`. Words are counted by
    `String.wordCount` in Core, the count the polishers cut their chunks by.
    The finish is built at release, so the pipeline, the processors switched
-   off and the trailing space are the ones set then. It owns no state: it
+   off, the short-sentence settings and the trailing space are the ones set then. It owns no state: it
    reports the polishing and inserting stages as it reaches them, and the
    coordinator flips its state on each, and it returns an outcome (too short,
    empty, inserted with its timing, or failed) that the coordinator turns
@@ -571,6 +573,7 @@ that default.
 |---|---|---|---|
 | 0.3 s | Shortest recording that is transcribed | `DictationCoordinator.minimumDuration` | `PladderCore/DictationCoordinator.swift` |
 | 4 words | Shortest dictation that is polished | `DictationCoordinator.minimumPolishWords` | `PladderCore/DictationCoordinator.swift` |
+| 10 words | Longest sentence pasted without its capital and period | `ShortSentence.maximumWords` | `PladderCore/Support/ShortSentence.swift` |
 | 10 min | Recording cap | `DictationCoordinator.maximumDuration` | `PladderCore/DictationCoordinator.swift` |
 | 1 s | Feed loop cadence | `DictationCoordinator.feedInterval` | `PladderCore/DictationCoordinator.swift` |
 | 500 ms | Live pass cadence (Live Transcript) | `DictationCoordinator.livePassInterval` | `PladderCore/DictationCoordinator.swift` |

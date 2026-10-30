@@ -30,11 +30,13 @@ private final class FixedRefiner: TranscriptRefiner, @unchecked Sendable {
     private func finish(
         pipeline: ProcessorPipeline = ProcessorPipeline([WhitespaceNormalizer()]),
         appendTrailingSpace: Bool = true,
+        shortSentence: ShortSentence = ShortSentence(dropPeriod: false, dropCapital: false),
         refiner: FixedRefiner? = nil,
         output: FakeOutput = FakeOutput()
     ) -> DictationFinish {
         DictationFinish(
             pipeline: pipeline, disabledProcessors: [], appendTrailingSpace: appendTrailingSpace,
+            shortSentence: shortSentence,
             willPolish: refiner != nil, refiner: refiner, minimumDuration: 0.3, minimumPolishWords: 4,
             output: output)
     }
@@ -181,6 +183,22 @@ private final class FixedRefiner: TranscriptRefiner, @unchecked Sendable {
             finish(pipeline: noProcessors, appendTrailingSpace: false, output: output),
             input(.whole(try await loaded("off"))))
         #expect(output.inserted == ["spaced ", "bare ", "off"])
+    }
+
+    @Test func aShortSentenceIsMadePlainAfterPolishAndOnlyWhenOn() async throws {
+        let output = FakeOutput()
+        let refiner = FixedRefiner(result: "Run this in the terminal: bash foo.")
+        let (outcome, _) = await run(
+            finish(shortSentence: ShortSentence(dropPeriod: true, dropCapital: true), refiner: refiner, output: output),
+            input(.whole(try await loaded("run this in the terminal bash foo"))))
+        _ = await run(finish(shortSentence: ShortSentence(dropPeriod: true, dropCapital: true), output: output), input(.whole(try await loaded("Yes."))))
+        _ = await run(finish(output: output), input(.whole(try await loaded("No."))))
+        #expect(output.inserted == ["run this in the terminal: bash foo ", "yes ", "No. "])
+        guard case .inserted(let insertion) = outcome else {
+            Issue.record("expected an insertion, got \(outcome)")
+            return
+        }
+        #expect(insertion.transcript.text == "run this in the terminal: bash foo")
     }
 
     @Test func aThrowingInsertBecomesAFailure() async throws {

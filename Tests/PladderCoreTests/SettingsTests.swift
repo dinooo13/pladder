@@ -15,6 +15,8 @@ import Testing
             settings.disabledProcessors = ["fillers", "dictionary"]
             settings.dictionary = [DictionaryEntry(from: "a", to: "b", matchCase: true)]
             settings.appendTrailingSpace = false
+            settings.shortSentenceWithoutPeriod = true
+            settings.shortSentenceWithoutCapital = true
             settings.playSounds = false
             settings.muteOutputWhileDictating = true
             settings.appearance = .light
