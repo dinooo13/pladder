@@ -350,7 +350,8 @@ punctuation, number words, both kinds of spoken list, a question and a
 request that must not be answered, clean text that must come back
 unchanged, code identifiers, repeats, an email and a longer passage. The
 inputs are hand-written in the shape Parakeet produces, with fillers left
-in; real dictation mostly arrives with numbers already as digits.
+in. Their number words are rarer in real dictation: Parakeet Ultra writes
+nearly every number as digits itself (see "Number words").
 
 ```sh
 swift run -c release pladder-cli polish-set docs/polish-set.json --model apple|s1-mini|s1-mini-8bit
@@ -402,6 +403,87 @@ LFM2.5-1.2B-Instruct and Gemma 3 1B, run with Pladder's own prompt, were
 tried and dropped: the first described or answered the transcript instead
 of cleaning it, the second mostly returned it untouched. MLX 4-bit S1-mini
 was faster still but lost German and Spanish.
+
+## Number words
+
+Does the engine write numbers as digits, or would a number-word processor
+(inverse text normalisation, issue #83) have work to do? `docs/number-set.json`
+holds 144 short sentences, 48 per language: four each of eleven kinds
+(cardinals under and over a thousand, ordinals, decimals, money, percentages,
+dates, times, phone numbers, measures, years) and four of prose whose
+number-like words must stay words ("one of them", "eine Frage", "halb fünf").
+Each has the text as spoken and the text as it should be written.
+
+```sh
+./scripts/make-number-fixtures.sh            # say, two voices per language, into bench/numbers
+swift run -c release pladder-cli numbers docs/number-set.json bench/numbers [--engine <id>]
+```
+
+The voices are Samantha (en-US) and Daniel (en-GB), Anna and Eddy (de-DE;
+Eddy is a formant voice and mishears more), Mónica (es-ES) and Paulina
+(es-MX), so 8 clips per language and kind. A clip counts as *digits* when the
+digits in the transcript are those of the expected text, separators and
+format aside; as *words* when it has no digits and the number's words are
+there; as *mixed* when some of it is digits and some still words; and as
+*wrong* otherwise. *Exact* is the expected text to the character. The command
+prints every transcript, then the table before and after the app's processors.
+Nothing is timed. Greedy decoding throughout, so a rerun gives the same text.
+
+M1 MacBook Air, macOS 27.2, October 2026, load average 4.8 to 5.7 from other
+work. Cells are words / digits / mixed or wrong, out of 8:
+
+| Kind | Ultra en | Ultra de | Ultra es | v3 en | v3 de | v3 es |
+|---|---|---|---|---|---|---|
+| cardinal, small | 2 / 6 / 0 | 1 / 6 / 1 | 2 / 6 / 0 | 5 / 3 / 0 | 1 / 6 / 1 | 2 / 6 / 0 |
+| cardinal, large | 0 / 8 / 0 | 0 / 8 / 0 | 0 / 8 / 0 | 0 / 8 / 0 | 0 / 8 / 0 | 0 / 7 / 1 |
+| ordinal | 4 / 4 / 0 | 4 / 4 / 0 | 8 / 0 / 0 | 6 / 2 / 0 | 4 / 4 / 0 | 8 / 0 / 0 |
+| decimal | 0 / 8 / 0 | 0 / 8 / 0 | 0 / 8 / 0 | 1 / 7 / 0 | 0 / 8 / 0 | 0 / 8 / 0 |
+| money | 0 / 8 / 0 | 0 / 8 / 0 | 0 / 8 / 0 | 2 / 6 / 0 | 0 / 8 / 0 | 0 / 8 / 0 |
+| percent | 0 / 8 / 0 | 0 / 8 / 0 | 0 / 8 / 0 | 0 / 8 / 0 | 0 / 8 / 0 | 0 / 8 / 0 |
+| date | 0 / 8 / 0 | 1 / 7 / 0 | 0 / 8 / 0 | 1 / 7 / 0 | 0 / 7 / 1 | 0 / 8 / 0 |
+| time | 0 / 8 / 0 | 0 / 8 / 0 | 1 / 4 / 3 | 1 / 7 / 0 | 0 / 8 / 0 | 0 / 4 / 4 |
+| phone | 0 / 6 / 2 | 0 / 8 / 0 | 0 / 8 / 0 | 3 / 3 / 2 | 0 / 8 / 0 | 0 / 7 / 1 |
+| measure | 0 / 8 / 0 | 0 / 8 / 0 | 0 / 8 / 0 | 1 / 7 / 0 | 0 / 8 / 0 | 0 / 8 / 0 |
+| year | 0 / 8 / 0 | 0 / 8 / 0 | 0 / 8 / 0 | 0 / 8 / 0 | 0 / 8 / 0 | 0 / 8 / 0 |
+| **all 88** | **7 / 91 / 2 %** | **7 / 92 / 1 %** | **12 / 84 / 3 %** | **23 / 75 / 2 %** | **6 / 92 / 2 %** | **11 / 82 / 7 %** |
+| prose, must stay words | 8 / 0 / 0 | 8 / 0 / 0 | 8 / 0 / 0 | 8 / 0 / 0 | 8 / 0 / 0 | 8 / 0 / 0 |
+
+What Parakeet Ultra leaves as words is what prose style guides write as
+words, apart from es "decimocuarto":
+
+- Cardinals under ten: "seven", "sieben", "siete", both voices. Every number
+  from ten up came out as digits.
+- Low ordinals: "third", "second", "dritte", "zweiten", and every Spanish
+  ordinal ("tercera", "quinto", "segunda", "decimocuarto"). "21st", "14th",
+  "21. Platz", "14. Stock" and the German dates ("3. März") are digits.
+- Spanish half and quarter hours: "a las 4 y media", "a las 7 y cuarto".
+
+No prose word ("one of them", "eine Frage", "halb fünf", "un segundo")
+became a digit. The only wrong numbers were en "oh one seven six, two two three,
+four four five", written "0176-223-445-0" by Ultra and "…-445-24" by v3, a
+digit no rule could remove, and Eddy's misheard "sieben". Formats differ from
+the expected text in places: English clock times came out as "4 30", "4.30"
+and "7.15" in three of four hour-and-minute clips, German and Spanish ones as
+"16.30" (a form both languages use), percentages without the space ("15%"),
+units as words ("12 kilometers", "200 Gramm"). Ultra dropped "Grad" from "auf
+hundertachtzig Grad" for both German voices; v3 kept it.
+
+The processors changed none of the 576 transcripts. "Komma" and "coma"
+between numbers never reach spoken punctuation, because the engine has
+already written "3,5".
+
+v3 differs mostly in English, where it left a quarter as words:
+"twenty-three", "forty-five", "fourteenth", "seven point two", "two hundred
+and fifty dollars", "seven fifteen", "five five five one two three…",
+"one hundred eighty degrees". In Spanish it wrote "un millón doscientos.000"
+and "4-2-1-9".
+
+Synthetic speech is the weak point. `say` reads every number in its
+canonical form, evenly paced and without a slip. People say "two fifty",
+"a hundred", "zero" or "oh", pause inside a number and restart it, and run
+numbers into longer sentences, any of which may change what the engine
+writes. Eight clips a cell make each share coarse. No real dictation was
+measured: the app logs no transcripts.
 
 ## Processors
 

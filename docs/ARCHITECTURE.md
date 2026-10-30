@@ -547,7 +547,7 @@ which the pill renders in an `OverlayPanel` that never takes focus.
 
 A developer tool; the user-facing part is in [INSTALL.md](../INSTALL.md).
 Errors and progress go to stderr, so stdout holds only results. The
-commands that transcribe, the first three below, take `--engine <id>` to run
+commands that transcribe, the first three below and `numbers`, take `--engine <id>` to run
 an engine other than the catalog's first, for example
 `--engine parakeet-tdt-v3-incremental`; the usage text lists the IDs.
 
@@ -560,6 +560,7 @@ an engine other than the catalog's first, for example
 | `bench-coordinator` | Drives the real coordinator and processors with stand-ins of fixed latency for the engine, microphone, paste and polish, and reports what release-to-paste costs beyond them. `--runs N` (default 21, first discarded), `--hold S` (1.5), `--engine-latency MS` (150), `--paste-latency MS` (0), `--polish` (a 300 ms stand-in), `--live`. |
 | `polish <text file \| ->` | Runs a polish model over one transcript, cold and then warm. `--model apple\|s1-mini\|s1-mini-8bit`, `--instructions <file>` (Apple), `--gguf <file>` (any S1-mini-family model), `--control <line>` (S1-mini). |
 | `polish-set <set.json>` | Runs a polish model over a test set after the app's processors: every answer, word error rate per language, exact matches, timings. `--model`, `--gguf` and `--control` as for `polish`; no `--instructions`. |
+| `numbers <set.json> <audio dir>` | Transcribes the number-word set as spoken by `scripts/make-number-fixtures.sh` and reports, per language and kind, how often numbers come out as words, digits, a mix or wrong, before and after the app's processors (a fresh install's, as for `polish-set`). Nothing is timed. |
 
 Fixtures are audio files with a sibling `.txt` holding the script, made by
 `scripts/make-fixtures.sh`. The procedures are in

@@ -14,6 +14,7 @@ func usage() -> Never {
            pladder-cli bench-coordinator [--runs N] [--hold S] [--engine-latency MS] [--paste-latency MS] [--polish] [--live]
            pladder-cli polish <text file | -> [--model \(PolishModel.cliNames) | --gguf <file>] [--control <line>] [--instructions <file>]
            pladder-cli polish-set <set.json> [--model \(PolishModel.cliNames) | --gguf <file>] [--control <line>]
+           pladder-cli numbers <set.json> <audio dir> [--engine <id>]
     engines: \(StandardEngines.entries.map(\.id.rawValue).joined(separator: ", ")); the first is the default
     """)
     exit(2)
@@ -76,6 +77,9 @@ case "bench-process":
 case "bench-coordinator":
     arguments.removeFirst()
     await CoordinatorBench.run(arguments: arguments)
+case "numbers":
+    arguments.removeFirst()
+    try await NumberWordsBench.run(arguments: arguments)
 case "polish", "polish-set":
     let command = arguments.removeFirst()
     var options = PolishOptions()
