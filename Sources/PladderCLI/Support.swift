@@ -10,8 +10,11 @@ func eprint(_ message: String, terminator: String = "\n") {
     FileHandle.standardError.write(Data((message + terminator).utf8))
 }
 
+// Set from `--engine`, which any command that transcribes accepts.
+nonisolated(unsafe) var selectedEngine = StandardEngines.defaultEntry
+
 func makeEngine() -> any TranscriptionEngine {
-    StandardEngines.defaultEntry.make()
+    selectedEngine.make()
 }
 
 func loadSamples(_ url: URL) throws -> [Float] {

@@ -691,6 +691,16 @@
         }
       }
     },
+    "Moondream's post-training of Parakeet TDT v3 via FluidAudio: fewer misheard words at the same speed, runs on the Neural Engine. ~600 MB download on first use.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moondreams Nachtraining von Parakeet TDT v3 über FluidAudio: weniger falsch verstandene Wörter bei gleicher Geschwindigkeit, läuft auf der Neural Engine. Beim ersten Start ca. 600 MB Download."
+          }
+        }
+      }
+    },
     "NVIDIA Parakeet via FluidAudio, runs on the Neural Engine. ~700 MB download on first use.": {
       "localizations": {
         "de": {

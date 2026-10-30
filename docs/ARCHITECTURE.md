@@ -546,7 +546,10 @@ which the pill renders in an `OverlayPanel` that never takes focus.
 ## pladder-cli
 
 A developer tool; the user-facing part is in [INSTALL.md](../INSTALL.md).
-Errors and progress go to stderr, so stdout holds only results.
+Errors and progress go to stderr, so stdout holds only results. The
+commands that transcribe, the first three below, take `--engine <id>` to run
+an engine other than the catalog's first, for example
+`--engine parakeet-ultra-incremental`; the usage text lists the IDs.
 
 | Command | Does |
 |---|---|

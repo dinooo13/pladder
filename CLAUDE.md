@@ -28,6 +28,7 @@ swift run -c release pladder-cli <audio file> [--process] [--verbose] # transcri
 ./scripts/make-fixtures.sh                    # synthesise benchmark fixtures into bench/fixtures (gitignored)
 swift run -c release pladder-cli bench bench/fixtures            # whole-buffer benchmark
 swift run -c release pladder-cli bench bench/fixtures --paced     # feed at real time, time endUtterance, check identity
+swift run -c release pladder-cli bench bench/fixtures --engine parakeet-ultra-incremental   # any of the above with another engine
 swift run -c release pladder-cli bench-coordinator [--polish] [--live]   # the coordinator's own share of release-to-paste, stand-ins of fixed latency
 swift run -c release pladder-cli polish <text file> [--model apple|s1-mini|s1-mini-8bit]   # one transcript, cold and warm
 swift run -c release pladder-cli polish-set docs/polish-set.json --model s1-mini-8bit    # a polish model over the test set: error rate, exact matches, timings
@@ -42,8 +43,8 @@ swift run -c release pladder-cli polish-set docs/polish-set.json --model s1-mini
 | Distribution | Direct, not sandboxed, not App Store | Global hotkey and synthetic paste do not work sandboxed |
 | Language | Swift 6.2 tools, strict concurrency, SwiftUI | Current toolchain |
 | Build | SwiftPM package + `scripts/bundle.sh` wrapping the binary in `Pladder.app` | No Xcode project to maintain; `Package.swift` opens in Xcode |
-| Engine | FluidAudio, Parakeet TDT 0.6B v3, one engine only | Fastest Swift-native option, runs on the Neural Engine. The recording is transcribed in windows while the key is held, so only the last window and the merge are left at release |
-| FluidAudio | A fork, branch `incremental-chunks`, pinned in `Package.resolved` | Adds `IncrementalChunkProcessor`: the same windows the batch path uses, run as the audio arrives. Offered upstream; goes back to the release line when it lands |
+| Engine | FluidAudio, Parakeet TDT 0.6B v3 by default; Parakeet Ultra (Moondream's post-training of v3) in the picker | Fastest Swift-native option, runs on the Neural Engine. The recording is transcribed in windows while the key is held, so only the last window and the merge are left at release. Ultra has the same architecture and windows, makes about a fifth fewer word errors on FLEURS English, German and Spanish, and is as fast (docs/BENCHMARKS.md) |
+| FluidAudio | A fork, branch `incremental-chunks`, pinned in `Package.resolved`, rebased on upstream main | Adds `IncrementalChunkProcessor`: the same windows the batch path uses, run as the audio arrives, for the v3 family. Upstream's `SlidingWindowAsrManager` is as quick at release but uses its own windows and misheard more on the long fixtures. Not yet a pull request upstream; goes back to the release line when one lands |
 | Hotkey | Hold Option+Space by default, either Option; any key or chord can be recorded | A CGEvent tap (Accessibility, no Input Monitoring) matches the chord and swallows its regular key so it never reaches the target app. Sides are ignored in a chord with a regular key and kept for a modifier-only chord, so the tap and Carbon agree |
 | Interrupted press | A non-chord key within 1 s of the chord press cancels the recording without transcribing | Anyone who records a lone Command key shares it with Cmd+C, Cmd+V and Cmd+Tab; the overlay waits 150 ms before showing so those never flash it. Option+Space shares no modifier with them |
 | Secure Event Input | `IsSecureEventInputEnabled()` polled with the grant; sustained 3 s and a chord Carbon can register → Carbon monitor until it clears | A password field or Terminal's Secure Keyboard Entry stops taps receiving key events; modifier-only chords are unaffected and stay on the tap |

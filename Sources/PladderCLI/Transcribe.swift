@@ -9,7 +9,7 @@ func appSettings() -> Settings {
     let url = ProcessInfo.processInfo.environment["PLADDER_SETTINGS_PATH"].flatMap { $0.isEmpty ? nil : URL(filePath: $0) }
         ?? FileManager.default.homeDirectoryForCurrentUser
             .appending(path: "Library/Application Support/Pladder/settings.json")
-    let fallback = Settings(engineID: StandardEngines.defaultEntry.id)
+    let fallback = Settings(engineID: selectedEngine.id)
     guard let data = try? Data(contentsOf: url) else { return fallback }
     do {
         return try JSONDecoder().decode(Settings.self, from: data)

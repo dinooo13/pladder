@@ -190,7 +190,7 @@ func runPacedBench(dir: String, runs: Int, pause: Double, includeShort: Bool, li
     }
 
     guard let engine = makeEngine() as? any StreamingTranscriptionEngine else {
-        eprint("\(StandardEngines.defaultEntry.id) does not transcribe while speaking; there is nothing to pace")
+        eprint("\(selectedEngine.id) does not transcribe while speaking; there is nothing to pace")
         exit(1)
     }
     printBenchHeader("Pladder benchmark (paced)", engine: engine)

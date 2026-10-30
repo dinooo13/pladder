@@ -268,6 +268,49 @@ processors and paste. 116 real dictations on the M1, 2026-10-29 and 30:
 Two of the four over 40 s waited about 0.2 s for an engine pass already
 running at release (issue #84); without that wait the median is about 0.26 s.
 
+## Parakeet Ultra
+
+Parakeet Ultra is Moondream's post-training of Parakeet TDT v3: the same
+architecture, tokenizer and windows, so the incremental path and the paced
+bench's identity gate apply to it unchanged. Both engines were measured on
+2026-10-30 on the M1 (macOS 27.2), FluidAudio fork at 22eea423, one engine
+after the other, load average 1.9 to 2.8 throughout, no thermal tags.
+
+Word error on FLEURS test clips, 350 per language, read speech, scored by
+FluidAudio's `fleurs-benchmark` (the batch path, which the paced bench shows
+gives the same text as the app's):
+
+| Model | English | German | Spanish | Mean | Realtime |
+|---|---:|---:|---:|---:|---:|
+| Parakeet TDT v3 | 5.1 % | 5.8 % | 3.9 % | 4.9 % | 89x |
+| Parakeet Ultra | 4.5 % | 4.9 % | 2.7 % | 4.0 % | 89x |
+
+Speed, `bench` (six runs, median of five) and `bench --paced --runs 2
+--pause 2` on the fixtures from 30 s to 5 min:
+
+| Fixture | Whole recording, v3 | Whole recording, Ultra | Left at release, v3 | Left at release, Ultra |
+|---|---:|---:|---:|---:|
+| 10s | 0.236 s | 0.239 s | | |
+| 30s | 0.400 s | 0.413 s | 0.276 s | 0.288 s |
+| 60s | 0.535 s | 0.542 s | 0.270 s | 0.281 s |
+| 2m | 0.839 s | 0.859 s | 0.281 s | 0.285 s |
+| 5m | 1.801 s | 1.808 s | 0.257 s | 0.261 s |
+| 10m | 3.343 s | 3.356 s | | |
+
+Every difference is under five percent, inside the noise line, and the
+paced text was identical to the whole-buffer text for both. On the fixtures
+the word error is the same (0.0 to 0.2 %) except 10m, 0.6 % for v3 and
+0.5 % for Ultra. Physical footprint after load: 102 MB for v3, 111 MB for
+Ultra. Ultra's first load in a new binary took 19.5 s, CoreML compiling
+the encoder for the Neural Engine; later loads took 0.14 s, as v3's do.
+
+FluidAudio's own `SlidingWindowAsrManager`, fed the same fixtures at real
+time, also leaves about 0.21 to 0.25 s at release, but its 11 s windows
+with 2 s of context are not the batch layout: its text differed from the
+whole-buffer text from 30 s up, and its word error was 0.9 to 1.2 % from
+60 s up where the batch path's was 0.0 to 0.2 %. That is why the fork's
+`IncrementalChunkProcessor` stays.
+
 ## Reading the app's release-to-paste log
 
 Every dictation logs one line with the total release-to-paste time, its
