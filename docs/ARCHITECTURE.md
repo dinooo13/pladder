@@ -73,7 +73,10 @@ the rest runs in `inFlight`:
 
 1. wait for the feed loop to exit. A chunk it drained just before the
    release is still handed over, so every sample reaches the engine once and
-   in order. The log line carries this wait as `feed`;
+   in order. The release cancels the loop but not the engine call in
+   flight: FluidAudio stops a cancelled window pass at its next check, and
+   `endUtterance` would then run that window again from the start. The log
+   line carries this wait as `feed`;
 2. stop the capture, which returns only the samples after the last drain;
 3. `DictationFinish.run`: drop a recording under 0.3 s, then `endUtterance`
    with the tail (or `transcribe` the whole buffer), run the processor
@@ -98,8 +101,9 @@ release-to-paste log line (`TimingLine.swift`).
 
 **Ending without text.** `cancelRecording` covers Escape, an interrupted
 press, a hotkey change and quitting. The microphone goes off first; the
-engine drops the utterance only once the feed loop has exited, so no chunk
-lands after it. Each cancel's cleanup then waits for the one before it, and a
+engine call the feed loop has in flight is cancelled, unlike at a release,
+and the engine drops the utterance only once the loop has exited, so no
+chunk lands after it. Each cancel's cleanup then waits for the one before it, and a
 press right after a cancel waits for the newest, so its microphone and
 utterance start only after every earlier cancel has stopped its microphone
 and dropped its utterance. A press that is itself cancelled while it waits
