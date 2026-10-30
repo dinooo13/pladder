@@ -33,9 +33,6 @@ final class AppModel {
     private static let hotkeyLog = Logger(subsystem: "de.dinooo13.pladder", category: "hotkey")
     private static let settingsLog = Logger(subsystem: "de.dinooo13.pladder", category: "settings")
 
-    // Each side effect runs only when its own keys changed: re-assigning `NSApp.appearance`
-    // with a forced Light or Dark re-themes every window, and on every click of a
-    // settings card it made the rows lag behind the click.
     var settings: Settings {
         get { storedSettings }
         set {
@@ -149,18 +146,19 @@ final class AppModel {
     // MARK: Settings
 
     private func settingsChanged(from old: Settings) {
-        let monitor = settings.hotkey != old.hotkey ? hotkeys.hotkeyChanged(to: settings.hotkey) : nil
+        let change = SettingsChange(from: old, to: settings)
+        let monitor = change.hotkey ? hotkeys.hotkeyChanged(to: settings.hotkey) : nil
         coordinator.update(DictationSettings(settings), standInHotkey: hotkeys.standInHotkey, monitor: monitor)
-        if settings.appearance != old.appearance {
+        if change.appearance {
             applyAppearance(settings.appearance)
         }
-        if settings.overlayStyle != old.overlayStyle || settings.overlayGlass != old.overlayGlass {
+        if change.overlayStyle {
             overlay.applyStyle(settings.overlayStyle, glass: settings.overlayGlass)
         }
-        if settings.overlayAnimationSpeed != old.overlayAnimationSpeed {
+        if change.overlaySpeed {
             overlay.applySpeed(settings.overlayAnimationSpeed)
         }
-        if settings.polishModel != old.polishModel || settings.polishDictations != old.polishDictations {
+        if change.polish {
             polish.apply(model: settings.polishModel, polishing: settings.polishDictations)
         }
         do {

@@ -14,12 +14,17 @@ final class HotkeyRouter {
     // a permission flip and settings opening, never on a key press.
     private(set) var systemShortcuts: Set<Hotkey> = []
 
-    @ObservationIgnored private let tap = GlobalHotkeyMonitor()
-    @ObservationIgnored private let carbon = CarbonHotkeyMonitor()
+    @ObservationIgnored private let tap: any HotkeyMonitor
+    @ObservationIgnored private let carbon: any HotkeyMonitor
     @ObservationIgnored private weak var coordinator: DictationCoordinator?
 
-    init(accessibilityTrusted: Bool, hotkey: Hotkey) {
+    init(
+        accessibilityTrusted: Bool, hotkey: Hotkey,
+        tap: any HotkeyMonitor = GlobalHotkeyMonitor(), carbon: any HotkeyMonitor = CarbonHotkeyMonitor()
+    ) {
         routing = HotkeyRouting(accessibilityTrusted: accessibilityTrusted, hotkey: hotkey)
+        self.tap = tap
+        self.carbon = carbon
     }
 
     var initialMonitor: any HotkeyMonitor { monitor(for: routing.source) }
