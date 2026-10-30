@@ -176,7 +176,9 @@ the default 1.5 s hold none does.
 
 Reference machine: Apple M1, 16 GB, macOS 26.6.2 (25G83), FluidAudio 0.15.6,
 model `parakeet-tdt-0.6b-v3` (CoreML). Recorded 2026-09-11 with `--runs 11`,
-ten kept runs per fixture. The M1 is the least powerful chip Pladder
+ten kept runs per fixture. The default engine is now Parakeet Ultra, so compare
+against this table with `--engine parakeet-tdt-v3-incremental`, and against
+"Parakeet Ultra" below without it. The M1 is the least powerful chip Pladder
 supports: if it is fast enough here, it is fast enough everywhere.
 
 | Measurement | Value |

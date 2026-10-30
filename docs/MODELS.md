@@ -1,8 +1,10 @@
 # The model download
 
-Parakeet TDT v3 is about 460 MB of CoreML bundles, fetched once from Hugging
-Face on first launch into
-`~/Library/Application Support/FluidAudio/Models/parakeet-tdt-0.6b-v3/`.
+Parakeet Ultra, the default, is about 610 MB of CoreML bundles, fetched once
+from Hugging Face on first launch into
+`~/Library/Application Support/FluidAudio/Models/parakeet-ultra/`; Parakeet
+TDT v3, the other choice, about 460 MB into `parakeet-tdt-0.6b-v3/` beside it.
+A model no longer chosen stays there until its folder is deleted by hand.
 
 ## What FluidAudio already guarantees
 

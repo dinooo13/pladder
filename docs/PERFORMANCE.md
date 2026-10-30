@@ -29,7 +29,7 @@ lands on that path without a before-and-after benchmark.
 
 ## The floor
 
-Parakeet TDT v3 runs on the Neural Engine through FluidAudio. The model has
+Parakeet runs on the Neural Engine through FluidAudio, Ultra as v3 does. The model has
 a fixed 15 s input window and FluidAudio zero-pads every utterance to it. So
 one encoder pass costs the same for a one-second utterance as for a
 twelve-second one. Only the decoder scales with length.
