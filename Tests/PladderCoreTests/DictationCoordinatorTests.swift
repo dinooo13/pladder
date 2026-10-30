@@ -3,14 +3,6 @@ import PladderTestSupport
 import Testing
 @testable import PladderCore
 
-// Ignores cancellation, as a CoreML pass in flight does: a fake that woke early
-// would hide what the release really waits for.
-func uncancellableSleep(_ duration: Duration) async {
-    await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
-        DispatchQueue.global().asyncAfter(deadline: .now() + duration.timeInterval) { done.resume() }
-    }
-}
-
 actor FakeCapture: AudioCapture {
     var samplesToReturn: [Float] = Array(repeating: 0.1, count: 16_000)
     var drainSamples: [Float] = []
@@ -191,11 +183,18 @@ actor CountingEngine: TranscriptionEngine {
     private(set) var status: EngineStatus = .unloaded
     private let recorder = Recorder<Int>()
     private let warmGate: Gate?
+    private let loadGate: Gate?
 
-    init(warmGate: Gate? = nil) { self.warmGate = warmGate }
+    init(warmGate: Gate? = nil, loadGate: Gate? = nil) {
+        self.warmGate = warmGate
+        self.loadGate = loadGate
+    }
     nonisolated var calls: [Int] { recorder.all }
 
-    func load() async throws { status = .ready }
+    func load() async throws {
+        await loadGate?.wait()
+        status = .ready
+    }
     func transcribe(_ samples: [Float]) async throws -> Transcript {
         recorder.append(samples.count)
         if samples.count == 8_000 { await warmGate?.wait() }
@@ -212,29 +211,33 @@ actor FakeStreamingEngine: StreamingTranscriptionEngine {
 
     private let counters = StreamingCounters()
     private var slot = UtteranceSlot<Void>()
-    private let livePassDelay: Duration
-    private let feedDelay: Duration
-    private let beginDelay: Duration
-    private let abandonDelay: Duration
+    // A `Gate` ignores cancellation, as a CoreML pass in flight does: a fake that woke
+    // early would hide what the release really waits for.
+    private let feedGate: Gate?
+    private let beginGate: Gate?
+    private let abandonGate: Gate?
+    private var livePassGate: Gate?
     private let beginFails: Bool
 
-    // `beginDelay` falls between claiming the utterance and returning it, where the real
+    // `beginGate` falls between claiming the utterance and returning it, where the real
     // engine builds its session.
     init(
         id: EngineID = FakeStreamingEngine.engineID,
-        livePassDelay: Duration = .zero,
-        feedDelay: Duration = .zero,
-        beginDelay: Duration = .zero,
-        abandonDelay: Duration = .zero,
+        livePassGate: Gate? = nil,
+        feedGate: Gate? = nil,
+        beginGate: Gate? = nil,
+        abandonGate: Gate? = nil,
         beginFails: Bool = false
     ) {
         self.id = id
-        self.livePassDelay = livePassDelay
-        self.feedDelay = feedDelay
-        self.beginDelay = beginDelay
-        self.abandonDelay = abandonDelay
+        self.livePassGate = livePassGate
+        self.feedGate = feedGate
+        self.beginGate = beginGate
+        self.abandonGate = abandonGate
         self.beginFails = beginFails
     }
+
+    func setLivePassGate(_ gate: Gate) { livePassGate = gate }
 
     nonisolated var feedCounts: [Int] { counters.feedCounts }
     nonisolated var livePassCount: Int { counters.livePassCount }
@@ -258,7 +261,7 @@ actor FakeStreamingEngine: StreamingTranscriptionEngine {
         counters.record("begin")
         if beginFails { throw BeginFailed() }
         let utterance = slot.begin().utterance
-        if beginDelay > .zero { await uncancellableSleep(beginDelay) }
+        await beginGate?.wait()
         guard slot.install((), for: utterance) else { throw CancellationError() }
         counters.record("begun")
         return utterance
@@ -267,9 +270,9 @@ actor FakeStreamingEngine: StreamingTranscriptionEngine {
     func feed(_ samples: [Float], to utterance: Utterance) async {
         guard slot.current == utterance else { return }
         counters.fed(samples.count)
-        if feedDelay > .zero {
+        if let feedGate {
             counters.setFeeding(true)
-            await uncancellableSleep(feedDelay)
+            await feedGate.wait()
             counters.setFeeding(false)
         }
         counters.record("fed")
@@ -283,7 +286,7 @@ actor FakeStreamingEngine: StreamingTranscriptionEngine {
 
     func abandonUtterance(_ utterance: Utterance) async {
         counters.abandonCalled()
-        if abandonDelay > .zero { await uncancellableSleep(abandonDelay) }
+        await abandonGate?.wait()
         counters.record(slot.release(utterance).wasCurrent ? "abandon" : "stale abandon")
     }
 
@@ -292,8 +295,8 @@ actor FakeStreamingEngine: StreamingTranscriptionEngine {
     func livePass(_ utterance: Utterance) async -> String? {
         guard slot.current == utterance else { return nil }
         let n = counters.lived()
-        // Counted before the delay, so a test can catch a pass in flight.
-        if livePassDelay > .zero { await uncancellableSleep(livePassDelay) }
+        // Counted before the gate, so a test can catch a pass in flight.
+        await livePassGate?.wait()
         return "partial \(n)"
     }
 }
@@ -339,7 +342,7 @@ func makeCoordinator(
     clock: any Clock<Duration> = ContinuousClock(),
     events: EventLog? = nil
 ) -> (DictationCoordinator, FakeOutput, FakeCapture) {
-    let engines = engines ?? [.serving(EchoEngine(text: engineText, delay: .milliseconds(5)))]
+    let engines = engines ?? [.serving(EchoEngine(text: engineText, delay: .zero))]
     let coordinator = DictationCoordinator(
         settings: settings ?? DictationSettings(engineID: engines[0].id),
         registry: EngineRegistry(engines),
@@ -376,13 +379,13 @@ func makeCountingCoordinator(
 @MainActor
 func makeStreamingCoordinator(
     style: OverlayStyle,
-    livePassDelay: Duration = .zero,
+    livePassGate: Gate? = nil,
     engine: FakeStreamingEngine? = nil,
     events: EventLog? = nil
 ) async -> (DictationCoordinator, FakeOutput, FakeCapture, FakeStreamingEngine) {
     let capture = FakeCapture()
     await capture.setDrainSamples(Array(repeating: 0.1, count: 8_000))
-    let engine = engine ?? FakeStreamingEngine(livePassDelay: livePassDelay)
+    let engine = engine ?? FakeStreamingEngine(livePassGate: livePassGate)
     var settings = DictationSettings(engineID: engine.id)
     settings.appendTrailingSpace = false
     settings.liveTranscript = style == .liveTranscript
@@ -763,21 +766,20 @@ final class EventLog: @unchecked Sendable {
     @Test func engineChangeWhileRecordingUsesTheEngineThatRecorded() async {
         var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.appendTrailingSpace = false
+        let load = Gate()
         let (c, output, capture) = makeCoordinator(
-            engines: [
-                .serving(EchoEngine(text: "one", delay: .milliseconds(5))),
-                .init(id: EngineID("two"), displayName: "Two", detail: "") { EchoEngine(text: "two", delay: .milliseconds(500)) },
-            ],
+            engines: [.serving(EchoEngine(text: "one", delay: .zero)), .serving(CountingEngine(loadGate: load))],
             settings: settings)
         await c.startIdle()
         await c.hotkeyPressed()
-        c.settings.engineID = EngineID("two")
+        c.settings.engineID = CountingEngine.engineID
         #expect(c.state.isRecording)
         c.hotkeyReleased()
         await c.inFlight?.value
         #expect(await capture.stopCount == 1)
         #expect(output.inserted == ["one"])
-        #expect(c.state == .unavailable(.loadingModel) || c.state == .idle)
+        #expect(c.state == .unavailable(.loadingModel))
+        await load.open()
         #expect(await waitUntil { c.engineStatus == .ready })
         #expect(await waitUntil { c.state == .idle })
     }
@@ -814,6 +816,7 @@ final class EventLog: @unchecked Sendable {
         let events = EventLog()
         var settings = DictationSettings(engineID: EchoEngine.engineID)
         settings.appendTrailingSpace = false
+        // Real time: the timing is read from the wall clock.
         let (c, output, _) = makeCoordinator(
             engines: [.serving(EchoEngine(text: "hello world", delay: .milliseconds(50)))],
             settings: settings, events: events)
@@ -921,12 +924,13 @@ final class EventLog: @unchecked Sendable {
     }
 
     @Test func releaseDuringLivePassStillInsertsExactlyOnce() async {
-        let (c, output, _, engine) = await makeStreamingCoordinator(
-            style: .liveTranscript, livePassDelay: .milliseconds(200))
+        let livePass = Gate()
+        let (c, output, _, engine) = await makeStreamingCoordinator(style: .liveTranscript, livePassGate: livePass)
         await c.startIdle()
         await c.hotkeyPressed()
         #expect(await waitUntil { engine.livePassCount == 1 })
         c.hotkeyReleased()
+        await livePass.open()
         await c.inFlight?.value
         #expect(output.inserted.count == 1)
         #expect(c.state == .idle)

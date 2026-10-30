@@ -161,6 +161,7 @@ private final class FixedRefiner: TranscriptRefiner, @unchecked Sendable {
     }
 
     @Test func timingSumsTheStagesAndFeedWaitCountsAsEngineTime() async throws {
+        // Real time: the timing is read from the wall clock.
         let engine = try await loaded("hello world", delay: .milliseconds(20))
         let (outcome, _) = await run(
             finish(), input(.whole(engine), captureStop: .milliseconds(7), feedWait: .milliseconds(40)))

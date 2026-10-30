@@ -18,11 +18,9 @@ import Testing
     }
 
     private func loadedStreaming(
-        livePassDelay: Duration = .zero, feedDelay: Duration = .zero, beginDelay: Duration = .zero,
-        beginFails: Bool = false
+        feedGate: Gate? = nil, beginGate: Gate? = nil, beginFails: Bool = false
     ) async throws -> FakeStreamingEngine {
-        let engine = FakeStreamingEngine(
-            livePassDelay: livePassDelay, feedDelay: feedDelay, beginDelay: beginDelay, beginFails: beginFails)
+        let engine = FakeStreamingEngine(feedGate: feedGate, beginGate: beginGate, beginFails: beginFails)
         try await engine.load()
         return engine
     }
@@ -63,16 +61,19 @@ import Testing
 
     @Test func aLivePassFinishingAfterEndPublishesNothing() async throws {
         let clock = ManualClock()
-        let engine = try await loadedStreaming(livePassDelay: .milliseconds(50))
+        let engine = try await loadedStreaming()
         let partials = Recorder<String?>()
         let s = await session(engine, clock: clock, live: true, partials: partials)
         await s.begin()
         s.startLoops()
         #expect(await waitUntil { partials.all == ["partial 1"] })
+        let livePass = Gate()
+        await engine.setLivePassGate(livePass)
         #expect(await clock.waitForSleeper(at: .milliseconds(500)))
         clock.advance(to: .milliseconds(500))
         #expect(await waitUntil { engine.livePassCount == 2 })
         let ending = s.end()
+        await livePass.open()
         _ = await ending.feed?.value
         #expect(partials.all == ["partial 1"])
         #expect(engine.warmPassCount == 0)
@@ -112,24 +113,31 @@ import Testing
 
     @Test func abandonWaitsForTheFeedBeforeDroppingTheUtterance() async throws {
         let clock = ManualClock()
-        let engine = try await loadedStreaming(feedDelay: .milliseconds(50))
+        let feed = Gate()
+        let engine = try await loadedStreaming(feedGate: feed)
         let s = await session(engine, clock: clock)
         await s.begin()
         s.startLoops()
         #expect(await clock.waitForSleeper(at: .seconds(1)))
         clock.advance(to: .seconds(1))
         #expect(await waitUntil { engine.isFeeding })
-        await s.end().abandon()
+        let abandoning = Task { await s.end().abandon() }
+        // Negative path: gives an abandon that wrongly skips the feed time to arrive.
+        try? await Task.sleep(for: .milliseconds(20))
+        await feed.open()
+        await abandoning.value
         #expect(Array(engine.log.suffix(2)) == ["fed", "abandon"])
     }
 
     @Test func aBeginOvertakenByEndDropsItsUtteranceAndStartsNoLoop() async throws {
         let clock = ManualClock()
-        let engine = try await loadedStreaming(beginDelay: .milliseconds(50))
+        let begin = Gate()
+        let engine = try await loadedStreaming(beginGate: begin)
         let s = await session(engine, clock: clock)
         let beginning = Task { await s.begin() }
         #expect(await waitUntil { engine.log.contains("begin") })
         let ending = s.end()
+        await begin.open()
         await beginning.value
         s.startLoops()
         guard case .whole = ending.source else {
