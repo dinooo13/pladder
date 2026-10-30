@@ -199,6 +199,25 @@ line ends with the window passes the feed ran during the recording, from the
 capture's start. The table gives the median total, the mean and the largest
 wait, and how many runs waited 20 ms or more.
 
+Apple M1, macOS 27.2, Parakeet Ultra, the 30 s fixture, 2026-10-30. Before
+is the feed loop's engine call cancelled by the release, after is it kept
+(#84); the two builds ran alternately, two runs each, load average 1.3 to
+1.6:
+
+| Release at | Before | After | What the release met |
+|---|---:|---:|---|
+| 15.09 to 15.30 s | 214 to 279 ms | 243 to 268 ms | Window 0 not yet started by the feed: the tail runs it inside `endUtterance` |
+| 28.30, 28.40 s | 248 to 253 ms | 237 to 250 ms | Window 1 not yet started, or started at the release |
+| 28.55 s | 238, 246 ms | 212, 158 ms | Window 1 in the feed, 4 to 91 ms in. Before, the release cancelled it and it ran again from the start; after, the release waits for the rest |
+| 2 to 30 s, a spread of 20 (mean) | 25, 23 ms | 24, 20 ms | Two of the 20 waited, near a boundary |
+
+A window can run once its audio exists, window 0 from 15.0 s, but the feed
+loop starts it at its next one-second wake, and those wakes drift late: in
+these runs window 0 started between 15.33 and 15.92 s. A release in that gap
+pays a whole pass, about 0.2 s, on top of the last window. Away from the
+boundaries no release waited, and a warm pass in flight at the release (9 to
+117 ms long) cost nothing measurable.
+
 ## Baseline
 
 Reference machine: Apple M1, 16 GB, macOS 26.6.2 (25G83), FluidAudio 0.15.6,
