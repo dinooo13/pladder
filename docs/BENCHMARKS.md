@@ -9,9 +9,11 @@ they do, see [PERFORMANCE.md](PERFORMANCE.md).
 ## What is measured
 
 - **Engine time and realtime factor** per fixture: wall clock around
-  `engine.transcribe`, the same call the coordinator makes. Realtime factor is
-  audio length divided by engine time, so 30x means a minute of speech in two
-  seconds.
+  `engine.transcribe`, the whole recording in one call. That is the engine's
+  speed, not what a dictation waits for: the app transcribes while the key is
+  held and leaves only the last window for the release (see "What a dictation
+  waits for"). Realtime factor is audio length divided by engine time, so 30x
+  means a minute of speech in two seconds.
 - **Word error rate** per fixture against the known script, so a change that
   is faster but worse is caught. Case and punctuation are ignored; only the
   words count. The calculation lives in the `PladderBench` target, which
@@ -234,6 +236,37 @@ mishearings, "flowers" heard as "flours" and "rye loaf" merged into one word.
 The sentence with "flowers" is transcribed correctly in the 30 s fixture,
 where it does not sit near a window boundary, which is the kind of seam
 effect the longer fixtures exist to expose.
+
+### What a dictation waits for
+
+The table above transcribes each recording whole, which is what a dictation
+waited for until transcribing while the key is held became the only path. Now
+the windows run during the recording and the release waits only for the last
+one and the merge, so the wait stays flat with length. `endUtterance` alone,
+from the paced run in [PERFORMANCE.md](PERFORMANCE.md):
+
+| Fixture | Whole recording (table above) | Left at release (paced) |
+|---|---:|---:|
+| 10s | 0.237 s | 0.257 s |
+| 30s | 0.399 s | 0.252 s |
+| 60s | 0.563 s | 0.278 s |
+| 2m | 0.908 s | 0.254 s |
+| 5m | 1.976 s | 0.275 s |
+| 10m | 3.704 s | 0.323 s |
+
+Under about 15 s a recording is one window either way and both paths cost
+the same. In the app, the `release-to-paste` log line adds capture stop,
+processors and paste. 116 real dictations on the M1, 2026-10-29 and 30:
+
+| Recording | Dictations | Median length | Release-to-paste (median) |
+|---|---:|---:|---:|
+| under 10 s | 67 | 4.6 s | 0.195 s |
+| 10–20 s | 28 | 13.6 s | 0.253 s |
+| 20–40 s | 17 | 30.1 s | 0.255 s |
+| 40–60 s | 4 | 42.2 s | 0.335 s |
+
+Two of the four over 40 s waited about 0.2 s for an engine pass already
+running at release (issue #84); without that wait the median is about 0.26 s.
 
 ## Reading the app's release-to-paste log
 
