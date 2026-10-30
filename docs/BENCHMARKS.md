@@ -85,8 +85,9 @@ separate table with chip, macOS version and model version.
 ### The paced bench, for engines that transcribe while speaking
 
 `--paced` replaces the whole-buffer call with the live one: each fixture is
-pushed in one-second chunks paced at real time, as the coordinator's feed
-task delivers them, and only `endUtterance` is timed. That is the part left
+pushed in chunks paced at real time, the size the coordinator's feed task
+hands over (100 ms; one second before #84), and only `endUtterance` is
+timed. That is the part left
 on the release-to-paste path.
 
 ```sh
@@ -211,12 +212,35 @@ is the feed loop's engine call cancelled by the release, after is it kept
 | 28.55 s | 238, 246 ms | 212, 158 ms | Window 1 in the feed, 4 to 91 ms in. Before, the release cancelled it and it ran again from the start; after, the release waits for the rest |
 | 2 to 30 s, a spread of 20 (mean) | 25, 23 ms | 24, 20 ms | Two of the 20 waited, near a boundary |
 
-A window can run once its audio exists, window 0 from 15.0 s, but the feed
-loop starts it at its next one-second wake, and those wakes drift late: in
-these runs window 0 started between 15.33 and 15.92 s. A release in that gap
-pays a whole pass, about 0.2 s, on top of the last window. Away from the
-boundaries no release waited, and a warm pass in flight at the release (9 to
-117 ms long) cost nothing measurable.
+A window can run once its audio exists, window 0 from 15.0 s, but only the
+feed loop starts it, at its next wake. With a wake every second, and the
+wakes drifting late, window 0 started between 15.33 and 15.92 s in the runs
+above, and a release in that gap paid a whole pass, about 0.2 s, on top of
+the last window. The feed now wakes every 100 ms. Same machine, the
+build above against the same build feeding every 100 ms, alternately, load
+average 1.2 to 1.9:
+
+| Release at | Feed every 1 s | Feed every 100 ms |
+|---|---:|---:|
+| 15.09, 15.10 s | 243 to 267 ms | 157 to 244 ms, the rest of a pass started at 15.00 to 15.09 s |
+| 15.30 s | 233, 261 ms | 0, 9 ms |
+| 28.30, 28.40 s | 238 to 248 ms | 59 to 217 ms |
+| 2 to 30 s, a spread of 20 (mean) | 16, 17 ms | 8, 9 ms |
+
+A cadence sweep over releases spread across the second after each boundary
+(16 runs per cell, alternately, load average 1.5 to 2.5):
+
+| Feed every | 15.0 to 16.0 s: mean wait, runs over 20 ms | 28.2 to 29.2 s: mean wait, runs over 20 ms | Window 0 started |
+|---|---:|---:|---|
+| 1 s | 195 ms, 14 | 110 ms, 9 | 15.53 to 15.69 s |
+| 250 ms | 75 ms, 5 | 30 ms, 2 | 15.02 to 15.26 s |
+| 100 ms | 52 ms, 4 | 15 ms, 2 | 15.01 to 15.11 s |
+
+What is left is a release inside the pass itself, which the merge needs.
+`bench-coordinator` and the paced bench, its text identical with 100 ms
+chunks, did not change. Away from the boundaries no release waited, and a
+warm pass in flight at the release (9 to 126 ms long) cost nothing
+measurable.
 
 ## Baseline
 
