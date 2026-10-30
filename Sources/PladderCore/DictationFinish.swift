@@ -35,6 +35,7 @@ struct DictationFinish {
     let pipeline: ProcessorPipeline
     let disabledProcessors: Set<String>
     let appendTrailingSpace: Bool
+    let shortSentence: ShortSentence
     let willPolish: Bool
     let refiner: (any TranscriptRefiner)?
     let minimumDuration: TimeInterval
@@ -76,6 +77,8 @@ struct DictationFinish {
             } else if willPolish {
                 timing.polish = .zero
             }
+            // After polish, which would put the capital and the stop back.
+            final = shortSentence.apply(final)
             let needsSpace = appendTrailingSpace && final.last?.isWhitespace != true
             let toInsert = needsSpace ? final + " " : final
             transcript.text = final

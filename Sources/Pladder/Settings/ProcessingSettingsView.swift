@@ -11,13 +11,7 @@ struct ProcessingSettingsView: View {
             Section {
                 ForEach(StandardProcessors.entries.map(\.id), id: \.self) { id in
                     Toggle(isOn: binding(for: id)) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(ProcessorText.name(id))
-                            Text(ProcessorText.detail(id))
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
+                        ToggleLabel(title: ProcessorText.name(id), detail: ProcessorText.detail(id))
                     }
                 }
             } header: {
@@ -27,11 +21,23 @@ struct ProcessingSettingsView: View {
             }
 
             Section {
-                Toggle("Append a space after each dictation", isOn: $model.settings.appendTrailingSpace)
+                Toggle(isOn: $model.settings.appendTrailingSpace) {
+                    ToggleLabel(
+                        title: String(localized: "Append a space after each dictation"),
+                        detail: String(localized: "Separates consecutive dictations so pasted runs stay readable."))
+                }
+                Toggle(isOn: $model.settings.shortSentenceWithoutPeriod) {
+                    ToggleLabel(
+                        title: String(localized: "Leave out the period after a short sentence"),
+                        detail: String(localized: "A dictation of one sentence up to ten words, such as “Yes” or a command, is pasted without its final period."))
+                }
+                Toggle(isOn: $model.settings.shortSentenceWithoutCapital) {
+                    ToggleLabel(
+                        title: String(localized: "Start a short sentence in lowercase"),
+                        detail: String(localized: "A dictation of one sentence up to ten words is pasted without its first capital. “I” and words such as “API” keep theirs."))
+                }
             } header: {
                 Text("Output")
-            } footer: {
-                FootnoteText("Separates consecutive dictations so pasted runs stay readable.")
             }
 
             Section {
@@ -87,5 +93,20 @@ struct ProcessingSettingsView: View {
             get: { !model.settings.disabledProcessors.contains(id) },
             set: { model.settings.setProcessor(id, enabled: $0) }
         )
+    }
+}
+
+private struct ToggleLabel: View {
+    let title: String
+    let detail: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+            Text(detail)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }

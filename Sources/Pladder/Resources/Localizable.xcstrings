@@ -31,6 +31,26 @@
         }
       }
     },
+    "A dictation of one sentence up to ten words is pasted without its first capital. “I” and words such as “API” keep theirs.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ein Diktat aus einem Satz mit bis zu zehn Wörtern wird ohne Großbuchstaben am Anfang eingefügt. „I“ und Wörter wie „API“ behalten ihn."
+          }
+        }
+      }
+    },
+    "A dictation of one sentence up to ten words, such as “Yes” or a command, is pasted without its final period.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ein Diktat aus einem Satz mit bis zu zehn Wörtern, etwa „Ja“ oder ein Befehl, wird ohne Schlusspunkt eingefügt."
+          }
+        }
+      }
+    },
     "Accessibility": {
       "localizations": {
         "de": {
@@ -487,6 +507,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Lass „Gehört als“ leer, um ein Wort einzutragen, das korrigiert werden soll, wenn es fast richtig erkannt wird."
+          }
+        }
+      }
+    },
+    "Leave out the period after a short sentence": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kein Punkt nach einem kurzen Satz"
           }
         }
       }
@@ -1057,6 +1087,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Das Sprachmodell ist noch nicht geladen."
+          }
+        }
+      }
+    },
+    "Start a short sentence in lowercase": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kurzen Satz klein beginnen"
           }
         }
       }

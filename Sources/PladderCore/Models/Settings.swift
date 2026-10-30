@@ -37,6 +37,8 @@ public struct Settings: Codable, Sendable, Equatable {
     public var disabledProcessors: Set<String>
     public var dictionary: [DictionaryEntry]
     public var appendTrailingSpace: Bool
+    public var shortSentenceWithoutPeriod: Bool
+    public var shortSentenceWithoutCapital: Bool
     public var playSounds: Bool
     public var muteOutputWhileDictating: Bool
     public var appearance: Appearance
@@ -55,6 +57,8 @@ public struct Settings: Codable, Sendable, Equatable {
         disabledProcessors = []
         dictionary = []
         appendTrailingSpace = true
+        shortSentenceWithoutPeriod = false
+        shortSentenceWithoutCapital = false
         playSounds = true
         muteOutputWhileDictating = false
         appearance = .system
@@ -65,7 +69,8 @@ public struct Settings: Codable, Sendable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case engineID, hotkey, submitKey, polishDictations, polishModel, toggleHotkey
-        case disabledProcessors, dictionary, appendTrailingSpace, playSounds
+        case disabledProcessors, dictionary, appendTrailingSpace, shortSentenceWithoutPeriod, shortSentenceWithoutCapital
+        case playSounds
         case muteOutputWhileDictating, appearance, overlayStyle, overlayGlass, overlayAnimationSpeed
     }
 
@@ -113,6 +118,8 @@ public struct Settings: Codable, Sendable, Equatable {
             if dictionary.count < rows.count { report?.dropped(CodingKeys.dictionary.rawValue) }
         }
         if let value = read(Bool.self, .appendTrailingSpace) { appendTrailingSpace = value }
+        if let value = read(Bool.self, .shortSentenceWithoutPeriod) { shortSentenceWithoutPeriod = value }
+        if let value = read(Bool.self, .shortSentenceWithoutCapital) { shortSentenceWithoutCapital = value }
         if let value = read(Bool.self, .playSounds) { playSounds = value }
         if let value = read(Bool.self, .muteOutputWhileDictating) { muteOutputWhileDictating = value }
         if let value = read(Appearance.self, .appearance) { appearance = value }

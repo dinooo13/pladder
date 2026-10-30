@@ -9,6 +9,7 @@ public struct DictationSettings: Sendable, Equatable {
     public var disabledProcessors: Set<String>
     public var dictionary: [DictionaryEntry]
     public var appendTrailingSpace: Bool
+    public var shortSentence: ShortSentence
     public var muteOutputWhileDictating: Bool
     public var liveTranscript: Bool
     public var copiedHoldDuration: Duration
@@ -22,6 +23,8 @@ public struct DictationSettings: Sendable, Equatable {
         disabledProcessors = settings.disabledProcessors
         dictionary = settings.dictionary
         appendTrailingSpace = settings.appendTrailingSpace
+        shortSentence = ShortSentence(
+            dropPeriod: settings.shortSentenceWithoutPeriod, dropCapital: settings.shortSentenceWithoutCapital)
         muteOutputWhileDictating = settings.muteOutputWhileDictating
         liveTranscript = settings.overlayStyle == .liveTranscript
         copiedHoldDuration = settings.overlayAnimationSpeed.copiedHoldDuration

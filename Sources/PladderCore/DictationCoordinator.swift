@@ -467,7 +467,8 @@ public final class DictationCoordinator {
         cycleEngine = nil
         let finish = DictationFinish(
             pipeline: pipeline, disabledProcessors: settings.disabledProcessors,
-            appendTrailingSpace: settings.appendTrailingSpace, willPolish: willPolish, refiner: refiner,
+            appendTrailingSpace: settings.appendTrailingSpace, shortSentence: settings.shortSentence,
+            willPolish: willPolish, refiner: refiner,
             minimumDuration: minimumDuration, minimumPolishWords: minimumPolishWords, output: output)
         inFlight = Task { [weak self] in
             guard let self else { return }
