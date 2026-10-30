@@ -108,6 +108,8 @@ public final class DictationCoordinator {
     @ObservationIgnored private(set) var handledHotkeyEvents = 0
 
     public struct CycleTiming: Sendable, Equatable {
+        // The wait for the feed loop to hand over its last chunk, before the capture stops.
+        public var feed: Duration
         public var captureStop: Duration
         public var engine: Duration
         public var processing: Duration
@@ -472,8 +474,7 @@ public final class DictationCoordinator {
             minimumDuration: minimumDuration, minimumPolishWords: minimumPolishWords, output: output)
         inFlight = Task { [weak self] in
             guard let self else { return }
-            // The feed loop finishes handing over a chunk drained before the release. What
-            // it waits for is engine work `endUtterance` would wait for anyway: engine time.
+            // The feed loop finishes handing over a chunk drained before the release.
             let handover = ContinuousClock.now
             let fed = await ending?.feed?.value
             let stopped = ContinuousClock.now

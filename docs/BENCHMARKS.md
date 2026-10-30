@@ -147,11 +147,11 @@ or hotkey, so it can run beside a copy of Pladder in use.
 
 Per run, `total` is `inserted` minus `recordingStopped`, as in the app's log
 line. `share` is the total minus the stages the `inserted` event reports
-(stop, engine, process, polish, paste): the time spent between them.
-`engine excess` is the engine stage minus the stand-in's latency: the feed
-hand-over and the actor hops around `endUtterance`, plus the stand-in timer's
-own overshoot, which the header prints. 21 runs by default, the first
-discarded.
+(feed, stop, engine, process, polish, paste): the time spent between them.
+`engine excess` is the feed and engine stages minus the stand-in's
+latency: the feed hand-over and the actor hops around `endUtterance`, plus
+the stand-in timer's own overshoot, which the header prints. 21 runs by
+default, the first discarded.
 
 Use it before and after a change to the coordinator, beside the paced bench:
 the paced bench says what the engine costs, this what the coordinator adds.
@@ -325,14 +325,14 @@ per-stage breakdown and the audio length:
 The line looks like:
 
 ```
-release-to-paste 0.312 s: stop 0.012, engine 0.250, process 0.003, paste 0.014; audio 4.2 s
+release-to-paste 0.312 s: feed 0.002, stop 0.012, engine 0.250, process 0.003, paste 0.014; audio 4.2 s, engine-time 0.250 s
 ```
 
 A polished dictation logs its own line, with the model
-call as a fifth stage and the model it ran on:
+call as a sixth stage and the model it ran on:
 
 ```
-polished release-to-paste 1.912 s: stop 0.012, engine 0.250, process 0.003, polish 1.620 (appleIntelligence), paste 0.014; audio 6.1 s
+polished release-to-paste 1.912 s: feed 0.002, stop 0.012, engine 0.250, process 0.003, polish 1.620 (appleIntelligence), paste 0.014; audio 6.1 s, engine-time 0.250 s
 ```
 
 `polish` is the model call; it exists only for dictations run with the
@@ -436,19 +436,25 @@ whenever an ambiguous filler is present. Differences under a millisecond at
 
 What each stage contains:
 
+- `feed` is the wait for the feed loop to exit: when a release lands while
+  the loop is handing the engine a chunk, and that chunk completes a window,
+  the window pass runs to its end first. Lines logged before #84 have no
+  `feed`; their `engine` included it.
 - `stop` is `AudioCapture.stop()`: removing the tap and collecting the
   captured samples.
-- `engine` is the engine's call: `endUtterance` for a streaming engine, `transcribe` otherwise. It includes, when a release lands while the feed loop is handing the engine a chunk, the wait for that hand-over, which the call would have waited for anyway.
+- `engine` is the engine's call: `endUtterance` for a streaming engine, `transcribe` otherwise.
 - `process` is the processor pipeline run.
 - `paste` is `TextOutput.insert`.
 
-The remainder of the total after these four stages is actor scheduling: the
+The remainder of the total after these five stages is actor scheduling: the
 coordinator resumes on the main actor between stages. If the remainder grows,
 something new is contending with the main actor.
 
 The engine's own `processingTime` is logged beside the stages as
-`engine-time`; a large gap between `engine` and `engine-time` means the engine
-actor was busy with something else.
+`engine-time`: for a streaming engine, the last window and the merge. A large
+gap between `engine` and `engine-time` means the call waited before the
+engine's own timer started, for the engine actor or for a window that the
+tail fed at release completed.
 
 A `keyboard bounce observed` line in the `hotkey` category means the keyboard
 reported a held key as released and pressed again, and every release since

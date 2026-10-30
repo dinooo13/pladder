@@ -161,17 +161,19 @@ private final class FixedRefiner: TranscriptRefiner, @unchecked Sendable {
         #expect(transcript.text == "Hello, World!")
     }
 
-    @Test func timingSumsTheStagesAndFeedWaitCountsAsEngineTime() async throws {
+    @Test func timingCarriesTheFeedWaitApartFromTheEngine() async throws {
         // Real time: the timing is read from the wall clock.
         let engine = try await loaded("hello world", delay: .milliseconds(20))
         let (outcome, _) = await run(
-            finish(), input(.whole(engine), captureStop: .milliseconds(7), feedWait: .milliseconds(40)))
+            finish(), input(.whole(engine), captureStop: .milliseconds(7), feedWait: .seconds(1)))
         guard case .inserted(let insertion) = outcome else {
             Issue.record("expected an insertion, got \(outcome)")
             return
         }
+        #expect(insertion.timing.feed == .seconds(1))
         #expect(insertion.timing.captureStop == .milliseconds(7))
-        #expect(insertion.timing.engine >= .milliseconds(60))
+        #expect(insertion.timing.engine >= .milliseconds(20))
+        #expect(insertion.timing.engine < .seconds(1))
         #expect(insertion.timing.processing > .zero)
         #expect(insertion.timing.insert > .zero)
     }
