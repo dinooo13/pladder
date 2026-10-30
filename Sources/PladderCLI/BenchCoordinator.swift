@@ -159,7 +159,7 @@ enum CoordinatorBench {
 
 // MARK: - Stand-ins
 
-private final class EventStamps: @unchecked Sendable {
+final class EventStamps: @unchecked Sendable {
     private let lock = NSLock()
     private var _stopped: ContinuousClock.Instant?
     private var _inserted: ContinuousClock.Instant?
@@ -298,7 +298,7 @@ private actor SilentCapture: AudioCapture {
     }
 }
 
-private struct TimedOutput: TextOutput {
+struct TimedOutput: TextOutput {
     let latency: Duration
 
     func insert(_ text: String, submit: Bool) async throws -> InsertResult {
@@ -320,7 +320,7 @@ private struct FixedLatencyRefiner: TranscriptRefiner {
     }
 }
 
-private struct SilentHotkeyMonitor: HotkeyMonitor {
+struct SilentHotkeyMonitor: HotkeyMonitor {
     func start(chords: [HotkeyRole: Hotkey], submitKey: Hotkey) -> AsyncStream<HotkeyMonitorEvent> {
         AsyncStream { _ in }
     }

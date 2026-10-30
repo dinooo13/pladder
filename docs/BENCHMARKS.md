@@ -172,6 +172,33 @@ passes gave medians of 156 and 153 ms total and 0.05 and 0.02 ms share. A
 release that lands in a warm or live pass waits for it, as in the app; at
 the default 1.5 s hold none does.
 
+### The release wait
+
+A release that lands next to a window pass waits for it; the paced bench
+never shows that, because its releases always come straight after a feed.
+`bench-release` releases where you ask:
+
+```sh
+swift run -c release pladder-cli bench-release bench/fixtures/30s.wav --at 15.1,15.3,28.3,28.4 --uniform 2-30:20
+```
+
+It builds the real coordinator and processors around the real engine, plays
+the file in through a stand-in microphone at real time, silence after its
+end, and releases each run at the given instant of the recording; `--uniform`
+adds a spread of release times with a fixed jitter, the same in every build,
+so a before and an after run see the same instants. Rounds go over every
+release time in turn, three by default, after one discarded run and three
+seconds of idle before each. Like `bench-coordinator` it touches no
+microphone, pasteboard or hotkey.
+
+Per run it prints the stages of the app's log line and `waited`, which is
+`feed` plus `engine` minus `engine-time`: what the release waited for before
+the engine's own last window and merge. `busy` names what was running at
+the release (a warm pass, a live pass, or a feed that ran a window), and the
+line ends with the window passes the feed ran during the recording, from the
+capture's start. The table gives the median total, the mean and the largest
+wait, and how many runs waited 20 ms or more.
+
 ## Baseline
 
 Reference machine: Apple M1, 16 GB, macOS 26.6.2 (25G83), FluidAudio 0.15.6,
