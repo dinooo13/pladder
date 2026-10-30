@@ -129,6 +129,34 @@ import Testing
         #expect(Array(engine.log.suffix(2)) == ["fed", "abandon"])
     }
 
+    @Test func aReleaseLetsTheEngineCallInFlightFinish() async throws {
+        let clock = ManualClock()
+        let engine = HeldFeedEngine()
+        let s = await session(engine, clock: clock)
+        await s.begin()
+        s.startLoops()
+        #expect(await clock.waitForSleeper(at: .seconds(1)))
+        clock.advance(to: .seconds(1))
+        await engine.gate.untilSomeoneWaits()
+        let ending = s.end()
+        await engine.gate.open()
+        #expect(await ending.feed?.value == 8_000)
+        #expect(engine.feeds.all == [.finished])
+    }
+
+    @Test func aCancelStopsTheEngineCallInFlight() async throws {
+        let clock = ManualClock()
+        let engine = HeldFeedEngine()
+        let s = await session(engine, clock: clock)
+        await s.begin()
+        s.startLoops()
+        #expect(await clock.waitForSleeper(at: .seconds(1)))
+        clock.advance(to: .seconds(1))
+        await engine.gate.untilSomeoneWaits()
+        await s.end().abandon()
+        #expect(engine.feeds.all == [.cancelled])
+    }
+
     @Test func aBeginOvertakenByEndDropsItsUtteranceAndStartsNoLoop() async throws {
         let clock = ManualClock()
         let begin = Gate()
@@ -147,5 +175,35 @@ import Testing
         #expect(engine.log.last == "abandon")
         #expect(clock.sleeperCount == 0)
         #expect(engine.warmPassCount == 0)
+    }
+}
+
+// Its feed holds until the gate opens or the call is cancelled, as a window pass
+// stops at FluidAudio's next cancellation check.
+private actor HeldFeedEngine: StreamingTranscriptionEngine {
+    enum Feed: Sendable, Equatable { case finished, cancelled }
+
+    nonisolated let id = EngineID("held-feed")
+    nonisolated let displayName = "Held feed"
+    nonisolated let gate = Gate()
+    nonisolated let feeds = Recorder<Feed>()
+    private(set) var status: EngineStatus = .ready
+
+    func load() async throws {}
+    func unload() async {}
+    func transcribe(_ samples: [Float]) async throws -> Transcript { throw TranscriptionError.notLoaded }
+    func beginUtterance() async throws -> Utterance { Utterance(id: 1) }
+    func endUtterance(_ utterance: Utterance, tail: [Float]) async throws -> Transcript {
+        throw TranscriptionError.notLoaded
+    }
+    func abandonUtterance(_ utterance: Utterance) async {}
+
+    func feed(_ samples: [Float], to utterance: Utterance) async {
+        await withTaskCancellationHandler {
+            await gate.wait()
+        } onCancel: {
+            Task { await self.gate.open() }
+        }
+        feeds.append(Task.isCancelled ? .cancelled : .finished)
     }
 }

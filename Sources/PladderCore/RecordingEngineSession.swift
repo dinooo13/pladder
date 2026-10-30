@@ -14,11 +14,14 @@ final class RecordingEngineSession {
         // Awaited at release: a chunk drained just before is still fed, so every sample
         // reaches the engine once and in order.
         let feed: Task<Int, Never>?
+        // The feed loop's engine call in flight at the end, which only a cancel stops.
+        let handover: Task<Void, Never>?
 
         // The engine drops the utterance only once the feed has exited, so no chunk lands
         // after it.
         func abandon() async {
             guard case .utterance(let engine, let utterance) = source else { return }
+            handover?.cancel()
             _ = await feed?.value
             await engine.abandonUtterance(utterance)
         }
@@ -36,8 +39,9 @@ final class RecordingEngineSession {
     private let onPartial: @MainActor (String?) -> Void
     private var streaming: (engine: any StreamingTranscriptionEngine, utterance: Utterance)?
     private var feed: Task<Int, Never>?
+    private var handover: Task<Void, Never>?
     // Cancelling cannot abort a CoreML call already started, so a release landing in
-    // a warm pass waits for it; the log shows that as `engine` above `engine-time`.
+    // a warm pass waits for that call, inside `engine-time`.
     private var warmup: Task<Void, Never>?
     private(set) var isEnded = false
 
@@ -95,7 +99,7 @@ final class RecordingEngineSession {
         } else {
             .whole(engine)
         }
-        return Ending(source: source, feed: feed)
+        return Ending(source: source, feed: feed, handover: handover)
     }
 
     // One loop for feed and live passes, so they never drain against each other.
@@ -108,7 +112,13 @@ final class RecordingEngineSession {
                 let chunk = await capture.drain()
                 if !chunk.isEmpty {
                     fed += chunk.count
-                    await engine.feed(chunk, to: utterance)
+                    // Kept from the release's cancel: FluidAudio checks for it between decoder
+                    // frames, and a window pass it stops is run again from the start by
+                    // `endUtterance`, so the release would wait for the whole pass.
+                    let handover = Task { await engine.feed(chunk, to: utterance) }
+                    self.handover = handover
+                    await handover.value
+                    self.handover = nil
                 }
                 guard live, !Task.isCancelled else { continue }
                 let text = await engine.livePass(utterance)
