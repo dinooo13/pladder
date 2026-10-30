@@ -17,6 +17,6 @@ public enum StandardEngines {
         make: { FluidAudioIncrementalEngine(model: .ultra) }
     )
 
-    public static let entries: [EngineRegistry.Entry] = [parakeet, parakeetUltra]
+    public static let entries: [EngineRegistry.Entry] = [parakeetUltra, parakeet]
     public static var defaultEntry: EngineRegistry.Entry { entries[0] }
 }

@@ -42,7 +42,7 @@ You type long prompts all day. Speech is three to four times faster than typing,
 
 **About 300 ms from letting go to pasted text, on an M1, the slowest chip Pladder runs on.** It does not matter whether you spoke for five seconds or five minutes: the recording is transcribed while you are still speaking, so by the time you release the key there is almost nothing left to do.
 
-The engine is NVIDIA's Parakeet TDT v3, running on the Neural Engine through [FluidAudio](https://github.com/FluidInference/FluidAudio). It loads at launch and stays loaded, so the first dictation after launch is as quick as the hundredth. Why it is fast is written up in [docs/PERFORMANCE.md](docs/PERFORMANCE.md); the measurement procedure and the full baseline are in [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+The engine is Parakeet Ultra, Moondream's post-training of NVIDIA's Parakeet TDT v3, running on the Neural Engine through [FluidAudio](https://github.com/FluidInference/FluidAudio). It loads at launch and stays loaded, so the first dictation after launch is as quick as the hundredth. Why it is fast is written up in [docs/PERFORMANCE.md](docs/PERFORMANCE.md); the measurement procedure and the full baseline are in [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
 ## Private by construction
 
@@ -87,7 +87,7 @@ Pladder does one thing: push-to-talk, on-device, into any app, as fast as the ha
 Any Apple Silicon Mac on macOS 26 or later. Benchmarks are taken on an M1, so every newer chip is faster.
 
 **Which languages?**
-The 25 European languages Parakeet TDT v3 supports, including English, German, French, Spanish, Italian, Portuguese, Dutch, Polish and Ukrainian.
+The 25 European languages Parakeet TDT v3 and Ultra support, including English, German, French, Spanish, Italian, Portuguese, Dutch, Polish and Ukrainian.
 
 **Option+Space is my Alfred or Raycast hotkey, or I type non-breaking spaces with it.**
 Both are lost while Pladder runs. Record another combination in Settings; see [push to talk](docs/USAGE.md#push-to-talk).
