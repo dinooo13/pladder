@@ -202,17 +202,18 @@ and a different accuracy profile. It is not in the app.
 
 ## Reading a regression
 
-If the release-to-paste log line grows, subtract the four stages from the
+If the release-to-paste log line grows, subtract the five stages from the
 total. The remainder is actor scheduling: the coordinator resumes on the
 main actor between stages. A growing remainder means something new is
 contending with the main actor, not that the engine got slower. The
 engine's own `processingTime` is logged as `engine-time` beside the stages.
 
-A gap between `engine` and `engine-time` has two possible causes, and they
-are worth telling apart. It can mean the call waited on the engine actor,
-usually behind a warm pass that was already running at release. It also
-covers the tail being fed at release, which the engine's own timer starts
-after, so a small gap is expected rather than a sign of contention.
+A wait at release shows in one of two places. `feed` is the feed loop
+still handing over its last chunk, a window pass included when that chunk
+completed a window. A gap between `engine` and `engine-time` is the call
+waiting before the engine's own timer starts: on the engine actor, or for a
+window that the tail fed at release completed. A gap of a millisecond or so
+is the tail itself and expected.
 
 The stages are logged with `privacy: .public`. Without that marker the
 system redacts the interpolated string and the line reads `<private>`

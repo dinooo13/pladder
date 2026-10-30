@@ -73,7 +73,7 @@ the rest runs in `inFlight`:
 
 1. wait for the feed loop to exit. A chunk it drained just before the
    release is still handed over, so every sample reaches the engine once and
-   in order. This wait counts as engine time;
+   in order. The log line carries this wait as `feed`;
 2. stop the capture, which returns only the samples after the last drain;
 3. `DictationFinish.run`: drop a recording under 0.3 s, then `endUtterance`
    with the tail (or `transcribe` the whole buffer), run the processor

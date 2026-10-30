@@ -113,10 +113,14 @@ enum CoordinatorBench {
             stamps.reset()
             let timing = insertion.timing
             let total = inserted - stopped
-            let stages = timing.captureStop + timing.engine + timing.processing + timing.insert + (timing.polish ?? .zero)
-            let run = Run(total: total, share: total - stages, engineExcess: timing.engine - options.engineLatency)
+            let stages = timing.feed + timing.captureStop + timing.engine + timing.processing + timing.insert
+                + (timing.polish ?? .zero)
+            let run = Run(
+                total: total, share: total - stages,
+                engineExcess: timing.feed + timing.engine - options.engineLatency)
             let tag = attempt == 1 ? " (discarded)" : ""
-            print("run \(attempt): total \(format(run.total)) (stop \(format(timing.captureStop)), "
+            print("run \(attempt): total \(format(run.total)) (feed \(format(timing.feed)), "
+                + "stop \(format(timing.captureStop)), "
                 + "process \(format(timing.processing))), share \(format(run.share)), "
                 + "engine excess \(format(run.engineExcess))\(tag)")
             if attempt > 1 { kept.append(run) }

@@ -52,7 +52,7 @@ struct DictationFinish {
         }
         do {
             var timing = DictationCoordinator.CycleTiming(
-                captureStop: input.captureStop, engine: .zero, processing: .zero, insert: .zero)
+                feed: input.feedWait, captureStop: input.captureStop, engine: .zero, processing: .zero, insert: .zero)
             var started = ContinuousClock.now
             var transcript = switch input.source {
             case .utterance(let engine, let utterance):
@@ -60,7 +60,7 @@ struct DictationFinish {
             case .whole(let engine):
                 try await engine.transcribe(input.audio.samples)
             }
-            timing.engine = input.feedWait + (ContinuousClock.now - started)
+            timing.engine = ContinuousClock.now - started
             if transcript.audioDuration == 0 {
                 transcript.audioDuration = totalDuration
             }
