@@ -28,6 +28,9 @@ on:
       - '.github/workflows/ci.yml'
       - '.github/actions/build-and-test/**'
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     # Pladder targets macOS 26 and needs Xcode 26.
