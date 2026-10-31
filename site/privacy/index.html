@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy: your voice never leaves your Mac · Pladder</title>
+<meta name="description" content="How Pladder handles your voice and your words: audio and text stay on your Mac, the microphone is open only while you hold the key, and there is no account, no analytics and no update check.">
+<link rel="canonical" href="https://dinooo13.github.io/pladder/privacy/">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="preload" href="../fonts/outfit.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../style.css">
+<meta name="theme-color" content="#F5F5FA">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Pladder">
+<meta property="og:title" content="Pladder privacy: your voice never leaves your Mac">
+<meta property="og:description" content="Audio and text stay on your Mac. No account, no analytics, no update check.">
+<meta property="og:url" content="https://dinooo13.github.io/pladder/privacy/">
+<meta property="og:image" content="https://dinooo13.github.io/pladder/social-preview.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="Pladder: talk to your agents. Push-to-talk dictation for macOS. On-device, free and open source.">
+<meta name="twitter:card" content="summary_large_image">
+</head>
+<body>
+<header class="bar">
+  <a class="brand" href="../"><img src="../logo.svg" width="130" height="36" alt="Pladder"></a>
+  <nav aria-label="Main">
+    <a href="./" aria-current="page">Privacy</a>
+    <a href="../#faq">FAQ</a>
+    <a href="https://github.com/dinooo13/pladder">GitHub</a>
+    <a class="pill-link" href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg">Download</a>
+  </nav>
+</header>
+
+<main class="page">
+<h1>Your voice never leaves your Mac</h1>
+<p class="lead">Privacy in Pladder is not a policy. It is how the app is built: there is no server to send anything to.</p>
+
+<h2>Your audio</h2>
+<p>The microphone is open only while you hold the key, and macOS shows its orange indicator only then. The audio goes from the microphone to your Mac's Neural Engine, where it is turned into text, and is then thrown away. It is never saved and never sent.</p>
+
+<h2>Your words</h2>
+<p>The transcript exists just long enough to be pasted where your cursor is. Pladder puts it on the clipboard for the paste, then gives you back what was on your clipboard before.</p>
+
+<h2>Learning your corrections</h2>
+<p>When you fix a word by hand right after a dictation, Pladder can offer to add the fix to your dictionary. To notice it, it watches the field it pasted into for up to a minute, through the macOS Accessibility permission. It reads only the words it pasted and a little around them, keeps nothing, and asks before it adds anything. The check that a correction makes sense runs on Apple's on-device model.</p>
+
+<h2>Polish</h2>
+<p>The optional, experimental polish also runs on your Mac: either Apple's on-device model, which is part of macOS, or S1-mini by Superwhisper, which runs on your Mac's graphics chip.</p>
+
+<h2>The network</h2>
+<p>Pladder makes no network requests except two kinds of one-time download from Hugging Face:</p>
+<ul>
+  <li>the speech model, on first launch;</li>
+  <li>S1-mini, only if you choose it for polish. It is pinned to a fixed version and checked against its SHA-256 checksum before use.</li>
+</ul>
+<p>After that it works with Wi-Fi off. There is no update check, no crash reporter and no analytics.</p>
+
+<h2>No account</h2>
+<p>There is nothing to sign up for, nothing to log in to and nothing to cancel.</p>
+
+<h2>Check it yourself</h2>
+<p>Pladder is open source under the MIT license. The model downloads are its only network code: FluidAudio's downloader for the speech model, and <a href="https://github.com/dinooo13/pladder/blob/main/Sources/PladderRefine/ModelFiles.swift">ModelFiles.swift</a> for S1-mini. The same facts, for developers, are in <a href="https://github.com/dinooo13/pladder/blob/main/docs/PRIVACY.md">docs/PRIVACY.md</a>.</p>
+
+<h2>This website</h2>
+<p>This site sets no cookies, runs no analytics and loads nothing from other servers: no outside fonts, no scripts, no tracking pixels. Every file, its one typeface included, comes from GitHub Pages, which hosts it and, like any web host, sees the requests.</p>
+
+<p class="back"><a class="button" href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg">Download for Mac</a></p>
+</main>
+
+<footer class="foot">
+  <img src="../logo.svg" width="101" height="28" alt="" loading="lazy">
+  <p><em>Pladder</em> is Low German for "to babble". Made by <a href="https://github.com/dinooo13">Fabian Meyer</a>.</p>
+  <p class="links"><a href="https://github.com/dinooo13/pladder">Source</a> <a href="https://github.com/dinooo13/pladder/blob/main/docs/USAGE.md">Usage</a> <a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md">Benchmarks</a> <a href="../">Home</a> <a href="../llms.txt">llms.txt</a></p>
+  <p>Last updated <time datetime="2026-11-01">1 November 2026</time>, for version 0.1.0.</p>
+</footer>
+</body>
+</html>
