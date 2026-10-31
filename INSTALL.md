@@ -140,14 +140,14 @@ It reads WAV, M4A, MP3, FLAC, CAF and Ogg Opus. To use it as the speech-to-text 
 
 ### Icon and screenshots
 
-The app icon is rendered from code so it can be regenerated at any size, and the README pictures are rendered from the app's own views:
+The mark is drawn from code, so every picture of it comes from one geometry, and the README pictures are rendered from the app's own views:
 
 ```sh
-swift scripts/make-icon.swift Assets     # writes Assets/icon_1024.png
-./scripts/make-screenshots.sh            # writes docs/images/*.png
+swift scripts/make-icon.swift --font Outfit.ttf   # the icon's layers, the logos, the favicon, the social preview
+./scripts/make-screenshots.sh                     # writes docs/images/styles-*.png
 ```
 
-`Assets/AppIcon.icns` is built from the icon with `iconutil` and copied into the bundle. The screenshot script needs Screen Recording for the terminal that runs it, and shows a few windows for a second or two.
+The app icon is `Assets/AppIcon.icon`, an Icon Composer document; `bundle.sh` compiles it with `actool`, which comes with Xcode, into the light, dark, tinted and clear appearances. `make-icon.swift` writes its layers and colours, and renders `Assets/icon_1024.png` and `site/apple-touch-icon.png` with Icon Composer's `ictool`, so it needs Xcode too. The wordmark is outlined from [Outfit](https://github.com/google/fonts/tree/main/ofl/outfit) SemiBold (SIL Open Font License), `ofl/outfit/Outfit[wght].ttf`; without `--font` the script leaves the wordmark, the logos and the social preview as they are. The screenshot script needs Screen Recording for the terminal that runs it, and shows a few windows for a second or two.
 
 ## Troubleshooting
 

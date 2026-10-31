@@ -106,8 +106,21 @@ if [[ -n "${BUILD_NUMBER:-}" ]]; then
 	plutil -replace CFBundleVersion -string "$BUILD_NUMBER" "$CONTENTS/Info.plist"
 fi
 printf 'APPL????' > "$CONTENTS/PkgInfo"
-# App icon, rendered by scripts/make-icon.swift and packed with iconutil.
-cp "$ROOT/Assets/AppIcon.icns" "$CONTENTS/Resources/AppIcon.icns"
+# App icon: Icon Composer's document, its layers drawn by scripts/make-icon.swift.
+# actool needs no Xcode project for it and writes Assets.car, which carries the
+# light, dark, tinted and clear appearances, and an AppIcon.icns beside it.
+# Its report goes to stdout, errors included, so it is shown only on failure.
+ICON_PLIST="$(mktemp)"
+if ! ICON_LOG=$(xcrun actool "$ROOT/Assets/AppIcon.icon" \
+	--compile "$CONTENTS/Resources" \
+	--app-icon AppIcon \
+	--platform macosx --target-device mac --minimum-deployment-target 26.0 \
+	--output-partial-info-plist "$ICON_PLIST" \
+	--errors --warnings --output-format human-readable-text 2>&1); then
+	echo "$ICON_LOG" >&2
+	exit 1
+fi
+rm -f "$ICON_PLIST"
 
 # SwiftPM emits one .bundle per target that declares resources.
 shopt -s nullglob
