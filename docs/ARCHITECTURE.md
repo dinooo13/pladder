@@ -47,13 +47,13 @@ its timers with `ManualClock`.
 4. arms the output mute and starts the key-down work: the clipboard snapshot
    and the polish model's load;
 5. starts the engine work, a `RecordingEngineSession` on the coordinator's
-   clock. A streaming engine begins an utterance and gets a feed loop. In
-   the other styles the loop wakes every 100 ms and hands the engine the
-   audio captured since, so a window starts as soon as its audio exists
-   rather than up to a second later. With the Live Transcript style it skips
-   that wait: each turn hands over what has been captured, asks for the
-   text so far, publishes it as `partialTranscript` and then waits half a
-   second, so audio goes in on the live-pass cadence. Outside Live
+   clock. A streaming engine begins an utterance and gets a feed loop. The
+   loop wakes every 100 ms and hands the engine the audio captured since,
+   so a window starts as soon as its audio exists rather than up to a
+   second later. With the Live Transcript style a turn also asks for the
+   text so far, once half a second has passed since the last live pass
+   ended, and publishes it as `partialTranscript`; the first turn asks at
+   once. Outside Live
    Transcript the streaming engine also gets a warm loop, which
    transcribes half a second of silence every two seconds and keeps the
    Neural Engine from going cold; in Live Transcript the live passes keep it
@@ -571,7 +571,7 @@ an engine other than the catalog's first, for example
 | `bench <dir> --paced` | Feeds each fixture in the feed loop's chunks at real time and times `endUtterance`; also transcribes it whole and reports whether the texts are identical. Skips fixtures under 13 s unless `--all`. `--live` adds the Live Transcript pass every 0.5 s and reports its cost. |
 | `bench-process <dir>` | Times the processor pipeline on the fixtures' scripts, with a filler in every sentence and with a spoken question mark too. `--runs N`, default 31. |
 | `bench-coordinator` | Drives the real coordinator and processors with stand-ins of fixed latency for the engine, microphone, paste and polish, and reports what release-to-paste costs beyond them. `--runs N` (default 21, first discarded), `--hold S` (1.5), `--engine-latency MS` (150), `--paste-latency MS` (0), `--polish` (a 300 ms stand-in), `--live`. |
-| `bench-release <audio file>` | Drives the real coordinator and engine with the file played in at real time, releases at chosen instants and reports what each release waited for and what was running. `--at S,S,…`, `--uniform FROM-TO:COUNT` (a fixed spread, the same in every build), `--runs N` (3), `--pause S` (3), `--feed-interval MS`. |
+| `bench-release <audio file>` | Drives the real coordinator and engine with the file played in at real time, releases at chosen instants and reports what each release waited for and what was running. `--at S,S,…`, `--uniform FROM-TO:COUNT` (a fixed spread, the same in every build), `--runs N` (3), `--pause S` (3), `--feed-interval MS`, `--live` (the Live Transcript style). |
 | `polish <text file \| ->` | Runs a polish model over one transcript, cold and then warm. `--model apple\|s1-mini\|s1-mini-8bit`, `--instructions <file>` (Apple), `--gguf <file>` (any S1-mini-family model), `--control <line>` (S1-mini). |
 | `polish-set <set.json>` | Runs a polish model over a test set after the app's processors: every answer, word error rate per language, exact matches, timings. `--model`, `--gguf` and `--control` as for `polish`; no `--instructions`. |
 

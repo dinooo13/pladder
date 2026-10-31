@@ -13,6 +13,7 @@ enum ReleaseBench {
         var runs = 3
         var pause: Duration = .seconds(3)
         var feedInterval: Duration?
+        var live = false
     }
 
     static func run(arguments: [String]) async throws {
@@ -36,6 +37,8 @@ enum ReleaseBench {
             case "--pause":
                 guard let value = rest.popFirst(), let seconds = Double(value), seconds >= 0 else { usage() }
                 options.pause = .milliseconds(Int(seconds * 1_000))
+            case "--live":
+                options.live = true
             case "--feed-interval":
                 guard let value = rest.popFirst(), let ms = Int(value), ms > 0 else { usage() }
                 options.feedInterval = .milliseconds(ms)
@@ -84,8 +87,10 @@ enum ReleaseBench {
         let engine = TracingEngine(inner: inner, trace: trace)
         let capture = FixtureCapture(samples: samples)
         let stamps = EventStamps()
+        var settings = DictationSettings(engineID: engine.id)
+        settings.liveTranscript = options.live
         let coordinator = DictationCoordinator(
-            settings: DictationSettings(engineID: engine.id),
+            settings: settings,
             registry: EngineRegistry([.init(id: engine.id, displayName: engine.displayName, detail: "") { engine }]),
             capture: capture,
             output: TimedOutput(latency: .zero),
@@ -106,7 +111,8 @@ enum ReleaseBench {
         print(String(format: "fixture: %@, %.1f s, silence after its end", (path as NSString).lastPathComponent,
             Double(samples.count) / CapturedAudio.sampleRate))
         print("runs:    \(options.runs) rounds over \(times.count) release times, \(format(options.pause)) idle before each")
-        print("feed:    every \(format(coordinator.feedInterval))")
+        print("feed:    every \(format(coordinator.feedInterval))"
+            + (options.live ? ", Live Transcript: a live pass \(format(coordinator.livePassInterval)) after the last" : ""))
         print("waited:  feed + engine - engine-time; busy: what was running at the release")
         print("")
 

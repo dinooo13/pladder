@@ -106,8 +106,14 @@ final class RecordingEngineSession {
     private func startFeed(_ engine: any StreamingTranscriptionEngine, utterance: Utterance) {
         feed = Task { [weak self, capture, clock, intervals, live] in
             var fed = 0
+            // Counted down by the feed sleeps, so audio goes in on the feed cadence in every
+            // style and a live pass starts `livePass` after the previous one ended.
+            var livePassDue: Duration? = live ? .zero : nil
             while !Task.isCancelled {
-                if !live { try? await clock.sleep(for: intervals.feed) }
+                if livePassDue.map({ $0 > .zero }) ?? true {
+                    try? await clock.sleep(for: intervals.feed)
+                    livePassDue = livePassDue.map { $0 - intervals.feed }
+                }
                 guard let self, !Task.isCancelled, !self.isEnded else { return fed }
                 let chunk = await capture.drain()
                 if !chunk.isEmpty {
@@ -120,12 +126,12 @@ final class RecordingEngineSession {
                     await handover.value
                     self.handover = nil
                 }
-                guard live, !Task.isCancelled else { continue }
+                guard let due = livePassDue, due <= .zero, !Task.isCancelled else { continue }
                 let text = await engine.livePass(utterance)
                 // A pass finishing after the release would put stale text back on screen.
                 guard !Task.isCancelled, !self.isEnded else { return fed }
                 self.onPartial(text)
-                try? await clock.sleep(for: intervals.livePass)
+                livePassDue = intervals.livePass
             }
             return fed
         }

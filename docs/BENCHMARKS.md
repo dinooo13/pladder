@@ -236,6 +236,17 @@ A cadence sweep over releases spread across the second after each boundary
 | 250 ms | 75 ms, 5 | 30 ms, 2 | 15.02 to 15.26 s |
 | 100 ms | 52 ms, 4 | 15 ms, 2 | 15.01 to 15.11 s |
 
+With Live Transcript the loop handed audio over only between live passes,
+every 0.65 to 0.75 s; it now feeds every 100 ms too and starts a live pass
+half a second after the last one ended. `bench-release --live`, the same
+spreads, alternately, load average 1.1 to 3.5:
+
+| Live Transcript | Fed between live passes | Fed every 100 ms |
+|---|---:|---:|
+| 15.0 to 16.0 s: mean wait, runs over 20 ms | 79 ms, 7 | 44 ms, 6 |
+| 28.2 to 29.2 s: mean wait, runs over 20 ms | 107 ms, 9 | 24 ms, 3 |
+| 2 to 30 s, a spread of 20 (mean) | 22, 22 ms | 12, 13 ms |
+
 What is left is a release inside the pass itself, which the merge needs.
 `bench-coordinator` and the paced bench, its text identical with 100 ms
 chunks, did not change. Away from the boundaries no release waited, and a
