@@ -24,7 +24,8 @@ Before and after any change that touches the code between `recordingStopped` and
 swift build                                   # debug build of everything
 swift test                                    # unit tests, well under a second
 ./scripts/bundle.sh [--run] [--install]       # release build → dist/Pladder.app, signed
-./scripts/release.sh <version>                # Developer ID, notarised, stapled → dist/release/Pladder-<version>.dmg; publishes nothing
+./scripts/release.sh <version>                # Developer ID, notarised, stapled → dist/release/Pladder.dmg; publishes nothing
+./scripts/changelog.sh <last tag> [<ref>]     # the release notes release.yml publishes, from the commit subjects
 swift run -c release pladder-cli <audio file> [--process] [--verbose] # transcribe one file to stdout; --process runs the app's processors, --verbose adds timing
 ./scripts/make-fixtures.sh                    # synthesise benchmark fixtures into bench/fixtures (gitignored)
 swift run -c release pladder-cli bench bench/fixtures            # whole-buffer benchmark
@@ -41,7 +42,7 @@ swift run -c release pladder-cli polish-set docs/polish-set.json --model s1-mini
 | Topic | Choice | Why |
 |---|---|---|
 | Platform | macOS 26+, Apple Silicon only | FluidAudio needs the Neural Engine |
-| Distribution | Direct, not sandboxed, not App Store: a Developer ID signed, notarised DMG on GitHub Releases, built by `scripts/release.sh` on the Mac; tagging and `gh release create` by hand. No update check | Global hotkey and synthetic paste do not work sandboxed. The certificate and the notarytool profile stay in the Mac's keychain, off GitHub, until the process is proven; an update check would be a network call |
+| Distribution | Direct, not sandboxed, not App Store: a Developer ID signed, notarised DMG on GitHub Releases, built by `release.yml`, dispatched by hand from `main` and approved in the `release` environment, which runs the CI suite, `scripts/release.sh`, tags and publishes "Pladder <version>" with `Pladder.dmg`, its `.sha256` and notes from `scripts/changelog.sh`. `release.sh` still runs by hand on the Mac. No update check | Global hotkey and synthetic paste do not work sandboxed. The certificate, as a `.p12`, and an App Store Connect API key for notarytool are `release` environment secrets, readable only by a run from `main` that a reviewer approved, imported into a keychain deleted at the end of the job; acceptable now that 0.1.0 proved the process by hand, and the key is scoped to the Developer role and revocable on its own. The Mac keeps its certificate and notarytool profile. One DMG name for every release keeps `releases/latest/download/Pladder.dmg` stable for the site, and the version is in the tag and the title; an update check would be a network call |
 | Language | Swift 6.2 tools, strict concurrency, SwiftUI | Current toolchain |
 | Build | SwiftPM package + `scripts/bundle.sh` wrapping the binary in `Pladder.app` | No Xcode project to maintain; `Package.swift` opens in Xcode |
 | Engine | FluidAudio, Parakeet Ultra (Moondream's post-training of Parakeet TDT 0.6B v3) by default; v3 in the picker | Fastest Swift-native option, runs on the Neural Engine. The recording is transcribed in windows while the key is held, so only the last window and the merge are left at release. Ultra has v3's architecture and windows, makes about a fifth fewer word errors on FLEURS English, German and Spanish, and is as fast (docs/BENCHMARKS.md). A settings file that names v3 keeps it |
@@ -65,6 +66,7 @@ swift run -c release pladder-cli polish-set docs/polish-set.json --model s1-mini
 | UI language | Follows the macOS system language; no setting | String Catalogs (`Localizable.xcstrings` in the app, `KeyNames.xcstrings` in `PladderSystem`) are compiled by `swift build`; `bundle.sh` merges their `.lproj` folders into `Pladder.app/Contents/Resources`, so `Bundle.main` serves them and no code names a bundle. `swift run` shows English. Core and Engines emit enum cases; the app turns them into text. German first; more languages are catalog contributions |
 | Recording cap | 10 min | Keeps the microphone from staying on when a key-up is lost. The cap ends a latched recording the same way |
 | Benchmark | A script run by hand, not a test | A benchmark that fails on noise gets ignored |
+| CI paths | `ci.yml` runs only on the paths the build and the bundle read, listed in it and in `release.yml`'s source check; `scripts.yml` checks every script on Linux; a release with no change in those paths since the last tag needs `force` | A macOS minute costs ten Linux ones, and a docs or script change cannot change the build. If `main` ever requires `ci.yml`, a skipped run blocks a docs-only pull request, so the job then needs a no-op twin |
 
 ## Pluggability rules
 
