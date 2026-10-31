@@ -9,7 +9,7 @@
 
 ## Download
 
-Get `Pladder-<version>.dmg` from the [latest release](https://github.com/dinooo13/pladder/releases/latest), open it and drag Pladder to Applications.
+Get `Pladder.dmg` from the [latest release](https://github.com/dinooo13/pladder/releases/latest), open it and drag Pladder to Applications.
 
 ## Build and install
 
@@ -83,23 +83,46 @@ A free Apple ID is enough for an Apple Development certificate: sign in to Xcode
 
 ### Releasing
 
-A release is built by hand on a Mac that has a Developer ID Application certificate in its login keychain and a notarytool profile, stored once:
+A release comes from the **Release** workflow (`.github/workflows/release.yml`): Actions > Release > Run workflow, on `main`, with the version, `0.1.1` say. Preview its notes first; they are exactly what this prints, with the last tag in place of `v0.1.0`:
+
+```sh
+./scripts/changelog.sh v0.1.0 HEAD
+```
+
+Before anyone is asked to approve, a Linux job refuses a ref other than `main`, a version that is not `major.minor.patch`, one whose tag exists or that is not newer than the last tag, and a release in which nothing the build reads (the paths `ci.yml` runs on) changed since the last tag, unless **force** is ticked. The release job then waits for a reviewer of the `release` environment. Once approved, it builds and runs the tests as CI does, imports the certificate into a throwaway keychain, runs `scripts/release.sh`, checks that the build number is the commit count, uploads the DMG as a workflow artifact, tags the commit `v<version>`, and publishes the release "Pladder <version>" with `Pladder.dmg`, its `.sha256` and the notes from `scripts/changelog.sh`. Every release names its DMG `Pladder.dmg`, so `releases/latest/download/Pladder.dmg` always resolves; the version is in the tag and the title. Tick **draft** to check a release before it is public. The keychain and the key files are deleted at the end, also when a step failed.
+
+The changelog groups the commit subjects since the last tag by their `Area:` prefix, folds the internal areas (Tests, CI, Bench, Docs, Scripts) into an Internals group at the end, and links the pull request a subject names, `(#93)`, and the issues a body `Closes` or `Refs`. Merge and `fixup!` commits are left out.
+
+The signing secrets live in the `release` environment, so only a run a reviewer approved can read them, and only from `main`:
+
+| Secret | What |
+|---|---|
+| `DEVELOPER_ID_P12` | The Developer ID Application certificate and its private key, as a base64 `.p12` |
+| `DEVELOPER_ID_P12_PASSWORD` | The password the `.p12` was exported with |
+| `NOTARY_API_KEY` | An App Store Connect API key with the Developer role, the contents of its `AuthKey_<key ID>.p8` |
+| `NOTARY_API_KEY_ID` | That key's ID |
+| `NOTARY_API_ISSUER` | The issuer ID shown above the keys in App Store Connect |
+
+The API key, rather than an Apple ID and an app-specific password, because it can do no more than its role allows and can be revoked on its own. If a secret leaks, revoke the key in App Store Connect and the certificate in the developer portal.
+
+A release can still be built by hand, on a Mac that has the Developer ID Application certificate in its login keychain and a notarytool profile, stored once:
 
 ```sh
 xcrun notarytool store-credentials pladder-notary --apple-id <Apple ID> --team-id <team ID>
 ```
 
-It asks for an app-specific password from [account.apple.com](https://account.apple.com) and keeps it in the keychain, so no secret goes in the repo or in GitHub. Then, from a clean checkout of the commit to release:
+It asks for an app-specific password from [account.apple.com](https://account.apple.com) and keeps it in the keychain. Instead of the profile, `NOTARY_KEY` (the path of the `.p8`), `NOTARY_KEY_ID` and `NOTARY_ISSUER` make the script sign in with the API key, as the workflow does. Then, from a clean, full clone of the commit to release:
 
 ```sh
-./scripts/release.sh 0.1.0
+./scripts/release.sh 0.1.1
 ```
 
-The script builds the app with the version and the commit count as its build number, signs it with the hardened runtime and a secure timestamp, notarises and staples the app, packs it with an Applications link into `dist/release/Pladder-0.1.0.dmg`, signs, notarises and staples the DMG, checks both with `spctl` and `stapler validate`, and writes the SHA-256 beside it. It publishes nothing. Tag and publish by hand:
+The script builds the app with the version and the commit count as its build number, signs it with the hardened runtime and a secure timestamp, notarises and staples the app, packs it with an Applications link into `dist/release/Pladder.dmg`, signs, notarises and staples the DMG, checks both with `spctl` and `stapler validate`, and writes the SHA-256 beside it. It publishes nothing. Tag and publish by hand:
 
 ```sh
-git tag -a v0.1.0 -m "Pladder 0.1.0" && git push origin v0.1.0
-gh release create v0.1.0 dist/release/Pladder-0.1.0.dmg dist/release/Pladder-0.1.0.dmg.sha256 --title "Pladder 0.1.0" --notes-file <notes>
+git tag -a v0.1.1 -m "Pladder 0.1.1" && git push origin v0.1.1
+./scripts/changelog.sh v0.1.0 v0.1.1 > notes.md
+gh release create v0.1.1 dist/release/Pladder.dmg dist/release/Pladder.dmg.sha256 --title "Pladder 0.1.1" --notes-file notes.md
 ```
 
 ### Command-line transcriber
