@@ -1,0 +1,27 @@
+name: Scripts
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/**'
+      - '.github/workflows/scripts.yml'
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - '.github/workflows/scripts.yml'
+
+jobs:
+  scripts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scripts never stop every Pladder
+        # The developer dictates with a running copy while scripts run; a
+        # bare kill by name would stop it mid-recording (see CLAUDE.md).
+        run: |
+          # Commands only: a comment may name what not to do.
+          if grep -rnE '^[^#]*(pkill -x Pladder|killall Pladder)' scripts; then exit 1; fi
+      - name: ShellCheck
+        run: shellcheck scripts/*.sh

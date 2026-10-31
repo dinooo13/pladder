@@ -1,0 +1,53 @@
+name: Build and test
+description: >
+  Selects Xcode 26, builds with warnings in Pladder's own sources as errors,
+  and runs the suite. ci.yml and release.yml both run it, so a release never
+  skips what CI runs.
+
+runs:
+  using: composite
+  steps:
+    - name: Select Xcode 26
+      # The newest Xcode 26 on the runner. No fallback: building with the
+      # runner's default Xcode would test a toolchain Pladder does not use.
+      shell: bash
+      run: |
+        XCODE=$(printf '%s\n' /Applications/Xcode_26*.app | sort -V | tail -1)
+        test -d "$XCODE"
+        sudo xcode-select -s "$XCODE"
+    - name: Swift version
+      shell: bash
+      run: swift --version
+    - name: Build
+      # Warnings in Pladder's own sources fail the build; the dependencies'
+      # are theirs to fix. The log goes outside the checkout, which
+      # release.sh needs clean.
+      shell: bash
+      run: |
+        set -o pipefail
+        swift build 2>&1 | tee "$RUNNER_TEMP/build.log"
+        if grep -E "^$PWD/Sources/.*warning:" "$RUNNER_TEMP/build.log"; then exit 1; fi
+    - name: Test
+      # The suite takes seconds. If it stalls, the stack of every thread of
+      # the test process goes into the log before it is stopped, so a hang
+      # says where it is instead of holding the runner for an hour.
+      shell: bash
+      run: |
+        set +e
+        swift build --build-tests || exit 1
+        swift test --skip-build &
+        TEST=$!
+        for _ in $(seq 1 300); do
+          kill -0 "$TEST" 2>/dev/null || break
+          sleep 1
+        done
+        if kill -0 "$TEST" 2>/dev/null; then
+          echo "::error::swift test still running after 5 minutes; sampling its threads"
+          for pid in $(pgrep -f 'swiftpm-testing-helper|PladderPackageTests'); do
+            sample "$pid" 3 -mayDie -file "$RUNNER_TEMP/sample-$pid.txt"
+            cat "$RUNNER_TEMP/sample-$pid.txt"
+          done
+          pkill -P "$TEST"; kill "$TEST"
+          exit 1
+        fi
+        wait "$TEST"
