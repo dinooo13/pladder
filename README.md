@@ -21,6 +21,7 @@
 </p>
 
 <p align="center">
+  <a href="https://dinooo13.github.io/pladder/">Website</a> ·
   <a href="#install">Install</a> ·
   <a href="#speed">Speed</a> ·
   <a href="#private-by-construction">Privacy</a> ·
