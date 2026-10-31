@@ -24,6 +24,7 @@ Before and after any change that touches the code between `recordingStopped` and
 swift build                                   # debug build of everything
 swift test                                    # unit tests, well under a second
 ./scripts/bundle.sh [--run] [--install]       # release build → dist/Pladder.app, signed
+./scripts/release.sh <version>                # Developer ID, notarised, stapled → dist/release/Pladder-<version>.dmg; publishes nothing
 swift run -c release pladder-cli <audio file> [--process] [--verbose] # transcribe one file to stdout; --process runs the app's processors, --verbose adds timing
 ./scripts/make-fixtures.sh                    # synthesise benchmark fixtures into bench/fixtures (gitignored)
 swift run -c release pladder-cli bench bench/fixtures            # whole-buffer benchmark
@@ -40,7 +41,7 @@ swift run -c release pladder-cli polish-set docs/polish-set.json --model s1-mini
 | Topic | Choice | Why |
 |---|---|---|
 | Platform | macOS 26+, Apple Silicon only | FluidAudio needs the Neural Engine |
-| Distribution | Direct, not sandboxed, not App Store | Global hotkey and synthetic paste do not work sandboxed |
+| Distribution | Direct, not sandboxed, not App Store: a Developer ID signed, notarised DMG on GitHub Releases, built by `scripts/release.sh` on the Mac; tagging and `gh release create` by hand. No update check | Global hotkey and synthetic paste do not work sandboxed. The certificate and the notarytool profile stay in the Mac's keychain, off GitHub, until the process is proven; an update check would be a network call |
 | Language | Swift 6.2 tools, strict concurrency, SwiftUI | Current toolchain |
 | Build | SwiftPM package + `scripts/bundle.sh` wrapping the binary in `Pladder.app` | No Xcode project to maintain; `Package.swift` opens in Xcode |
 | Engine | FluidAudio, Parakeet Ultra (Moondream's post-training of Parakeet TDT 0.6B v3) by default; v3 in the picker | Fastest Swift-native option, runs on the Neural Engine. The recording is transcribed in windows while the key is held, so only the last window and the merge are left at release. Ultra has v3's architecture and windows, makes about a fifth fewer word errors on FLEURS English, German and Spanish, and is as fast (docs/BENCHMARKS.md). A settings file that names v3 keeps it |
@@ -95,7 +96,7 @@ swift run -c release pladder-cli polish-set docs/polish-set.json --model s1-mini
 - **Polish latency and quality.** Apple's model takes about 1.5 to 2 seconds warm on an M1 for a typical dictation, S1-mini 0.3 to 0.5, and both are capped at eight, the model's load and every chunk of a long dictation included; past the cap the text is pasted as dictated. A small model can still rewrite rather than clean; for Apple's the guided `cleanedText` field, greedy sampling, inline examples and naming the transcript's language keep that rare. S1-mini's known slips are in docs/BENCHMARKS.md, the worst a German number word read wrong, which real dictation rarely feeds it since Parakeet writes digits. `pladder-cli polish-set` is where model and prompt changes are judged.
 - **Polish model memory.** S1-mini stays loaded while chosen and polish is on: about 0.8 or 1.5 GB of weights plus a 235 MB key-value cache for its 2,048-token context. Long dictations are polished in chunks of about 250 words to fit.
 - **Clipboard clobbering.** Output saves the pasteboard, pastes, and restores it once the target app has read the transcript. Nothing read within 8 s leaves the transcript on the clipboard that long, never stale text in the target.
-- **Permissions.** Accessibility and Microphone grants are keyed to the code signature. `bundle.sh` signs with an Apple Development or Developer ID certificate when one is in the keychain; an ad-hoc signature changes on every build and resets both grants.
+- **Permissions.** Accessibility and Microphone grants are keyed to the code signature. `bundle.sh` signs with a Developer ID certificate when one is in the keychain, else Apple Development; an ad-hoc signature changes on every build and resets both grants. A Developer ID grant is keyed to the team, an Apple Development one to the certificate's name, so a move between the two, such as from an Apple Development build to the DMG, asks for both once.
 - **Lost key-up.** When the 10 min watchdog fires, the coordinator transcribes and pastes as if the user had released. Discarding is probably the right behaviour; tracked separately.
 
 ## Working on this Mac while Pladder is in use

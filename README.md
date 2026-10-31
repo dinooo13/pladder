@@ -56,7 +56,9 @@ A dictionary fixes the words speech models get wrong: product names, libraries, 
 
 ## Install
 
-There is no download yet; Pladder builds from source in about a minute. It needs macOS 26 or later on Apple Silicon, and Xcode 26 to build:
+Pladder needs macOS 26 or later on Apple Silicon. Download `Pladder-<version>.dmg` from the [latest release](https://github.com/dinooo13/pladder/releases/latest), open it and drag Pladder to Applications; it is signed and notarised.
+
+Or build it from source in about a minute, with Xcode 26:
 
 ```sh
 git clone https://github.com/dinooo13/pladder.git

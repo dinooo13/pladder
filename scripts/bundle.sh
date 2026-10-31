@@ -5,11 +5,15 @@
 # signature, which macOS needs to remember the Accessibility and Microphone
 # grants across launches.
 #
-# Usage: scripts/bundle.sh [--run] [--install]
+# Usage: scripts/bundle.sh [--run] [--install] [--release]
 #   --run              launch dist/Pladder.app when done
 #   --install          copy the app to /Applications (replacing an old copy)
+#   --release          Developer ID only, with a secure timestamp (notarisation
+#                      needs both); scripts/release.sh passes it
 #   SCRATCH=<dir>      optional swift build --scratch-path
 #   CODESIGN_IDENTITY  signing identity; auto-detected, "-" forces ad-hoc
+#   MARKETING_VERSION  CFBundleShortVersionString of the bundled Info.plist
+#   BUILD_NUMBER       CFBundleVersion of the bundled Info.plist
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -18,10 +22,12 @@ cd "$ROOT"
 SCRATCH="${SCRATCH:-.build}"
 RUN=0
 INSTALL=0
+RELEASE=0
 for arg in "$@"; do
 	case "$arg" in
 	--run) RUN=1 ;;
 	--install) INSTALL=1 ;;
+	--release) RELEASE=1 ;;
 	*)
 		echo "unknown argument: $arg" >&2
 		exit 2
@@ -35,6 +41,43 @@ CONTENTS="$APP/Contents"
 # Info.plist lives under Sources/Pladder/Resources and is excluded from the
 # SwiftPM resource bundle in Package.swift; it is copied straight into the app.
 PLIST="$ROOT/Sources/Pladder/Resources/Info.plist"
+
+# Sign with a real certificate when one is available. An ad-hoc signature
+# changes with every build, and macOS keys Accessibility and Microphone
+# permission on the signature, so the user would have to re-grant both after
+# each rebuild. A developer certificate gives a stable identity instead.
+# Override with CODESIGN_IDENTITY=- to force ad-hoc, or set it to a specific
+# identity name or hash.
+#
+# Developer ID first: its designated requirement names the team, not the
+# certificate, so a dev build and the released DMG share one set of grants.
+first_identity() {
+	# `|| true`: under pipefail a keychain without a matching certificate
+	# makes grep fail the whole assignment, and `set -e` would end the script
+	# right here, silently, instead of falling back to ad-hoc below. CI runs
+	# this path on purpose, on a runner with no certificate.
+	security find-identity -v -p codesigning 2>/dev/null \
+		| grep -E "\"$1" \
+		| head -1 | sed -E 's/^[^"]*"([^"]+)".*$/\1/' || true
+}
+if [[ -z "${CODESIGN_IDENTITY:-}" ]]; then
+	CODESIGN_IDENTITY=$(first_identity "Developer ID Application")
+	if [[ -z "$CODESIGN_IDENTITY" && "$RELEASE" -eq 0 ]]; then
+		CODESIGN_IDENTITY=$(first_identity "Apple Development")
+	fi
+	CODESIGN_IDENTITY=${CODESIGN_IDENTITY:--}
+fi
+if [[ "$RELEASE" -eq 1 && "$CODESIGN_IDENTITY" != "Developer ID Application"* ]]; then
+	echo "--release needs a Developer ID Application identity, got: $CODESIGN_IDENTITY" >&2
+	exit 1
+fi
+echo "Signing with: $CODESIGN_IDENTITY"
+# A dev build stays offline: a secure timestamp asks Apple's server on every
+# signature.
+TIMESTAMP=--timestamp=none
+if [[ "$RELEASE" -eq 1 ]]; then
+	TIMESTAMP=--timestamp
+fi
 
 swift build -c release --product Pladder --scratch-path "$SCRATCH"
 BIN_DIR="$(swift build -c release --product Pladder --scratch-path "$SCRATCH" --show-bin-path)"
@@ -56,6 +99,12 @@ if lipo -archs "$LLAMA_BIN" | grep -q x86_64; then
 fi
 install_name_tool -add_rpath "@executable_path/../Frameworks" "$CONTENTS/MacOS/Pladder"
 cp "$PLIST" "$CONTENTS/Info.plist"
+if [[ -n "${MARKETING_VERSION:-}" ]]; then
+	plutil -replace CFBundleShortVersionString -string "$MARKETING_VERSION" "$CONTENTS/Info.plist"
+fi
+if [[ -n "${BUILD_NUMBER:-}" ]]; then
+	plutil -replace CFBundleVersion -string "$BUILD_NUMBER" "$CONTENTS/Info.plist"
+fi
 printf 'APPL????' > "$CONTENTS/PkgInfo"
 # App icon, rendered by scripts/make-icon.swift and packed with iconutil.
 cp "$ROOT/Assets/AppIcon.icns" "$CONTENTS/Resources/AppIcon.icns"
@@ -77,23 +126,6 @@ for lproj in "$BIN_DIR"/*.bundle/Contents/Resources/*.lproj; do
 done
 shopt -u nullglob
 
-# Sign with a real certificate when one is available. An ad-hoc signature
-# changes with every build, and macOS keys Accessibility and Microphone
-# permission on the signature, so the user would have to re-grant both after
-# each rebuild. A developer certificate gives a stable identity instead.
-# Override with CODESIGN_IDENTITY=- to force ad-hoc, or set it to a specific
-# identity name or hash.
-if [[ -z "${CODESIGN_IDENTITY:-}" ]]; then
-	# `|| true`: under pipefail a keychain without a matching certificate
-	# makes grep fail the whole assignment, and `set -e` would end the script
-	# right here, silently, instead of falling back to ad-hoc below. CI runs
-	# this path on purpose, on a runner with no certificate.
-	CODESIGN_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null \
-		| grep -E '"(Developer ID Application|Apple Development)' \
-		| head -1 | sed -E 's/^[^"]*"([^"]+)".*$/\1/' || true)
-	CODESIGN_IDENTITY=${CODESIGN_IDENTITY:--}
-fi
-echo "Signing with: $CODESIGN_IDENTITY"
 # The hardened runtime only loads libraries signed by the app's own team, and
 # two ad-hoc signatures count as different teams, so an ad-hoc build would
 # refuse its own llama.framework at launch. It goes without the hardened
@@ -105,12 +137,12 @@ fi
 # Inside out: the framework first, with the same identity.
 codesign --force --sign "$CODESIGN_IDENTITY" \
 	${RUNTIME[@]+"${RUNTIME[@]}"} \
-	--timestamp=none \
+	"$TIMESTAMP" \
 	"$CONTENTS/Frameworks/llama.framework"
 codesign --force --sign "$CODESIGN_IDENTITY" \
 	--entitlements "$ROOT/scripts/Pladder.entitlements" \
 	${RUNTIME[@]+"${RUNTIME[@]}"} \
-	--timestamp=none \
+	"$TIMESTAMP" \
 	"$APP"
 
 echo "Built $APP"
