@@ -1,0 +1,177 @@
+name: Release
+
+# Started by hand only, from main. See INSTALL.md, "Releasing".
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version, major.minor.patch
+        required: true
+        type: string
+      draft:
+        description: Publish as a draft, to check before it is public
+        type: boolean
+        default: false
+      force:
+        description: Release even though no source path changed since the last tag
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  check:
+    # No environment and no secret, so a refused release stops here, before
+    # anyone is asked to approve and before a macOS runner starts.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      last-tag: ${{ steps.check.outputs.last-tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: check
+        name: Ref, version and source changes
+        env:
+          VERSION: ${{ inputs.version }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          if [[ "$GITHUB_REF" != refs/heads/main ]]; then
+            echo "::error::Releases are made from main only, not $GITHUB_REF"
+            exit 1
+          fi
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version \"$VERSION\" is not major.minor.patch"
+            exit 1
+          fi
+          if git rev-parse --quiet --verify "refs/tags/v$VERSION" >/dev/null; then
+            echo "::error::Tag v$VERSION exists already"
+            exit 1
+          fi
+          last=$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' HEAD 2>/dev/null || true)
+          if [[ -n "$last" ]]; then
+            if [[ "$(printf '%s\n' "${last#v}" "$VERSION" | sort -V | tail -1)" != "$VERSION" ]]; then
+              echo "::error::Version $VERSION is not newer than $last"
+              exit 1
+            fi
+            # ci.yml's path list without its two CI files; change both.
+            if [[ "$FORCE" != true ]] && git diff --quiet "$last" HEAD -- \
+              Sources Tests Package.swift Package.resolved \
+              scripts/bundle.sh scripts/Pladder.entitlements Assets; then
+              echo "::error::Nothing the build reads changed since $last. Set force to release anyway."
+              exit 1
+            fi
+          fi
+          echo "last-tag=$last" >> "$GITHUB_OUTPUT"
+
+  release:
+    needs: check
+    if: github.ref == 'refs/heads/main'
+    runs-on: macos-26
+    # The environment's required reviewer holds the whole job, so no step,
+    # and no secret, starts before the approval.
+    environment: release
+    # Two notarisations usually take minutes each, but Apple's queue can take
+    # far longer.
+    timeout-minutes: 120
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The build number is the commit count, and the changelog reads the
+          # tags; a shallow clone has neither.
+          fetch-depth: 0
+      - uses: ./.github/actions/build-and-test
+        timeout-minutes: 30
+      - name: Import the certificate into a temporary keychain
+        env:
+          DEVELOPER_ID_P12: ${{ secrets.DEVELOPER_ID_P12 }}
+          DEVELOPER_ID_P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+          NOTARY_API_KEY: ${{ secrets.NOTARY_API_KEY }}
+        run: |
+          keychain="$RUNNER_TEMP/release.keychain-db"
+          password=$(openssl rand -hex 24)
+          echo "::add-mask::$password"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          printf '%s' "$DEVELOPER_ID_P12" | base64 --decode > "$RUNNER_TEMP/developer-id.p12"
+          security import "$RUNNER_TEMP/developer-id.p12" -k "$keychain" -f pkcs12 \
+            -P "$DEVELOPER_ID_P12_PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/developer-id.p12"
+          # A .p12 from Keychain Access holds no intermediate, and without one
+          # the identity is not valid for codesign. Both Developer ID CAs,
+          # pinned: the original (to 2027) and G2.
+          for ca in DeveloperIDCA:7afc9d01a62f03a2de9637936d4afe68090d2de18d03f29c88cfb0b1ba63587f \
+            DeveloperIDG2CA:f16cd3c54c7f83cea4bf1a3e6a0819c8aaa8e4a1528fd144715f350643d2df3a; do
+            curl -fsSL "https://www.apple.com/certificateauthority/${ca%%:*}.cer" -o "$RUNNER_TEMP/${ca%%:*}.cer"
+            echo "${ca#*:}  $RUNNER_TEMP/${ca%%:*}.cer" | shasum -a 256 -c
+            security import "$RUNNER_TEMP/${ca%%:*}.cer" -k "$keychain"
+          done
+          # Lets codesign use the key without a dialog nobody could answer.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
+            -k "$password" "$keychain" >/dev/null
+          searched=("$keychain")
+          while IFS= read -r line; do
+            searched+=("$(sed -E 's/^[[:space:]]*"(.*)"$/\1/' <<<"$line")")
+          done < <(security list-keychains -d user)
+          security list-keychains -d user -s "${searched[@]}"
+          security find-identity -v -p codesigning "$keychain"
+          (umask 077 && printf '%s\n' "$NOTARY_API_KEY" > "$RUNNER_TEMP/notary-key.p8")
+      - name: Build, sign, notarise and staple
+        env:
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_API_KEY_ID }}
+          NOTARY_ISSUER: ${{ secrets.NOTARY_API_ISSUER }}
+        run: NOTARY_KEY="$RUNNER_TEMP/notary-key.p8" ./scripts/release.sh "$VERSION"
+      - name: The build number is the commit count
+        run: |
+          build=$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' dist/Pladder.app/Contents/Info.plist)
+          count=$(git rev-list --count HEAD)
+          echo "CFBundleVersion $build, commits $count"
+          test "$build" = "$count"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pladder-${{ inputs.version }}
+          path: |
+            dist/release/Pladder.dmg
+            dist/release/Pladder.dmg.sha256
+          if-no-files-found: error
+          compression-level: 0
+      - name: Tag and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRAFT: ${{ inputs.draft }}
+          LAST_TAG: ${{ needs.check.outputs.last-tag }}
+        run: |
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            tag -a "v$VERSION" -m "Pladder $VERSION" "$GITHUB_SHA"
+          ./scripts/changelog.sh "$LAST_TAG" "v$VERSION" > "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md"
+          git push origin "v$VERSION"
+          draft=()
+          if [[ "$DRAFT" == true ]]; then draft=(--draft); fi
+          # One name for every release, so releases/latest/download/Pladder.dmg
+          # always resolves; the version is in the tag and the title.
+          gh release create "v$VERSION" --verify-tag ${draft[@]+"${draft[@]}"} \
+            --title "Pladder $VERSION" --notes-file "$RUNNER_TEMP/notes.md" \
+            dist/release/Pladder.dmg dist/release/Pladder.dmg.sha256
+      - name: Delete the keychain and the key files
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/release.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/developer-id.p12" "$RUNNER_TEMP/notary-key.p8"
+          ls "$RUNNER_TEMP"
