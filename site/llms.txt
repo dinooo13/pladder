@@ -1,0 +1,32 @@
+# Pladder
+
+> Pladder is push-to-talk dictation for macOS. Hold a key, speak, let go, and the words are pasted where the cursor is, in any app. Speech is transcribed on the Mac; audio and text never leave it. Free and MIT-licensed, for Apple Silicon Macs on macOS 26 or later.
+
+Pladder is made for talking to coding agents such as Claude Code, Codex, OpenCode, Cursor and T3 Code, and works in every app that takes text. The default key is Option+Space; tapping V while holding it also presses Return after the paste, so a prompt is sent with one hand.
+
+Key facts:
+
+- Speed: the median time from releasing the key to pasted text was [0.195 s](https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#what-a-dictation-waits-for) over 67 real dictations under ten seconds on an M1, the slowest chip Pladder supports.
+- The wait does not grow with length: the recording is transcribed while the key is held, so after five minutes of speech [0.261 s](https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#parakeet-ultra) of work is left at release.
+- Accuracy: [4.0 %](https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#parakeet-ultra) word error rate on FLEURS English, German and Spanish test clips.
+- Engine: Parakeet Ultra, Moondream's post-training of NVIDIA's Parakeet TDT v3, on the Apple Neural Engine through FluidAudio.
+- Privacy: audio and text never leave the Mac. The only network requests are one-time model downloads from Hugging Face. No account, no telemetry, no update check.
+- Languages: the 25 European languages of Parakeet, detected as you speak.
+- Price: free. License: MIT. Source: https://github.com/dinooo13/pladder
+
+## Pages
+
+- [Home](https://dinooo13.github.io/pladder/): what Pladder does, download, speed, privacy, agents and FAQ.
+- [Privacy](https://dinooo13.github.io/pladder/privacy/): what Pladder does with your voice and your words.
+
+## Documentation
+
+- [README](https://github.com/dinooo13/pladder#readme): overview and install.
+- [Usage](https://github.com/dinooo13/pladder/blob/main/docs/USAGE.md): keys, dictionary, polish, languages and the command-line tool.
+- [Benchmarks](https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md): how speed and accuracy are measured, and the M1 baseline.
+- [Performance](https://github.com/dinooo13/pladder/blob/main/docs/PERFORMANCE.md): why it is fast.
+- [Privacy for developers](https://github.com/dinooo13/pladder/blob/main/docs/PRIVACY.md).
+
+## Download
+
+- [Pladder for Mac (DMG)](https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg), Developer ID signed and notarised.

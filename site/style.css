@@ -1,0 +1,330 @@
+/* The site's one stylesheet. Colours are the mark's: ink indigo, paper and
+   the caret's coral, which marks only the cursor and the wait. Display type
+   is Outfit, the wordmark's face, served from here; body text is the Mac's
+   own. Nothing loads from another server. */
+
+@font-face {
+  font-family: "Outfit";
+  src: url("fonts/outfit.woff2") format("woff2");
+  font-weight: 500 700;
+  font-display: swap;
+}
+
+:root {
+  --ink: #171933;
+  --ink-2: #2B2F55;
+  --paper: #F5F5FA;
+  --lilac: #C9CBEA;
+  --slate: #4A4D6A;
+  --coral: #FF6A47;
+  --display: "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --text: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --measure: 38rem;
+  --gutter: clamp(1.25rem, 5vw, 4rem);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 1.125rem/1.6 var(--text);
+}
+
+a { color: inherit; text-decoration-thickness: 0.06em; text-underline-offset: 0.18em; }
+a:hover { text-decoration-color: var(--coral); }
+:focus-visible { outline: 3px solid var(--coral); outline-offset: 3px; border-radius: 4px; }
+img { max-width: 100%; height: auto; }
+
+h1, h2 { font-family: var(--display); font-weight: 700; margin: 0; }
+h2 {
+  font-size: clamp(2.1rem, 5vw, 3.6rem);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  max-width: 16ch;
+}
+.lead { font-size: 1.3rem; line-height: 1.5; max-width: var(--measure); margin: 1.25rem 0 0; }
+
+kbd {
+  font: 600 0.8em/1 var(--text);
+  padding: 0.25em 0.5em;
+  border-radius: 0.4em;
+  border: 1px solid currentColor;
+  border-bottom-width: 2px;
+  white-space: nowrap;
+}
+
+/* The bands */
+
+main > section { padding: clamp(4rem, 10vw, 8rem) var(--gutter); }
+.hero, .private, .bar, .foot { background: var(--ink); color: var(--paper); }
+
+/* Header */
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 2rem;
+  padding: 1.25rem var(--gutter);
+}
+.brand { display: block; line-height: 0; }
+.bar nav { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 1.5rem; font-size: 1rem; }
+.bar nav a { text-decoration: none; padding: 0.5rem 0; }
+.bar nav a:hover { text-decoration: underline; text-decoration-color: var(--coral); }
+.bar nav a[aria-current] { text-decoration: underline; }
+.bar .pill-link {
+  border: 1px solid var(--lilac);
+  border-radius: 999px;
+  padding: 0.45rem 1.1rem;
+}
+
+/* Hero: the headline ends at the cursor, and the demo below is the product. */
+
+.hero { padding-top: clamp(3rem, 8vw, 6rem); padding-bottom: clamp(3rem, 7vw, 5rem); }
+.hero h1 {
+  font-size: clamp(3.2rem, 8.4vw, 8rem);
+  line-height: 0.95;
+  letter-spacing: -0.035em;
+}
+.caret {
+  display: inline-block;
+  width: 0.09em;
+  height: 0.82em;
+  margin-left: 0.06em;
+  background: var(--coral);
+  border-radius: 0.05em;
+  vertical-align: -0.04em;
+  animation: blink 1.1s steps(1) infinite;
+}
+.caret.small { width: 2px; height: 1.15em; margin: 0 0.1em; vertical-align: -0.2em; }
+@keyframes blink { 50% { opacity: 0; } }
+
+.intro { font-size: clamp(1.2rem, 2.2vw, 1.45rem); line-height: 1.5; max-width: 36rem; margin: 2rem 0 0; color: var(--lilac); }
+
+.get { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 1.5rem; margin-top: 2.5rem; }
+.button {
+  display: inline-block;
+  font: 600 1.15rem/1 var(--display);
+  text-decoration: none;
+  padding: 1.05rem 1.9rem 1.1rem;
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+}
+.button:hover { background: #FFFFFF; box-shadow: 0 0 0 4px rgba(255, 106, 71, 0.35); }
+.release { margin: 0; font-size: 0.95rem; color: var(--lilac); }
+.checksum { margin-top: 0.75rem; font-size: 0.9rem; color: var(--lilac); max-width: 44rem; }
+.checksum summary { cursor: pointer; width: max-content; padding: 0.4rem 0; }
+.checksum p { margin: 0.25rem 0 0; }
+.checksum code { font: 0.85rem/1.5 var(--mono); overflow-wrap: anywhere; color: var(--paper); }
+
+/* The demo: hold the keys, the pill listens, let go, the prompt lands whole.
+   One loop, the page's only motion besides the cursor. */
+
+.demo { margin: clamp(3rem, 7vw, 5rem) 0 0; }
+.stage {
+  --loop: 9s;
+  display: grid;
+  justify-items: center;
+  gap: 1.5rem;
+  padding: clamp(1.5rem, 4vw, 3rem);
+  border-radius: 1.75rem;
+  background: var(--ink-2);
+}
+.field {
+  position: relative;
+  width: 100%;
+  max-width: 52rem;
+  min-height: 4.6rem;
+  padding: 1.1rem 1.25rem 1.1rem 2.6rem;
+  border-radius: 0.9rem;
+  background: var(--ink);
+  font: 1.05rem/1.55 var(--mono);
+  color: var(--paper);
+  text-align: left;
+}
+.prompt { position: absolute; left: 1.25rem; top: 1.1rem; color: var(--lilac); }
+.placeholder { position: absolute; top: 1.1rem; color: #8A8DB0; animation: placeholder var(--loop) infinite; }
+.said { display: block; animation: said var(--loop) infinite; }
+
+.listening {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.85rem 1.4rem;
+  border-radius: 999px;
+  background: rgba(23, 25, 51, 0.85);
+  border: 1px solid rgba(201, 203, 234, 0.25);
+  animation: listening var(--loop) infinite;
+}
+.dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: #FF453A; }
+.wave { display: flex; align-items: center; gap: 4px; height: 1.9rem; }
+.wave i {
+  display: block;
+  width: 4px;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--paper);
+  transform: scaleY(0.25);
+  animation: talk 0.75s ease-in-out infinite alternate;
+  animation-delay: calc(var(--i) * -0.17s);
+}
+
+.keys { display: flex; gap: 0.6rem; }
+.key {
+  display: grid;
+  place-items: center;
+  min-width: 4.2rem;
+  height: 4.2rem;
+  padding: 0.5rem 0.9rem;
+  border: 0;
+  border-radius: 0.7rem;
+  background: #3A3F6E;
+  color: var(--paper);
+  font: 500 1.15rem/1 var(--text);
+  box-shadow: 0 5px 0 #11132A;
+  animation: press var(--loop) infinite;
+}
+.key small { font-size: 0.7rem; color: var(--lilac); margin-top: 0.2rem; }
+.key.space { min-width: 13rem; font-size: 0.85rem; color: var(--lilac); }
+
+.demo figcaption { margin-top: 1.25rem; color: var(--lilac); font-size: 1rem; }
+
+/* 0–8 % idle, 8–56 % held and listening, 56 % let go and pasted, 94 % reset. */
+@keyframes press {
+  0%, 7% { transform: none; box-shadow: 0 5px 0 #11132A; }
+  8%, 55% { transform: translateY(4px); box-shadow: 0 1px 0 #11132A; }
+  56%, 100% { transform: none; box-shadow: 0 5px 0 #11132A; }
+}
+@keyframes listening {
+  0%, 8% { opacity: 0; transform: translateY(6px) scale(0.92); }
+  11%, 54% { opacity: 1; transform: none; }
+  57%, 100% { opacity: 0; transform: scale(0.92); }
+}
+@keyframes placeholder {
+  0%, 55% { opacity: 1; }
+  56%, 95% { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes said {
+  0%, 55% { opacity: 0; background: transparent; }
+  56% { opacity: 1; background: rgba(255, 106, 71, 0.28); }
+  70%, 92% { opacity: 1; background: transparent; }
+  95%, 100% { opacity: 0; }
+}
+@keyframes talk { to { transform: scaleY(1); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .caret, .wave i, .key, .listening, .placeholder, .said { animation: none; }
+  .listening, .placeholder { opacity: 0; }
+}
+
+/* Speed: the wait, drawn to scale against the talking. */
+
+.speed .lead a, .note a { text-decoration-color: var(--coral); }
+.scale { margin: 3.5rem 0 0; display: grid; gap: 2.5rem; max-width: 64rem; }
+.run p { margin: 0; }
+.what { font: 600 1.15rem/1.3 var(--display); }
+.track { display: flex; height: 0.75rem; margin: 0.8rem 0; }
+.track .talk { flex: 1; background: var(--ink-2); border-radius: 0.375rem 0 0 0.375rem; }
+.track .wait { width: max(3px, var(--wait)); background: var(--coral); }
+.took { color: var(--slate); }
+.took a { color: var(--ink); font-weight: 650; text-decoration-color: var(--coral); }
+.note { max-width: var(--measure); margin: 3rem 0 0; color: var(--slate); font-size: 1rem; }
+
+/* Privacy */
+
+.private { background: var(--ink-2); }
+.private .lead { color: var(--lilac); }
+.promises {
+  list-style: none;
+  padding: 0;
+  margin: 3rem 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 2rem 2.5rem;
+  max-width: 72rem;
+}
+.promises li { border-top: 2px solid var(--lilac); padding-top: 1rem; color: var(--lilac); }
+.promises strong { display: block; color: var(--paper); font: 600 1.35rem/1.2 var(--display); margin-bottom: 0.4rem; }
+.private a { color: var(--paper); text-decoration-color: var(--coral); }
+
+/* Agents and details */
+
+.cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 1.5rem 4rem;
+  max-width: 64rem;
+  margin-top: 2rem;
+}
+.cols p { margin: 0; font-size: 1.2rem; }
+
+.details { padding-top: 0; }
+.details dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 2.25rem 3rem;
+  margin: 2.5rem 0 0;
+  max-width: 64rem;
+}
+.details dt { font: 600 1.25rem/1.25 var(--display); }
+.details dd { margin: 0.35rem 0 0; color: var(--slate); }
+
+/* FAQ */
+
+.faq { padding-top: 0; }
+.faq h2 { margin-bottom: 1.5rem; }
+.faq details { border-top: 1px solid var(--lilac); max-width: 48rem; }
+.faq details:last-of-type { border-bottom: 1px solid var(--lilac); }
+.faq summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 1.15rem 2.5rem 1.15rem 0;
+  position: relative;
+  font: 600 1.2rem/1.35 var(--display);
+}
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after {
+  content: "+";
+  position: absolute;
+  right: 0.25rem;
+  top: 1rem;
+  font: 400 1.6rem/1 var(--text);
+  color: var(--slate);
+}
+.faq details[open] summary::after { content: "\2212"; }
+.faq details p { margin: 0 0 1.25rem; color: var(--slate); max-width: var(--measure); }
+
+/* Free */
+
+.free { text-align: center; display: grid; justify-items: center; }
+.free h2 { font-size: clamp(3rem, 9vw, 6.5rem); max-width: none; }
+.free .lead { margin: 1.25rem auto 2.25rem; color: var(--slate); }
+.free .button { background: var(--ink); color: var(--paper); }
+.free .button:hover { background: var(--ink-2); }
+.free .release { color: var(--slate); margin-top: 1.25rem; }
+
+/* Footer */
+
+.foot { padding: 3rem var(--gutter) 3.5rem; font-size: 0.95rem; color: var(--lilac); }
+.foot img { display: block; margin-bottom: 1.25rem; }
+.foot p { margin: 0.4rem 0; }
+.foot a { color: var(--paper); }
+.foot .links a { margin-right: 1.1rem; display: inline-block; padding: 0.3rem 0; }
+
+/* Text pages */
+
+.page { max-width: calc(var(--measure) + 2 * var(--gutter)); }
+.page h1 { font-size: clamp(2.6rem, 7vw, 4.5rem); line-height: 1; letter-spacing: -0.04em; }
+.page h2 { font-size: 1.6rem; letter-spacing: -0.015em; margin-top: 2.75rem; max-width: none; }
+.page p, .page li { margin: 0.75rem 0 0; }
+.page .back { margin-top: 3.5rem; }
+.page .button { background: var(--ink); color: var(--paper); }
+.page { margin: 0 auto; padding: clamp(3rem, 8vw, 6rem) var(--gutter) clamp(4rem, 10vw, 7rem); }

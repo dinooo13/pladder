@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pladder: push-to-talk dictation for macOS, on-device and free</title>
+<meta name="description" content="Hold a key, talk, let go: Pladder pastes your words where the cursor is, in about a fifth of a second. Private, on-device speech to text for Apple Silicon Macs. Free and open source. Made for Claude Code, Codex and Cursor.">
+<link rel="canonical" href="https://dinooo13.github.io/pladder/">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preload" href="fonts/outfit.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="style.css">
+<meta name="theme-color" content="#F5F5FA">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Pladder">
+<meta property="og:title" content="Pladder: talk to your agents">
+<meta property="og:description" content="Push-to-talk dictation for macOS. Hold a key, talk, let go, and the words are pasted where the cursor is. Insanely fast, on-device, free.">
+<meta property="og:url" content="https://dinooo13.github.io/pladder/">
+<meta property="og:image" content="https://dinooo13.github.io/pladder/social-preview.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="Pladder: talk to your agents. Push-to-talk dictation for macOS. On-device, free and open source.">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://dinooo13.github.io/pladder/#app",
+      "name": "Pladder",
+      "description": "Push-to-talk dictation for macOS. Hold a key, talk, let go, and the words are pasted where the cursor is. Speech is transcribed on the Mac; audio and text never leave it.",
+      "url": "https://dinooo13.github.io/pladder/",
+      "operatingSystem": "macOS 26+",
+      "applicationCategory": "UtilitiesApplication",
+      "softwareVersion": "0.1.0",
+      "downloadUrl": "https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg",
+      "license": "https://opensource.org/licenses/MIT",
+      "isAccessibleForFree": true,
+      "image": "https://dinooo13.github.io/pladder/social-preview.png",
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+      "author": {"@id": "https://dinooo13.github.io/pladder/#author"},
+      "codeRepository": "https://github.com/dinooo13/pladder"
+    },
+    {
+      "@type": "Person",
+      "@id": "https://dinooo13.github.io/pladder/#author",
+      "name": "Fabian Meyer",
+      "url": "https://github.com/dinooo13"
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Is there a free offline dictation app for Mac?",
+          "acceptedAnswer": {"@type": "Answer", "text": "Yes. Pladder is free, MIT-licensed and runs entirely on your Mac. After a one-time download of the speech model it works with Wi-Fi off. It needs an Apple Silicon Mac with macOS 26 or later."}
+        },
+        {
+          "@type": "Question",
+          "name": "How do I dictate into Claude Code?",
+          "acceptedAnswer": {"@type": "Answer", "text": "Install Pladder, click into Claude Code's prompt, hold Option+Space, say the prompt and let go. The words are pasted at the cursor. Tap V while you still hold the keys and Pladder presses Return for you, so the prompt is sent. The same works in Codex, Cursor, OpenCode, T3 Code and every other app that takes text."}
+        },
+        {
+          "@type": "Question",
+          "name": "Does Pladder send my voice to the cloud?",
+          "acceptedAnswer": {"@type": "Answer", "text": "No. Audio and text never leave the Mac. Speech is transcribed on the Neural Engine, the microphone is open only while you hold the key, and there is no account, no analytics and no update check. The only network requests are one-time model downloads from Hugging Face."}
+        },
+        {
+          "@type": "Question",
+          "name": "How is Pladder different from macOS Dictation and Whisper apps?",
+          "acceptedAnswer": {"@type": "Answer", "text": "Pladder is push-to-talk: it records only while you hold the key and pastes the whole text when you let go, into any app. It runs Parakeet Ultra, a post-training of NVIDIA's Parakeet TDT v3, rather than Whisper, and transcribes while you are still speaking, so the wait after you let go stays the same for a sentence or for five minutes. It is open source, and its speed is benchmarked in the repository rather than claimed."}
+        },
+        {
+          "@type": "Question",
+          "name": "Which Macs and languages does Pladder support?",
+          "acceptedAnswer": {"@type": "Answer", "text": "Any Apple Silicon Mac on macOS 26 or later; the benchmarks are taken on an M1, so every newer chip is faster. It understands the 25 European languages of Parakeet, among them English, German, French, Spanish, Italian, Portuguese, Dutch, Polish and Ukrainian, and detects the language as you speak."}
+        }
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<header class="bar">
+  <a class="brand" href="./"><img src="logo.svg" width="130" height="36" alt="Pladder"></a>
+  <nav aria-label="Main">
+    <a href="privacy/">Privacy</a>
+    <a href="#faq">FAQ</a>
+    <a href="https://github.com/dinooo13/pladder">GitHub</a>
+    <a class="pill-link" href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg">Download</a>
+  </nav>
+</header>
+
+<main>
+<section class="hero">
+  <h1>Talk to your agents<span class="caret" aria-hidden="true"></span></h1>
+  <p class="intro">Pladder is push-to-talk dictation for macOS. Hold a key, say what you want, let go, and your words are already where the cursor is. Insanely fast, private by design, and free.</p>
+  <div class="get">
+    <a class="button" href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg">Download for Mac</a>
+    <p class="release">Version <span id="version">0.1.0</span>, for Apple Silicon Macs on macOS 26 or later.</p>
+  </div>
+  <details class="checksum">
+    <summary>Check the download</summary>
+    <p>SHA-256 of the disk image: <code id="sha256">9f6bec01e2ad786157b82c5519cfe7b4808fea11750667e450a6be4341030113</code></p>
+  </details>
+
+  <figure class="demo">
+    <div class="stage" aria-hidden="true">
+      <div class="field">
+        <span class="prompt">&gt;</span>
+        <span class="placeholder"><span class="caret small"></span>Ask your agent anything</span>
+        <span class="said">Move the hotkey recorder under the polish toggle and add a test for an empty chord.<span class="caret small"></span></span>
+      </div>
+      <div class="listening">
+        <span class="dot"></span>
+        <span class="wave"><i style="--i:0"></i><i style="--i:1"></i><i style="--i:2"></i><i style="--i:3"></i><i style="--i:4"></i><i style="--i:5"></i><i style="--i:6"></i><i style="--i:7"></i><i style="--i:8"></i><i style="--i:9"></i><i style="--i:10"></i><i style="--i:11"></i></span>
+      </div>
+      <div class="keys"><kbd class="key">⌥<small>option</small></kbd><kbd class="key space">space</kbd></div>
+    </div>
+    <figcaption>Hold Option and Space while you talk. Let go, and the whole prompt lands at once.</figcaption>
+  </figure>
+</section>
+
+<section class="speed" id="speed">
+  <h2>Insanely fast, however long you talk.</h2>
+  <p class="lead">Pladder transcribes while you are still talking, so when you let go there is almost nothing left to do. On an M1, the slowest chip it runs on, short dictations land in a median of <a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#what-a-dictation-waits-for">0.195 s</a>.</p>
+  <div class="scale">
+    <div class="run">
+      <p class="what">Talk for 30 seconds</p>
+      <div class="track" style="--wait: 0.96%"><span class="talk"></span><span class="wait"></span></div>
+      <p class="took"><a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#parakeet-ultra">0.288 s</a> until the text is there</p>
+    </div>
+    <div class="run">
+      <p class="what">Talk for five minutes</p>
+      <div class="track" style="--wait: 0.087%"><span class="talk"></span><span class="wait"></span></div>
+      <p class="took"><a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#parakeet-ultra">0.261 s</a> until the text is there</p>
+    </div>
+  </div>
+  <p class="note">Drawn to scale: the coral sliver at the end is your wait. It hears you right, too: <a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#parakeet-ultra">4.0 %</a> word error on the FLEURS clips in English, German and Spanish, against <a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#parakeet-ultra">4.9 %</a> for the Parakeet model it improves on. Every figure here links to <a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md">how it was measured</a>.</p>
+</section>
+
+<section class="private" id="privacy">
+  <div class="inner">
+    <h2>Your voice never leaves your Mac.</h2>
+    <p class="lead">Not as a promise in a policy: there is simply nowhere for it to go. Pladder has no server.</p>
+    <ul class="promises">
+      <li><strong>On-device.</strong> Your Mac's Neural Engine turns speech into text, and the audio is gone the moment it has.</li>
+      <li><strong>Offline.</strong> Once the speech model is downloaded, it works with Wi-Fi off.</li>
+      <li><strong>Nobody watching.</strong> No account, no tracking, no update check. The microphone is on only while you hold the key.</li>
+      <li><strong>Checkable.</strong> It is open source, so anyone can read what it does.</li>
+    </ul>
+    <p><a href="privacy/">How Pladder handles your words</a></p>
+  </div>
+</section>
+
+<section class="agents" id="agents">
+  <h2>Made for the prompt box.</h2>
+  <div class="cols">
+    <p>Hold <kbd>⌥</kbd> <kbd>Space</kbd>, describe the change, tap <kbd>V</kbd> with the same hand and let go. The prompt is pasted, Return is pressed, and your agent is already working, while your other hand never left the mouse.</p>
+    <p>Pladder types wherever your cursor is: Claude Code, Codex, Cursor, T3 Code, OpenCode, any terminal, any editor, any text field. A dictionary fixes the names speech models stumble on, so "clode code" comes out as "Claude Code", every time.</p>
+  </div>
+</section>
+
+<section class="details" aria-labelledby="details">
+  <h2 id="details">The small things, done right.</h2>
+  <dl>
+    <div><dt>Your keys</dt><dd>Record any key or combination to talk and to send, or a toggle key for long dictations. Escape throws a recording away.</dd></div>
+    <div><dt>It learns your words</dt><dd>Fix a word by hand after a dictation and Pladder offers to remember it. Only when you say so.</dd></div>
+    <div><dt>No ums</dt><dd>"Uh" and "um" are dropped, and saying "comma" or "new paragraph" gives you the mark.</dd></div>
+    <div><dt>Polish, if you like</dt><dd>An optional on-device model turns "wait, no, Friday" into "Friday" before the paste.</dd></div>
+    <div><dt>25 languages</dt><dd>English, German, French, Spanish and the rest of Europe, recognised as you speak. Nothing to switch.</dd></div>
+    <div><dt>Feels like macOS</dt><dd>A menu bar app with a Liquid Glass pill in four styles, and nothing in the Dock.</dd></div>
+  </dl>
+</section>
+
+<section class="faq" id="faq">
+  <h2>Questions</h2>
+  <details>
+    <summary>Is there a free offline dictation app for Mac?</summary>
+    <p>Yes. Pladder is free, MIT-licensed and runs entirely on your Mac. After a one-time download of the speech model it works with Wi-Fi off. It needs an Apple Silicon Mac with macOS 26 or later.</p>
+  </details>
+  <details>
+    <summary>How do I dictate into Claude Code?</summary>
+    <p>Install Pladder, click into Claude Code's prompt, hold Option+Space, say the prompt and let go. The words are pasted at the cursor. Tap V while you still hold the keys and Pladder presses Return for you, so the prompt is sent. The same works in Codex, Cursor, OpenCode, T3 Code and every other app that takes text.</p>
+  </details>
+  <details>
+    <summary>Does Pladder send my voice to the cloud?</summary>
+    <p>No. Audio and text never leave the Mac. Speech is transcribed on the Neural Engine, the microphone is open only while you hold the key, and there is no account, no analytics and no update check. The only network requests are one-time model downloads from Hugging Face.</p>
+  </details>
+  <details>
+    <summary>How is Pladder different from macOS Dictation and Whisper apps?</summary>
+    <p>Pladder is push-to-talk: it records only while you hold the key and pastes the whole text when you let go, into any app. It runs Parakeet Ultra, a post-training of NVIDIA's Parakeet TDT v3, rather than Whisper, and transcribes while you are still speaking, so the wait after you let go stays the same for a sentence or for five minutes. It is open source, and its speed is benchmarked in the repository rather than claimed.</p>
+  </details>
+  <details>
+    <summary>Which Macs and languages does Pladder support?</summary>
+    <p>Any Apple Silicon Mac on macOS 26 or later; the benchmarks are taken on an M1, so every newer chip is faster. It understands the 25 European languages of Parakeet, among them English, German, French, Spanish, Italian, Portuguese, Dutch, Polish and Ukrainian, and detects the language as you speak.</p>
+  </details>
+</section>
+
+<section class="free">
+  <h2>Free. Really.</h2>
+  <p class="lead">No trial, no subscription, no account. Pladder is open source under the MIT license.</p>
+  <a class="button" href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg">Download for Mac</a>
+  <p class="release">Or <a href="https://github.com/dinooo13/pladder#install">build it from source</a> in about a minute.</p>
+</section>
+</main>
+
+<footer class="foot">
+  <img src="logo.svg" width="101" height="28" alt="" loading="lazy">
+  <p><em>Pladder</em> is Low German for "to babble". Made by <a href="https://github.com/dinooo13">Fabian Meyer</a>.</p>
+  <p class="links"><a href="https://github.com/dinooo13/pladder">Source</a> <a href="https://github.com/dinooo13/pladder/blob/main/docs/USAGE.md">Usage</a> <a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md">Benchmarks</a> <a href="privacy/">Privacy</a> <a href="llms.txt">llms.txt</a></p>
+  <p>Last updated <time datetime="2026-11-01">1 November 2026</time>, for version 0.1.0.</p>
+</footer>
+</body>
+</html>
