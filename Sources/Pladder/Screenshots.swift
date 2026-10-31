@@ -21,8 +21,6 @@ enum Screenshots {
             await capture(StylesFigure(), size: CGSize(width: 1264, height: 250), scheme: scheme,
                           to: directory.appending(path: "styles-\(suffix).png"))
         }
-        await capture(SocialFigure(), size: CGSize(width: 1280, height: 640), scheme: .dark,
-                      to: directory.appending(path: "social-preview.png"))
 
         NSApp.terminate(nil)
     }
@@ -171,30 +169,5 @@ private struct StylesFigure: View {
         .frame(width: 290, height: 28)
         .background(.ultraThinMaterial)
         .clipShape(UnevenRoundedRectangle(topLeadingRadius: 16, topTrailingRadius: 16))
-    }
-}
-
-private struct SocialFigure: View {
-    var body: some View {
-        Wallpaper()
-            .overlay {
-                VStack(spacing: 28) {
-                    HStack(spacing: 28) {
-                        Image(nsImage: NSApp.applicationIconImage)
-                            .resizable()
-                            .frame(width: 128, height: 128)
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Pladder")
-                                .font(.system(size: 72, weight: .bold, design: .rounded))
-                            Text("Push-to-talk dictation for macOS. On-device. Free.")
-                                .font(.system(size: 26, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.85))
-                        }
-                    }
-                    .foregroundStyle(.white)
-                    Pill(state: .recording, level: 0.6, scale: 1.5)
-                        .padding(.top, 24)
-                }
-            }
     }
 }

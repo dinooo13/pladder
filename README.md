@@ -1,8 +1,9 @@
-<p align="center">
-  <img src="Assets/icon_1024.png" width="128" alt="Pladder icon">
-</p>
-
-<h1 align="center">Pladder</h1>
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="Assets/logo-dark.svg">
+    <img src="Assets/logo.svg" height="96" alt="Pladder">
+  </picture>
+</h1>
 
 <p align="center">
   <strong>Talk to your agents.</strong><br>
