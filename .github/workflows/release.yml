@@ -28,16 +28,20 @@ defaults:
   run:
     shell: bash
 
+# The actions are pinned to commits: they run in the job that holds the
+# signing key, and a moved tag would change what runs there.
 jobs:
   check:
     # No environment and no secret, so a refused release stops here, before
     # anyone is asked to approve and before a macOS runner starts.
+    # A fork's copy skips instead of failing on secrets it does not have.
+    if: github.repository == 'dinooo13/pladder'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       last-tag: ${{ steps.check.outputs.last-tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
       - id: check
@@ -76,7 +80,7 @@ jobs:
 
   release:
     needs: check
-    if: github.ref == 'refs/heads/main'
+    if: github.repository == 'dinooo13/pladder' && github.ref == 'refs/heads/main'
     runs-on: macos-26
     # The environment's required reviewer holds the whole job, so no step,
     # and no secret, starts before the approval.
@@ -89,7 +93,7 @@ jobs:
     env:
       VERSION: ${{ inputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           # The build number is the commit count, and the changelog reads the
           # tags; a shallow clone has neither.
@@ -136,13 +140,21 @@ jobs:
           NOTARY_KEY_ID: ${{ secrets.NOTARY_API_KEY_ID }}
           NOTARY_ISSUER: ${{ secrets.NOTARY_API_ISSUER }}
         run: NOTARY_KEY="$RUNNER_TEMP/notary-key.p8" ./scripts/release.sh "$VERSION"
+      - name: Delete the keychain and the key files
+        # Right after the one step that needs them, so the artifact upload
+        # and the publish run without; always(), so a failed run deletes them too.
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/release.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/developer-id.p12" "$RUNNER_TEMP/notary-key.p8"
+          ls "$RUNNER_TEMP"
       - name: The build number is the commit count
         run: |
           build=$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' dist/Pladder.app/Contents/Info.plist)
           count=$(git rev-list --count HEAD)
           echo "CFBundleVersion $build, commits $count"
           test "$build" = "$count"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: Pladder-${{ inputs.version }}
           path: |
@@ -169,9 +181,3 @@ jobs:
           gh release create "v$VERSION" --verify-tag ${draft[@]+"${draft[@]}"} \
             --title "Pladder $VERSION" --notes-file "$RUNNER_TEMP/notes.md" \
             dist/release/Pladder.dmg dist/release/Pladder.dmg.sha256
-      - name: Delete the keychain and the key files
-        if: always()
-        run: |
-          security delete-keychain "$RUNNER_TEMP/release.keychain-db" 2>/dev/null || true
-          rm -f "$RUNNER_TEMP/developer-id.p12" "$RUNNER_TEMP/notary-key.p8"
-          ls "$RUNNER_TEMP"
