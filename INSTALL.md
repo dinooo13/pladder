@@ -9,15 +9,7 @@
 
 ## Download
 
-Get `Pladder-<version>.dmg` from the [latest release](https://github.com/dinooo13/pladder/releases/latest), open it and drag Pladder to Applications. The app is signed with a Developer ID and notarised by Apple, so macOS asks only the usual "downloaded from the internet" question at the first launch.
-
-To check the download, compare its checksum with the `.sha256` file on the release page:
-
-```sh
-shasum -a 256 ~/Downloads/Pladder-*.dmg
-```
-
-The DMG holds the app only. The speech model still downloads at the first launch, as described below.
+Get `Pladder-<version>.dmg` from the [latest release](https://github.com/dinooo13/pladder/releases/latest), open it and drag Pladder to Applications.
 
 ## Build and install
 
