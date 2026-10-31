@@ -7,10 +7,11 @@
 // Writes the layers and colours of Assets/AppIcon.icon, which scripts/bundle.sh
 // compiles with actool, then Assets/mark.svg, Assets/icon_1024.png,
 // site/favicon.svg and site/apple-touch-icon.png. With --font it also writes
-// the wordmark: Assets/wordmark.svg, Assets/logo.svg, Assets/logo-dark.svg and
-// docs/images/social-preview.png. The font is Outfit (SIL Open Font License
-// 1.1), ofl/outfit/Outfit[wght].ttf in github.com/google/fonts at 5f24607;
-// the wordmark is outlined so nothing that shows it needs the font.
+// the wordmark: Assets/wordmark.svg, Assets/logo.svg, Assets/logo-dark.svg,
+// site/logo.svg and the social preview, in docs/images and site. The font is
+// Outfit (SIL Open Font License 1.1), ofl/outfit/Outfit[wght].ttf in
+// github.com/google/fonts at 5f24607; the wordmark is outlined so nothing
+// that shows it needs the font.
 import AppKit
 import CoreText
 
@@ -260,14 +261,16 @@ write(svg(width: wordBox.width, height: wordBox.height,
 let wordScale = Mark.caretHeight / wordBox.height
 let lockupGap: CGFloat = 176
 let lockupWidth = 1024 + lockupGap + wordBox.width * wordScale
+var placement = CGAffineTransform(translationX: 1024 + lockupGap, y: 512 + Mark.caretHeight / 2)
+    .scaledBy(x: wordScale, y: -wordScale)
+    .translatedBy(x: -wordBox.minX, y: -wordBox.minY)
+let placedWord = pathData(word.copy(using: &placement)!)
 for (name, color) in [("logo", Palette.inkBottom), ("logo-dark", Palette.paper)] {
-    var t = CGAffineTransform(translationX: 1024 + lockupGap, y: 512 + Mark.caretHeight / 2)
-        .scaledBy(x: wordScale, y: -wordScale)
-        .translatedBy(x: -wordBox.minX, y: -wordBox.minY)
-    let placed = word.copy(using: &t)!
-    let body = flatMark(id: "ink") + "<path fill=\"\(color.hex)\" d=\"\(pathData(placed))\"/>"
+    let body = flatMark(id: "ink") + "<path fill=\"\(color.hex)\" d=\"\(placedWord)\"/>"
     write(svg(width: lockupWidth, height: 1024, body, label: "Pladder"), "Assets/\(name).svg")
 }
+write(svg(width: lockupWidth, height: 1024, flatMark(id: "ink") + "<path fill=\"\(Palette.paper.hex)\" d=\"\(placedWord)\"/>",
+          label: "Pladder"), "site/logo.svg")
 
 // MARK: - Social preview
 
@@ -310,5 +313,7 @@ centred("Talk to your agents.", font: outfit(500, 52), alpha: 0.95, baseline: 19
 centred("Push-to-talk dictation for macOS. On-device, free and open source.", font: outfit(400, 30), alpha: 0.62, baseline: 136)
 
 let png = NSBitmapImageRep(cgImage: ctx.makeImage()!).representation(using: .png, properties: [:])!
-try! png.write(to: root.appendingPathComponent("docs/images/social-preview.png"))
-print("wrote docs/images/social-preview.png")
+for path in ["docs/images/social-preview.png", "site/social-preview.png"] {
+    try! png.write(to: root.appendingPathComponent(path))
+    print("wrote \(path)")
+}
