@@ -6,14 +6,14 @@ import Testing
 @MainActor
 @Suite(.timeLimit(.minutes(1))) struct RecordingEngineSessionTests {
     private func session(
-        _ engine: any TranscriptionEngine, clock: ManualClock, live: Bool = false,
+        _ engine: any TranscriptionEngine, clock: ManualClock, live: Bool = false, feed: Duration = .seconds(1),
         partials: Recorder<String?> = Recorder()
     ) async -> RecordingEngineSession {
         let capture = FakeCapture()
         await capture.setDrainSamples(Array(repeating: 0.1, count: 8_000))
         return RecordingEngineSession(
             engine: engine, capture: capture, clock: clock,
-            intervals: .init(feed: .seconds(1), livePass: .milliseconds(500), warmup: .seconds(2)),
+            intervals: .init(feed: feed, livePass: .milliseconds(500), warmup: .seconds(2)),
             live: live, onPartial: { partials.append($0) })
     }
 
@@ -59,6 +59,23 @@ import Testing
         #expect(engine.warmPassCount == 1)
     }
 
+    @Test func liveTranscriptFeedsOnTheFeedCadenceAndPassesOnItsOwn() async throws {
+        let clock = ManualClock()
+        let engine = try await loadedStreaming()
+        let s = await session(engine, clock: clock, live: true, feed: .milliseconds(100))
+        await s.begin()
+        s.startLoops()
+        #expect(await waitUntil { engine.livePassCount == 1 && engine.feedCounts.count == 1 })
+        for tick in 1...5 {
+            #expect(await clock.waitForSleeper(at: .milliseconds(100 * tick)))
+            clock.advance(to: .milliseconds(100 * tick))
+            #expect(await waitUntil { engine.feedCounts.count == 1 + tick })
+            if tick < 5 { #expect(engine.livePassCount == 1) }
+        }
+        #expect(await waitUntil { engine.livePassCount == 2 })
+        _ = await s.end().feed?.value
+    }
+
     @Test func aLivePassFinishingAfterEndPublishesNothing() async throws {
         let clock = ManualClock()
         let engine = try await loadedStreaming()
@@ -69,8 +86,8 @@ import Testing
         #expect(await waitUntil { partials.all == ["partial 1"] })
         let livePass = Gate()
         await engine.setLivePassGate(livePass)
-        #expect(await clock.waitForSleeper(at: .milliseconds(500)))
-        clock.advance(to: .milliseconds(500))
+        #expect(await clock.waitForSleeper(at: .seconds(1)))
+        clock.advance(to: .seconds(1))
         #expect(await waitUntil { engine.livePassCount == 2 })
         let ending = s.end()
         await livePass.open()
