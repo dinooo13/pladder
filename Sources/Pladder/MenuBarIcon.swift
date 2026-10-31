@@ -1,8 +1,9 @@
 import AppKit
 import PladderCore
 
-// A template image, so it takes the menu bar's tint; the bars mirror
-// `scripts/make-icon.swift`.
+// A template image, so it takes the menu bar's tint. The four bars and the
+// caret are `scripts/make-icon.swift`'s mark, scaled to a 15 pt caret and
+// rounded to whole and half points.
 enum MenuBarIcon {
     // Few enough to cache every variant, so the label follows the level without redrawing.
     enum Variant: Hashable {
@@ -27,12 +28,14 @@ enum MenuBarIcon {
         }
     }
 
-    private static let envelope: [CGFloat] = [0.20, 0.36, 0.58, 0.82, 1.0, 0.82, 0.58, 0.36, 0.20]
+    private static let barHeights: [CGFloat] = [7, 13, 9, 5]
 
-    // Bar and gap widths on half points keep the capsules crisp on Retina menu bars.
-    private static let barWidth: CGFloat = 1.5
-    private static let gap: CGFloat = 1.0
-    private static let maxBarHeight: CGFloat = 14
+    // Widths and positions on half points keep the capsules crisp on Retina menu bars.
+    private static let barWidth: CGFloat = 2
+    private static let gap: CGFloat = 1.5
+    private static let caretGap: CGFloat = 2
+    private static let caretHeight: CGFloat = 15
+    private static let serifWidth: CGFloat = 5
     private static let canvas = NSSize(width: 22, height: 16)
 
     @MainActor private static var cache: [Variant: NSImage] = [:]
@@ -53,33 +56,38 @@ enum MenuBarIcon {
     private static func heights(for variant: Variant) -> [CGFloat] {
         switch variant {
         case .recording(let step):
+            // Silence leaves dots, so a recording never looks idle.
             let amount = CGFloat(step) / CGFloat(Variant.levelSteps - 1)
-            let floor = envelope.min()!
-            return envelope.map { floor + ($0 - floor) * amount }
+            return barHeights.map { barWidth + ($0 - barWidth) * amount }
         case .idle, .busy, .off:
-            return envelope
+            return barHeights
         }
     }
 
     private static func render(_ variant: Variant) -> NSImage {
         let image = NSImage(size: canvas, flipped: false) { rect in
             let heights = heights(for: variant)
-            let totalWidth = CGFloat(heights.count) * barWidth + CGFloat(heights.count - 1) * gap
-            var x = (rect.width - totalWidth) / 2
+            let overhang = (serifWidth - barWidth) / 2
+            let width = CGFloat(heights.count + 1) * barWidth + CGFloat(heights.count - 1) * gap + caretGap + overhang
+            let left = ((rect.width - width) / 2 * 2).rounded() / 2
+            var x = left
             let alpha: CGFloat = variant == .busy ? 0.45 : 1
 
-            let bars = NSBezierPath()
+            let shapes = NSBezierPath()
             for h in heights {
-                let barHeight = max(barWidth, maxBarHeight * h)
-                let bar = NSRect(x: x, y: rect.midY - barHeight / 2, width: barWidth, height: barHeight)
-                bars.append(NSBezierPath(roundedRect: bar, xRadius: barWidth / 2, yRadius: barWidth / 2))
+                shapes.append(capsule(NSRect(x: x, y: rect.midY - h / 2, width: barWidth, height: h)))
                 x += barWidth + gap
             }
+            x += caretGap - gap
+            let bottom = rect.midY - caretHeight / 2
+            shapes.append(capsule(NSRect(x: x, y: bottom, width: barWidth, height: caretHeight)))
+            shapes.append(capsule(NSRect(x: x - overhang, y: bottom, width: serifWidth, height: barWidth)))
+            shapes.append(capsule(NSRect(x: x - overhang, y: bottom + caretHeight - barWidth, width: serifWidth, height: barWidth)))
             NSColor.black.withAlphaComponent(alpha).setFill()
-            bars.fill()
+            shapes.fill()
 
             if variant == .off {
-                drawSlash(in: rect)
+                drawSlash(across: NSRect(x: left, y: bottom, width: width, height: caretHeight))
             }
             return true
         }
@@ -87,11 +95,16 @@ enum MenuBarIcon {
         return image
     }
 
-    private static func drawSlash(in rect: NSRect) {
-        let inset: CGFloat = 3
+    private static func capsule(_ rect: NSRect) -> NSBezierPath {
+        let radius = min(rect.width, rect.height) / 2
+        return NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
+    }
+
+    // Corner to corner of the mark, so the cut never leaves a stub of a serif.
+    private static func drawSlash(across mark: NSRect) {
         let slash = NSBezierPath()
-        slash.move(to: NSPoint(x: rect.minX + inset, y: rect.maxY - inset))
-        slash.line(to: NSPoint(x: rect.maxX - inset, y: rect.minY + inset))
+        slash.move(to: NSPoint(x: mark.minX + 0.5, y: mark.maxY - 0.5))
+        slash.line(to: NSPoint(x: mark.maxX - 0.5, y: mark.minY + 0.5))
         slash.lineCapStyle = .round
 
         NSGraphicsContext.current?.compositingOperation = .clear
