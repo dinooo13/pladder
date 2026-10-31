@@ -4,8 +4,20 @@
 
 - macOS 26 or later.
 - An Apple Silicon Mac (M1 or newer). The speech model runs on the Neural Engine.
-- Xcode 26 (Swift 6.2 or later) to build. There is no binary release yet.
+- Xcode 26 (Swift 6.2 or later), only to build from source.
 - About 600 MB of disk for the speech model, downloaded once.
+
+## Download
+
+Get `Pladder-<version>.dmg` from the [latest release](https://github.com/dinooo13/pladder/releases/latest), open it and drag Pladder to Applications. The app is signed with a Developer ID and notarised by Apple, so macOS asks only the usual "downloaded from the internet" question at the first launch.
+
+To check the download, compare its checksum with the `.sha256` file on the release page:
+
+```sh
+shasum -a 256 ~/Downloads/Pladder-*.dmg
+```
+
+The DMG holds the app only. The speech model still downloads at the first launch, as described below.
 
 ## Build and install
 
@@ -33,7 +45,9 @@ If a permission was missed, the menu bar menu offers **Grant Accessibility…** 
 
 ## Updating
 
-Pull and run the same command again:
+A downloaded copy: quit Pladder, download the new DMG and drag it to Applications again, replacing the old one. Pladder does not check for updates itself, because that would be a network call; watch the [releases](https://github.com/dinooo13/pladder/releases) instead.
+
+A copy built from source: pull and run the same command again:
 
 ```sh
 git pull
@@ -64,7 +78,9 @@ swift run pladder-cli audio.wav  # transcribe a file from the terminal
 
 ### Signing
 
-macOS ties the Microphone and Accessibility grants to the app's code signature. The bundle script looks for an **Apple Development** or **Developer ID Application** certificate in your keychain and signs with the first one it finds, which gives the app a stable identity across rebuilds. Without a certificate it falls back to an ad-hoc signature, which changes on every build and makes macOS ask for both permissions again.
+macOS ties the Microphone and Accessibility grants to the app's code signature. The bundle script signs with a **Developer ID Application** certificate if your keychain has one, and otherwise with an **Apple Development** certificate, which gives the app a stable identity across rebuilds. Without either it falls back to an ad-hoc signature, which changes on every build and makes macOS ask for both permissions again.
+
+The two certificates differ in what a grant remembers. An Apple Development signature is matched on the name of your certificate; a Developer ID signature on the team. So a copy signed with Developer ID, a self-built one or the released DMG, shares its grants with every other Developer ID copy of the same team, and a move between the two kinds, such as from an Apple Development build to the DMG, makes macOS ask for Microphone and Accessibility once more. Developer ID needs the paid Apple Developer Program; Apple Development does not.
 
 ```sh
 CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" ./scripts/bundle.sh
@@ -72,6 +88,27 @@ CODESIGN_IDENTITY=- ./scripts/bundle.sh     # force ad-hoc
 ```
 
 A free Apple ID is enough for an Apple Development certificate: sign in to Xcode under Settings > Accounts and click Manage Certificates.
+
+### Releasing
+
+A release is built by hand on a Mac that has a Developer ID Application certificate in its login keychain and a notarytool profile, stored once:
+
+```sh
+xcrun notarytool store-credentials pladder-notary --apple-id <Apple ID> --team-id <team ID>
+```
+
+It asks for an app-specific password from [account.apple.com](https://account.apple.com) and keeps it in the keychain, so no secret goes in the repo or in GitHub. Then, from a clean checkout of the commit to release:
+
+```sh
+./scripts/release.sh 0.1.0
+```
+
+The script builds the app with the version and the commit count as its build number, signs it with the hardened runtime and a secure timestamp, notarises and staples the app, packs it with an Applications link into `dist/release/Pladder-0.1.0.dmg`, signs, notarises and staples the DMG, checks both with `spctl` and `stapler validate`, and writes the SHA-256 beside it. It publishes nothing. Tag and publish by hand:
+
+```sh
+git tag -a v0.1.0 -m "Pladder 0.1.0" && git push origin v0.1.0
+gh release create v0.1.0 dist/release/Pladder-0.1.0.dmg dist/release/Pladder-0.1.0.dmg.sha256 --title "Pladder 0.1.0" --notes-file <notes>
+```
 
 ### Command-line transcriber
 
@@ -103,7 +140,7 @@ swift scripts/make-icon.swift Assets     # writes Assets/icon_1024.png
 Check the menu bar menu. If it says the model is loading or downloading, wait. If it offers **Grant Accessibility…**, the grant is missing; it is keyed to the code signature, so a rebuild with an ad-hoc signature resets it.
 
 **macOS asks for permissions after every build.**
-The app was signed ad-hoc. Install a development certificate so the signature stays stable; see [Signing](#signing).
+The app was signed ad-hoc. Install a development certificate so the signature stays stable; see [Signing](#signing). It also asks once after a move between an Apple Development and a Developer ID signature, such as from a self-built copy to the downloaded one.
 
 **The model download failed.**
 The menu offers **Retry Model Download**. The files come from Hugging Face; a proxy or firewall that blocks it will stop the download. Once the models are in `~/Library/Application Support/FluidAudio/Models`, no network is needed again.
