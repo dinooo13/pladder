@@ -4,7 +4,10 @@ How Pladder's speed is measured, and the baseline to compare against. The
 benchmark is run by hand before and after any change on the release-to-paste
 path (see [CLAUDE.md](../CLAUDE.md)). It is not part of the test suite: a
 benchmark that fails on noise gets ignored. For why the numbers look the way
-they do, see [PERFORMANCE.md](PERFORMANCE.md).
+they do, see [PERFORMANCE.md](PERFORMANCE.md). The website quotes figures
+from this file, each linked to its heading; `scripts/check-site-numbers.sh`
+fails when one is no longer there, so change `site/` along with a number it
+quotes.
 
 ## What is measured
 
