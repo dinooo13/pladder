@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Scripts never stop every Pladder
         # The developer dictates with a running copy while scripts run; a
         # bare kill by name would stop it mid-recording (see CLAUDE.md).
