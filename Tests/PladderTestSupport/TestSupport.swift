@@ -73,10 +73,13 @@ public func waitUntil(_ timeout: Duration = .seconds(2), _ condition: @MainActor
     return condition()
 }
 
-// Polls in real time, a millisecond at a time for up to about two seconds, for what a
-// detached task does on its own schedule.
-public func eventually(_ condition: @Sendable () async -> Bool) async -> Bool {
-    for _ in 0..<2_000 {
+// Polls in real time, a millisecond at a time, for what a detached task does on its own
+// schedule. Bounded by time: on a loaded CI runner a 1 ms sleep takes several.
+public func eventually(
+    _ timeout: Duration = .seconds(2), _ condition: @Sendable () async -> Bool
+) async -> Bool {
+    let deadline = ContinuousClock.now + timeout
+    while ContinuousClock.now < deadline {
         if await condition() { return true }
         try? await Task.sleep(for: .milliseconds(1))
     }

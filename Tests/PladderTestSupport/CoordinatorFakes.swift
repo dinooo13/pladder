@@ -6,13 +6,17 @@ public actor FakeCapture: AudioCapture {
     public private(set) var drainSamples: [Float] = []
     public private(set) var startCount = 0
     public private(set) var stopCount = 0
+    public private(set) var isCapturing = false
     private var levelContinuation: AsyncStream<Float>.Continuation?
+    private var startGate: Gate?
     private var stopGate: Gate?
 
     public init() {}
 
     public func start() async throws -> AsyncStream<Float> {
         startCount += 1
+        await startGate?.wait()
+        isCapturing = true
         let (stream, cont) = AsyncStream<Float>.makeStream()
         levelContinuation = cont
         return stream
@@ -24,6 +28,7 @@ public actor FakeCapture: AudioCapture {
 
     public func stop() async -> CapturedAudio {
         stopCount += 1
+        isCapturing = false
         levelContinuation?.finish()
         await stopGate?.wait()
         return CapturedAudio(samples: samplesToReturn)
@@ -33,6 +38,7 @@ public actor FakeCapture: AudioCapture {
 
     public func setSamples(_ s: [Float]) { samplesToReturn = s }
     public func setDrainSamples(_ s: [Float]) { drainSamples = s }
+    public func setStartGate(_ gate: Gate) { startGate = gate }
     public func setStopGate(_ gate: Gate) { stopGate = gate }
     public func emitLevel(_ l: Float) { levelContinuation?.yield(l) }
 }

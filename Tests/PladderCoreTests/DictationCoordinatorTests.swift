@@ -294,9 +294,14 @@ extension DictationCoordinator {
         await inFlight?.value
     }
 
+    // The state flips before the microphone starts; a test that acts on the recording
+    // before the press is handled races the start's own late stop.
     func press(_ hotkey: FakeHotkey, sourceLocation: SourceLocation = #_sourceLocation) async {
+        let handled = handledHotkeyEvents
         hotkey.press()
-        #expect(await waitUntil { self.state.isRecording }, sourceLocation: sourceLocation)
+        #expect(
+            await waitUntil { self.handledHotkeyEvents > handled && self.state.isRecording },
+            sourceLocation: sourceLocation)
     }
 
     func cycleFinished(sourceLocation: SourceLocation = #_sourceLocation) async {
@@ -472,6 +477,29 @@ final class EventLog: @unchecked Sendable {
         #expect(b.lastHotkey == c.settings.hotkey)
         #expect(a.stopCount >= 1)
         await c.press(b)
+        await c.cancelRecording()
+    }
+
+    @Test func replacingTheHotkeyMonitorWhileTheMicrophoneStartsLeavesItOff() async {
+        let a = FakeHotkey()
+        let b = FakeHotkey()
+        let (c, output, capture) = makeCoordinator(hotkeyMonitor: a)
+        let startGate = Gate()
+        await c.startIdle()
+        await capture.setStartGate(startGate)
+        a.press()
+        await startGate.untilSomeoneWaits()
+        c.update(c.settings, standInHotkey: c.standInHotkey, monitor: b)
+        #expect(c.state == .idle)
+        #expect(await eventually { await capture.stopCount == 1 })
+        await startGate.open()
+        #expect(await waitUntil { c.handledHotkeyEvents == 1 })
+        #expect(await capture.stopCount == 2)
+        #expect(await !capture.isCapturing)
+        #expect(c.state == .idle)
+        #expect(output.inserted.isEmpty)
+        await c.press(b)
+        #expect(await capture.isCapturing)
         await c.cancelRecording()
     }
 
