@@ -3,18 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pladder: push-to-talk dictation for macOS, on-device and free</title>
-<meta name="description" content="Hold a key, talk, let go: Pladder pastes your words where the cursor is, in about a fifth of a second. Private, on-device speech to text for Apple Silicon Macs. Free and open source. Made for Claude Code, Codex and Cursor.">
+<title>Pladder: push-to-talk dictation for Mac, free and on-device</title>
+<meta name="description" content="Hold Option+Space, talk, let go: Pladder pastes your words where the cursor is, about a fifth of a second later. Free, open-source dictation for Mac that runs entirely on-device. Made for talking to T3 Code, Claude Code, Codex and Cursor.">
 <link rel="canonical" href="https://dinooo13.github.io/pladder/">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preload" href="fonts/outfit.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="style.css">
-<meta name="theme-color" content="#F5F5FA">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#15172B" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Pladder">
 <meta property="og:title" content="Pladder: talk to your agents">
-<meta property="og:description" content="Push-to-talk dictation for macOS. Hold a key, talk, let go, and the words are pasted where the cursor is. Insanely fast, on-device, free.">
+<meta property="og:description" content="Push-to-talk dictation for Mac. Say the prompt, let go, and it's in T3 Code, Claude or Codex. Free, and nothing you say leaves your Mac.">
 <meta property="og:url" content="https://dinooo13.github.io/pladder/">
 <meta property="og:image" content="https://dinooo13.github.io/pladder/social-preview.png">
 <meta property="og:image:width" content="1280">
@@ -53,13 +55,18 @@
       "mainEntity": [
         {
           "@type": "Question",
-          "name": "Is there a free offline dictation app for Mac?",
-          "acceptedAnswer": {"@type": "Answer", "text": "Yes. Pladder is free, MIT-licensed and runs entirely on your Mac. After a one-time download of the speech model it works with Wi-Fi off. It needs an Apple Silicon Mac with macOS 26 or later."}
+          "name": "Which apps does it work with?",
+          "acceptedAnswer": {"@type": "Answer", "text": "Anything with a text field: T3 Code, Claude, Codex, Claude Code, Cursor, ChatGPT, your terminal, Mail, Messages, Notes. If you can type there, you can talk there."}
         },
         {
           "@type": "Question",
           "name": "How do I dictate into Claude Code?",
-          "acceptedAnswer": {"@type": "Answer", "text": "Install Pladder, click into Claude Code's prompt, hold Option+Space, say the prompt and let go. The words are pasted at the cursor. Tap V while you still hold the keys and Pladder presses Return for you, so the prompt is sent. The same works in Codex, Cursor, OpenCode, T3 Code and every other app that takes text."}
+          "acceptedAnswer": {"@type": "Answer", "text": "Install Pladder, click into Claude Code's prompt, hold Option+Space, say the prompt and let go. The words are pasted at the cursor. Tap V while you still hold the keys and Pladder presses Return for you, so the prompt is sent. The same works in T3 Code, Codex, Cursor, OpenCode and every other app that takes text."}
+        },
+        {
+          "@type": "Question",
+          "name": "Is there a free offline dictation app for Mac?",
+          "acceptedAnswer": {"@type": "Answer", "text": "Yes: Pladder. No trial, no subscription, no word limit, no ads, and it's open source under the MIT license. It runs entirely on your Mac, so after a one-time download of the speech model it works with Wi-Fi off."}
         },
         {
           "@type": "Question",
@@ -68,13 +75,18 @@
         },
         {
           "@type": "Question",
-          "name": "How is Pladder different from macOS Dictation and Whisper apps?",
-          "acceptedAnswer": {"@type": "Answer", "text": "Pladder is push-to-talk: it records only while you hold the key and pastes the whole text when you let go, into any app. It runs Parakeet Ultra, a post-training of NVIDIA's Parakeet TDT v3, rather than Whisper, and transcribes while you are still speaking, so the wait after you let go stays the same for a sentence or for five minutes. It is open source, and its speed is benchmarked in the repository rather than claimed."}
+          "name": "How is it different from Wispr Flow or Superwhisper?",
+          "acceptedAnswer": {"@type": "Answer", "text": "No subscription, no cloud, no account. Wispr Flow transcribes on its servers, and Superwhisper keeps its Parakeet models for Pro. Pladder gives you Parakeet for free, does everything on your Mac, and its speed is measured in public benchmarks anyone can rerun."}
         },
         {
           "@type": "Question",
-          "name": "Which Macs and languages does Pladder support?",
-          "acceptedAnswer": {"@type": "Answer", "text": "Any Apple Silicon Mac on macOS 26 or later; the benchmarks are taken on an M1, so every newer chip is faster. It understands the 25 European languages of Parakeet, among them English, German, French, Spanish, Italian, Portuguese, Dutch, Polish and Ukrainian, and detects the language as you speak."}
+          "name": "How is it different from macOS Dictation and Whisper apps?",
+          "acceptedAnswer": {"@type": "Answer", "text": "Pladder is push-to-talk: it records only while you hold the key and pastes the whole text when you let go, into any app. It runs Parakeet Ultra, a post-training of NVIDIA's Parakeet TDT v3, rather than Whisper, and transcribes while you are still speaking, so the wait after you let go stays the same for a sentence or for five minutes."}
+        },
+        {
+          "@type": "Question",
+          "name": "Will it run on my Mac, and in my language?",
+          "acceptedAnswer": {"@type": "Answer", "text": "Any Mac with an Apple chip, M1 or newer, on macOS 26 or later; the benchmarks are taken on an M1, so every newer chip is faster. It understands the 25 European languages of Parakeet, among them English, German, French, Spanish, Italian, Portuguese, Dutch, Polish and Ukrainian, and detects the language as you speak."}
         }
       ]
     }
@@ -83,135 +95,306 @@
 </script>
 </head>
 <body>
-<header class="bar">
-  <a class="brand" href="./"><img src="logo.svg" width="130" height="36" alt="Pladder"></a>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="top-band">
+<div class="top">
+  <a class="brand" href="./">
+    <svg width="34" height="34" viewBox="0 0 1024 1024" aria-hidden="true"><defs><linearGradient id="ink" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2B2F55"/><stop offset="1" stop-color="#171933"/></linearGradient></defs><path fill="url(#ink)" d="M229.07 0L794.93 0C956.78 0 1024 67.22 1024 229.07L1024 794.93C1024 956.78 956.78 1024 794.93 1024L229.07 1024C67.22 1024 0 956.78 0 794.93L0 229.07C0 67.22 67.22 0 229.07 0Z"/><g fill="#F5F5FA"><rect x="168" y="392" width="80" height="240" rx="40"/><rect x="302" y="280" width="80" height="464" rx="40"/><rect x="436" y="344" width="80" height="336" rx="40"/><rect x="570" y="416" width="80" height="192" rx="40"/></g><g fill="#FF6A47"><rect x="718" y="244" width="80" height="536" rx="40"/><rect x="660" y="244" width="196" height="80" rx="40"/><rect x="660" y="700" width="196" height="80" rx="40"/></g></svg>
+    <span>pladder</span>
+  </a>
   <nav aria-label="Main">
-    <a href="privacy/">Privacy</a>
-    <a href="#faq">FAQ</a>
-    <a href="https://github.com/dinooo13/pladder">GitHub</a>
-    <a class="pill-link" href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg">Download</a>
+    <a class="in-page" href="#speed">Speed</a>
+    <a class="in-page" href="#private">Privacy</a>
+    <a class="in-page" href="#compare">Compare</a>
+    <a class="in-page" href="#faq">FAQ</a>
+    <a class="btn btn-small" href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg">Get it free</a>
   </nav>
+</div>
 </header>
 
-<main>
-<section class="hero">
-  <h1>Talk to your agents<span class="caret" aria-hidden="true"></span></h1>
-  <p class="intro">Pladder is push-to-talk dictation for macOS. Hold a key, say what you want, let go, and your words are already where the cursor is. Insanely fast, private by design, and free.</p>
-  <div class="get">
-    <a class="button" href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg">Download for Mac</a>
-    <p class="release">Version <span id="version">0.1.0</span>, for Apple Silicon Macs on macOS 26 or later.</p>
-  </div>
-  <details class="checksum">
-    <summary>Check the download</summary>
-    <p>SHA-256 of the disk image: <code id="sha256">9f6bec01e2ad786157b82c5519cfe7b4808fea11750667e450a6be4341030113</code></p>
-  </details>
-
-  <figure class="demo">
-    <div class="stage" aria-hidden="true">
-      <div class="field">
-        <span class="prompt">&gt;</span>
-        <span class="placeholder"><span class="caret small"></span>Ask your agent anything</span>
-        <span class="said">Move the hotkey recorder under the polish toggle and add a test for an empty chord.<span class="caret small"></span></span>
+<main id="main">
+<div class="band">
+<section class="hero" aria-labelledby="title">
+  <div class="hero-text">
+    <h1 id="title">Talk to<br>your agents.</h1>
+    <div class="hero-copy">
+      <p class="intro">Pladder is push-to-talk dictation for Mac. Say the prompt, let go, and it's in T3 Code, Claude or Codex in <a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#what-a-dictation-waits-for">0.2 seconds</a>. Free, and nothing you say leaves your Mac.</p>
+      <div class="get">
+        <a class="btn" href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12"/><path d="m6 11 6 6 6-6"/><path d="M5 20h14"/></svg>
+          Download for Mac
+        </a>
+        <span class="perks">Free · No subscription · Works offline</span>
       </div>
-      <div class="listening">
-        <span class="dot"></span>
-        <span class="wave"><i style="--i:0"></i><i style="--i:1"></i><i style="--i:2"></i><i style="--i:3"></i><i style="--i:4"></i><i style="--i:5"></i><i style="--i:6"></i><i style="--i:7"></i><i style="--i:8"></i><i style="--i:9"></i><i style="--i:10"></i><i style="--i:11"></i></span>
+    </div>
+  </div>
+
+  <div class="visual">
+    <div class="shot" role="img" aria-label="T3 Code with the reply “Yes, and add a test for it.” in its prompt box, dictated with Pladder, whose recording pill shows the words as they are spoken.">
+      <div class="t3">
+        <div class="t3-side">
+          <div class="t3-title"><span class="lights"><i></i><i></i><i></i></span><span><b>T3</b> <span class="mute">Code</span></span></div>
+          <div class="t3-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search</div>
+          <div class="t3-group">Working <span class="rule"></span></div>
+          <div class="t3-threads">
+            <div class="t3-thread active">
+              <div class="meta"><span class="badge coral">P</span><span class="name">pladder</span><span class="status"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M10.1 2.2a10 10 0 0 1 3.8 0M17.6 3.7a10 10 0 0 1 2.7 2.7M21.8 10.1a10 10 0 0 1 0 3.8M20.3 17.6a10 10 0 0 1-2.7 2.7M13.9 21.8a10 10 0 0 1-3.8 0M6.4 20.3a10 10 0 0 1-2.7-2.7M2.2 13.9a10 10 0 0 1 0-3.8M3.7 6.4a10 10 0 0 1 2.7-2.7"/></svg>Working</span></div>
+              <div class="subject">Persist dark mode toggle</div>
+              <div class="meta branch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="8" r="2.5"/><path d="M6 8.5v7M18 10.5c0 4-6 3-11 5.5"/></svg><span>t3/dark-mode</span><span class="diff"><span class="add">+24</span> <span class="del">−3</span></span></div>
+            </div>
+            <div class="t3-thread">
+              <div class="meta"><span class="badge">W</span><span class="name">website</span><span>7m</span></div>
+              <div class="subject">Fix flaky login test</div>
+              <div class="meta branch">t3/login-test</div>
+            </div>
+            <div class="t3-thread">
+              <div class="meta"><span class="badge coral">P</span><span class="name">pladder</span><span>29m</span></div>
+              <div class="subject">Onboarding copy</div>
+              <div class="meta branch">t3/onboarding</div>
+            </div>
+          </div>
+          <div class="t3-group settled">Settled <span>12</span> ›</div>
+        </div>
+        <div class="t3-main">
+          <div class="t3-crumbs"><span class="square"></span><span class="mute">pladder</span><span class="mute">/</span><span class="name">Persist dark mode toggle</span></div>
+          <div class="t3-chat">
+            <div class="t3-ask">Why does dark mode reset?</div>
+            <div class="t3-worked">Worked for 20 seconds <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></div>
+            <p>It's only kept in memory. Save it to <code>UserDefaults</code>?</p>
+          </div>
+          <div class="t3-composer">
+            <p>Yes, and add a test for it.</p>
+            <div class="t3-tools">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m21.4 11.1-8.5 8.5a5.5 5.5 0 0 1-7.8-7.8l8.5-8.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.8 1.8 0 0 1-2.6-2.6l7.8-7.8"/></svg>
+              <span class="t3-model">Opus 5.5 <span class="mute">High</span></span>
+              <span class="t3-send"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11.5V2.5M7 2.5L3 6.5M7 2.5L11 6.5"/></svg></span>
+            </div>
+          </div>
+          <div class="t3-foot"><span>Current checkout</span><span>t3/dark-mode</span></div>
+        </div>
       </div>
-      <div class="keys"><kbd class="key">⌥<small>option</small></kbd><kbd class="key space">space</kbd></div>
-    </div>
-    <figcaption>Hold Option and Space while you talk. Let go, and the whole prompt lands at once.</figcaption>
-  </figure>
-</section>
 
-<section class="speed" id="speed">
-  <h2>Insanely fast, however long you talk.</h2>
-  <p class="lead">Pladder transcribes while you are still talking, so when you let go there is almost nothing left to do. On an M1, the slowest chip it runs on, short dictations land in a median of <a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#what-a-dictation-waits-for">0.195 s</a>.</p>
-  <div class="scale">
-    <div class="run">
-      <p class="what">Talk for 30 seconds</p>
-      <div class="track" style="--wait: 0.96%"><span class="talk"></span><span class="wait"></span></div>
-      <p class="took"><a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#parakeet-ultra">0.288 s</a> until the text is there</p>
+      <div class="pill">
+        <span class="rec"></span>
+        <span class="wave"><i style="--h:9"></i><i style="--h:17"></i><i style="--h:22"></i><i style="--h:14"></i><i style="--h:24"></i><i style="--h:12"></i><i style="--h:19"></i><i style="--h:8"></i></span>
+        <span class="said">yes, and add a test for it</span>
+      </div>
     </div>
-    <div class="run">
-      <p class="what">Talk for five minutes</p>
-      <div class="track" style="--wait: 0.087%"><span class="talk"></span><span class="wait"></span></div>
-      <p class="took"><a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#parakeet-ultra">0.261 s</a> until the text is there</p>
-    </div>
+
+    <p class="keys"><span class="kgroup"><kbd class="key"><span aria-hidden="true">⌥</span><span class="sr">Option</span></kbd> <span aria-hidden="true">+</span> <kbd class="key key-space">space</kbd> to talk,</span> <span class="kgroup">tap <kbd class="key key-v">V</kbd> to send</span></p>
   </div>
-  <p class="note">Drawn to scale: the coral sliver at the end is your wait. It hears you right, too: <a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#parakeet-ultra">4.0 %</a> word error on the FLEURS clips in English, German and Spanish, against <a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#parakeet-ultra">4.9 %</a> for the Parakeet model it improves on. Every figure here links to <a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md">how it was measured</a>.</p>
 </section>
+</div>
 
-<section class="private" id="privacy">
-  <div class="inner">
-    <h2>Your voice never leaves your Mac.</h2>
-    <p class="lead">Not as a promise in a policy: there is simply nowhere for it to go. Pladder has no server.</p>
-    <ul class="promises">
-      <li><strong>On-device.</strong> Your Mac's Neural Engine turns speech into text, and the audio is gone the moment it has.</li>
-      <li><strong>Offline.</strong> Once the speech model is downloaded, it works with Wi-Fi off.</li>
-      <li><strong>Nobody watching.</strong> No account, no tracking, no update check. The microphone is on only while you hold the key.</li>
-      <li><strong>Checkable.</strong> It is open source, so anyone can read what it does.</li>
-    </ul>
-    <p><a href="privacy/">How Pladder handles your words</a></p>
+<section class="sec" id="speed" aria-labelledby="speed-title">
+  <div class="speed">
+    <div class="speed-num">
+      <p class="big"><a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#what-a-dictation-waits-for">0.2 s</a></p>
+      <p class="small-muted">from letting go to your words on screen</p>
+    </div>
+    <div class="speed-text">
+      <h2 id="speed-title" class="h-l">Blink and it's there.</h2>
+      <p class="lede-s">No spinning wheel, no “processing”, no upload. Your prompt is in the box the moment you let go, and your agent is working before you've looked up.</p>
+      <p class="note">Measured on an M1, the oldest Mac it runs on: a median of <a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#what-a-dictation-waits-for">0.195 s</a> over real dictations, and still <a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#parakeet-ultra">0.261 s</a> after five minutes of talking. <a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md">See the benchmark</a></p>
+    </div>
   </div>
 </section>
 
-<section class="agents" id="agents">
-  <h2>Made for the prompt box.</h2>
-  <div class="cols">
-    <p>Hold <kbd>⌥</kbd> <kbd>Space</kbd>, describe the change, tap <kbd>V</kbd> with the same hand and let go. The prompt is pasted, Return is pressed, and your agent is already working, while your other hand never left the mouse.</p>
-    <p>Pladder types wherever your cursor is: Claude Code, Codex, Cursor, T3 Code, OpenCode, any terminal, any editor, any text field. A dictionary fixes the names speech models stumble on, so "clode code" comes out as "Claude Code", every time.</p>
+<section class="sec" id="prompts" aria-labelledby="prompts-title">
+  <h2 id="prompts-title" class="h-xl narrow">Say the detailed prompt, not the lazy one.</h2>
+  <p class="lede">Typing makes you cut corners. Talking is three to four times faster, so you give your agent the context it actually needs.</p>
+  <div class="grid g380">
+    <div class="card big-card">
+      <p class="label faint">Typed</p>
+      <p class="mono">&gt; fix dark mode bug</p>
+      <p class="faint small">And then three rounds of “no, I meant…”.</p>
+    </div>
+    <div class="card big-card dark">
+      <p class="label pop">Said</p>
+      <p class="mono">&gt; The dark mode toggle in settings forgets its state after a restart. Save it, load it on launch, and add a test that flips it and relaunches.</p>
+      <p class="small dark-muted">Right the first time.</p>
+    </div>
+  </div>
+  <div class="grid g380 tight">
+    <div class="card row-card">
+      <span class="mono-inline faint"><del>clode code</del></span>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="becomes" role="img"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+      <span class="mono-inline strong">Claude Code</span>
+      <p class="muted full">A dictionary fixes the names speech models trip over: tools, libraries, your project's jargon.</p>
+    </div>
+    <div class="card row-card">
+      <kbd class="key key-v">V</kbd>
+      <span class="strong">Tap it before you let go</span>
+      <p class="muted full">Pladder pastes the prompt and presses Enter for you. Same hand, no reaching.</p>
+    </div>
   </div>
 </section>
 
-<section class="details" aria-labelledby="details">
-  <h2 id="details">The small things, done right.</h2>
-  <dl>
-    <div><dt>Your keys</dt><dd>Record any key or combination to talk and to send, or a toggle key for long dictations. Escape throws a recording away.</dd></div>
-    <div><dt>It learns your words</dt><dd>Fix a word by hand after a dictation and Pladder offers to remember it. Only when you say so.</dd></div>
-    <div><dt>No ums</dt><dd>"Uh" and "um" are dropped, and saying "comma" or "new paragraph" gives you the mark.</dd></div>
-    <div><dt>Polish, if you like</dt><dd>An optional on-device model turns "wait, no, Friday" into "Friday" before the paste.</dd></div>
-    <div><dt>25 languages</dt><dd>English, German, French, Spanish and the rest of Europe, recognised as you speak. Nothing to switch.</dd></div>
-    <div><dt>Feels like macOS</dt><dd>A menu bar app with a Liquid Glass pill in four styles, and nothing in the Dock.</dd></div>
-  </dl>
+<section class="sec" id="everywhere" aria-labelledby="everywhere-title">
+  <h2 id="everywhere-title" class="h-xl">Stop typing. Start talking.</h2>
+  <p class="lede">Not just for agents. If there's a blinking cursor anywhere on your Mac, Pladder can fill it.</p>
+  <div class="grid g280">
+    <div class="card"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg><h3>Emails</h3><p class="muted">Clear your inbox at the speed you talk.</p></div>
+    <div class="card"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></svg><h3>Messages</h3><p class="muted">Reply to friends without breaking stride.</p></div>
+    <div class="card"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h5"/></svg><h3>Notes &amp; docs</h3><p class="muted">Get the first draft out of your head in minutes.</p></div>
+    <div class="card"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><h3>Search boxes</h3><p class="muted">Ask the long question, not the three-word one.</p></div>
+  </div>
 </section>
 
-<section class="faq" id="faq">
-  <h2>Questions</h2>
-  <details>
-    <summary>Is there a free offline dictation app for Mac?</summary>
-    <p>Yes. Pladder is free, MIT-licensed and runs entirely on your Mac. After a one-time download of the speech model it works with Wi-Fi off. It needs an Apple Silicon Mac with macOS 26 or later.</p>
-  </details>
-  <details>
-    <summary>How do I dictate into Claude Code?</summary>
-    <p>Install Pladder, click into Claude Code's prompt, hold Option+Space, say the prompt and let go. The words are pasted at the cursor. Tap V while you still hold the keys and Pladder presses Return for you, so the prompt is sent. The same works in Codex, Cursor, OpenCode, T3 Code and every other app that takes text.</p>
-  </details>
-  <details>
-    <summary>Does Pladder send my voice to the cloud?</summary>
-    <p>No. Audio and text never leave the Mac. Speech is transcribed on the Neural Engine, the microphone is open only while you hold the key, and there is no account, no analytics and no update check. The only network requests are one-time model downloads from Hugging Face.</p>
-  </details>
-  <details>
-    <summary>How is Pladder different from macOS Dictation and Whisper apps?</summary>
-    <p>Pladder is push-to-talk: it records only while you hold the key and pastes the whole text when you let go, into any app. It runs Parakeet Ultra, a post-training of NVIDIA's Parakeet TDT v3, rather than Whisper, and transcribes while you are still speaking, so the wait after you let go stays the same for a sentence or for five minutes. It is open source, and its speed is benchmarked in the repository rather than claimed.</p>
-  </details>
-  <details>
-    <summary>Which Macs and languages does Pladder support?</summary>
-    <p>Any Apple Silicon Mac on macOS 26 or later; the benchmarks are taken on an M1, so every newer chip is faster. It understands the 25 European languages of Parakeet, among them English, German, French, Spanish, Italian, Portuguese, Dutch, Polish and Ukrainian, and detects the language as you speak.</p>
-  </details>
+<section class="sec" id="private" aria-labelledby="private-title">
+  <div class="private">
+    <div class="private-head">
+      <h2 id="private-title" class="h-xl narrower">Talk freely. Nobody's listening.</h2>
+      <p class="dark-muted lede-s">Your voice becomes text on your Mac, not on someone else's server. What you say about your code, your clients or your weekend stays with you.</p>
+    </div>
+    <div class="grid g380">
+      <div class="card big-card dark2">
+        <p class="label dark-faint">Cloud dictation apps</p>
+        <p class="claim dark-muted">Their privacy policy is pages long.</p>
+        <div class="policy" aria-hidden="true"><span style="width:100%"></span><span style="width:93%"></span><span style="width:97%"></span><span style="width:61%"></span><span class="gap" style="width:100%"></span><span style="width:86%"></span><span style="width:70%"></span></div>
+        <p class="small dark-faint">Because your voice goes to their servers.</p>
+      </div>
+      <div class="card big-card soft">
+        <p class="label">Pladder</p>
+        <p class="claim">Ours is one line:</p>
+        <p class="claim-xl">Nothing you say leaves your Mac.</p>
+        <p class="small strongish push">Offline · No account · Mic on only while you hold the key · <a href="privacy/">Privacy details</a></p>
+      </div>
+    </div>
+  </div>
 </section>
 
-<section class="free">
-  <h2>Free. Really.</h2>
-  <p class="lead">No trial, no subscription, no account. Pladder is open source under the MIT license.</p>
-  <a class="button" href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg">Download for Mac</a>
-  <p class="release">Or <a href="https://github.com/dinooo13/pladder#install">build it from source</a> in about a minute.</p>
+<section class="sec" id="compare" aria-labelledby="compare-title">
+  <h2 id="compare-title" class="h-xl narrow">Others rent you dictation. Pladder gives it to you.</h2>
+  <p class="lede">The popular dictation apps are subscriptions. Pladder is free, and it never sends your voice anywhere.</p>
+  <div class="table-wrap">
+    <table role="table">
+      <caption id="compare-caption" class="sr">Pladder compared with Wispr Flow and Superwhisper</caption>
+      <thead role="rowgroup">
+        <tr role="row"><td role="cell"></td><th role="columnheader" scope="col" class="us">Pladder</th><th role="columnheader" scope="col">Wispr Flow</th><th role="columnheader" scope="col">Superwhisper</th></tr>
+      </thead>
+      <tbody role="rowgroup">
+        <tr role="row"><th role="rowheader" scope="row">Price</th><td role="cell" data-label="Pladder" class="us">Free. No subscription.</td><td role="cell" data-label="Wispr Flow">$15 a month for Pro</td><td role="cell" data-label="Superwhisper">$8.49 a month for Pro</td></tr>
+        <tr role="row"><th role="rowheader" scope="row">Free plan limits</th><td role="cell" data-label="Pladder" class="us">None. The best model is included.</td><td role="cell" data-label="Wispr Flow">Weekly word cap</td><td role="cell" data-label="Superwhisper">Whisper models only. Parakeet needs Pro.</td></tr>
+        <tr role="row"><th role="rowheader" scope="row">Speed</th><td role="cell" data-label="Pladder" class="us"><span><a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#what-a-dictation-waits-for">0.2 s</a>, measured in public</span></td><td role="cell" data-label="Wispr Flow">No public benchmark to rerun</td><td role="cell" data-label="Superwhisper">No public benchmark to rerun</td></tr>
+        <tr role="row"><th role="rowheader" scope="row">Where your voice goes</th><td role="cell" data-label="Pladder" class="us">Nowhere. It stays on your Mac.</td><td role="cell" data-label="Wispr Flow">To their cloud servers</td><td role="cell" data-label="Superwhisper">Your Mac, or the cloud with Pro cloud models</td></tr>
+        <tr role="row"><th role="rowheader" scope="row">Works offline</th><td role="cell" data-label="Pladder" class="us">Always</td><td role="cell" data-label="Wispr Flow">No</td><td role="cell" data-label="Superwhisper">Only with local models</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="fine">Pro prices as listed on <a href="https://wisprflow.ai/pricing">Wispr Flow's pricing page</a> and <a href="https://superwhisper.com/docs/billing/plans">Superwhisper's plans page</a> in November 2026, billed monthly. Yearly plans cost less per month, and Superwhisper also sells a lifetime license. Check their sites for current terms.</p>
+</section>
+
+<section class="sec" id="how" aria-labelledby="how-title">
+  <p class="kicker">Learn it in five seconds</p>
+  <h2 id="how-title" class="h-xl">Simple as a walkie-talkie.</h2>
+  <ol class="grid g300 steps">
+    <li class="card big-card"><span class="num" aria-hidden="true">1</span><h3>Hold <span aria-hidden="true">⌥</span><span class="sr">Option</span> Space</h3><p class="muted">Click into the prompt box, then hold. The mic turns on. Only now.</p></li>
+    <li class="card big-card"><span class="num" aria-hidden="true">2</span><h3>Talk</h3><p class="muted">Like you'd explain it to a colleague. Say “comma” or “new paragraph” when you want one.</p></li>
+    <li class="card big-card"><span class="num" aria-hidden="true">3</span><h3>Let go</h3><p class="muted">The text lands at the cursor. Tap V first to send it. Changed your mind? Press Escape.</p></li>
+  </ol>
+</section>
+
+<section class="sec" id="styles" aria-labelledby="styles-title">
+  <h2 id="styles-title" class="h-xl">Four styles. Pick your pill.</h2>
+  <p class="lede">A small Liquid Glass pill shows you're recording. Keep it compact, shrink it to a dot, watch your words appear live, or tuck it into the menu bar.</p>
+  <ul class="styles">
+    <li><figure><picture><source type="image/avif" media="(prefers-color-scheme: dark)" srcset="media/style-compact-dark.avif"><source type="image/webp" media="(prefers-color-scheme: dark)" srcset="media/style-compact-dark.webp"><source type="image/avif" srcset="media/style-compact-light.avif"><img src="media/style-compact-light.webp" width="580" height="380" loading="lazy" decoding="async" alt="A wide pill with a red recording dot and a waveform."></picture><figcaption>Compact</figcaption></figure></li>
+    <li><figure><picture><source type="image/avif" media="(prefers-color-scheme: dark)" srcset="media/style-minimal-dark.avif"><source type="image/webp" media="(prefers-color-scheme: dark)" srcset="media/style-minimal-dark.webp"><source type="image/avif" srcset="media/style-minimal-light.avif"><img src="media/style-minimal-light.webp" width="580" height="380" loading="lazy" decoding="async" alt="A small round pill with only a waveform."></picture><figcaption>Minimal</figcaption></figure></li>
+    <li><figure><picture><source type="image/avif" media="(prefers-color-scheme: dark)" srcset="media/style-live-dark.avif"><source type="image/webp" media="(prefers-color-scheme: dark)" srcset="media/style-live-dark.webp"><source type="image/avif" srcset="media/style-live-light.avif"><img src="media/style-live-light.webp" width="580" height="380" loading="lazy" decoding="async" alt="A long pill that shows the words as they are spoken: “the words show up as you say them, right here”."></picture><figcaption>Live</figcaption></figure></li>
+    <li><figure><picture><source type="image/avif" media="(prefers-color-scheme: dark)" srcset="media/style-menu-bar-dark.avif"><source type="image/webp" media="(prefers-color-scheme: dark)" srcset="media/style-menu-bar-dark.webp"><source type="image/avif" srcset="media/style-menu-bar-light.avif"><img src="media/style-menu-bar-light.webp" width="580" height="380" loading="lazy" decoding="async" alt="No pill on screen; the Pladder icon in the menu bar shows the recording."></picture><figcaption>Menu Bar</figcaption></figure></li>
+  </ul>
+</section>
+
+<section class="sec" id="little-things" aria-labelledby="little-title">
+  <h2 id="little-title" class="h-l">Little things you'll love.</h2>
+  <div class="grid g360">
+    <div class="card">
+      <h3>No more “um”</h3>
+      <p class="faint small"><del>“So, um, I think we should, uh, meet at noon”</del></p>
+      <p class="strong">“So, I think we should meet at noon”</p>
+    </div>
+    <div class="card">
+      <h3>Changed your mind?</h3>
+      <p class="faint small"><del>“See you Thursday, wait, no, Friday”</del></p>
+      <p class="strong">“See you Friday”</p>
+      <p class="muted small">With the optional polish, also on your Mac.</p>
+    </div>
+    <div class="card">
+      <h3>Learns your names</h3>
+      <p class="muted">Fix a word once and Pladder offers to remember it. Colleagues, pets, weird project names.</p>
+    </div>
+    <div class="card">
+      <h3>Your clipboard, untouched</h3>
+      <p class="muted">Whatever you'd copied is still there afterwards.</p>
+    </div>
+    <div class="card">
+      <h3>Out of your way</h3>
+      <p class="muted">Lives in the menu bar. Nothing in the Dock, no window to manage.</p>
+    </div>
+    <div class="card">
+      <h3>25 languages</h3>
+      <p class="strong"><span lang="de">Hallo</span> · <span lang="fr">Bonjour</span> · <span lang="es">Hola</span> · <span lang="it">Ciao</span></p>
+      <p class="muted">It notices which one you're speaking.</p>
+    </div>
+  </div>
+</section>
+
+<section class="sec faq" id="faq" aria-labelledby="faq-title">
+  <h2 id="faq-title" class="h-l">Questions</h2>
+  <div class="faq-list">
+    <details>
+      <summary>Which apps does it work with?</summary>
+      <p>Anything with a text field: T3 Code, Claude, Codex, Claude Code, Cursor, ChatGPT, your terminal, Mail, Messages, Notes. If you can type there, you can talk there.</p>
+    </details>
+    <details>
+      <summary>How do I dictate into Claude Code?</summary>
+      <p>Install Pladder, click into Claude Code's prompt, hold Option+Space, say the prompt and let go. The words are pasted at the cursor. Tap V while you still hold the keys and Pladder presses Return for you, so the prompt is sent. The same works in T3 Code, Codex, Cursor, OpenCode and every other app that takes text.</p>
+    </details>
+    <details>
+      <summary>Is there a free offline dictation app for Mac?</summary>
+      <p>Yes: Pladder. No trial, no subscription, no word limit, no ads, and it's open source under the MIT license. It runs entirely on your Mac, so after a one-time download of the speech model it works with Wi-Fi off.</p>
+    </details>
+    <details>
+      <summary>Does Pladder send my voice to the cloud?</summary>
+      <p>No. Audio and text never leave the Mac. Speech is transcribed on the Neural Engine, the microphone is open only while you hold the key, and there is no account, no analytics and no update check. The only network requests are one-time model downloads from Hugging Face.</p>
+    </details>
+    <details>
+      <summary>How is it different from Wispr Flow or Superwhisper?</summary>
+      <p>No subscription, no cloud, no account. Wispr Flow transcribes on its servers, and Superwhisper keeps its Parakeet models for Pro. Pladder gives you Parakeet for free, does everything on your Mac, and its speed is measured in public benchmarks anyone can rerun.</p>
+    </details>
+    <details>
+      <summary>How is it different from macOS Dictation and Whisper apps?</summary>
+      <p>Pladder is push-to-talk: it records only while you hold the key and pastes the whole text when you let go, into any app. It runs Parakeet Ultra, a post-training of NVIDIA's Parakeet TDT v3, rather than Whisper, and transcribes while you are still speaking, so the wait after you let go stays the same for a sentence or for five minutes.</p>
+    </details>
+    <details>
+      <summary>Will it run on my Mac, and in my language?</summary>
+      <p>Any Mac with an Apple chip, M1 or newer, on macOS 26 or later; the benchmarks are taken on an M1, so every newer chip is faster. It understands the 25 European languages of Parakeet, among them English, German, French, Spanish, Italian, Portuguese, Dutch, Polish and Ukrainian, and detects the language as you speak.</p>
+    </details>
+  </div>
+</section>
+
+<section class="sec last" aria-labelledby="free-title">
+  <div class="cta">
+    <h2 id="free-title" class="h-cta">Talk is cheap.<br>Pladder is free.</h2>
+    <p class="cta-lede">No trial, no subscription, no account.</p>
+    <a class="btn" href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg">Download for Mac</a>
+    <p class="release">Version <span id="version">0.1.0</span>, for Macs with an Apple chip on macOS 26 or later. Or <a href="https://github.com/dinooo13/pladder#install">build it from source</a>.</p>
+    <details class="checksum">
+      <summary>Check the download</summary>
+      <p>SHA-256 of the disk image: <code id="sha256">9f6bec01e2ad786157b82c5519cfe7b4808fea11750667e450a6be4341030113</code></p>
+    </details>
+  </div>
 </section>
 </main>
 
 <footer class="foot">
-  <img src="logo.svg" width="101" height="28" alt="" loading="lazy">
-  <p><em>Pladder</em> is Low German for "to babble". Made by <a href="https://github.com/dinooo13">Fabian Meyer</a>.</p>
-  <p class="links"><a href="https://github.com/dinooo13/pladder">Source</a> <a href="https://github.com/dinooo13/pladder/blob/main/docs/USAGE.md">Usage</a> <a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md">Benchmarks</a> <a href="privacy/">Privacy</a> <a href="llms.txt">llms.txt</a></p>
-  <p>Last updated <time datetime="2026-11-01">1 November 2026</time>, for version 0.1.0.</p>
+  <div>
+    <p><em>Pladder</em> is Low German for “to babble”. Made by <a href="https://github.com/dinooo13">Fabian Meyer</a>.</p>
+    <p>Last updated <time datetime="2026-11-02">2 November 2026</time>, for version 0.1.0.</p>
+  </div>
+  <nav aria-label="Footer"><a href="https://github.com/dinooo13/pladder">Source</a><a href="https://github.com/dinooo13/pladder/blob/main/docs/USAGE.md">Usage</a><a href="privacy/">Privacy</a><a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md">Benchmarks</a><a href="llms.txt">llms.txt</a></nav>
 </footer>
 </body>
 </html>

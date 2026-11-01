@@ -10,7 +10,9 @@
 <link rel="apple-touch-icon" href="../apple-touch-icon.png">
 <link rel="preload" href="../fonts/outfit.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="../style.css">
-<meta name="theme-color" content="#F5F5FA">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#15172B" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="Pladder">
 <meta property="og:title" content="Pladder privacy: your voice never leaves your Mac">
@@ -23,19 +25,27 @@
 <meta name="twitter:card" content="summary_large_image">
 </head>
 <body>
-<header class="bar">
-  <a class="brand" href="../"><img src="../logo.svg" width="130" height="36" alt="Pladder"></a>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="top-band page-band">
+<div class="top">
+  <a class="brand" href="../">
+    <svg width="34" height="34" viewBox="0 0 1024 1024" aria-hidden="true"><defs><linearGradient id="ink" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2B2F55"/><stop offset="1" stop-color="#171933"/></linearGradient></defs><path fill="url(#ink)" d="M229.07 0L794.93 0C956.78 0 1024 67.22 1024 229.07L1024 794.93C1024 956.78 956.78 1024 794.93 1024L229.07 1024C67.22 1024 0 956.78 0 794.93L0 229.07C0 67.22 67.22 0 229.07 0Z"/><g fill="#F5F5FA"><rect x="168" y="392" width="80" height="240" rx="40"/><rect x="302" y="280" width="80" height="464" rx="40"/><rect x="436" y="344" width="80" height="336" rx="40"/><rect x="570" y="416" width="80" height="192" rx="40"/></g><g fill="#FF6A47"><rect x="718" y="244" width="80" height="536" rx="40"/><rect x="660" y="244" width="196" height="80" rx="40"/><rect x="660" y="700" width="196" height="80" rx="40"/></g></svg>
+    <span>pladder</span>
+  </a>
   <nav aria-label="Main">
-    <a href="./" aria-current="page">Privacy</a>
-    <a href="../#faq">FAQ</a>
-    <a href="https://github.com/dinooo13/pladder">GitHub</a>
-    <a class="pill-link" href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg">Download</a>
+    <a class="in-page" href="../#speed">Speed</a>
+    <a class="in-page" href="./" aria-current="page">Privacy</a>
+    <a class="in-page" href="../#compare">Compare</a>
+    <a class="in-page" href="../#faq">FAQ</a>
+    <a class="btn btn-small" href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg">Get it free</a>
   </nav>
+</div>
 </header>
 
-<main class="page">
+<main class="page" id="main">
 <h1>Your voice never leaves your Mac</h1>
-<p class="lead">Privacy in Pladder is not a policy. It is how the app is built: there is no server to send anything to.</p>
+<p class="lede">Privacy in Pladder is not a policy. It is how the app is built: there is no server to send anything to.</p>
 
 <h2>Your audio</h2>
 <p>The microphone is open only while you hold the key, and macOS shows its orange indicator only then. The audio goes from the microphone to your Mac's Neural Engine, where it is turned into text, and is then thrown away. It is never saved and never sent.</p>
@@ -66,14 +76,15 @@
 <h2>This website</h2>
 <p>This site sets no cookies, runs no analytics and loads nothing from other servers: no outside fonts, no scripts, no tracking pixels. Every file, its one typeface included, comes from GitHub Pages, which hosts it and, like any web host, sees the requests.</p>
 
-<p class="back"><a class="button" href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg">Download for Mac</a></p>
+<p class="back"><a class="btn" href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg">Download for Mac</a></p>
 </main>
 
 <footer class="foot">
-  <img src="../logo.svg" width="101" height="28" alt="" loading="lazy">
-  <p><em>Pladder</em> is Low German for "to babble". Made by <a href="https://github.com/dinooo13">Fabian Meyer</a>.</p>
-  <p class="links"><a href="https://github.com/dinooo13/pladder">Source</a> <a href="https://github.com/dinooo13/pladder/blob/main/docs/USAGE.md">Usage</a> <a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md">Benchmarks</a> <a href="../">Home</a> <a href="../llms.txt">llms.txt</a></p>
-  <p>Last updated <time datetime="2026-11-01">1 November 2026</time>, for version 0.1.0.</p>
+  <div>
+    <p><em>Pladder</em> is Low German for “to babble”. Made by <a href="https://github.com/dinooo13">Fabian Meyer</a>.</p>
+    <p>Last updated <time datetime="2026-11-02">2 November 2026</time>, for version 0.1.0.</p>
+  </div>
+  <nav aria-label="Footer"><a href="../">Home</a><a href="https://github.com/dinooo13/pladder">Source</a><a href="https://github.com/dinooo13/pladder/blob/main/docs/USAGE.md">Usage</a><a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md">Benchmarks</a><a href="../llms.txt">llms.txt</a></nav>
 </footer>
 </body>
 </html>
