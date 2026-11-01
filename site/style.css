@@ -607,9 +607,6 @@ td.us a { color: inherit; }
 .h-cta { font-size: clamp(44px, 6.4vw, 96px); line-height: 0.95; letter-spacing: -0.045em; }
 .cta-lede { font-size: 19px; font-weight: 500; max-width: 26em; }
 .release { font-size: 14px; font-weight: 500; color: var(--dark-muted); max-width: 34em; }
-.checksum { font-size: 14px; color: var(--dark-muted); max-width: 40em; margin-top: -12px; }
-.checksum summary { cursor: pointer; width: max-content; margin: 0 auto; padding: 8px 0; }
-.checksum code { font: 13px/1.5 var(--mono); overflow-wrap: anywhere; color: var(--cta-ink); }
 
 /* Footer */
 
