@@ -7,8 +7,8 @@
 # else in a page, its meta tags and JSON-LD included, fails. One link per
 # line, as the pages are written.
 #
-# It also checks that every page names the same release, and with --release
-# that it is the latest one on GitHub and its DMG's SHA-256 (needs `gh`).
+# It also fails when a page names a release, a version or a SHA-256: the
+# download is always the latest release, so a pinned one would go stale.
 #
 # Plain bash 3.2 and POSIX awk, so it runs the same on macOS and ubuntu.
 
@@ -95,35 +95,10 @@ awk -v sections="$sections" '
     }
 ' "${files[@]}"
 
-# The release the pages name: the visible version, the checksum, the JSON-LD
-# and every "for version" line must agree.
-version=$(sed -n 's/.*<span id="version">\([^<]*\)<.*/\1/p' site/index.html)
-sha=$(sed -n 's/.*<code id="sha256">\([0-9a-f]*\)<.*/\1/p' site/index.html)
-if [ -z "$version" ] || [ ${#sha} -ne 64 ]; then
-    echo "site/index.html: no version or SHA-256 beside the download button" >&2
+pinned=$(grep -rnoE '"softwareVersion"|[Vv]ersion [0-9]+\.[0-9]+\.[0-9]+|\b[0-9a-f]{64}\b' site --include='*.html' --include='*.txt' || true)
+if [ -n "$pinned" ]; then
+    echo "the site names a release; link releases/latest instead:" >&2
+    echo "$pinned" >&2
     exit 1
 fi
-stale=$(grep -rhoE '"softwareVersion": "[^"]*"|for version [0-9][0-9.]*[0-9]' site \
-    | grep -vF "\"softwareVersion\": \"$version\"" | grep -vF "for version $version" || true)
-if [ -n "$stale" ]; then
-    echo "the site names version $version beside the button, but also: $stale" >&2
-    exit 1
-fi
-
-if [ "$1" = "--release" ]; then
-    latest=$(gh api repos/dinooo13/pladder/releases/latest --jq '.tag_name | ltrimstr("v")')
-    if [ "$latest" != "$version" ]; then
-        echo "the site names version $version, the latest release is $latest" >&2
-        exit 1
-    fi
-    # The fixed-name asset the button downloads, or the versioned one with the same bytes.
-    digest=$(gh api repos/dinooo13/pladder/releases/latest --jq \
-        "[.assets[] | select(.name == \"Pladder.dmg\" or .name == \"Pladder-$version.dmg\")][0].digest")
-    if [ "$digest" != "sha256:$sha" ]; then
-        echo "the site gives SHA-256 $sha, the latest release's DMG has ${digest:-none}" >&2
-        exit 1
-    fi
-    echo "Version $version and its SHA-256 match the latest release."
-else
-    echo "Every page names version $version."
-fi
+echo "No page names a release."
