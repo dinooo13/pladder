@@ -32,6 +32,8 @@ import Testing
         await s.begin()
         s.startLoops()
         for second in 1...3 {
+            // The warm loop sleeps until 2 s too, so a sleeper there need not be the feed loop's.
+            #expect(await clock.waitForSleepers(2))
             #expect(await clock.waitForSleeper(at: .seconds(second)))
             clock.advance(to: .seconds(second))
             #expect(await waitUntil { engine.feedCounts.count == second })
