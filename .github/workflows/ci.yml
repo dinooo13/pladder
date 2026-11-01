@@ -47,14 +47,35 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
+      - id: cache
+        # Dependencies only: SwiftPM recompiles a restored .build in full anyway.
+        # Not in the composite action, so release.yml, which signs, never reads it.
+        uses: actions/cache/restore@v6
+        with:
+          path: &deps |
+            .build/artifacts
+            .build/checkouts
+            .build/repositories
+            .build/workspace-state.json
+          key: swiftpm-deps-${{ hashFiles('Package.resolved') }}
       - uses: ./.github/actions/build-and-test
         timeout-minutes: 30
       - name: Bundle
+        # Not on pull requests: a second, release build that doubles the wait.
         # No CODESIGN_IDENTITY on purpose: the runner has no certificate, so
         # this runs the auto-detection and its ad-hoc fallback, which once
         # ended the script silently on a Mac without a certificate.
+        if: github.event_name == 'push'
         run: ./scripts/bundle.sh
       - uses: actions/upload-artifact@v7
+        if: github.event_name == 'push'
         with:
           name: Pladder.app
           path: dist/Pladder.app
+      - uses: actions/cache/save@v6
+        # Only main writes the cache, so pull requests share one and cannot
+        # evict it with their own.
+        if: github.event_name == 'push' && steps.cache.outputs.cache-hit != 'true'
+        with:
+          path: *deps
+          key: swiftpm-deps-${{ hashFiles('Package.resolved') }}
