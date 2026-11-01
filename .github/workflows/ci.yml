@@ -37,7 +37,7 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/build-and-test
         timeout-minutes: 30
       - name: Bundle
@@ -45,7 +45,7 @@ jobs:
         # this runs the auto-detection and its ad-hoc fallback, which once
         # ended the script silently on a Mac without a certificate.
         run: ./scripts/bundle.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: Pladder.app
           path: dist/Pladder.app
