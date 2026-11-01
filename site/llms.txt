@@ -13,10 +13,11 @@ Key facts:
 - Privacy: audio and text never leave the Mac. The only network requests are one-time model downloads from Hugging Face. No account, no telemetry, no update check.
 - Languages: the 25 European languages of Parakeet, detected as you speak.
 - Price: free. License: MIT. Source: https://github.com/dinooo13/pladder
+- Compared with Wispr Flow and Superwhisper (their published plans, November 2026): both charge for Pro; Wispr Flow transcribes on its servers and has a weekly word cap on its free plan; Superwhisper's free plan has Whisper models only, and its Parakeet models need Pro. Pladder runs Parakeet on the Mac for free.
 
 ## Pages
 
-- [Home](https://dinooo13.github.io/pladder/): what Pladder does, download, speed, privacy, agents and FAQ.
+- [Home](https://dinooo13.github.io/pladder/): what Pladder does, download, speed, privacy, a comparison with Wispr Flow and Superwhisper, and FAQ.
 - [Privacy](https://dinooo13.github.io/pladder/privacy/): what Pladder does with your voice and your words.
 
 ## Documentation
