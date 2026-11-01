@@ -116,14 +116,18 @@ jobs:
           security import "$RUNNER_TEMP/developer-id.p12" -k "$keychain" -f pkcs12 \
             -P "$DEVELOPER_ID_P12_PASSWORD" -T /usr/bin/codesign
           rm "$RUNNER_TEMP/developer-id.p12"
-          # A .p12 from Keychain Access holds no intermediate, and without one
-          # the identity is not valid for codesign. Both Developer ID CAs,
+          # Without the intermediate the identity is not valid for codesign.
+          # A .p12 from Keychain Access may or may not carry it, and importing
+          # one it carries fails with "already exists". Both Developer ID CAs,
           # pinned: the original (to 2027) and G2.
           for ca in DeveloperIDCA:7afc9d01a62f03a2de9637936d4afe68090d2de18d03f29c88cfb0b1ba63587f \
             DeveloperIDG2CA:f16cd3c54c7f83cea4bf1a3e6a0819c8aaa8e4a1528fd144715f350643d2df3a; do
             curl -fsSL "https://www.apple.com/certificateauthority/${ca%%:*}.cer" -o "$RUNNER_TEMP/${ca%%:*}.cer"
             echo "${ca#*:}  $RUNNER_TEMP/${ca%%:*}.cer" | shasum -a 256 -c
-            security import "$RUNNER_TEMP/${ca%%:*}.cer" -k "$keychain"
+            if ! out=$(security import "$RUNNER_TEMP/${ca%%:*}.cer" -k "$keychain" 2>&1); then
+              grep -q 'already exists' <<<"$out" || { echo "$out" >&2; exit 1; }
+            fi
+            echo "${ca%%:*}: ${out:-imported}"
           done
           # Lets codesign use the key without a dialog nobody could answer.
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
