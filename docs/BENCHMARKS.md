@@ -353,6 +353,7 @@ processors and paste. 116 real dictations on the M1, 2026-10-29 and 30:
 
 Two of the four over 40 s waited about 0.2 s for an engine pass already
 running at release (issue #84); without that wait the median is about 0.26 s.
+The website rounds the median under 10 s, 0.195 s, to 0.2 s.
 
 ## Parakeet Ultra
 
