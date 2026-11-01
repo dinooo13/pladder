@@ -1,38 +1,47 @@
 name: CI
 
-# Only the paths the build and the bundle read, so a change that cannot alter
-# the result starts no macOS runner. release.yml's source check has the same
-# list without the two CI files; change both.
+# Runs on every push and pull request, so build-and-test can be a required
+# check: GitHub counts a job skipped by its if as passed, but leaves a check
+# whose workflow a paths filter skipped waiting for good.
 on:
   push:
     branches: [main]
-    paths:
-      - 'Sources/**'
-      - 'Tests/**'
-      - 'Package.swift'
-      - 'Package.resolved'
-      - 'scripts/bundle.sh'
-      - 'scripts/Pladder.entitlements'
-      - 'Assets/**'
-      - '.github/workflows/ci.yml'
-      - '.github/actions/build-and-test/**'
   pull_request:
-    paths:
-      - 'Sources/**'
-      - 'Tests/**'
-      - 'Package.swift'
-      - 'Package.resolved'
-      - 'scripts/bundle.sh'
-      - 'scripts/Pladder.entitlements'
-      - 'Assets/**'
-      - '.github/workflows/ci.yml'
-      - '.github/actions/build-and-test/**'
 
 permissions:
   contents: read
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      build: ${{ steps.diff.outputs.build }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: diff
+        name: Did a path the build or the bundle reads change
+        # Only those paths, so a change that cannot alter the result starts no
+        # macOS runner. release.yml's source check has the same list without
+        # the two CI files; change both.
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if git cat-file -e "$BASE^{commit}" 2>/dev/null && git diff --quiet "$BASE" HEAD -- \
+            Sources Tests Package.swift Package.resolved \
+            scripts/bundle.sh scripts/Pladder.entitlements Assets \
+            .github/workflows/ci.yml .github/actions/build-and-test; then
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          fi
+
   build-and-test:
+    needs: changes
+    # Runs when changes failed too, so a broken check never passes unbuilt.
+    if: ${{ !cancelled() && needs.changes.outputs.build != 'false' }}
     # Pladder targets macOS 26 and needs Xcode 26.
     runs-on: macos-26
     timeout-minutes: 45

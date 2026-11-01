@@ -1,21 +1,10 @@
 name: Docs
 
+# No paths filter, so the check can be required on main: it takes seconds.
 on:
   push:
     branches: [main]
-    paths:
-      - 'docs/**'
-      - 'Sources/**'
-      - 'Tests/**'
-      - 'scripts/check-doc-pointers.sh'
-      - '.github/workflows/docs.yml'
   pull_request:
-    paths:
-      - 'docs/**'
-      - 'Sources/**'
-      - 'Tests/**'
-      - 'scripts/check-doc-pointers.sh'
-      - '.github/workflows/docs.yml'
 
 jobs:
   doc-pointers:
