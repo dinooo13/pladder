@@ -423,7 +423,7 @@ kbd.key-v { background: var(--coral); color: var(--coral-ink); border-color: rgb
   backdrop-filter: blur(24px) saturate(180%);
   font-family: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
 }
-.rec { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #FF3B30; box-shadow: 0 0 8px rgba(255, 59, 48, 0.6); }
+.rec { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #FF6A47; box-shadow: 0 0 8px rgba(255, 106, 71, 0.6); }
 .wave { flex: none; display: flex; align-items: center; gap: 3px; height: 24px; opacity: 0.8; }
 .wave i { display: block; width: 3px; height: calc(var(--h) * 1px); border-radius: 2px; background: currentColor; }
 .kgroup { display: inline-flex; align-items: center; gap: inherit; white-space: nowrap; }

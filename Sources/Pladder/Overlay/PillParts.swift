@@ -24,14 +24,19 @@ enum PillMetrics {
     }
 }
 
+extension Color {
+    // #FF6A47, the icon's caret in `scripts/make-icon.swift` and the site's accent.
+    static let brandCoral = Color(.sRGB, red: 1, green: 0x6A / 255, blue: 0x47 / 255)
+}
+
 struct RecordingDot: View {
     var size: CGFloat = PillMetrics.dotSize
 
     var body: some View {
         Circle()
-            .fill(.red)
+            .fill(Color.brandCoral)
             .frame(width: size, height: size)
-            .shadow(color: .red.opacity(0.6), radius: 4)
+            .shadow(color: Color.brandCoral.opacity(0.6), radius: 4)
     }
 }
 
