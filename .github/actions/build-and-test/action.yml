@@ -19,13 +19,15 @@ runs:
       shell: bash
       run: swift --version
     - name: Build
+      # With the tests in one go: --build-tests turns on testability and so
+      # recompiles every module a plain swift build made (about a minute).
       # Warnings in Pladder's own sources fail the build; the dependencies'
       # are theirs to fix. The log goes outside the checkout, which
       # release.sh needs clean.
       shell: bash
       run: |
         set -o pipefail
-        swift build 2>&1 | tee "$RUNNER_TEMP/build.log"
+        swift build --build-tests 2>&1 | tee "$RUNNER_TEMP/build.log"
         if grep -E "^$PWD/Sources/.*warning:" "$RUNNER_TEMP/build.log"; then exit 1; fi
     - name: Test
       # The suite takes seconds. If it stalls, the stack of every thread of
@@ -34,7 +36,6 @@ runs:
       shell: bash
       run: |
         set +e
-        swift build --build-tests || exit 1
         swift test --skip-build &
         TEST=$!
         for _ in $(seq 1 300); do
