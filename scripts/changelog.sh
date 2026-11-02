@@ -37,8 +37,6 @@ fi
 cat <<EOF
 Requires macOS 26 or later on an Apple Silicon Mac (M1 or newer). Open \`Pladder.dmg\` and drag Pladder to Applications.
 
-The DMG's SHA-256 is in \`Pladder.dmg.sha256\`; with both files in one folder, \`shasum -a 256 -c Pladder.dmg.sha256\` checks it.
-
 - Pladder does not check for updates, since that would be a network call. Watch the releases instead.
 - The speech model, about 600 MB, downloads from Hugging Face once, at first launch.
 - A move from a copy built yourself with an Apple Development certificate makes macOS ask for Microphone and Accessibility once more.
