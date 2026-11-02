@@ -1,1 +1,5 @@
 blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/dinooo13/pladder/security/advisories/new
+    about: Report it privately, not in an issue. See SECURITY.md.
