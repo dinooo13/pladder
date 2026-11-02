@@ -98,6 +98,21 @@ jobs:
           # The build number is the commit count, and the changelog reads the
           # tags; a shallow clone has neither.
           fetch-depth: 0
+      - name: Tag
+        id: tag
+        # First, because GitHub refuses a GITHUB_TOKEN tag, by push or API,
+        # on a commit whose .github/workflows matches no branch tip: a push to
+        # main that changes a workflow would otherwise fail the run at the end.
+        run: |
+          git fetch --quiet origin main
+          if ! git diff --quiet "$GITHUB_SHA" FETCH_HEAD -- .github/workflows; then
+            echo "::error::main changed .github/workflows since this run started, so GITHUB_TOKEN cannot tag $GITHUB_SHA. Run the release again."
+            exit 1
+          fi
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            tag -a "v$VERSION" -m "Pladder $VERSION" "$GITHUB_SHA"
+          git push origin "v$VERSION"
       - uses: ./.github/actions/build-and-test
         timeout-minutes: 30
       - name: Import the certificate into a temporary keychain
@@ -166,18 +181,14 @@ jobs:
             dist/release/Pladder.dmg.sha256
           if-no-files-found: error
           compression-level: 0
-      - name: Tag and publish
+      - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
           DRAFT: ${{ inputs.draft }}
           LAST_TAG: ${{ needs.check.outputs.last-tag }}
         run: |
-          git -c user.name='github-actions[bot]' \
-            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-            tag -a "v$VERSION" -m "Pladder $VERSION" "$GITHUB_SHA"
           ./scripts/changelog.sh "$LAST_TAG" "v$VERSION" > "$RUNNER_TEMP/notes.md"
           cat "$RUNNER_TEMP/notes.md"
-          git push origin "v$VERSION"
           draft=()
           if [[ "$DRAFT" == true ]]; then draft=(--draft); fi
           # One name for every release, so releases/latest/download/Pladder.dmg
@@ -185,3 +196,15 @@ jobs:
           gh release create "v$VERSION" --verify-tag ${draft[@]+"${draft[@]}"} \
             --title "Pladder $VERSION" --notes-file "$RUNNER_TEMP/notes.md" \
             dist/release/Pladder.dmg dist/release/Pladder.dmg.sha256
+      - name: Delete the tag of a release that was not published
+        # Deleting is allowed where creating is not, so this works even after
+        # main's workflows changed. A release that exists keeps its tag.
+        if: (failure() || cancelled()) && steps.tag.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "::warning::Release v$VERSION exists; its tag stays."
+          else
+            git push origin --delete "v$VERSION"
+          fi
