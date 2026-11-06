@@ -31,3 +31,4 @@ Key facts:
 ## Download
 
 - [Pladder for Mac (DMG)](https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg), Developer ID signed and notarised.
+- Homebrew: `brew install --cask dinooo13/tap/pladder`, updated with `brew upgrade`.

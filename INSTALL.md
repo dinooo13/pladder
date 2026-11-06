@@ -11,6 +11,14 @@
 
 Get `Pladder.dmg` from the [latest release](https://github.com/dinooo13/pladder/releases/latest), open it and drag Pladder to Applications.
 
+Or install it with [Homebrew](https://brew.sh):
+
+```sh
+brew install --cask dinooo13/tap/pladder
+```
+
+It is the same notarised DMG, so macOS asks only the usual question at the first launch.
+
 ## Build and install
 
 ```sh
@@ -47,6 +55,12 @@ Pladder updates itself wherever it is, as long as you can write there. A copy op
 
 **Copies of 0.1.x have no updater.** Replace one by hand once: quit Pladder, download the [latest DMG](https://github.com/dinooo13/pladder/releases/latest) and drag Pladder to Applications, replacing the old copy. From then on it updates itself.
 
+A copy installed with Homebrew updates with the rest of your casks: `brew upgrade` quits Pladder, replaces it and opens it again. Check for Updates… works there too; after it has updated a copy, the next `brew upgrade` installs the same version once more, which costs a download and nothing else.
+
+```sh
+brew upgrade
+```
+
 A copy built from source: pull and run the same command again:
 
 ```sh
@@ -57,6 +71,15 @@ git pull
 The install step quits the running copy and replaces it. Because the app is signed with your development certificate, macOS keeps the Microphone and Accessibility grants across updates. See [Signing](#signing) if it asks again. A copy built from source gets the commit count as its build number, and Check for Updates… offers it a release only when the release's build number is higher, that is when the release has commits the copy does not.
 
 ## Uninstalling
+
+A copy installed with Homebrew:
+
+```sh
+brew uninstall --cask pladder          # the app only
+brew uninstall --cask --zap pladder    # also the settings, the dictionary and the speech model
+```
+
+Otherwise, by hand:
 
 1. Quit Pladder from the menu bar.
 2. Delete `/Applications/Pladder.app`.
@@ -97,7 +120,7 @@ A release comes from the **Release** workflow (`.github/workflows/release.yml`):
 ./scripts/changelog.sh v0.1.0 HEAD
 ```
 
-Before anyone is asked to approve, a Linux job refuses a ref other than `main`, a version that is not `major.minor.patch`, one whose tag exists or that is not newer than the last tag, and a release in which nothing the build reads (the paths `ci.yml` builds for) changed since the last tag, unless **force** is ticked. The release job then waits for a reviewer of the `release` environment. Once approved, it tags the commit `v<version>`, builds and runs the tests as CI does, imports the certificate into a throwaway keychain, runs `scripts/release.sh`, checks that the build number is the commit count, signs the DMG with the update key and writes `appcast.xml` with `scripts/appcast.sh`, uploads the DMG as a workflow artifact, and publishes the release "Pladder <version>" with `Pladder.dmg`, its `.sha256`, `appcast.xml` and the notes from `scripts/changelog.sh`. Every release names its DMG `Pladder.dmg` and its feed `appcast.xml`, so `releases/latest/download/Pladder.dmg` always resolves and every copy's feed, `releases/latest/download/appcast.xml`, is always the newest release's; the version is in the tag and the title. Tick **draft** to check a release before it is public. The keychain and the key files are deleted as soon as `release.sh` is done, before the upload and the publish, and also when a step failed. The tag comes first because GitHub lets the workflow's token tag a commit only while its `.github/workflows` matches a branch tip: a push to `main` that changes a workflow during the run would otherwise fail it at the very end. If main's workflows changed between the dispatch and the approval, the job stops at once; run it again. A run that fails or is cancelled before the release exists deletes its tag, so it can simply be run again.
+Before anyone is asked to approve, a Linux job refuses a ref other than `main`, a version that is not `major.minor.patch`, one whose tag exists or that is not newer than the last tag, and a release in which nothing the build reads (the paths `ci.yml` builds for) changed since the last tag, unless **force** is ticked. The release job then waits for a reviewer of the `release` environment. Once approved, it tags the commit `v<version>`, builds and runs the tests as CI does, imports the certificate into a throwaway keychain, runs `scripts/release.sh`, checks that the build number is the commit count, signs the DMG with the update key and writes `appcast.xml` with `scripts/appcast.sh`, uploads the DMG as a workflow artifact, and publishes the release "Pladder <version>" with `Pladder.dmg`, its `.sha256`, `appcast.xml` and the notes from `scripts/changelog.sh`, then bumps the [Homebrew](#homebrew) cask. Every release names its DMG `Pladder.dmg` and its feed `appcast.xml`, so `releases/latest/download/Pladder.dmg` always resolves and every copy's feed, `releases/latest/download/appcast.xml`, is always the newest release's; the version is in the tag and the title. Tick **draft** to check a release before it is public. The keychain and the key files are deleted as soon as `release.sh` is done, before the upload and the publish, and also when a step failed. The tag comes first because GitHub lets the workflow's token tag a commit only while its `.github/workflows` matches a branch tip: a push to `main` that changes a workflow during the run would otherwise fail it at the very end. If main's workflows changed between the dispatch and the approval, the job stops at once; run it again. A run that fails or is cancelled before the release exists deletes its tag, so it can simply be run again.
 
 The changelog groups the commit subjects since the last tag by their `Area:` prefix, folds the internal areas (Tests, CI, Bench, Docs, Scripts) into an Internals group at the end, and links the pull request a subject names, `(#93)`, and the issues a body `Closes` or `Refs`. Merge and `fixup!` commits are left out.
 
@@ -111,6 +134,7 @@ The signing secrets live in the `release` environment, so only a run a reviewer 
 | `NOTARY_API_KEY_ID` | That key's ID |
 | `NOTARY_API_ISSUER` | The issuer ID shown above the keys in App Store Connect |
 | `SPARKLE_ED_PRIVATE_KEY` | The private EdDSA key updates are signed with, as `generate_keys -x` writes it (see [Update signing key](#update-signing-key)) |
+| `HOMEBREW_TAP_TOKEN` | A fine-grained token for the tap; see [Homebrew](#homebrew) |
 
 The API key, rather than an Apple ID and an app-specific password, because it can do no more than its role allows and can be revoked on its own. If a secret leaks, revoke the key in App Store Connect and the certificate in the developer portal.
 
@@ -155,6 +179,34 @@ rm sparkle-private-key.txt
 ```
 
 `appcast.sh` by hand signs with the keychain's `pladder` account. Keep the offline copy somewhere safe: every copy checks the DMG against this one public key before opening it (`SUVerifyUpdateBeforeExtraction`), so with the private key lost no update can reach them, and each would have to be replaced by hand once more. If the key leaks, make a new pair, ship the new public key in a release signed with the old private key, and replace the secret.
+
+### Homebrew
+
+The cask lives in its own repository, [dinooo13/homebrew-tap](https://github.com/dinooo13/homebrew-tap), as `Casks/pladder.rb`, which is what `brew install --cask dinooo13/tap/pladder` reads. Its source is `scripts/pladder.rb` here, with the version and the SHA-256 left out; `scripts/cask.sh` fills them in. Change the cask here, not in the tap: the next release overwrites the tap's copy.
+
+After the publish, the Release workflow writes `Casks/pladder.rb` for the new version and the SHA-256 of its DMG, and commits it to the tap through the GitHub API with `HOMEBREW_TAP_TOKEN`, as "pladder <version>". `brew upgrade` picks it up after the next `brew update`, which Homebrew runs by itself. A draft is not bumped, since its DMG is not public yet. A failed bump leaves the run green, since the release is already out; it shows as a failed step. Bump by hand then, or after publishing a draft, from a clone of the tap:
+
+```sh
+../pladder/scripts/cask.sh 0.1.3 > Casks/pladder.rb   # reads the SHA-256 from the release
+git commit -am "pladder 0.1.3" && git push
+```
+
+`HOMEBREW_TAP_TOKEN` is a fine-grained personal access token with access to `dinooo13/homebrew-tap` only, and only the **Contents: Read and write** permission. It is a `release` environment secret, like the signing secrets; when it expires, the bump fails until a new one is stored.
+
+Check a change to the cask with `brew style` and `brew audit --cask --strict --online`, which need it in a tap. A throwaway local tap does it without touching the real one:
+
+```sh
+brew tap-new --no-git pladder-check/tap
+mkdir -p "$(brew --repo pladder-check/tap)/Casks"
+./scripts/cask.sh 0.1.2 > "$(brew --repo pladder-check/tap)/Casks/pladder.rb"
+brew style --cask pladder-check/tap/pladder
+brew audit --cask --strict --online pladder-check/tap/pladder
+brew untap pladder-check/tap
+```
+
+`brew audit --new` also asks for the notability the main Homebrew repository wants, which Pladder does not meet yet. The cask does not say `auto_updates true`, although Pladder has an updater: that line makes `brew upgrade` skip the app unless `--greedy`, and Pladder checks for updates by itself only when the user turns that on, so most copies installed with Homebrew would never be updated.
+
+Do not try `--zap` on a Mac you dictate on: it deletes the settings and the dictionary. The cask also quits Pladder by its bundle ID on uninstall and upgrade, so the copy you use is stopped too.
 
 ### Command-line transcriber
 

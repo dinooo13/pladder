@@ -213,6 +213,26 @@ jobs:
           gh release create "v$VERSION" --verify-tag ${draft[@]+"${draft[@]}"} \
             --title "Pladder $VERSION" --notes-file "$RUNNER_TEMP/notes.md" \
             dist/release/Pladder.dmg dist/release/Pladder.dmg.sha256 dist/release/appcast.xml
+      - name: Bump the Homebrew cask
+        # The release is out by now, so a failed bump leaves the run green and
+        # is done by hand (INSTALL.md, "Homebrew"). A draft's DMG is not public,
+        # so the cask would point at a 404.
+        if: ${{ !inputs.draft }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "::error::No HOMEBREW_TAP_TOKEN in the release environment; bump the cask by hand."
+            exit 1
+          fi
+          sha=$(cut -d ' ' -f 1 dist/release/Pladder.dmg.sha256)
+          ./scripts/cask.sh "$VERSION" "$sha" > "$RUNNER_TEMP/pladder.rb"
+          api=repos/dinooo13/homebrew-tap/contents/Casks/pladder.rb
+          old=$(gh api "$api" --jq .sha)
+          gh api -X PUT "$api" -f message="pladder $VERSION" -f sha="$old" \
+            -f content="$(base64 < "$RUNNER_TEMP/pladder.rb" | tr -d '\n')" \
+            --jq .commit.html_url
       - name: Delete the tag of a release that was not published
         # Deleting is allowed where creating is not, so this works even after
         # main's workflows changed. A release that exists keeps its tag.
