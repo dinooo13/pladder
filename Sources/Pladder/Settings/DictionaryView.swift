@@ -161,6 +161,7 @@ struct DictionaryView: View {
         VStack(alignment: .leading, spacing: 6) {
             TextField("", text: $sample, prompt: Text("Type a sentence to see how the rules change it"))
                 .labelsHidden()
+                .accessibilityLabel("Try a sentence")
                 .textFieldStyle(.roundedBorder)
             if !sample.isEmpty {
                 Label {

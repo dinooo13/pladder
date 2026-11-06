@@ -13,12 +13,14 @@ enum Screenshots {
     }
 
     static var capturesMenu: Bool { CommandLine.arguments.contains("--menu") }
+    // The app's own model, on the throwaway settings file, which the real Settings scene shows.
+    static var appModel: AppModel?
 
     static func run(into directory: URL) async {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
-        // `--menu`: the real menu of this copy's own status item, opened in-process and closed
-        // with an Escape posted to this app alone, in the system's appearance; menus do not
+        // `--menu`: the real menu of this copy's own status item, opened in-process, captured,
+        // and gone with this process right after, in the system's appearance; menus do not
         // follow `NSApp.appearance`.
         if capturesMenu {
             await captureMenu(into: directory)
@@ -148,6 +150,15 @@ enum Screenshots {
         // What VoiceOver is given, tab by tab: role, label, value and help of every element,
         // in the order it walks them.
         if CommandLine.arguments.contains("--accessibility") {
+            // The states a fresh copy never shows here: the end of Get Started with its try
+            // field, and a dictionary with rows.
+            if let model = appModel {
+                model.reviewShowsGetStarted = true
+                model.settings.dictionary = [
+                    DictionaryEntry(from: "clode code", to: "Claude Code"),
+                    DictionaryEntry(from: "", to: "Pladder", matchCase: true),
+                ]
+            }
             for (tab, name) in [(SettingsTab.general, "general"), (.text, "text"), (.dictionary, "dictionary")] {
                 SettingsView.requestedTab = tab
                 try? await Task.sleep(for: .seconds(1))
@@ -204,14 +215,10 @@ enum Screenshots {
                 } else {
                     print("screenshots: no menu window")
                 }
-                DispatchQueue.main.async {
-                    if let escape = NSEvent.keyEvent(
-                        with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
-                        windowNumber: 0, context: nil, characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}",
-                        isARepeat: false, keyCode: 53) {
-                        NSApp.postEvent(escape, atStart: true)
-                    }
-                }
+                fflush(stdout)
+                // The menu's tracking loop does not always take a posted Escape, so this copy
+                // ends here, and its status item and menu go with it.
+                exit(0)
             }
             button.performClick(nil)
         }

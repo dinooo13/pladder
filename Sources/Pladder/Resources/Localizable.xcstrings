@@ -1610,6 +1610,16 @@
           }
         }
       }
+    },
+    "Try a sentence": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Satz ausprobieren"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

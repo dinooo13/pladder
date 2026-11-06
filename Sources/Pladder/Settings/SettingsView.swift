@@ -84,12 +84,16 @@ struct PermissionRow: View {
 
     var body: some View {
         LabeledContent {
-            if isPrimary {
-                Button(buttonTitle) { action() }
-                    .buttonStyle(.borderedProminent)
-            } else {
-                Button(buttonTitle) { action() }
+            Group {
+                if isPrimary {
+                    Button(buttonTitle) { action() }
+                        .buttonStyle(.borderedProminent)
+                } else {
+                    Button(buttonTitle) { action() }
+                }
             }
+            // The button keeps its own title, the action; the row says what it is for.
+            .accessibilityHint(Text(detail))
         } label: {
             Text(title)
             Text(detail)

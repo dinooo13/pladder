@@ -13,7 +13,7 @@
 #   --settings-scene  the real Settings window, toolbar and key window included
 #   --hero-video      the films scripts/make-hero-film.sh encodes for the site's hero
 #   --settings-scene --accessibility  the Settings window's accessibility tree, as text
-#   --menu            the real menu of a status item of its own, opened and closed in-process
+#   --menu            the real menu of a status item of its own, opened in-process; the copy then exits
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

@@ -138,6 +138,7 @@ private struct StartupSection: View {
                 Text("Mute other audio while recording")
                 Text("So music or a call does not end up in the dictation.")
             }
+            .accessibilityHint(Text("So music or a call does not end up in the dictation."))
         }
     }
 }
@@ -150,6 +151,7 @@ private struct ShortcutsSection: View {
             LabeledContent {
                 HotkeyRecorderField(
                     title: "Talk key",
+                    hint: "Hold to record, release to paste. Escape discards.",
                     hotkey: $model.settings.hotkey,
                     setHotkeySuspended: model.setHotkeySuspended,
                     requiresRegularKey: model.hotkeys.hotkeyNeedsRegularKey,
@@ -167,6 +169,7 @@ private struct ShortcutsSection: View {
             LabeledContent {
                 HotkeyRecorderField(
                     title: "Hands-free key",
+                    hint: "Tap to start, tap again to paste.",
                     hotkey: $model.settings.toggleHotkey,
                     setHotkeySuspended: model.setHotkeySuspended,
                     requiresRegularKey: model.hotkeys.hotkeyNeedsRegularKey,
@@ -186,6 +189,7 @@ private struct ShortcutsSection: View {
             LabeledContent {
                 HotkeyRecorderField(
                     title: "Send key",
+                    hint: "Press while talking to send the text with Return.",
                     hotkey: $model.settings.submitKey,
                     setHotkeySuspended: model.setHotkeySuspended,
                     allowsEmpty: true
@@ -237,6 +241,7 @@ private struct SpeechModelSection: View {
                 // The registry's own text, localized where it is built.
                 Text(verbatim: model.registry.entry(for: model.settings.engineID)?.detail ?? "")
             }
+            .accessibilityHint(Text(verbatim: model.registry.entry(for: model.settings.engineID)?.detail ?? ""))
             if !model.showsGetStarted {
                 SpeechModelProgress(model: model)
             }

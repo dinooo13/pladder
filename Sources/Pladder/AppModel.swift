@@ -301,8 +301,10 @@ final class AppModel {
     // Latched for the launch: once setup was needed, Get Started stays to say it is done.
     var showsGetStarted: Bool {
         if needsSetup { setupSeen = true }
-        return setupSeen
+        return setupSeen || reviewShowsGetStarted
     }
+    // Only the review captures set it, to show the section's end state.
+    var reviewShowsGetStarted = false
     @ObservationIgnored private var setupSeen = false
 
     var retryEngineTitle: String {
