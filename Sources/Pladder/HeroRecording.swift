@@ -74,7 +74,7 @@ enum HeroRecording {
 
 // One dictation, timed as the app times it: the pill rises in, the words arrive in
 // passes, and at the release the row gathers into the disc while the reply is pasted
-// 0.2 s later, before the disc dives. The pill is the app's own `OverlayView` on its own
+// 0.2 s later, before the disc dives; then the pill rises again for the next prompt. The pill is the app's own `OverlayView` on its own
 // `OverlayModel`, so every morph and fade is the one the panel shows.
 @MainActor
 @Observable
@@ -115,7 +115,22 @@ final class HeroScene {
             pillOffset = 60
             pillOpacity = 0
         }
-        await pause(OverlayMotion.flightDuration + 0.9)
+        await pause(OverlayMotion.flightDuration + 0.5)
+        // The next prompt begins: the film ends on the pasted reply with the pill listening
+        // over it, so a visitor who looks late still sees both the result and the pill.
+        overlay.state = .idle
+        overlay.presentation = .settled
+        overlay.partialTranscript = nil
+        overlay.level = 0
+        pillOffset = 24
+        await pause(0.05)
+        overlay.state = .recording
+        withAnimation(.easeOut(duration: OverlayMotion.flightDuration)) {
+            pillOffset = 0
+            pillOpacity = 1
+        }
+        await pause(OverlayMotion.flightDuration)
+        await speak(for: 0.5)
     }
 
     // A speaking voice's level, so the bars move as they do on a real take.

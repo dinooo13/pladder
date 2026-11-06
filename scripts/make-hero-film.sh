@@ -22,7 +22,8 @@ swift build --product Pladder
 
 for scheme in light dark; do
   out="site/media/hero-film-$scheme"
-  # The last frame, the pasted reply, held for 0.9 s: the capture ends at the last change.
+  # The last frame, the pasted reply with the pill listening for the next prompt, held for
+  # 0.9 s: the capture ends at the last change.
   # Tagged BT.709, limited range, so browsers decode the page colour where it was.
   ffmpeg -y -loglevel error -i "$FILMS/hero-film-$scheme.mov" -vf "fps=30,tpad=stop_mode=clone:stop_duration=0.9,scale=out_color_matrix=bt709:out_range=tv" \
     -c:v libx264 -pix_fmt yuv420p -crf 20 -preset slow -movflags +faststart \
