@@ -4,6 +4,8 @@ Push-to-talk dictation for macOS 26 on Apple Silicon. Hold a key, speak, release
 
 How the code fits together — the dictation flow, the hotkey pipeline, the clipboard timing, the settings file, the polish and the correction learner — is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+How the app, the pill, the menu and the site look, read and behave, and what was tried and dropped, is in [docs/DESIGN.md](docs/DESIGN.md). Every UI change follows it, or changes it first with the reason.
+
 ## What the project optimises for
 
 1. **Speed of the release-to-paste path.** This is the metric. The path runs from the hotkey release to the paste: capture stop, engine, processors, output. In code it is everything between the coordinator's `recordingStopped` and `inserted` events. Nothing goes on that path without a before-and-after benchmark.
