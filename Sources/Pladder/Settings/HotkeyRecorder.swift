@@ -26,8 +26,10 @@ struct HotkeyRecorderField: View {
             // Nothing recorded: a plain button that says what it does, not an empty well
             // that reads as disabled.
             if isEmpty && !recorder.isRecording {
-                Button("Record Shortcut") { toggleRecording() }
-                    .frame(minWidth: 136)
+                // The width on the label, so the bezel lines up with the recorded fields.
+                Button { toggleRecording() } label: {
+                    Text("Record Shortcut").frame(minWidth: 120)
+                }
                     .help(help)
                     .accessibilityLabel(title)
                     .accessibilityValue(String(localized: "None"))

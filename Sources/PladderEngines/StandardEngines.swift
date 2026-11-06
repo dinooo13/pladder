@@ -7,6 +7,7 @@ public enum StandardEngines {
         id: FluidAudioIncrementalEngine.engineID,
         displayName: "Parakeet TDT v3",
         detail: "A little less accurate. 700 MB.",
+        downloadMegabytes: 700,
         make: { FluidAudioIncrementalEngine(model: .v3) }
     )
 
@@ -14,6 +15,7 @@ public enum StandardEngines {
         id: FluidAudioIncrementalEngine.ultraEngineID,
         displayName: "Parakeet Ultra",
         detail: "Most accurate. 600 MB.",
+        downloadMegabytes: 600,
         make: { FluidAudioIncrementalEngine(model: .ultra) }
     )
 

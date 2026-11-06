@@ -33,7 +33,7 @@
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026 Fabian Meyer. MIT License.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Pladder records your voice while you hold the talk key, or until you tap it again in hands-free mode, and transcribes it on this Mac.</string>
+	<string>Pladder records your voice while you hold the talk key, or until you tap the hands-free key again, and transcribes it on this Mac.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>

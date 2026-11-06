@@ -7,13 +7,13 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pladder nimmt deine Stimme auf, solange du die Sprechtaste hältst oder bis du sie freihändig noch einmal antippst, und transkribiert sie auf diesem Mac."
+            "value": "Pladder nimmt deine Stimme auf, solange du die Sprechtaste hältst oder bis du die Freihandtaste noch einmal antippst, und transkribiert sie auf diesem Mac."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pladder records your voice while you hold the talk key, or until you tap it again in hands-free mode, and transcribes it on this Mac."
+            "value": "Pladder records your voice while you hold the talk key, or until you tap the hands-free key again, and transcribes it on this Mac."
           }
         }
       }

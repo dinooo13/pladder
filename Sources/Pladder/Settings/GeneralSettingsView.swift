@@ -87,7 +87,12 @@ private struct SpeechModelProgress: View {
                 Text("Downloading the speech model…")
             } currentValueLabel: {
                 if let fraction {
-                    Text(fraction, format: .percent.precision(.fractionLength(0)))
+                    let percent = Int((fraction * 100).rounded())
+                    if let size = model.registry.entry(for: model.settings.engineID)?.downloadMegabytes {
+                        Text("\(percent)% of \(size) MB")
+                    } else {
+                        Text(fraction, format: .percent.precision(.fractionLength(0)))
+                    }
                 }
             }
         case .loading:
@@ -218,7 +223,7 @@ private struct SpeechModelSection: View {
                     Text(LocalizedStringKey(entry.displayName)).tag(entry.id)
                 }
             } label: {
-                Text("Speech model")
+                Text("Model")
                 // The registry's own text, localized where it is built.
                 Text(verbatim: model.registry.entry(for: model.settings.engineID)?.detail ?? "")
             }

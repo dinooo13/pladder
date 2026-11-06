@@ -5,17 +5,21 @@ public struct EngineRegistry: Sendable {
         public var id: EngineID
         public var displayName: String
         public var detail: String
+        // What the first download weighs, for the progress line.
+        public var downloadMegabytes: Int?
         public var make: @Sendable () -> any TranscriptionEngine
 
         public init(
             id: EngineID,
             displayName: String,
             detail: String,
+            downloadMegabytes: Int? = nil,
             make: @escaping @Sendable () -> any TranscriptionEngine
         ) {
             self.id = id
             self.displayName = displayName
             self.detail = detail
+            self.downloadMegabytes = downloadMegabytes
             self.make = make
         }
     }

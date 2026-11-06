@@ -149,7 +149,7 @@ struct OverlayStyleThumbnail: View {
             Spacer()
             // Resized, not scaled: `scaleEffect` keeps the 22×16 layout and would push the
             // strip to the icon's height.
-            Image(nsImage: MenuBarIcon.image(for: .recording, level: Self.previewLevel))
+            Image(nsImage: MenuBarIcon.image(for: .recording, level: Self.previewLevel, tile: true))
                 .resizable()
                 .renderingMode(.template)
                 .aspectRatio(contentMode: .fit)

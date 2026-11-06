@@ -215,10 +215,8 @@ private struct StylesFigure: View {
         VStack(alignment: .trailing, spacing: 6) {
             HStack(spacing: 14) {
                 Spacer()
-                Image(nsImage: MenuBarIcon.image(for: .recording, level: 0.6))
+                Image(nsImage: MenuBarIcon.image(for: .recording, level: 0.6, tile: true))
                     .renderingMode(.template)
-                    .padding(.horizontal, 4)
-                    .background(.primary.opacity(0.12), in: RoundedRectangle(cornerRadius: 4))
                 Image(systemName: "wifi")
                 Image(systemName: "battery.75percent")
                 Image(systemName: "switch.2")
