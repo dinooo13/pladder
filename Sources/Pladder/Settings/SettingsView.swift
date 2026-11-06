@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import PladderCore
 
@@ -46,12 +47,36 @@ final class TabRequest {
 }
 
 extension View {
-    // A grouped Form is a scroll view and proposes no height of its own; fixed vertically
-    // with scrolling off it takes its content's, so each tab is as tall as what it shows,
-    // as in the system's own settings windows.
+    // Each tab as tall as what it shows, as in the system's own settings windows, but never
+    // taller than the screen: past that the form scrolls.
     func fittingContent() -> some View {
-        scrollDisabled(true)
-            .fixedSize(horizontal: false, vertical: true)
+        modifier(FittingContent())
+    }
+}
+
+private struct FittingContent: ViewModifier {
+    // A grouped Form is a scroll view and proposes no height of its own, so the height is
+    // its content's, read back from the scroll view.
+    @State private var contentHeight: CGFloat?
+
+    // The window's title bar and tab toolbar, and some desktop above and below.
+    private static let chromeAndMargin: CGFloat = 140
+
+    private var maxHeight: CGFloat {
+        let screen = NSScreen.main?.visibleFrame.height ?? 800
+        return screen - Self.chromeAndMargin
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                // The content alone: the top inset is the toolbar the window slides the form under
+                // while it resizes, and adding it fed every resize back into the next one.
+                geometry.contentSize.height.rounded()
+            } action: { _, height in
+                contentHeight = height
+            }
+            .frame(height: min(contentHeight ?? maxHeight, maxHeight))
     }
 }
 
