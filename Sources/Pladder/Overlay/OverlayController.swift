@@ -168,6 +168,8 @@ final class OverlayController {
             // The disc has already gathered and was waiting for this.
             if holdingDisc {
                 holdingDisc = false
+                // The work is done: the disc dives empty, not still spinning.
+                model.state = .idle
                 hideTask?.cancel()
                 hideTask = Task { [weak self] in await self?.dive() }
                 return

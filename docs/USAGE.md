@@ -23,7 +23,7 @@ Any key or combination can take its place: record it in Settings by pressing it.
 
 Press the send key, V by default, at any point while you hold the talk key, and Return is pressed after the text is pasted. That sends a chat message, a prompt to an agent or a terminal command without touching the keyboard again. V sits under the index finger of the hand holding Option+Space, so you can dictate and send with one hand and keep the other on the mouse. It is taken only while the talk key is held; the rest of the time V types as usual. The send key can be changed in Settings, like the talk key.
 
-### Toggle
+### Hands-free key
 
 For a long dictation, record a **Hands-free** key in Settings: one tap starts a recording, the next tap pastes it. Give it the same combination as the talk key and that key does both: tap to start and tap again to paste, or hold and release as before. It is off by default, because a stray tap would otherwise leave the microphone open.
 

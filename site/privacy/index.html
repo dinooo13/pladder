@@ -35,7 +35,7 @@
     <a class="in-page" href="./" aria-current="page">Privacy</a>
     <a class="in-page" href="../#compare">Compare</a>
     <a class="in-page" href="../#faq">FAQ</a>
-    <a class="btn btn-small" href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg">Download</a>
+    <a class="btn btn-small btn-quiet" href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg">Download</a>
   </nav>
 </header>
 
@@ -44,16 +44,16 @@
 <p class="lede">Privacy in Pladder is not a policy. It is how the app is built: there is no server to send anything to.</p>
 
 <h2>Your audio</h2>
-<p>The microphone is open only while you dictate: while you hold the key, or until you tap it again in hands-free mode. macOS shows its orange indicator only then. The audio goes from the microphone to your Mac's Neural Engine, where it is turned into text, and is then thrown away. It is never saved and never sent.</p>
+<p>The microphone is open only while you dictate: while you hold the key, or until you tap the hands-free key again. macOS shows its orange indicator only then. The audio goes from the microphone to your Mac’s Neural Engine, where it is turned into text, and is then thrown away. It is never saved and never sent.</p>
 
 <h2>Your words</h2>
 <p>The transcript is pasted where your cursor is: Pladder puts it on the clipboard for the paste, then gives you back what was on your clipboard before. The last dictation stays in memory, never on disk, so you can copy it again from the menu; quitting Pladder forgets it.</p>
 
 <h2>Learning your corrections</h2>
-<p>When you fix a word by hand right after a dictation, Pladder can offer to add the fix to your dictionary. To notice it, it watches the field it pasted into for up to a minute, through the macOS Accessibility permission. It reads only the words it pasted and a little around them, keeps nothing, and asks before it adds anything. The check that a correction makes sense runs on Apple's on-device model.</p>
+<p>When you fix a word by hand right after a dictation, Pladder can offer to add the fix to your dictionary. To notice it, it watches the field it pasted into for up to a minute, through the macOS Accessibility permission. It reads only the words it pasted and a little around them, keeps nothing, and asks before it adds anything. The check that a correction makes sense runs on Apple’s on-device model.</p>
 
 <h2>Polish</h2>
-<p>The optional polish, marked Beta, also runs on your Mac: either Apple's on-device model, which is part of macOS, or S1-mini by Superwhisper, which runs on your Mac's graphics chip.</p>
+<p>The optional polish, marked Beta, also runs on your Mac: either Apple’s on-device model, which is part of macOS, or S1-mini by Superwhisper, which runs on your Mac’s graphics chip.</p>
 
 <h2>The network</h2>
 <p>Pladder makes no network requests except two kinds of one-time download from Hugging Face:</p>
@@ -67,7 +67,7 @@
 <p>There is nothing to sign up for, nothing to log in to and nothing to cancel.</p>
 
 <h2>Check it yourself</h2>
-<p>Pladder is open source under the MIT license. The model downloads are its only network code: FluidAudio's downloader for the speech model, and <a href="https://github.com/dinooo13/pladder/blob/main/Sources/PladderRefine/ModelFiles.swift">ModelFiles.swift</a> for S1-mini. The same facts, for developers, are in <a href="https://github.com/dinooo13/pladder/blob/main/docs/PRIVACY.md">docs/PRIVACY.md</a>.</p>
+<p>Pladder is open source under the MIT license. The model downloads are its only network code: FluidAudio’s downloader for the speech model, and <a href="https://github.com/dinooo13/pladder/blob/main/Sources/PladderRefine/ModelFiles.swift">ModelFiles.swift</a> for S1-mini. The same facts, for developers, are in <a href="https://github.com/dinooo13/pladder/blob/main/docs/PRIVACY.md">docs/PRIVACY.md</a>.</p>
 
 <h2>This website</h2>
 <p>This site sets no cookies, runs no analytics and loads nothing from other servers: no outside fonts, no scripts, no tracking pixels. Every file comes from GitHub Pages, which hosts it and, like any web host, sees the requests.</p>

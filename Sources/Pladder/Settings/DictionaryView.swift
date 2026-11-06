@@ -67,7 +67,8 @@ struct DictionaryView: View {
                     }
                     DictionaryField(
                         text: row.from,
-                        prompt: "any close match",
+                        help: "Leave empty to fix near misses of the replacement, such as a name that comes out nearly right.",
+                        prompt: "optional",
                         cell: DictionaryCell(id: row.wrappedValue.id, column: .from),
                         focus: $focusedCell
                     )
@@ -79,6 +80,7 @@ struct DictionaryView: View {
             TableColumn("Replace with") { row in
                 DictionaryField(
                     text: row.to,
+                    help: "What is pasted instead.",
                     prompt: "Claude",
                     cell: DictionaryCell(id: row.wrappedValue.id, column: .to),
                     focus: $focusedCell
@@ -91,6 +93,7 @@ struct DictionaryView: View {
                 Toggle("Exact case", isOn: row.matchCase)
                     .labelsHidden()
                     .help("Paste the replacement exactly as written, even at the start of a sentence.")
+                    .frame(maxWidth: .infinity)
             }
             .width(76)
         }
@@ -244,6 +247,7 @@ private struct FileFailure {
 // the settings on every keystroke.
 private struct DictionaryField: View {
     @Binding var text: String
+    let help: LocalizedStringKey
     let prompt: LocalizedStringKey
     let cell: DictionaryCell
     var focus: FocusState<DictionaryCell?>.Binding
@@ -256,6 +260,7 @@ private struct DictionaryField: View {
             .labelsHidden()
             .textFieldStyle(.plain)
             .focused(focus, equals: cell)
+            .help(help)
             .onAppear { draft = text }
             .onSubmit { commit() }
             .onChange(of: text) { _, new in

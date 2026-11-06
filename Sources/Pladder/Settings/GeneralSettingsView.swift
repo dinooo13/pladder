@@ -111,7 +111,7 @@ private struct StartupSection: View {
 
     var body: some View {
         Section {
-            Toggle("Launch at login", isOn: Binding(
+            Toggle("Open at Login", isOn: Binding(
                 get: { model.launchAtLoginEnabled },
                 set: { model.setLaunchAtLogin($0) }
             ))
@@ -225,6 +225,8 @@ private struct SpeechModelSection: View {
             if !model.showsGetStarted {
                 SpeechModelProgress(model: model)
             }
+        } header: {
+            Text("Speech Model")
         }
     }
 }

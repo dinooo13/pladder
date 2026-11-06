@@ -16,6 +16,7 @@ struct OverlayPill: View {
     @Namespace private var glassNamespace
     @State private var showDot = true
     @State private var pulsing = false
+    @State private var widestText: CGFloat = 0
 
     private var phase: OverlayPhase { OverlayPhase(state) }
 
@@ -41,6 +42,7 @@ struct OverlayPill: View {
                 pulsing = false
                 return
             }
+            widestText = 0
             showDot = true
             try? await Task.sleep(for: .milliseconds(700))
             guard !Task.isCancelled else { return }
@@ -161,20 +163,24 @@ struct OverlayPill: View {
                     LiveTranscriptText(
                         text: partial,
                         hugs: hugsContent,
-                        width: hugsContent ? nil : Self.liveTextWidth,
+                        width: hugsContent ? nil : liveTextWidth,
                         settled: isPreview
                     )
                 } else {
-                    // Until the first pass lands, so the wide capsule never reads as empty.
+                    // Until the first pass lands, so the capsule never reads as empty.
                     Text("Listening…")
                         .font(PillMetrics.font)
                         .foregroundStyle(.secondary)
-                        .frame(maxWidth: hugsContent ? nil : .infinity, alignment: .leading)
+                        .fixedSize()
                 }
             }
-            // A width that followed the text would jitter on every pass; the height follows
-            // the lines, one to three.
-            .frame(width: hugsContent ? nil : Self.liveRowWidth, alignment: .leading)
+            // Grows with the words and never narrows within a take: a width that followed the
+            // text both ways would jitter on every pass. The height follows the lines, one to three.
+            .frame(width: hugsContent ? nil : Self.liveRowLead + liveTextWidth, alignment: .leading)
+            .animation(.smooth(duration: 0.2), value: liveTextWidth)
+            .onChange(of: partial) { _, new in
+                widestText = max(widestText, LiveTranscriptMetrics.lineWidth(of: new ?? ""))
+            }
         default:
             compactContent
         }
@@ -189,12 +195,23 @@ struct OverlayPill: View {
 
     static var liveTextWidth: CGFloat { liveRowWidth - liveRowLead }
 
+    // The widest the words have been this take, from "Listening…" up to the full row.
+    private var liveTextWidth: CGFloat {
+        let floor = LiveTranscriptMetrics.lineWidth(of: String(localized: "Listening…"))
+        let now = LiveTranscriptMetrics.lineWidth(of: partial ?? "")
+        return min(max(widestText, now, floor).rounded(.up), Self.liveTextWidth)
+    }
+
     // Five 3 pt bars with 3 pt gaps are 27 × 20 pt, inside the disc with room to spare.
     static let minimalDiameter: CGFloat = 44
 
     @ViewBuilder
     private var minimalContent: some View {
         switch state {
+        // Gathering after the release: the microphone is off and the paste is the news, so
+        // the disc leaves empty rather than with frozen bars that read as an ellipsis.
+        case .recording where presentation == .flyingOut && needsRow:
+            Color.clear
         case .recording:
             ZStack {
                 if showsDot {

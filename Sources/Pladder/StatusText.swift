@@ -89,13 +89,13 @@ extension OnDeviceModelAvailability {
         switch self {
         case .available: nil
         case .appleIntelligenceNotEnabled:
-            String(localized: "Apple Intelligence is off, so dictations paste as dictated. Turn it on in System Settings.")
+            String(localized: "Apple Intelligence is off, so dictations are pasted without polish. Turn it on in System Settings.")
         case .deviceNotEligible:
-            String(localized: "This Mac cannot run Apple Intelligence, so dictations paste as dictated.")
+            String(localized: "This Mac cannot run Apple Intelligence, so dictations are pasted without polish.")
         case .modelNotReady:
-            String(localized: "The Apple Intelligence model is still downloading, so dictations paste as dictated for now.")
+            String(localized: "The Apple Intelligence model is still downloading, so dictations are pasted without polish for now.")
         case .unavailable:
-            String(localized: "Apple Intelligence is unavailable, so dictations paste as dictated.")
+            String(localized: "Apple Intelligence is unavailable, so dictations are pasted without polish.")
         }
     }
 }
@@ -126,11 +126,11 @@ extension ModelFileFailure {
     var text: String {
         switch self {
         case .download:
-            String(localized: "The download stopped, so dictations paste as dictated.")
+            String(localized: "The download stopped, so dictations are pasted without polish.")
         case .checksum:
-            String(localized: "The download did not match the published model and was deleted, so dictations paste as dictated.")
+            String(localized: "The download did not match the published model and was deleted, so dictations are pasted without polish.")
         case .disk:
-            String(localized: "The model could not be saved, probably for lack of disk space, so dictations paste as dictated.")
+            String(localized: "The model could not be saved, probably for lack of disk space, so dictations are pasted without polish.")
         }
     }
 }
@@ -214,7 +214,7 @@ enum ProcessorText {
         case DictionaryReplacer.processorID:
             String(localized: "Applies your replacement rules. Edit them in the Dictionary tab.")
         case CustomWordCorrector.processorID:
-            String(localized: "Repairs near misses of the words you list in the Dictionary tab with an empty Heard as.")
+            String(localized: "Fixes near misses of the dictionary words whose Heard as is empty.")
         case WhitespaceNormalizer.processorID:
             String(localized: "Trims the transcript and collapses runs of spaces.")
         case SpokenPunctuation.processorID:

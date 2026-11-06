@@ -49,7 +49,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font: 400 17px/1.6 var(--text);
+  font: 400 17px/1.5 var(--text);
   overflow-x: clip;
 }
 
@@ -82,7 +82,7 @@ del { text-decoration-thickness: 0.08em; color: var(--faint); }
 .skip:focus { top: 1rem; }
 
 /* SF Pro Display at these sizes; a little negative tracking, as Apple sets it. */
-h1, h2, h3 { margin: 0; font-weight: 600; line-height: 1.1; letter-spacing: -0.01em; text-wrap: balance; }
+h1, h2, h3 { margin: 0; font-weight: 600; line-height: 1.1; letter-spacing: -0.015em; text-wrap: balance; }
 h2 { font-size: clamp(30px, 3.4vw, 44px); margin-bottom: 16px; }
 
 .btn {
@@ -97,6 +97,9 @@ h2 { font-size: clamp(30px, 3.4vw, 44px); margin-bottom: 16px; }
   text-decoration: none;
 }
 .btn:hover { background: #FF7D5E; }
+/* The header's button: the hero's is the page's one coral action. */
+.btn-quiet { background: none; color: var(--ink); box-shadow: inset 0 0 0 1px var(--key-line); }
+.btn-quiet:hover { background: var(--soft); }
 .btn-small { padding: 8px 16px; font-size: 14px; }
 
 /* Keycaps as a Mac keyboard prints them: the symbol over the word. */
@@ -162,14 +165,19 @@ kbd.key-v { min-width: 34px; min-height: 30px; align-items: center; justify-cont
 
 /* Sections: plain text on one background, a hairline between them. */
 
-/* Narrower than the hero, so a section's text never leaves half the page empty. */
+/* The hero's container and left edge, so the page has one. */
 .sec {
-  max-width: 880px;
+  max-width: 1120px;
   margin: 0 auto;
   padding: 88px 24px;
   border-top: 1px solid var(--line);
 }
 .hero + .sec { border-top: 0; }
+/* A text-only section takes two columns, heading beside its body, so it fills the width. */
+@media (min-width: 900px) {
+  .split { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 0 48px; align-items: start; }
+  .split .lede { margin-bottom: 0; }
+}
 .lede { font-size: 19px; color: var(--muted); max-width: 36em; margin-bottom: 32px; }
 .note { font-size: 15px; color: var(--muted); max-width: 44em; }
 .note a { color: var(--ink); }
@@ -193,8 +201,8 @@ kbd.key-v { min-width: 34px; min-height: 30px; align-items: center; justify-cont
 .facts {
   margin-top: 48px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
-  gap: 28px 40px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 28px 32px;
 }
 .facts dt { font-weight: 600; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .facts dd { color: var(--muted); font-size: 16px; margin-top: 4px; }

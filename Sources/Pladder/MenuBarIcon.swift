@@ -41,6 +41,8 @@ enum MenuBarIcon {
     private static let caretHeight: CGFloat = 15
     private static let serifWidth: CGFloat = 5
     private static let canvas = NSSize(width: 22, height: 16)
+    // The mark inside the recording tile, leaving it a margin of about 2 pt.
+    private static let knockoutScale: CGFloat = 0.7
 
     @MainActor private static var cache: [Variant: NSImage] = [:]
 
@@ -87,6 +89,21 @@ enum MenuBarIcon {
             shapes.append(capsule(NSRect(x: x, y: bottom, width: barWidth, height: caretHeight)))
             shapes.append(capsule(NSRect(x: x - overhang, y: bottom, width: serifWidth, height: barWidth)))
             shapes.append(capsule(NSRect(x: x - overhang, y: bottom + caretHeight - barWidth, width: serifWidth, height: barWidth)))
+            if case .recording = variant {
+                // Knocked out of a filled tile, as the system's own recording glyphs are, so the
+                // menu bar says "recording" at a glance even with no pill on screen.
+                let tile = NSBezierPath(roundedRect: rect.insetBy(dx: 0.5, dy: 0.5), xRadius: 4.5, yRadius: 4.5)
+                NSColor.black.setFill()
+                tile.fill()
+                var shrink = AffineTransform(translationByX: -rect.midX, byY: -rect.midY)
+                shrink.append(AffineTransform(scale: Self.knockoutScale))
+                shrink.append(AffineTransform(translationByX: rect.midX, byY: rect.midY))
+                shapes.transform(using: shrink)
+                NSGraphicsContext.current?.compositingOperation = .clear
+                shapes.fill()
+                NSGraphicsContext.current?.compositingOperation = .sourceOver
+                return true
+            }
             NSColor.black.withAlphaComponent(alpha).setFill()
             shapes.fill()
 
