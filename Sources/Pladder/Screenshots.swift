@@ -300,7 +300,7 @@ struct HeroFigure: View {
     // What the prompt box holds: nil is its placeholder with the cursor.
     var composer: String?
     // The pill, or none: the default is the still picture's.
-    var pill: HeroPill? = HeroPill(partial: "yes, and add a test that flips it and relaunches")
+    var pill: HeroPill? = HeroPill(partial: "yes, and add a test that relaunches the app")
     // Driven over time for the film; the stills leave it nil.
     var scene: HeroScene?
     @Environment(\.colorScheme) private var scheme
@@ -324,11 +324,15 @@ struct HeroFigure: View {
             } else if let pill {
                 OverlayPill(
                     state: .recording, level: 0.6, style: .liveTranscript, isPreview: true,
-                    partial: pill.partial, presentation: pill.presentation)
+                    partial: compact ? "yes, and add a test" : pill.partial, hugsContent: compact,
+                    presentation: pill.presentation)
                     .fixedSize()
                     .compositingGroup()
                     .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
+                    // Laid out at its own size and scaled after, so a long reply can never widen
+                    // the figure; on a phone it hugs a shorter one.
                     .scaleEffect(compact ? 0.8 : 1, anchor: .top)
+                    .frame(width: compact ? Self.compactSize.width : nil)
                     .padding(.top, compact ? 224 : 348)
             }
         }
@@ -382,7 +386,7 @@ struct HeroFigure: View {
             .font(.system(size: 15))
             .padding(18)
         }
-        .frame(height: compact ? 196 : 324)
+        .frame(width: (compact ? Self.compactSize.width : Self.size.width) - 40, height: compact ? 196 : 324)
         // macOS 26 window corners.
         .background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: 18))
         .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(.separator))
