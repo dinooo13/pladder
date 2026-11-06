@@ -520,6 +520,8 @@ td.us a { color: inherit; }
 .cta h2 { font-size: clamp(34px, 4.4vw, 56px); }
 .cta .lede { margin-bottom: 24px; }
 .release { margin-top: 20px; font-size: 14px; color: var(--faint); max-width: 34em; }
+.release + .release { margin-top: 8px; }
+.release code { font: 13px var(--mono); color: var(--muted); user-select: all; }
 
 /* Footer */
 
