@@ -12,8 +12,8 @@ struct SettingsView: View {
             DictionaryView(model: model)
                 .tabItem { Label("Dictionary", systemImage: "character.book.closed") }
 
-            ProcessingSettingsView(model: model)
-                .tabItem { Label("Processing", systemImage: "wand.and.sparkles") }
+            TextSettingsView(model: model)
+                .tabItem { Label("Text", systemImage: "text.word.spacing") }
         }
         // No material or glass on the window: Apple's own settings windows are plain. The
         // fixed width keeps switching tabs from resizing the window sideways.
@@ -38,14 +38,13 @@ struct WarningLabel: View {
 struct PermissionRow: View {
     let title: LocalizedStringKey
     let detail: String
-    let granted: Bool
+    let buttonTitle: String
     let action: @MainActor () -> Void
 
     var body: some View {
         LabeledContent {
-            if !granted {
-                Button("Open Settings…") { action() }
-            }
+            Button(buttonTitle) { action() }
+                .buttonStyle(.borderedProminent)
         } label: {
             Label {
                 VStack(alignment: .leading, spacing: 2) {
@@ -56,8 +55,9 @@ struct PermissionRow: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             } icon: {
-                Image(systemName: granted ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-                    .foregroundStyle(granted ? .green : .orange)
+                Image(systemName: "exclamationmark.circle.fill")
+                    .foregroundStyle(.orange)
+                    .accessibilityHidden(true)
             }
         }
     }

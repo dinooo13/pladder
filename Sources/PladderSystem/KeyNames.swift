@@ -6,6 +6,14 @@ public extension Hotkey {
     @MainActor
     var displayName: String { KeyNames.name(for: self, collapsingSides: !isModifierOnly) }
 
+    // As a shortcut field shows it: "⌥Space", "⌃⇧D". A chord of modifiers alone keeps its
+    // sides in words, "Right Command", since a glyph cannot say which side.
+    @MainActor
+    var shortcutName: String {
+        guard !isModifierOnly else { return displayName }
+        return KeyNames.glyphs(for: self)
+    }
+
     // For anything Carbon matches: its mask cannot tell Left from Right.
     @MainActor
     var sideAgnosticDisplayName: String { KeyNames.name(for: self, collapsingSides: true) }
@@ -20,6 +28,36 @@ public enum KeyNames {
             .map { name(forKeyCode: $0, collapsingSides: collapsingSides) }
             .joined(separator: " + ")
     }
+
+    @MainActor
+    public static func glyphs(for hotkey: Hotkey) -> String {
+        guard !hotkey.keyCodes.isEmpty else { return localized("None") }
+        let sorted = hotkey.keyCodes.sorted { (rank($0), $0) < (rank($1), $1) }
+        let modifiers = sorted.compactMap { modifierGlyphs[$0] }.joined()
+        let keys = sorted.filter { modifierGlyphs[$0] == nil }
+            .map { keyGlyphs[$0] ?? name(forKeyCode: $0, collapsingSides: true) }
+            .joined(separator: " ")
+        return modifiers + keys
+    }
+
+    private static let modifierGlyphs: [UInt16: String] = {
+        let entries: [(Int, String)] = [
+            (kVK_Control, "⌃"), (kVK_RightControl, "⌃"), (kVK_Option, "⌥"), (kVK_RightOption, "⌥"),
+            (kVK_Shift, "⇧"), (kVK_RightShift, "⇧"), (kVK_Command, "⌘"), (kVK_RightCommand, "⌘"),
+            (kVK_Function, "fn "),
+        ]
+        return Dictionary(uniqueKeysWithValues: entries.map { (UInt16($0.0), $0.1) })
+    }()
+
+    private static let keyGlyphs: [UInt16: String] = {
+        let entries: [(Int, String)] = [
+            (kVK_Return, "↩"), (kVK_Tab, "⇥"), (kVK_Delete, "⌫"), (kVK_ForwardDelete, "⌦"),
+            (kVK_Escape, "⎋"), (kVK_LeftArrow, "←"), (kVK_RightArrow, "→"),
+            (kVK_UpArrow, "↑"), (kVK_DownArrow, "↓"), (kVK_PageUp, "⇞"), (kVK_PageDown, "⇟"),
+            (kVK_Home, "↖"), (kVK_End, "↘"),
+        ]
+        return Dictionary(uniqueKeysWithValues: entries.map { (UInt16($0.0), $0.1) })
+    }()
 
     @MainActor
     public static func name(forKeyCode code: UInt16, collapsingSides: Bool = false) -> String {

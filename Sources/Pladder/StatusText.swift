@@ -8,8 +8,8 @@ import PladderSystem
 extension UnavailableReason {
     var text: String {
         switch self {
-        case .starting: String(localized: "Starting")
-        case .loadingModel: String(localized: "Loading model")
+        case .starting: String(localized: "Starting…")
+        case .loadingModel: String(localized: "Loading the speech model…")
         case .engineFailed(let failure): failure.text
         }
     }
@@ -19,12 +19,12 @@ extension EngineFailure {
     var text: String {
         switch self {
         case .download(let reason):
-            // Retry resumes the partial download rather than starting the ~460 MB over.
-            String(localized: "Download failed: \(reason.text) (Retry resumes it)")
+            // Try Again resumes the partial download rather than starting the ~460 MB over.
+            String(localized: "Couldn’t download the speech model: \(reason.text).")
         case .incompleteFiles:
-            String(localized: "Model files incomplete (Retry re-downloads them)")
+            String(localized: "The speech model’s files are incomplete.")
         case .loadFailed(let detail):
-            String(localized: "Model could not be loaded: \(detail)")
+            String(localized: "Couldn’t load the speech model: \(detail)")
         }
     }
 }
@@ -33,7 +33,7 @@ extension DownloadFailure {
     var text: String {
         switch self {
         case .serverError: String(localized: "Hugging Face returned an error")
-        case .rateLimited: String(localized: "Hugging Face rate limit")
+        case .rateLimited: String(localized: "Hugging Face is limiting downloads")
         case .stalled: String(localized: "the transfer stalled")
         case .damagedFile: String(localized: "a file arrived damaged")
         case .noConnection: String(localized: "no connection")
@@ -51,10 +51,10 @@ extension DictationFailure {
     var text: String {
         switch self {
         // AVFoundation's description, already in the system language.
-        case .microphone(let detail): String(localized: "Microphone: \(detail)")
-        case .engineNotLoaded: String(localized: "Speech model is not loaded yet.")
+        case .microphone(let detail): String(localized: "Couldn’t use the microphone: \(detail)")
+        case .engineNotLoaded: String(localized: "The speech model isn’t loaded yet.")
         case .pasteKeystroke:
-            String(localized: "Could not create the paste keystroke. Try again, or restart Pladder.")
+            String(localized: "Couldn’t paste. Try again, or restart Pladder.")
         case .other(let detail): detail
         }
     }
@@ -82,8 +82,19 @@ extension PolishModel {
     var displayName: String {
         switch self {
         case .appleIntelligence: String(localized: "Apple Intelligence")
-        case .s1Mini: String(localized: "S1-mini by Superwhisper (1.5 GB)")
-        case .s1Mini8Bit: String(localized: "S1-mini by Superwhisper, 8-bit (805 MB)")
+        case .s1Mini: String(localized: "S1-mini by Superwhisper")
+        case .s1Mini8Bit: String(localized: "S1-mini by Superwhisper, 8-bit")
+        }
+    }
+
+    var summary: String {
+        switch self {
+        case .appleIntelligence:
+            String(localized: "Built into macOS. Adds one to two seconds to each dictation.")
+        case .s1Mini:
+            String(localized: "Adds about half a second. A one-time 1.5 GB download from Hugging Face; trained on English, also handles German and Spanish.")
+        case .s1Mini8Bit:
+            String(localized: "Adds about half a second. A one-time 805 MB download from Hugging Face; trained on English, also handles German and Spanish.")
         }
     }
 }
@@ -117,8 +128,8 @@ enum MenuStatus {
             return String(localized: "Recording — press \(chords.stop) to stop")
         case .transcribing: return String(localized: "Transcribing…")
         case .polishing: return String(localized: "Polishing…")
-        case .inserting: return String(localized: "Inserting…")
-        case .error(let failure): return String(localized: "Error: \(failure.text)")
+        case .inserting: return String(localized: "Pasting…")
+        case .error(let failure): return failure.text
         case .copied: return String(localized: "Copied — press ⌘V")
         case .idle:
             return readyLine(chords)
@@ -126,12 +137,12 @@ enum MenuStatus {
             switch engineStatus {
             case .downloading(let progress):
                 if let progress {
-                    return String(localized: "Model: downloading \(Int((progress * 100).rounded()))%")
+                    return String(localized: "Downloading the speech model… \(Int((progress * 100).rounded()))%")
                 }
-                return String(localized: "Model: downloading…")
-            case .loading: return String(localized: "Model: loading…")
-            case .unloaded: return String(localized: "Model: not loaded")
-            case .failed(let failure): return String(localized: "Model failed: \(failure.text)")
+                return String(localized: "Downloading the speech model…")
+            case .loading: return String(localized: "Loading the speech model…")
+            case .unloaded: return String(localized: "The speech model isn’t loaded.")
+            case .failed(let failure): return failure.text
             case .ready: return readyLine(chords)
             }
         }
@@ -140,12 +151,12 @@ enum MenuStatus {
     // A whole sentence either way: a suffix glued on cannot be translated.
     private static func readyLine(_ chords: Chords) -> String {
         if chords.accessibilityOff {
-            return String(localized: "Ready — hold \(chords.hold) (Accessibility is off)")
+            return String(localized: "Hold \(chords.hold) to dictate, then press ⌘V")
         }
         if chords.secureKeyboardEntry {
-            return String(localized: "Ready — hold \(chords.hold) (Secure Keyboard Entry is on)")
+            return String(localized: "Hold \(chords.hold) to dictate (Secure Keyboard Entry is on)")
         }
-        return String(localized: "Ready — hold \(chords.hold)")
+        return String(localized: "Hold \(chords.hold) to dictate")
     }
 
     static func summary(of text: String) -> String? {
@@ -163,7 +174,7 @@ enum MenuStatus {
 enum ProcessorText {
     static func name(_ id: String) -> String {
         switch id {
-        case FillerRemover.processorID: String(localized: "Remove fillers")
+        case FillerRemover.processorID: String(localized: "Remove filler words")
         case DictionaryReplacer.processorID: String(localized: "Dictionary")
         case CustomWordCorrector.processorID: String(localized: "Custom words")
         case WhitespaceNormalizer.processorID: String(localized: "Tidy whitespace")
@@ -175,7 +186,7 @@ enum ProcessorText {
     static func detail(_ id: String) -> String {
         switch id {
         case FillerRemover.processorID:
-            String(localized: "Strips hesitation sounds like “uh” and “um” from English, German and Spanish transcripts.")
+            String(localized: "Drops “uh”, “um” and “äh”.")
         case DictionaryReplacer.processorID:
             String(localized: "Applies your replacement rules. Edit them in the Dictionary tab.")
         case CustomWordCorrector.processorID:
@@ -183,7 +194,7 @@ enum ProcessorText {
         case WhitespaceNormalizer.processorID:
             String(localized: "Trims the transcript and collapses runs of spaces.")
         case SpokenPunctuation.processorID:
-            String(localized: "Turns spoken marks such as “comma”, “question mark” and “new paragraph” into the marks themselves, in English, German and Spanish.")
+            String(localized: "Say “comma”, “question mark” or “new paragraph” to type them.")
         default: ""
         }
     }

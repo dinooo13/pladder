@@ -22,9 +22,10 @@ final class PermissionMonitor {
     var needsMicrophone: Bool { microphoneStatus != .authorized }
     var needsAnyPermission: Bool { needsAccessibility || needsMicrophone }
 
+    // No system prompt here: the first launch opens Settings, where the grant is asked for
+    // from its own button, with a sentence on what it is for.
     func start() {
         startPolling()
-        if !accessibilityTrusted { Permissions.requestAccessibility() }
     }
 
     func stop() {

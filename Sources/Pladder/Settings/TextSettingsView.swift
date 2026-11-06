@@ -3,55 +3,68 @@ import PladderCore
 import PladderRefine
 import PladderSystem
 
-struct ProcessingSettingsView: View {
+struct TextSettingsView: View {
     @Bindable var model: AppModel
 
     var body: some View {
         Form {
             Section {
-                ForEach(StandardProcessors.entries.map(\.id), id: \.self) { id in
+                ForEach(StandardProcessors.entries.map(\.id).filter(StandardProcessors.switchable.contains), id: \.self) { id in
                     Toggle(isOn: binding(for: id)) {
                         ToggleLabel(title: ProcessorText.name(id), detail: ProcessorText.detail(id))
                     }
                 }
+                Toggle(isOn: $model.settings.appendTrailingSpace) {
+                    ToggleLabel(
+                        title: String(localized: "Add a space after each dictation"),
+                        detail: String(localized: "So the next dictation does not run into this one."))
+                }
             } header: {
-                Text("Processors")
-            } footer: {
-                FootnoteText("Each dictation runs through these in order before it is inserted.")
+                Text("Cleanup")
             }
 
             Section {
-                Toggle(isOn: $model.settings.appendTrailingSpace) {
-                    ToggleLabel(
-                        title: String(localized: "Append a space after each dictation"),
-                        detail: String(localized: "Separates consecutive dictations so pasted runs stay readable."))
-                }
                 Toggle(isOn: $model.settings.shortSentenceWithoutPeriod) {
                     ToggleLabel(
-                        title: String(localized: "Leave out the period after a short sentence"),
-                        detail: String(localized: "A dictation of one sentence up to ten words, such as “Yes” or a command, is pasted without its final period."))
+                        title: String(localized: "No period"),
+                        detail: String(localized: "“Yes.” is pasted as “Yes”."))
                 }
                 Toggle(isOn: $model.settings.shortSentenceWithoutCapital) {
                     ToggleLabel(
-                        title: String(localized: "Start a short sentence in lowercase"),
-                        detail: String(localized: "A dictation of one sentence up to ten words is pasted without its first capital. “I” and words such as “API” keep theirs."))
+                        title: String(localized: "No capital"),
+                        detail: String(localized: "“Run the tests” is pasted as “run the tests”. “I” and “API” keep theirs."))
                 }
             } header: {
-                Text("Output")
+                Text("Short replies")
+            } footer: {
+                FootnoteText("For a dictation of one sentence up to ten words, such as a reply to an agent.")
             }
 
             Section {
-                Toggle("Polish dictations", isOn: $model.settings.polishDictations)
+                Toggle(isOn: $model.settings.polishDictations) {
+                    ToggleLabel(
+                        title: String(localized: "Polish with on-device AI"),
+                        detail: String(localized: "Fixes self-corrections, lists and punctuation before pasting."))
+                }
                 Picker("Model", selection: $model.settings.polishModel) {
                     ForEach(PolishModel.allCases, id: \.self) { choice in
                         Text(choice.displayName).tag(choice)
                     }
                 }
+                .disabled(!model.settings.polishDictations)
                 polishModelStatus
             } header: {
-                Text("Experimental")
+                HStack(spacing: 6) {
+                    Text("Polish")
+                    Text("Beta")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .overlay(Capsule().strokeBorder(.separator))
+                }
             } footer: {
-                FootnoteText("Before the text is pasted, the model cleans it up on this Mac: self-corrections, spoken punctuation, lists. Apple Intelligence adds one to two seconds to every dictation, S1-mini by Superwhisper about half a second. S1-mini is trained on English, also handles German and Spanish, and is downloaded once from Hugging Face when you pick it. Anything a model cannot fix is pasted as dictated.")
+                FootnoteText(verbatim: model.settings.polishModel.summary)
             }
         }
         .formStyle(.grouped)
@@ -83,7 +96,7 @@ struct ProcessingSettingsView: View {
                     Button("Try Again") { model.polish.retryDownload() }
                 }
             }
-        } else if let warning = model.polish.availability.polishWarning {
+        } else if model.settings.polishDictations, let warning = model.polish.availability.polishWarning {
             WarningLabel(warning)
         }
     }

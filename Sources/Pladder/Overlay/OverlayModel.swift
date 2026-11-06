@@ -7,11 +7,7 @@ import PladderCore
 final class OverlayModel {
     var state: DictationState = .idle
     var level: Float = 0
-    // AppKit reaches a borderless panel inconsistently, so the scheme is set in SwiftUI.
-    var appearance: Appearance = .system
     var style: OverlayStyle = .compact
-    var glass: Bool = true
-    var speed: OverlayAnimationSpeed = .quick
     var presentation: OverlayPresentation = .hidden
     var partialTranscript: String?
     init() {}
@@ -24,37 +20,18 @@ enum OverlayPresentation: Equatable {
     case flyingOut
 }
 
-// Here, because PladderCore never imports SwiftUI.
-extension OverlayAnimationSpeed {
-    var flightDuration: TimeInterval {
-        switch self {
-        case .instant: 0.06
-        case .quick: 0.20
-        case .expressive: 0.35
-        }
-    }
+enum OverlayMotion {
+    static let flightDuration: TimeInterval = 0.20
 
     // The controller waits exactly this long between the collapse and the dive, and the
     // content crossfade runs over the same span, so the two directions mirror each other.
-    var morphDuration: TimeInterval {
-        switch self {
-        case .instant: 0.10
-        case .quick: 0.26
-        case .expressive: 0.5
-        }
-    }
+    static let morphDuration: TimeInterval = 0.26
 
     // The bounce is kept small enough that the spring settles inside `morphDuration`.
-    var morphAnimation: Animation {
-        switch self {
-        case .instant: .smooth(duration: morphDuration)
-        case .quick: .spring(duration: morphDuration, bounce: 0.12)
-        case .expressive: .spring(duration: morphDuration, bounce: 0.22)
-        }
-    }
+    static let morphAnimation: Animation = .spring(duration: morphDuration, bounce: 0.12)
 
     // No bounce: a spring on opacity would dip past zero and flash the content back.
-    var contentFade: Animation { .easeInOut(duration: morphDuration) }
+    static let contentFade: Animation = .easeInOut(duration: morphDuration)
 }
 
 enum OverlayPhase: Equatable {

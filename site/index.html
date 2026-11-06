@@ -12,7 +12,7 @@
 <link rel="stylesheet" href="style.css">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#15172B" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#111113" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Pladder">
 <meta property="og:title" content="Pladder: talk to your agents">
@@ -99,8 +99,8 @@
 <header class="top-band">
 <div class="top">
   <a class="brand" href="./">
-    <svg width="34" height="34" viewBox="0 0 1024 1024" aria-hidden="true"><defs><linearGradient id="ink" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2B2F55"/><stop offset="1" stop-color="#171933"/></linearGradient></defs><path fill="url(#ink)" d="M229.07 0L794.93 0C956.78 0 1024 67.22 1024 229.07L1024 794.93C1024 956.78 956.78 1024 794.93 1024L229.07 1024C67.22 1024 0 956.78 0 794.93L0 229.07C0 67.22 67.22 0 229.07 0Z"/><g fill="#F5F5FA"><rect x="168" y="392" width="80" height="240" rx="40"/><rect x="302" y="280" width="80" height="464" rx="40"/><rect x="436" y="344" width="80" height="336" rx="40"/><rect x="570" y="416" width="80" height="192" rx="40"/></g><g fill="#FF6A47"><rect x="718" y="244" width="80" height="536" rx="40"/><rect x="660" y="244" width="196" height="80" rx="40"/><rect x="660" y="700" width="196" height="80" rx="40"/></g></svg>
-    <span>pladder</span>
+    <svg width="34" height="34" viewBox="0 0 1024 1024" aria-hidden="true"><defs><linearGradient id="ink" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#323238"/><stop offset="1" stop-color="#18181B"/></linearGradient></defs><path fill="url(#ink)" d="M229.07 0L794.93 0C956.78 0 1024 67.22 1024 229.07L1024 794.93C1024 956.78 956.78 1024 794.93 1024L229.07 1024C67.22 1024 0 956.78 0 794.93L0 229.07C0 67.22 67.22 0 229.07 0Z"/><g fill="#F4F4F5"><rect x="168" y="392" width="80" height="240" rx="40"/><rect x="302" y="280" width="80" height="464" rx="40"/><rect x="436" y="344" width="80" height="336" rx="40"/><rect x="570" y="416" width="80" height="192" rx="40"/></g><g fill="#FF6A47"><rect x="718" y="244" width="80" height="536" rx="40"/><rect x="660" y="244" width="196" height="80" rx="40"/><rect x="660" y="700" width="196" height="80" rx="40"/></g></svg>
+    <span>Pladder</span>
   </a>
   <nav aria-label="Main">
     <a class="in-page" href="#speed">Speed</a>
@@ -124,7 +124,7 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12"/><path d="m6 11 6 6 6-6"/><path d="M5 20h14"/></svg>
           Download for Mac
         </a>
-        <span class="perks">Free · No subscription · Works offline</span>
+        <span class="perks">Free, with no subscription. Works offline.</span>
       </div>
     </div>
   </div>
@@ -181,7 +181,7 @@
       </div>
     </div>
 
-    <p class="keys"><span class="kgroup"><kbd class="key"><span aria-hidden="true">⌥</span><span class="sr">Option</span></kbd> <span aria-hidden="true">+</span> <kbd class="key key-space">space</kbd> to talk,</span> <span class="kgroup">tap <kbd class="key key-v">V</kbd> to send</span></p>
+    <p class="keys"><span class="kgroup">Hold <kbd class="key"><span class="glyph" aria-hidden="true">⌥</span><span>option</span></kbd> <kbd class="key key-space">space</kbd> to talk,</span> <span class="kgroup">tap <kbd class="key key-v">V</kbd> to send</span></p>
   </div>
 </section>
 </div>
@@ -202,10 +202,10 @@
 
 <section class="sec" id="prompts" aria-labelledby="prompts-title">
   <h2 id="prompts-title" class="h-xl narrow">Say the detailed prompt, not the lazy one.</h2>
-  <p class="lede">Typing makes you cut corners. Talking is three to four times faster, so you give your agent the context it actually needs.</p>
+  <p class="lede">Typing makes you cut corners. Talking is three to four times faster, so you give your agent the context it actually needs. And it works wherever there's a cursor: email, messages, notes, the search box.</p>
   <div class="grid g380">
     <div class="card big-card">
-      <p class="label faint">Typed</p>
+      <p class="label muted">Typed</p>
       <p class="mono">&gt; fix dark mode bug</p>
       <p class="faint small">And then three rounds of “no, I meant…”.</p>
     </div>
@@ -230,17 +230,6 @@
   </div>
 </section>
 
-<section class="sec" id="everywhere" aria-labelledby="everywhere-title">
-  <h2 id="everywhere-title" class="h-xl">Stop typing. Start talking.</h2>
-  <p class="lede">Not just for agents. If there's a blinking cursor anywhere on your Mac, Pladder can fill it.</p>
-  <div class="grid g280">
-    <div class="card"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg><h3>Emails</h3><p class="muted">Clear your inbox at the speed you talk.</p></div>
-    <div class="card"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></svg><h3>Messages</h3><p class="muted">Reply to friends without breaking stride.</p></div>
-    <div class="card"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h5"/></svg><h3>Notes &amp; docs</h3><p class="muted">Get the first draft out of your head in minutes.</p></div>
-    <div class="card"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><h3>Search boxes</h3><p class="muted">Ask the long question, not the three-word one.</p></div>
-  </div>
-</section>
-
 <section class="sec" id="private" aria-labelledby="private-title">
   <div class="private">
     <div class="private-head">
@@ -258,7 +247,7 @@
         <p class="label">Pladder</p>
         <p class="claim">Ours is one line:</p>
         <p class="claim-xl">Nothing you say leaves your Mac.</p>
-        <p class="small strongish push">Offline · No account · Mic on only while you hold the key · <a href="privacy/">Privacy details</a></p>
+        <p class="small strongish push">It works offline, there is no account, and the microphone is on only while you hold the key. <a href="privacy/">How Pladder handles privacy</a></p>
       </div>
     </div>
   </div>
@@ -268,17 +257,17 @@
   <h2 id="compare-title" class="h-xl narrow">Others rent you dictation. Pladder gives it to you.</h2>
   <p class="lede">The popular dictation apps are subscriptions. Pladder is free, and it never sends your voice anywhere.</p>
   <div class="table-wrap">
-    <table role="table">
+    <table>
       <caption id="compare-caption" class="sr">Pladder compared with Wispr Flow and Superwhisper</caption>
-      <thead role="rowgroup">
-        <tr role="row"><td role="cell"></td><th role="columnheader" scope="col" class="us">Pladder</th><th role="columnheader" scope="col">Wispr Flow</th><th role="columnheader" scope="col">Superwhisper</th></tr>
+      <thead>
+        <tr><td></td><th scope="col" class="us">Pladder</th><th scope="col">Wispr Flow</th><th scope="col">Superwhisper</th></tr>
       </thead>
-      <tbody role="rowgroup">
-        <tr role="row"><th role="rowheader" scope="row">Price</th><td role="cell" data-label="Pladder" class="us">Free. No subscription.</td><td role="cell" data-label="Wispr Flow">$15 a month for Pro</td><td role="cell" data-label="Superwhisper">$8.49 a month for Pro</td></tr>
-        <tr role="row"><th role="rowheader" scope="row">Free plan limits</th><td role="cell" data-label="Pladder" class="us">None. The best model is included.</td><td role="cell" data-label="Wispr Flow">Weekly word cap</td><td role="cell" data-label="Superwhisper">Whisper models only. Parakeet needs Pro.</td></tr>
-        <tr role="row"><th role="rowheader" scope="row">Speed</th><td role="cell" data-label="Pladder" class="us"><span><a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#what-a-dictation-waits-for">0.2 s</a>, measured in public</span></td><td role="cell" data-label="Wispr Flow">No public benchmark to rerun</td><td role="cell" data-label="Superwhisper">No public benchmark to rerun</td></tr>
-        <tr role="row"><th role="rowheader" scope="row">Where your voice goes</th><td role="cell" data-label="Pladder" class="us">Nowhere. It stays on your Mac.</td><td role="cell" data-label="Wispr Flow">To their cloud servers</td><td role="cell" data-label="Superwhisper">Your Mac, or the cloud with Pro cloud models</td></tr>
-        <tr role="row"><th role="rowheader" scope="row">Works offline</th><td role="cell" data-label="Pladder" class="us">Always</td><td role="cell" data-label="Wispr Flow">No</td><td role="cell" data-label="Superwhisper">Only with local models</td></tr>
+      <tbody>
+        <tr><th scope="row">Price</th><td data-label="Pladder" class="us">Free. No subscription.</td><td data-label="Wispr Flow">$15 a month for Pro</td><td data-label="Superwhisper">$8.49 a month for Pro</td></tr>
+        <tr><th scope="row">Free plan limits</th><td data-label="Pladder" class="us">None. The best model is included.</td><td data-label="Wispr Flow">Weekly word cap</td><td data-label="Superwhisper">Whisper models only. Parakeet needs Pro.</td></tr>
+        <tr><th scope="row">Speed</th><td data-label="Pladder" class="us"><span><a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#what-a-dictation-waits-for">0.2 s</a>, measured in public</span></td><td data-label="Wispr Flow">No public benchmark to rerun</td><td data-label="Superwhisper">No public benchmark to rerun</td></tr>
+        <tr><th scope="row">Where your voice goes</th><td data-label="Pladder" class="us">Nowhere. It stays on your Mac.</td><td data-label="Wispr Flow">To their cloud servers</td><td data-label="Superwhisper">Your Mac, or the cloud with Pro cloud models</td></tr>
+        <tr><th scope="row">Works offline</th><td data-label="Pladder" class="us">Always</td><td data-label="Wispr Flow">No</td><td data-label="Superwhisper">Only with local models</td></tr>
       </tbody>
     </table>
   </div>
@@ -286,7 +275,6 @@
 </section>
 
 <section class="sec" id="how" aria-labelledby="how-title">
-  <p class="kicker">Learn it in five seconds</p>
   <h2 id="how-title" class="h-xl">Simple as a walkie-talkie.</h2>
   <ol class="grid g300 steps">
     <li class="card big-card"><span class="num" aria-hidden="true">1</span><h3>Hold <span aria-hidden="true">⌥</span><span class="sr">Option</span> Space</h3><p class="muted">Click into the prompt box, then hold. The mic turns on. Only now.</p></li>
@@ -297,9 +285,9 @@
 
 <section class="sec" id="styles" aria-labelledby="styles-title">
   <h2 id="styles-title" class="h-xl">Four styles. Pick your pill.</h2>
-  <p class="lede">A small Liquid Glass pill shows you're recording. Keep it compact, shrink it to a dot, watch your words appear live, or tuck it into the menu bar.</p>
+  <p class="lede">A small Liquid Glass pill shows you're recording, just above the Dock. Keep it compact, shrink it to a dot, watch your words appear live, or leave it all to the menu bar.</p>
   <ul class="styles">
-    <li><figure><picture><source type="image/avif" media="(prefers-color-scheme: dark)" srcset="media/style-compact-dark.avif"><source type="image/webp" media="(prefers-color-scheme: dark)" srcset="media/style-compact-dark.webp"><source type="image/avif" srcset="media/style-compact-light.avif"><img src="media/style-compact-light.webp" width="580" height="380" loading="lazy" decoding="async" alt="A wide pill with a red recording dot and a waveform."></picture><figcaption>Compact</figcaption></figure></li>
+    <li><figure><picture><source type="image/avif" media="(prefers-color-scheme: dark)" srcset="media/style-compact-dark.avif"><source type="image/webp" media="(prefers-color-scheme: dark)" srcset="media/style-compact-dark.webp"><source type="image/avif" srcset="media/style-compact-light.avif"><img src="media/style-compact-light.webp" width="580" height="380" loading="lazy" decoding="async" alt="A wide pill with a coral recording dot and a waveform."></picture><figcaption>Compact</figcaption></figure></li>
     <li><figure><picture><source type="image/avif" media="(prefers-color-scheme: dark)" srcset="media/style-minimal-dark.avif"><source type="image/webp" media="(prefers-color-scheme: dark)" srcset="media/style-minimal-dark.webp"><source type="image/avif" srcset="media/style-minimal-light.avif"><img src="media/style-minimal-light.webp" width="580" height="380" loading="lazy" decoding="async" alt="A small round pill with only a waveform."></picture><figcaption>Minimal</figcaption></figure></li>
     <li><figure><picture><source type="image/avif" media="(prefers-color-scheme: dark)" srcset="media/style-live-dark.avif"><source type="image/webp" media="(prefers-color-scheme: dark)" srcset="media/style-live-dark.webp"><source type="image/avif" srcset="media/style-live-light.avif"><img src="media/style-live-light.webp" width="580" height="380" loading="lazy" decoding="async" alt="A long pill that shows the words as they are spoken: “the words show up as you say them, right here”."></picture><figcaption>Live</figcaption></figure></li>
     <li><figure><picture><source type="image/avif" media="(prefers-color-scheme: dark)" srcset="media/style-menu-bar-dark.avif"><source type="image/webp" media="(prefers-color-scheme: dark)" srcset="media/style-menu-bar-dark.webp"><source type="image/avif" srcset="media/style-menu-bar-light.avif"><img src="media/style-menu-bar-light.webp" width="580" height="380" loading="lazy" decoding="async" alt="No pill on screen; the Pladder icon in the menu bar shows the recording."></picture><figcaption>Menu Bar</figcaption></figure></li>
@@ -308,17 +296,11 @@
 
 <section class="sec" id="little-things" aria-labelledby="little-title">
   <h2 id="little-title" class="h-l">Little things you'll love.</h2>
-  <div class="grid g360">
+  <div class="grid g240">
     <div class="card">
       <h3>No more “um”</h3>
       <p class="faint small"><del>“So, um, I think we should, uh, meet at noon”</del></p>
       <p class="strong">“So, I think we should meet at noon”</p>
-    </div>
-    <div class="card">
-      <h3>Changed your mind?</h3>
-      <p class="faint small"><del>“See you Thursday, wait, no, Friday”</del></p>
-      <p class="strong">“See you Friday”</p>
-      <p class="muted small">With the optional polish, also on your Mac.</p>
     </div>
     <div class="card">
       <h3>Learns your names</h3>
@@ -329,12 +311,8 @@
       <p class="muted">Whatever you'd copied is still there afterwards.</p>
     </div>
     <div class="card">
-      <h3>Out of your way</h3>
-      <p class="muted">Lives in the menu bar. Nothing in the Dock, no window to manage.</p>
-    </div>
-    <div class="card">
       <h3>25 languages</h3>
-      <p class="strong"><span lang="de">Hallo</span> · <span lang="fr">Bonjour</span> · <span lang="es">Hola</span> · <span lang="it">Ciao</span></p>
+      <p class="strong"><span lang="de">Hallo</span>, <span lang="fr">bonjour</span>, <span lang="es">hola</span>, <span lang="it">ciao</span>.</p>
       <p class="muted">It notices which one you're speaking.</p>
     </div>
   </div>
@@ -379,7 +357,7 @@
     <h2 id="free-title" class="h-cta">Talk is cheap.<br>Pladder is free.</h2>
     <p class="cta-lede">No trial, no subscription, no account.</p>
     <a class="btn" href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg">Download for Mac</a>
-    <p class="release">For Macs with an Apple chip on macOS 26 or later. Always the latest release: <a href="https://github.com/dinooo13/pladder/releases/latest">what's new</a> · <a href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg.sha256">SHA-256</a>. Or <a href="https://github.com/dinooo13/pladder#install">build it from source</a>.</p>
+    <p class="release">For Macs with an Apple chip on macOS 26 or later. Always the latest release: see <a href="https://github.com/dinooo13/pladder/releases/latest">what's new</a>, check its <a href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg.sha256">SHA-256</a>, or <a href="https://github.com/dinooo13/pladder#install">build it from source</a>.</p>
   </div>
 </section>
 </main>
@@ -389,7 +367,7 @@
     <p><em>Pladder</em> is Low German for “to babble”. Made by <a href="https://github.com/dinooo13">Fabian Meyer</a>.</p>
     <p>Last updated <time datetime="2026-11-02">2 November 2026</time>.</p>
   </div>
-  <nav aria-label="Footer"><a href="https://github.com/dinooo13/pladder">Source</a><a href="https://github.com/dinooo13/pladder/blob/main/docs/USAGE.md">Usage</a><a href="privacy/">Privacy</a><a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md">Benchmarks</a><a href="llms.txt">llms.txt</a></nav>
+  <nav aria-label="Footer"><a href="https://github.com/dinooo13/pladder">Source</a><a href="https://github.com/dinooo13/pladder/blob/main/docs/USAGE.md">Usage</a><a href="privacy/">Privacy</a><a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md">Benchmarks</a></nav>
 </footer>
 </body>
 </html>

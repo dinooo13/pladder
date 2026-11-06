@@ -6,12 +6,14 @@ struct GeneralSettingsView: View {
 
     var body: some View {
         Form {
-            EngineSection(model: model)
-            PushToTalkSection(model: model)
-            AppearanceSection(model: model)
+            // First, and only while something is missing: it is what stops dictation working.
+            if model.permissions.needsAnyPermission {
+                PermissionsSection(permissions: model.permissions)
+            }
+            SpeechModelSection(model: model)
+            ShortcutsSection(model: model)
             OverlaySection(model: model)
-            SoundsSection(model: model)
-            PermissionsSection(permissions: model.permissions)
+            StartupSection(model: model)
         }
         .formStyle(.grouped)
         // Re-read here rather than on the poll: the user may have just changed it in System
@@ -22,18 +24,38 @@ struct GeneralSettingsView: View {
     }
 }
 
-private struct EngineSection: View {
+private struct SpeechModelSection: View {
     @Bindable var model: AppModel
 
     var body: some View {
         Section {
-            Picker("Engine", selection: $model.settings.engineID) {
+            Picker("Speech model", selection: $model.settings.engineID) {
                 ForEach(model.registry.available) { entry in
                     Text(LocalizedStringKey(entry.displayName)).tag(entry.id)
                 }
             }
-        } header: {
-            Text("Engine")
+            switch model.coordinator.engineStatus {
+            case .downloading(let fraction):
+                ProgressView(value: fraction) {
+                    Text("Downloading the speech model…").font(.callout)
+                } currentValueLabel: {
+                    if let fraction {
+                        Text(fraction, format: .percent.precision(.fractionLength(0)))
+                    }
+                }
+            case .loading:
+                ProgressView {
+                    Text("Loading the speech model…").font(.callout)
+                }
+            case .failed(let failure):
+                HStack(alignment: .firstTextBaseline) {
+                    WarningLabel(failure.text)
+                    Spacer()
+                    Button("Try Again") { model.retryEngine() }
+                }
+            case .ready, .unloaded:
+                EmptyView()
+            }
         } footer: {
             // The registry's own text, localized where it is built.
             FootnoteText(verbatim: model.registry.entry(for: model.settings.engineID)?.detail ?? "")
@@ -41,26 +63,26 @@ private struct EngineSection: View {
     }
 }
 
-private struct PushToTalkSection: View {
+private struct ShortcutsSection: View {
     @Bindable var model: AppModel
 
     var body: some View {
         Section {
-            LabeledContent("Key") {
+            LabeledContent("Push to talk") {
                 HotkeyRecorderField(
                     hotkey: $model.settings.hotkey,
                     setHotkeySuspended: model.setHotkeySuspended,
-                    // The send key is off without Accessibility anyway.
                     requiresRegularKey: model.hotkeys.hotkeyNeedsRegularKey,
                     systemShortcuts: model.hotkeys.systemShortcuts
                 )
             }
+            .help("Hold to record, release to paste.")
             if let warning = HotkeyWarning.forKey(
                 model.settings.hotkey, standIn: model.hotkeys.standInHotkey,
                 systemShortcuts: model.hotkeys.systemShortcuts) {
                 WarningLabel(warning.text)
             }
-            LabeledContent("Toggle key") {
+            LabeledContent("Hands-free") {
                 HotkeyRecorderField(
                     hotkey: $model.settings.toggleHotkey,
                     setHotkeySuspended: model.setHotkeySuspended,
@@ -69,54 +91,30 @@ private struct PushToTalkSection: View {
                     systemShortcuts: model.hotkeys.systemShortcuts
                 )
             }
+            .help("Press once to start recording and again to paste. Set it to the push-to-talk key and a short tap starts hands-free while a hold works as before.")
             if let warning = HotkeyWarning.forToggle(
                 model.settings.toggleHotkey, hotkey: model.settings.hotkey,
                 accessibilityTrusted: model.permissions.accessibilityTrusted,
                 systemShortcuts: model.hotkeys.systemShortcuts) {
                 WarningLabel(warning.text)
             }
-            LabeledContent("Send key") {
+            LabeledContent("Paste and send") {
                 HotkeyRecorderField(
                     hotkey: $model.settings.submitKey,
                     setHotkeySuspended: model.setHotkeySuspended,
                     allowsEmpty: true
                 )
             }
+            .help("Press it while recording and Return follows the text, to send a message or run a command.")
             if let warning = HotkeyWarning.forSendKey(
                 model.settings.submitKey, hotkey: model.settings.hotkey,
                 accessibilityTrusted: model.permissions.accessibilityTrusted) {
                 WarningLabel(warning.text)
             }
         } header: {
-            Text("Push to Talk")
+            Text("Shortcuts")
         } footer: {
-            // Separate literals, so each translation stays whole.
-            VStack(alignment: .leading, spacing: 4) {
-                FootnoteText("Hold to record, release to insert. Press the send key while recording and Return is pressed after the text. Click a field and press any key combination to assign it.")
-                FootnoteText("Tap the toggle key to start recording and tap it again to insert. Set it to the same combination as the key and a short tap toggles while a hold still works as before. Escape discards a recording. Delete clears a field.")
-            }
-        }
-    }
-}
-
-private struct AppearanceSection: View {
-    @Bindable var model: AppModel
-
-    var body: some View {
-        Section {
-            LabeledContent("Appearance") {
-                HStack(spacing: 8) {
-                    ForEach(Appearance.allCases, id: \.self) { appearance in
-                        OptionCard(
-                            title: appearance.displayName,
-                            isSelected: model.settings.appearance == appearance,
-                            action: { model.settings.appearance = appearance }
-                        ) {
-                            AppearanceThumbnail(appearance: appearance, glass: model.settings.overlayGlass)
-                        }
-                    }
-                }
-            }
+            FootnoteText("Hold to record, release to paste. Escape discards a recording.")
         }
     }
 }
@@ -124,78 +122,41 @@ private struct AppearanceSection: View {
 private struct OverlaySection: View {
     @Bindable var model: AppModel
 
-    // Menu never flies a pill in, so the background and the speed have nothing to act on.
-    private var hasPill: Bool { model.settings.overlayStyle != .menuBar }
-
     var body: some View {
         Section {
-            LabeledContent("Style") {
-                HStack(spacing: 8) {
-                    ForEach(OverlayStyle.allCases, id: \.self) { style in
-                        OptionCard(
-                            title: style.displayName,
-                            isSelected: model.settings.overlayStyle == style,
-                            action: { model.settings.overlayStyle = style }
-                        ) {
-                            OverlayStyleThumbnail(style: style, glass: model.settings.overlayGlass)
-                        }
-                    }
-                }
-            }
-            LabeledContent("Background") {
-                HStack(spacing: 8) {
-                    ForEach([true, false], id: \.self) { glass in
-                        OptionCard(
-                            title: glass ? String(localized: "Glass") : String(localized: "Flat"),
-                            isSelected: model.settings.overlayGlass == glass,
-                            isEnabled: hasPill,
-                            action: { model.settings.overlayGlass = glass }
-                        ) {
-                            BackgroundThumbnail(glass: glass)
-                        }
-                    }
-                }
-            }
-            LabeledContent("Animation") {
-                HStack(spacing: 8) {
-                    ForEach(OverlayAnimationSpeed.allCases, id: \.self) { speed in
-                        OptionCard(
-                            title: speed.displayName,
-                            isSelected: model.settings.overlayAnimationSpeed == speed,
-                            isEnabled: hasPill,
-                            action: { model.settings.overlayAnimationSpeed = speed }
-                        ) {
-                            AnimationSpeedThumbnail(speed: speed)
-                        }
-                    }
-                }
+            OptionCardRow(
+                title: String(localized: "Overlay"),
+                selection: $model.settings.overlayStyle,
+                options: OverlayStyle.allCases,
+                name: \.displayName
+            ) { style in
+                OverlayStyleThumbnail(style: style)
             }
         } header: {
             Text("Overlay")
         } footer: {
-            FootnoteText("Shown while you dictate, flying up from the bottom edge as a circle and expanding into place. Menu relies on the wave in the menu bar alone; errors still appear.")
+            FootnoteText(verbatim: model.settings.overlayStyle.summary)
         }
     }
 }
 
-private struct SoundsSection: View {
+private struct StartupSection: View {
     @Bindable var model: AppModel
 
     var body: some View {
-        Section("Sounds & Startup") {
+        Section {
+            Toggle("Launch at login", isOn: Binding(
+                get: { model.launchAtLoginEnabled },
+                set: { model.setLaunchAtLogin($0) }
+            ))
+            if let error = model.launchAtLoginError {
+                WarningLabel(error)
+            }
             Toggle("Play start and stop sounds", isOn: $model.settings.playSounds)
-            Toggle("Mute audio while dictating", isOn: $model.settings.muteOutputWhileDictating)
-            VStack(alignment: .leading, spacing: 2) {
-                Toggle("Launch at login", isOn: Binding(
-                    get: { model.launchAtLoginEnabled },
-                    set: { model.setLaunchAtLogin($0) }
-                ))
-                if let error = model.launchAtLoginError {
-                    Text(error)
-                        .font(.callout)
-                        .foregroundStyle(.red)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+            Toggle("Mute other audio while recording", isOn: $model.settings.muteOutputWhileDictating)
+        } footer: {
+            if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String {
+                FootnoteText(verbatim: String(localized: "Pladder \(version)"))
             }
         }
     }
@@ -205,58 +166,53 @@ private struct PermissionsSection: View {
     let permissions: PermissionMonitor
 
     var body: some View {
-        Section("Permissions") {
-            PermissionRow(
-                title: "Accessibility",
-                detail: String(localized: "Needed for a modifier-only key such as Right Command, for the send key and for pasting. Without it Option+Space still works and the text is copied for you to paste with ⌘V; a standard account needs an administrator to switch it on."),
-                granted: permissions.accessibilityTrusted,
-                action: permissions.grantAccessibility
-            )
-            PermissionRow(
-                title: "Microphone",
-                detail: microphoneDetail,
-                granted: permissions.microphoneStatus == .authorized,
-                action: permissions.grantMicrophone
-            )
+        Section {
+            if permissions.needsMicrophone {
+                PermissionRow(
+                    title: "Microphone",
+                    detail: microphoneDetail,
+                    buttonTitle: permissions.microphoneStatus == .notDetermined
+                        ? String(localized: "Allow…") : String(localized: "Open System Settings…"),
+                    action: permissions.grantMicrophone
+                )
+            }
+            if permissions.needsAccessibility {
+                PermissionRow(
+                    title: "Accessibility",
+                    detail: String(localized: "Lets Pladder paste for you. Without it, the text is copied and you press ⌘V."),
+                    buttonTitle: String(localized: "Open System Settings…"),
+                    action: permissions.grantAccessibility
+                )
+            }
+        } header: {
+            Text("Permissions")
         }
     }
 
     private var microphoneDetail: String {
         switch permissions.microphoneStatus {
-        case .authorized: String(localized: "Granted.")
-        case .denied, .restricted: String(localized: "Denied. Enable it in System Settings.")
-        default: String(localized: "Not requested yet.")
+        case .denied, .restricted: String(localized: "Turned off for Pladder. Turn it on in System Settings to dictate.")
+        default: String(localized: "Needed to hear you. Nothing you say leaves this Mac.")
         }
     }
 }
 
-private extension Appearance {
+extension OverlayStyle {
     var displayName: String {
         switch self {
-        case .system: String(localized: "Auto")
-        case .light: String(localized: "Light")
-        case .dark: String(localized: "Dark")
-        }
-    }
-}
-
-private extension OverlayStyle {
-    var displayName: String {
-        switch self {
-        case .menuBar: String(localized: "Menu")
+        case .menuBar: String(localized: "Menu Bar")
         case .minimal: String(localized: "Minimal")
         case .compact: String(localized: "Compact")
         case .liveTranscript: String(localized: "Live")
         }
     }
-}
 
-private extension OverlayAnimationSpeed {
-    var displayName: String {
+    var summary: String {
         switch self {
-        case .instant: String(localized: "Ludicrous")
-        case .quick: String(localized: "Quick")
-        case .expressive: String(localized: "Chill")
+        case .compact: String(localized: "A small pill with a level meter, above the Dock.")
+        case .minimal: String(localized: "A single dot that turns into a level meter.")
+        case .liveTranscript: String(localized: "Shows the words as you speak them.")
+        case .menuBar: String(localized: "Nothing on screen: the menu bar icon follows your voice. Errors still appear.")
         }
     }
 }

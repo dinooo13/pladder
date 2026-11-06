@@ -55,7 +55,7 @@ enum Mark {
     }
 }
 
-// One deep ink with a quiet top-to-bottom shift; the accent is on the caret only.
+// One neutral graphite with a quiet top-to-bottom shift; the accent is on the caret only.
 struct RGB {
     let r: CGFloat, g: CGFloat, b: CGFloat
     init(_ hex: UInt32) {
@@ -67,11 +67,11 @@ struct RGB {
 }
 
 enum Palette {
-    static let inkTop = RGB(0x2B2F55)
-    static let inkBottom = RGB(0x171933)
-    static let darkTop = RGB(0x26272E)
-    static let darkBottom = RGB(0x111115)
-    static let paper = RGB(0xF5F5FA)
+    static let inkTop = RGB(0x323238)
+    static let inkBottom = RGB(0x18181B)
+    static let darkTop = RGB(0x27272A)
+    static let darkBottom = RGB(0x101012)
+    static let paper = RGB(0xF4F4F5)
     static let accent = RGB(0xFF6A47)
 }
 
@@ -165,12 +165,22 @@ let document: [String: Any] = [
         ["value": gradient(Palette.inkTop, Palette.inkBottom)],
         ["appearance": "dark", "value": gradient(Palette.darkTop, Palette.darkBottom)],
     ],
-    "groups": [[
-        "layers": [layer("caret"), layer("bars")],
-        "shadow": ["kind": "neutral", "opacity": 0.5],
-        "specular": true,
-        "translucency": ["enabled": true, "value": 0.5],
-    ]],
+    // The caret in a group of its own without translucency: the tile showing through
+    // turned its coral brown towards the bottom.
+    "groups": [
+        [
+            "layers": [layer("caret")],
+            "shadow": ["kind": "neutral", "opacity": 0.5],
+            "specular": true,
+            "translucency": ["enabled": false, "value": 0],
+        ],
+        [
+            "layers": [layer("bars")],
+            "shadow": ["kind": "neutral", "opacity": 0.5],
+            "specular": true,
+            "translucency": ["enabled": true, "value": 0.5],
+        ],
+    ],
     "supported-platforms": ["squares": "shared"],
 ]
 let json = try! JSONSerialization.data(withJSONObject: document, options: [.prettyPrinted, .sortedKeys])

@@ -36,8 +36,9 @@ struct HotkeyRecorderField: View {
                     .frame(minWidth: 140)
                     .contentTransition(.numericText())
             }
-            .tint(recorder.isRecording ? .accentColor : nil)
+            .buttonStyle(RecorderButtonStyle(isRecording: recorder.isRecording))
             .help(help)
+            .accessibilityValue(recorder.isRecording ? String(localized: "Recording a shortcut") : hotkey.displayName)
             if let notice = recorder.notice {
                 Text(notice)
                     .font(.callout)
@@ -51,13 +52,13 @@ struct HotkeyRecorderField: View {
     }
 
     private var label: String {
-        guard recorder.isRecording else { return hotkey.displayName }
+        guard recorder.isRecording else { return hotkey.shortcutName }
         // Naming the modifiers that did arrive is the honest version of "Needs a regular
         // key": macOS may have eaten the key before Pladder saw it.
         if let refused = recorder.refusedModifiers {
             return String(localized: "Only \(refused.sideAgnosticDisplayName) arrived…")
         }
-        return recorder.pending?.displayName ?? String(localized: "Press keys…")
+        return recorder.pending?.shortcutName ?? String(localized: "Press keys…")
     }
 
     // Whole sentences: a translation cannot be assembled from clauses.
@@ -75,6 +76,21 @@ struct HotkeyRecorderField: View {
             String(localized: "Click, then press the key or combination to use.")
         case (false, true):
             String(localized: "Click, then press the key or combination to use. Without Accessibility the key must include a regular key, for example Control+Shift+D.")
+        }
+    }
+}
+
+// Bordered at rest; while recording, the accent ring and tint of a focused field.
+private struct RecorderButtonStyle: PrimitiveButtonStyle {
+    let isRecording: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        if isRecording {
+            Button(configuration)
+                .buttonStyle(.borderedProminent)
+        } else {
+            Button(configuration)
+                .buttonStyle(.bordered)
         }
     }
 }
