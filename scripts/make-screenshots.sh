@@ -6,10 +6,12 @@
 # so it is safe to run while another Pladder is in use; it shows a few
 # windows for a second or two.
 #
-# Usage: scripts/make-screenshots.sh [dir] [--hero | --settings]   (default: docs/images)
+# Usage: scripts/make-screenshots.sh [dir] [--hero | --settings | --settings-scene | --hero-frames]   (default: docs/images)
 #   --hero      the site's hero picture, hero-light.png and hero-dark.png, which
 #               site/media/hero-* are encoded from
 #   --settings  each Settings tab, light and dark, for reviewing the window
+#   --settings-scene  the real Settings window, toolbar and key window included
+#   --hero-frames     the keyframes scripts/make-hero-loop.sh turns into the site's loop
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

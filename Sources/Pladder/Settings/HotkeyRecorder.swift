@@ -28,7 +28,7 @@ struct HotkeyRecorderField: View {
             if isEmpty && !recorder.isRecording {
                 // The width on the label, so the bezel lines up with the recorded fields.
                 Button { toggleRecording() } label: {
-                    Text("Record Shortcut").frame(minWidth: 120)
+                    Text("Record Shortcut").frame(minWidth: 112)
                 }
                     .help(help)
                     .accessibilityLabel(title)

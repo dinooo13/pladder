@@ -8,6 +8,11 @@ enum SettingsTab: Hashable {
 struct SettingsView: View {
     @Bindable var model: AppModel
     @State var tab: SettingsTab = .general
+    // Only the screenshots set it, to show each tab of the real window in turn.
+    @MainActor static var requestedTab: SettingsTab? {
+        didSet { if let requestedTab { TabRequest.shared.tab = requestedTab } }
+    }
+    @State private var request = TabRequest.shared
 
     var body: some View {
         TabView(selection: $tab) {
@@ -29,7 +34,15 @@ struct SettingsView: View {
         // No material or glass on the window: Apple's own settings windows are plain. The
         // fixed width keeps switching tabs from resizing the window sideways.
         .frame(width: 540)
+        .onChange(of: request.tab) { _, new in if let new { tab = new } }
     }
+}
+
+@MainActor
+@Observable
+final class TabRequest {
+    static let shared = TabRequest()
+    var tab: SettingsTab?
 }
 
 extension View {
