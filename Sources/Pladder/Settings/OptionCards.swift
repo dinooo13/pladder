@@ -87,7 +87,6 @@ struct OptionCard<Thumbnail: View>: View {
                     )
                 Text(title)
                     .font(.callout)
-                    .foregroundStyle(isSelected ? .primary : .secondary)
             }
             .contentShape(Rectangle())
         }

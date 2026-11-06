@@ -44,7 +44,7 @@ struct PillBackground: ViewModifier {
 
     private var rim: Color {
         if contrast == .increased { return Color(nsColor: .separatorColor) }
-        return scheme == .dark ? .white.opacity(0.14) : .black.opacity(0.06)
+        return scheme == .dark ? .white.opacity(0.22) : .black.opacity(0.07)
     }
 
     // One shape for row and disc: a capsule in a square is a circle, so the morph is only

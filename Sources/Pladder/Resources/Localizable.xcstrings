@@ -71,26 +71,6 @@
         }
       }
     },
-    "Allow Accessibility Access…": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Zugriff auf Bedienungshilfen erlauben …"
-          }
-        }
-      }
-    },
-    "Allow Microphone Access…": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Zugriff auf das Mikrofon erlauben …"
-          }
-        }
-      }
-    },
     "Allow…": {
       "localizations": {
         "de": {
@@ -107,26 +87,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Apple Intelligence"
-          }
-        }
-      }
-    },
-    "Apple Intelligence is off, so dictations paste as dictated. Turn it on in System Settings.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Apple Intelligence ist aus, deshalb fügen Diktate den Text so ein, wie er diktiert wurde. Schalte es in den Systemeinstellungen ein."
-          }
-        }
-      }
-    },
-    "Apple Intelligence is unavailable, so dictations paste as dictated.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Apple Intelligence ist nicht verfügbar, deshalb fügen Diktate den Text so ein, wie er diktiert wurde."
           }
         }
       }
@@ -166,7 +126,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bereinigen"
+            "value": "Bereinigung"
           }
         }
       }
@@ -401,22 +361,12 @@
         }
       }
     },
-    "Launch at login": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bei der Anmeldung öffnen"
-          }
-        }
-      }
-    },
     "Lets Pladder paste for you. Without it, the text is copied and you press ⌘V.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Damit fügt Pladder den Text für dich ein. Ohne wird er kopiert und du drückst ⌘V."
+            "value": "Damit fügt Pladder den Text für dich ein. Ohne sie wird er kopiert und du drückst ⌘V."
           }
         }
       }
@@ -641,16 +591,6 @@
         }
       }
     },
-    "Repairs near misses of the words you list in the Dictionary tab with an empty Heard as.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Korrigiert fast richtig erkannte Wörter, die du im Tab „Wörterbuch“ mit leerem „Gehört als“ einträgst."
-          }
-        }
-      }
-    },
     "Replace with": {
       "localizations": {
         "de": {
@@ -771,52 +711,12 @@
         }
       }
     },
-    "The Apple Intelligence model is still downloading, so dictations paste as dictated for now.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Das Modell für Apple Intelligence wird noch heruntergeladen, deshalb fügen Diktate den Text vorerst so ein, wie er diktiert wurde."
-          }
-        }
-      }
-    },
-    "The download did not match the published model and was deleted, so dictations paste as dictated.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Der Download passte nicht zum veröffentlichten Modell und wurde gelöscht, Diktate werden deshalb unverändert eingefügt."
-          }
-        }
-      }
-    },
-    "The download stopped, so dictations paste as dictated.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Der Download wurde abgebrochen, Diktate werden deshalb unverändert eingefügt."
-          }
-        }
-      }
-    },
     "The file should be a dictionary exported from Pladder.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
             "value": "Die Datei sollte ein aus Pladder exportiertes Wörterbuch sein."
-          }
-        }
-      }
-    },
-    "The model could not be saved, probably for lack of disk space, so dictations paste as dictated.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Das Modell konnte nicht gespeichert werden, vermutlich fehlt Speicherplatz. Diktate werden deshalb unverändert eingefügt."
           }
         }
       }
@@ -847,16 +747,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Die Dateien des Sprachmodells sind unvollständig."
-          }
-        }
-      }
-    },
-    "This Mac cannot run Apple Intelligence, so dictations paste as dictated.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dieser Mac kann Apple Intelligence nicht ausführen, deshalb fügen Diktate den Text so ein, wie er diktiert wurde."
           }
         }
       }
@@ -951,16 +841,6 @@
         }
       }
     },
-    "“Yes.” is pasted as “Yes”.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "„Ja.“ wird als „Ja“ eingefügt."
-          }
-        }
-      }
-    },
     "Clear": {
       "localizations": {
         "de": {
@@ -997,16 +877,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sprachmodell erneut herunterladen"
-          }
-        }
-      }
-    },
-    "Drop the final period": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Schlusspunkt weglassen"
           }
         }
       }
@@ -1057,16 +927,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Damit Musik oder ein Anruf nicht im Diktat landet."
-          }
-        }
-      }
-    },
-    "Start with a lowercase letter": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mit Kleinbuchstaben beginnen"
           }
         }
       }
@@ -1341,16 +1201,6 @@
         }
       }
     },
-    "any close match": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ähnliche Wörter"
-          }
-        }
-      }
-    },
     "“Run the tests” is pasted as “run the tests”. “I” and “API” keep their capital.": {
       "localizations": {
         "de": {
@@ -1386,17 +1236,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Exakt"
-          }
-        }
-      }
-    },
-    "For a dictation of one sentence up to ten words, such as a reply to an agent.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Für ein Diktat aus einem Satz mit bis zu zehn Wörtern, etwa eine Antwort an einen Agenten."
+            "value": "Groß/klein"
           }
         }
       }
@@ -1426,7 +1266,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tastenkombinationen"
+            "value": "Tastaturkurzbefehle"
           }
         }
       }
@@ -1467,16 +1307,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sendetaste"
-          }
-        }
-      }
-    },
-    "Short Replies": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Kurze Antworten"
           }
         }
       }
@@ -1526,7 +1356,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Beta. KI auf dem Mac korrigiert Selbstkorrekturen, Listen und Satzzeichen."
+            "value": "Beta. KI auf dem Mac räumt Selbstkorrekturen, Listen und Satzzeichen auf."
           }
         }
       }
@@ -1537,6 +1367,206 @@
           "stringUnit": {
             "state": "translated",
             "value": "Hi"
+          }
+        }
+      }
+    },
+    "A one-sentence reply up to ten words: “Yes.” is pasted as “Yes”.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eine Antwort aus einem Satz mit bis zu zehn Wörtern: „Ja.“ wird als „Ja“ eingefügt."
+          }
+        }
+      }
+    },
+    "Allow Accessibility…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bedienungshilfen erlauben …"
+          }
+        }
+      }
+    },
+    "Allow Microphone…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mikrofon erlauben …"
+          }
+        }
+      }
+    },
+    "Apple Intelligence is off, so dictations are pasted without polish. Turn it on in System Settings.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence ist aus, deshalb werden Diktate unverändert eingefügt. Schalte es in den Systemeinstellungen ein."
+          }
+        }
+      }
+    },
+    "Apple Intelligence is unavailable, so dictations are pasted without polish.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence ist nicht verfügbar, deshalb werden Diktate unverändert eingefügt."
+          }
+        }
+      }
+    },
+    "Dismiss “%@” → “%@”": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "„%1$@“ → „%2$@“ verwerfen"
+          }
+        }
+      }
+    },
+    "Drop the period after a short reply": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Punkt nach einer kurzen Antwort weglassen"
+          }
+        }
+      }
+    },
+    "Fixes near misses of the dictionary words whose Heard as is empty.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Korrigiert Beinahe-Treffer der Wörterbuchwörter, deren „Gehört als“ leer ist."
+          }
+        }
+      }
+    },
+    "None": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keiner"
+          }
+        }
+      }
+    },
+    "Open at Login": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bei der Anmeldung öffnen"
+          }
+        }
+      }
+    },
+    "Speech Model": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sprachmodell"
+          }
+        }
+      }
+    },
+    "Start a short reply in lowercase": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kurze Antwort kleingeschrieben beginnen"
+          }
+        }
+      }
+    },
+    "The Apple Intelligence model is still downloading, so dictations are pasted without polish for now.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Modell für Apple Intelligence wird noch heruntergeladen, deshalb werden Diktate vorerst unverändert eingefügt."
+          }
+        }
+      }
+    },
+    "The download did not match the published model and was deleted, so dictations are pasted without polish.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Download stimmte nicht mit dem veröffentlichten Modell überein und wurde gelöscht, deshalb werden Diktate unverändert eingefügt."
+          }
+        }
+      }
+    },
+    "The download stopped, so dictations are pasted without polish.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Download wurde unterbrochen, deshalb werden Diktate unverändert eingefügt."
+          }
+        }
+      }
+    },
+    "The model could not be saved, probably for lack of disk space, so dictations are pasted without polish.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Modell konnte nicht gesichert werden, vermutlich fehlt Speicherplatz, deshalb werden Diktate unverändert eingefügt."
+          }
+        }
+      }
+    },
+    "This Mac cannot run Apple Intelligence, so dictations are pasted without polish.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auf diesem Mac läuft Apple Intelligence nicht, deshalb werden Diktate unverändert eingefügt."
+          }
+        }
+      }
+    },
+    "optional": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "optional"
+          }
+        }
+      }
+    },
+    "Leave empty to fix near misses of the replacement, such as a name that comes out nearly right.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leer lassen, um Beinahe-Treffer des Ersatzes zu korrigieren, etwa einen Namen, der fast richtig ankommt."
+          }
+        }
+      }
+    },
+    "What is pasted instead.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Was stattdessen eingefügt wird."
           }
         }
       }

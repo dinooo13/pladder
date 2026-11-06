@@ -16,6 +16,7 @@ struct LiveTranscriptText: View {
 
     // Only a colour, so lagging one pass behind costs nothing.
     @State private var previous = ""
+    @Environment(\.colorSchemeContrast) private var contrast
 
     // SwiftUI's head truncation with a line limit keeps the first lines and drops the
     // middle, so the tail is cut here, at a word, against the font's real metrics.
@@ -36,7 +37,8 @@ struct LiveTranscriptText: View {
         var settled = AttributedString(stable)
         settled.foregroundColor = .primary
         var unsettled = AttributedString(shown.dropFirst(stable.count))
-        unsettled.foregroundColor = .secondary
+        // Secondary on glass over a bright wallpaper is too faint once contrast is raised.
+        unsettled.foregroundColor = contrast == .increased ? Color.primary.opacity(0.75) : .secondary
         return settled + unsettled
     }
 
@@ -61,6 +63,11 @@ struct LiveTranscriptText: View {
 enum LiveTranscriptMetrics {
     static var font: NSFont { PillMetrics.nsFont }
     static let lineHeight: CGFloat = height(of: "Mg", width: .greatestFiniteMagnitude)
+
+    // On one line, unwrapped: how wide the row would have to be for this text.
+    static func lineWidth(of text: String) -> CGFloat {
+        NSAttributedString(string: text, attributes: [.font: font]).size().width
+    }
 
     static func tail(of text: String, fittingLines lines: Int, width: CGFloat) -> String {
         guard !text.isEmpty, width > 0, lines > 0 else { return text }

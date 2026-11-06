@@ -60,6 +60,16 @@
           "@type": "Question",
           "name": "Will it run on my Mac, and in my language?",
           "acceptedAnswer": {"@type": "Answer", "text": "Any Mac with an Apple chip, M1 or newer, on macOS 26 or later; the benchmarks are taken on an M1, so every newer chip is faster. It understands the 25 European languages of Parakeet, among them English, German, French, Spanish, Italian, Portuguese, Dutch, Polish and Ukrainian, and detects the language as you speak."}
+        },
+        {
+          "@type": "Question",
+          "name": "Option+Space is already my Alfred or Raycast shortcut. What now?",
+          "acceptedAnswer": {"@type": "Answer", "text": "Record another key in Settings, General, Keyboard Shortcuts: any combination works, a single key such as Right Command too. Option+Space is only the default because no macOS shortcut owns it."}
+        },
+        {
+          "@type": "Question",
+          "name": "Why does Pladder ask for Accessibility?",
+          "acceptedAnswer": {"@type": "Answer", "text": "To paste for you: macOS lets an app press ⌘V in another app only with Accessibility. Without it, Pladder still works and leaves the text on the clipboard for you to paste. It never reads the screen beyond the words it just pasted."}
         }
       ]
     }
@@ -79,7 +89,7 @@
     <a class="in-page" href="#private">Privacy</a>
     <a class="in-page" href="#compare">Compare</a>
     <a class="in-page" href="#faq">FAQ</a>
-    <a class="btn btn-small" href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg">Download</a>
+    <a class="btn btn-small btn-quiet" href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg">Download</a>
   </nav>
 </header>
 
@@ -87,7 +97,7 @@
 <section class="hero" aria-labelledby="title">
   <div class="hero-text">
     <h1 id="title">Talk to your agents.</h1>
-    <p class="intro">Pladder is push-to-talk dictation for Mac. Hold a key, say the prompt, let go, and it's in T3 Code, Claude or Codex in <a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#what-a-dictation-waits-for">0.2 seconds</a>. Free, and nothing you say leaves your Mac.</p>
+    <p class="intro">Pladder is push-to-talk dictation for Mac. Hold a key, say the prompt, let go, and it’s in T3 Code, Claude or Codex in <a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#what-a-dictation-waits-for">0.2 seconds</a>. Free, and nothing you say leaves your Mac.</p>
     <div class="get">
       <a class="btn" href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12"/><path d="m6 11 6 6 6-6"/><path d="M5 20h14"/></svg>
@@ -99,6 +109,10 @@
   </div>
   <figure class="visual">
     <picture>
+      <source type="image/avif" media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset="media/hero-mobile-dark.avif">
+      <source type="image/webp" media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset="media/hero-mobile-dark.webp">
+      <source type="image/avif" media="(max-width: 640px)" srcset="media/hero-mobile-light.avif">
+      <source type="image/webp" media="(max-width: 640px)" srcset="media/hero-mobile-light.webp">
       <source type="image/avif" media="(prefers-color-scheme: dark)" srcset="media/hero-dark.avif">
       <source type="image/webp" media="(prefers-color-scheme: dark)" srcset="media/hero-dark.webp">
       <source type="image/avif" srcset="media/hero-light.avif">
@@ -107,21 +121,25 @@
   </figure>
 </section>
 
-<section class="sec" id="speed" aria-labelledby="speed-title">
+<section class="sec split" id="speed" aria-labelledby="speed-title">
+  <div class="sec-head">
   <h2 id="speed-title">Pasted the moment you let go.</h2>
   <p class="lede">No spinning wheel, no upload. Pladder transcribes while you are still talking, so the wait after you let go is the same for one sentence or five minutes.</p>
+  </div>
+  <div class="sec-body">
   <dl class="figures">
     <div>
-      <dt>from letting go to the text on screen, the median over real dictations on an M1, the oldest Mac Pladder runs on</dt>
+      <dt>Median time from letting go to text on screen, over real dictations on an M1, the oldest Mac Pladder runs on.</dt>
       <dd><a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#what-a-dictation-waits-for">0.195 s</a></dd>
     </div>
   </dl>
   <p class="note">Five minutes of talking still paste in <a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#parakeet-ultra">0.261 s</a>. <a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md">Read the benchmark</a>.</p>
+  </div>
 </section>
 
 <section class="sec" id="prompts" aria-labelledby="prompts-title">
   <h2 id="prompts-title">Say the detailed prompt, not the lazy one.</h2>
-  <p class="lede">Talking is three to four times faster than typing, so you give your agent the context it needs. It works wherever there's a cursor: email, messages, notes, the terminal.</p>
+  <p class="lede">Talking is three to four times faster than typing, so you give your agent the context it needs. It works wherever there’s a cursor: email, messages, notes, the terminal.</p>
   <div class="pair">
     <div class="block">
       <p class="label">Typed</p>
@@ -133,22 +151,26 @@
     </div>
   </div>
   <dl class="facts">
-    <div><dt>Tap <kbd class="key key-v">V</kbd> before you let go</dt><dd>Pladder pastes the prompt and presses Return, so it's sent. Same hand, no reaching.</dd></div>
-    <div><dt><del>clode code</del> becomes Claude Code</dt><dd>A dictionary fixes the names speech models trip over: tools, libraries, your project's jargon.</dd></div>
+    <div><dt>Tap <kbd class="key key-v">V</kbd> before you let go</dt><dd>Pladder pastes the prompt and presses Return, so it’s sent. Same hand, no reaching.</dd></div>
+    <div><dt><del>clode code</del> becomes Claude Code</dt><dd>A dictionary fixes the names speech models trip over: tools, libraries, your project’s jargon.</dd></div>
     <div><dt>No more “um”</dt><dd>Filler words are dropped before the text is pasted.</dd></div>
     <div><dt>Learns your names</dt><dd>Fix a word once and Pladder offers to remember it.</dd></div>
   </dl>
 </section>
 
-<section class="sec" id="private" aria-labelledby="private-title">
+<section class="sec split" id="private" aria-labelledby="private-title">
+  <div class="sec-head">
   <h2 id="private-title">Nothing you say leaves your Mac.</h2>
-  <p class="lede">Your voice becomes text on the Neural Engine, not on someone else's server. What you say about your code, your clients or your weekend stays with you.</p>
+  <p class="lede">Your voice becomes text on the Neural Engine, not on someone else’s server. What you say about your code, your clients or your weekend stays with you.</p>
+  </div>
+  <div class="sec-body">
   <ul class="checks">
     <li>Works with Wi-Fi off, after a one-time download of the speech model.</li>
     <li>The microphone is on only while you dictate: while you hold the key, or until you tap it again hands-free.</li>
     <li>No account, no analytics, no update check.</li>
   </ul>
   <p class="note"><a href="privacy/">How Pladder handles privacy</a></p>
+  </div>
 </section>
 
 <section class="sec" id="compare" aria-labelledby="compare-title">
@@ -168,22 +190,25 @@
       </tbody>
     </table>
   </div>
-  <p class="fine">Pro prices as listed on <a href="https://wisprflow.ai/pricing">Wispr Flow's pricing page</a> and <a href="https://superwhisper.com/docs/billing/plans">Superwhisper's plans page</a> in November 2026, billed monthly. Yearly plans cost less per month, and Superwhisper also sells a lifetime license. Check their sites for current terms.</p>
+  <p class="fine">Pro prices as listed on <a href="https://wisprflow.ai/pricing">Wispr Flow’s pricing page</a> and <a href="https://superwhisper.com/docs/billing/plans">Superwhisper’s plans page</a> in November 2026, billed monthly. Yearly plans cost less per month, and Superwhisper also sells a lifetime license. Check their sites for current terms.</p>
 </section>
 
 <section class="sec" id="styles" aria-labelledby="styles-title">
-  <h2 id="styles-title">Four ways to show it's listening.</h2>
+  <h2 id="styles-title">Four ways to show it’s listening.</h2>
   <p class="lede">A small Liquid Glass pill just above the Dock. Keep it compact, shrink it to a dot, watch your words appear live, or leave it all to the menu bar.</p>
   <ul class="styles">
     <li><figure><picture><source type="image/avif" media="(prefers-color-scheme: dark)" srcset="media/style-compact-dark.avif"><source type="image/webp" media="(prefers-color-scheme: dark)" srcset="media/style-compact-dark.webp"><source type="image/avif" srcset="media/style-compact-light.avif"><img src="media/style-compact-light.webp" width="580" height="380" loading="lazy" decoding="async" alt="A wide pill with a coral recording dot and a waveform."></picture><figcaption>Compact</figcaption></figure></li>
-    <li><figure><picture><source type="image/avif" media="(prefers-color-scheme: dark)" srcset="media/style-minimal-dark.avif"><source type="image/webp" media="(prefers-color-scheme: dark)" srcset="media/style-minimal-dark.webp"><source type="image/avif" srcset="media/style-minimal-light.avif"><img src="media/style-minimal-light.webp" width="580" height="380" loading="lazy" decoding="async" alt="A small round pill with only a waveform."></picture><figcaption>Minimal</figcaption></figure></li>
-    <li><figure><picture><source type="image/avif" media="(prefers-color-scheme: dark)" srcset="media/style-live-dark.avif"><source type="image/webp" media="(prefers-color-scheme: dark)" srcset="media/style-live-dark.webp"><source type="image/avif" srcset="media/style-live-light.avif"><img src="media/style-live-light.webp" width="580" height="380" loading="lazy" decoding="async" alt="A long pill that shows the words as they are spoken: “the words show up as you say them, right here”."></picture><figcaption>Live</figcaption></figure></li>
+    <li><figure><picture><source type="image/avif" media="(prefers-color-scheme: dark)" srcset="media/style-minimal-dark.avif"><source type="image/webp" media="(prefers-color-scheme: dark)" srcset="media/style-minimal-dark.webp"><source type="image/avif" srcset="media/style-minimal-light.avif"><img src="media/style-minimal-light.webp" width="580" height="380" loading="lazy" decoding="async" alt="A small round pill with a coral waveform."></picture><figcaption>Minimal</figcaption></figure></li>
+    <li><figure><picture><source type="image/avif" media="(prefers-color-scheme: dark)" srcset="media/style-live-dark.avif"><source type="image/webp" media="(prefers-color-scheme: dark)" srcset="media/style-live-dark.webp"><source type="image/avif" srcset="media/style-live-light.avif"><img src="media/style-live-light.webp" width="580" height="380" loading="lazy" decoding="async" alt="A pill that shows the words as they are spoken: “as you speak”."></picture><figcaption>Live</figcaption></figure></li>
     <li><figure><picture><source type="image/avif" media="(prefers-color-scheme: dark)" srcset="media/style-menu-bar-dark.avif"><source type="image/webp" media="(prefers-color-scheme: dark)" srcset="media/style-menu-bar-dark.webp"><source type="image/avif" srcset="media/style-menu-bar-light.avif"><img src="media/style-menu-bar-light.webp" width="580" height="380" loading="lazy" decoding="async" alt="No pill on screen; the Pladder icon in the menu bar shows the recording."></picture><figcaption>Menu bar only</figcaption></figure></li>
   </ul>
 </section>
 
-<section class="sec faq" id="faq" aria-labelledby="faq-title">
+<section class="sec split faq" id="faq" aria-labelledby="faq-title">
+  <div class="sec-head">
   <h2 id="faq-title">Questions</h2>
+  </div>
+  <div class="sec-body">
   <div class="faq-list">
     <details>
       <summary>Which apps does it work with?</summary>
@@ -193,6 +218,15 @@
       <summary>Will it run on my Mac, and in my language?</summary>
       <p>Any Mac with an Apple chip, M1 or newer, on macOS 26 or later; the benchmarks are taken on an M1, so every newer chip is faster. It understands the 25 European languages of Parakeet, among them English, German, French, Spanish, Italian, Portuguese, Dutch, Polish and Ukrainian, and detects the language as you speak.</p>
     </details>
+    <details>
+      <summary>Option+Space is already my Alfred or Raycast shortcut. What now?</summary>
+      <p>Record another key in Settings, General, Keyboard Shortcuts: any combination works, a single key such as Right Command too. Option+Space is only the default because no macOS shortcut owns it.</p>
+    </details>
+    <details>
+      <summary>Why does Pladder ask for Accessibility?</summary>
+      <p>To paste for you: macOS lets an app press ⌘V in another app only with Accessibility. Without it, Pladder still works and leaves the text on the clipboard for you to paste. It never reads the screen beyond the words it just pasted.</p>
+    </details>
+  </div>
   </div>
 </section>
 
@@ -200,7 +234,7 @@
   <h2 id="free-title">Talk is cheap. Pladder is free.</h2>
   <p class="lede">No trial, no subscription, no account.</p>
   <a class="btn" href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg">Download for Mac</a>
-  <p class="release">For Macs with an Apple chip on macOS 26 or later. Always the latest release: see <a href="https://github.com/dinooo13/pladder/releases/latest">what's new</a>, check its <a href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg.sha256">SHA-256</a>, or <a href="https://github.com/dinooo13/pladder#install">build it from source</a>.</p>
+  <p class="release">For Macs with an Apple chip on macOS 26 or later. Always the latest release: see <a href="https://github.com/dinooo13/pladder/releases/latest">what’s new</a>, check its <a href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg.sha256">SHA-256</a>, or <a href="https://github.com/dinooo13/pladder#install">build it from source</a>.</p>
 </section>
 </main>
 

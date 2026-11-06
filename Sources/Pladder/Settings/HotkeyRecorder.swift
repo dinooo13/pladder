@@ -23,13 +23,37 @@ struct HotkeyRecorderField: View {
     // placeholder when empty, a clear button, and the focus ring while recording.
     var body: some View {
         VStack(alignment: .trailing, spacing: 4) {
+            // Nothing recorded: a plain button that says what it does, not an empty well
+            // that reads as disabled.
+            if isEmpty && !recorder.isRecording {
+                Button("Record Shortcut") { toggleRecording() }
+                    .frame(minWidth: 136)
+                    .help(help)
+                    .accessibilityLabel(title)
+                    .accessibilityValue(String(localized: "None"))
+            } else {
+                field
+            }
+            if let notice = recorder.notice {
+                Text(notice)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.trailing)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 260, alignment: .trailing)
+            }
+        }
+        .onDisappear { recorder.cancel() }
+    }
+
+    private var field: some View {
             HStack(spacing: 4) {
                 // Balances the clear button, so the keys stay centred in the field.
                 if showsClear {
                     Color.clear.frame(width: 14, height: 1)
                 }
                 Text(label)
-                    .foregroundStyle(isEmpty && !recorder.isRecording ? .secondary : .primary)
+                    .foregroundStyle(recorder.isRecording && recorder.pending == nil ? .secondary : .primary)
                     .lineLimit(1)
                     .frame(maxWidth: .infinity)
                 if showsClear {
@@ -71,16 +95,6 @@ struct HotkeyRecorderField: View {
             .accessibilityAddTraits(.isButton)
             .accessibilityValue(recorder.isRecording ? String(localized: "Recording a shortcut") : hotkey.displayName)
             .accessibilityAction { toggleRecording() }
-            if let notice = recorder.notice {
-                Text(notice)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.trailing)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: 260, alignment: .trailing)
-            }
-        }
-        .onDisappear { recorder.cancel() }
     }
 
     private var isEmpty: Bool { hotkey.keyCodes.isEmpty }

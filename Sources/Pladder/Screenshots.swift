@@ -36,6 +36,9 @@ enum Screenshots {
                 let suffix = scheme == .dark ? "dark" : "light"
                 await capture(HeroFigure(), size: HeroFigure.size, scheme: scheme,
                               to: directory.appending(path: "hero-\(suffix).png"), opaque: true)
+                // A phone shows the picture at about half size, so it gets a narrower one.
+                await capture(HeroFigure(compact: true), size: HeroFigure.compactSize, scheme: scheme,
+                              to: directory.appending(path: "hero-mobile-\(suffix).png"), opaque: true)
             }
             NSApp.terminate(nil)
             return
@@ -137,7 +140,7 @@ private struct Wallpaper: View {
                     .blur(radius: w * 0.12)
                     .position(x: w * 0.2, y: h * 0.1)
                 Circle()
-                    .fill(Color(red: 1, green: 0.42, blue: 0.28).opacity(scheme == .dark ? 0.18 : 0.14))
+                    .fill(Color(white: scheme == .dark ? 0.05 : 0.6).opacity(0.35))
                     .frame(width: w * 0.55)
                     .blur(radius: w * 0.12)
                     .position(x: w * 0.9, y: h * 0.95)
@@ -231,6 +234,7 @@ private struct StylesFigure: View {
                 Divider()
                 Text("About Pladder")
                 Text("Settings…")
+                Divider()
                 Text("Quit Pladder")
             }
             .font(.system(size: 12))
@@ -247,6 +251,8 @@ private struct StylesFigure: View {
 // prompt box waits with its cursor and the Live pill shows the words, as it is.
 private struct HeroFigure: View {
     static let size = CGSize(width: 580, height: 420)
+    static let compactSize = CGSize(width: 350, height: 284)
+    var compact = false
     @Environment(\.colorScheme) private var scheme
 
     // The site's --hero colours, so the picture has no edge on the page.
@@ -264,7 +270,8 @@ private struct HeroFigure: View {
                 style: .liveTranscript,
                 partial: "yes, and add a test for it"
             )
-            .padding(.top, 348)
+            .scaleEffect(compact ? 0.8 : 1, anchor: .top)
+            .padding(.top, compact ? 224 : 348)
         }
     }
 
@@ -288,10 +295,12 @@ private struct HeroFigure: View {
                     .padding(.vertical, 10)
                     .background(.quaternary, in: RoundedRectangle(cornerRadius: 14))
                     .frame(maxWidth: .infinity, alignment: .trailing)
-                (Text(verbatim: "It’s only kept in memory. Save it to ")
-                    + Text(verbatim: "UserDefaults").font(.system(size: 12, design: .monospaced))
-                    + Text(verbatim: "?"))
-                    .foregroundStyle(.primary)
+                if !compact {
+                    (Text(verbatim: "It’s only kept in memory. Save it to ")
+                        + Text(verbatim: "UserDefaults").font(.system(size: 12, design: .monospaced))
+                        + Text(verbatim: "?"))
+                        .foregroundStyle(.primary)
+                }
                 Spacer(minLength: 0)
                 HStack(alignment: .bottom) {
                     HStack(spacing: 1) {
@@ -311,7 +320,7 @@ private struct HeroFigure: View {
             .font(.system(size: 15))
             .padding(18)
         }
-        .frame(height: 324)
+        .frame(height: compact ? 196 : 324)
         // macOS 26 window corners.
         .background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: 18))
         .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(.separator))

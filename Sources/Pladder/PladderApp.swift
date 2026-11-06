@@ -132,10 +132,10 @@ private struct MenuContent: View {
 
         // Right under the status: these are what stops dictation working.
         if model.permissions.needsMicrophone {
-            Button("Allow Microphone Access…") { model.permissions.grantMicrophone() }
+            Button("Allow Microphone…") { model.permissions.grantMicrophone() }
         }
         if model.permissions.needsAccessibility {
-            Button("Allow Accessibility Access…") { model.permissions.grantAccessibility() }
+            Button("Allow Accessibility…") { model.permissions.grantAccessibility() }
         }
 
         if let last = model.lastTranscriptSummary {
@@ -153,8 +153,14 @@ private struct MenuContent: View {
         if !model.corrections.proposals.isEmpty {
             Section("Suggested Corrections") {
                 ForEach(model.corrections.proposals) { proposal in
+                    // Holding Option turns each into its own dismiss, the menu's usual idiom.
                     Button("Add “\(proposal.pair.heard)” → “\(proposal.pair.corrected)” to Dictionary") {
                         model.corrections.accept(proposal)
+                    }
+                    .modifierKeyAlternate(.option) {
+                        Button("Dismiss “\(proposal.pair.heard)” → “\(proposal.pair.corrected)”") {
+                            model.corrections.dismiss(proposal)
+                        }
                     }
                 }
                 if model.corrections.proposals.count > 1 {
@@ -173,6 +179,8 @@ private struct MenuContent: View {
         }
         Button("Settings…") { showSettings(openSettings) }
             .keyboardShortcut(",", modifiers: .command)
+
+        Divider()
 
         Button("Quit Pladder") { NSApp.terminate(nil) }
             .keyboardShortcut("q", modifiers: .command)

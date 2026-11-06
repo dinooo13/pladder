@@ -22,21 +22,14 @@ struct TextSettingsView: View {
                     Text("Add a space after each dictation")
                     Text("So the next dictation does not run into this one.")
                 }
-            }
-
-            Section {
                 Toggle(isOn: $model.settings.shortSentenceWithoutPeriod) {
-                    Text("Drop the final period")
-                    Text("“Yes.” is pasted as “Yes”.")
+                    Text("Drop the period after a short reply")
+                    Text("A one-sentence reply up to ten words: “Yes.” is pasted as “Yes”.")
                 }
                 Toggle(isOn: $model.settings.shortSentenceWithoutCapital) {
-                    Text("Start with a lowercase letter")
+                    Text("Start a short reply in lowercase")
                     Text("“Run the tests” is pasted as “run the tests”. “I” and “API” keep their capital.")
                 }
-            } header: {
-                Text("Short Replies")
-            } footer: {
-                Text("For a dictation of one sentence up to ten words, such as a reply to an agent.")
             }
 
             Section {
