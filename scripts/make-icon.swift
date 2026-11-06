@@ -320,8 +320,10 @@ func centred(_ text: String, font: CTFont, alpha: CGFloat, baseline: CGFloat) {
     ctx.fillPath()
     ctx.restoreGState()
 }
-centred("Talk to your agents.", font: outfit(500, 52), alpha: 0.95, baseline: 196)
-centred("Push-to-talk dictation for macOS. On-device, free and open source.", font: outfit(400, 30), alpha: 0.62, baseline: 136)
+// The words in SF, as on the site; Outfit is the wordmark's alone.
+func system(_ weight: NSFont.Weight, _ size: CGFloat) -> CTFont { NSFont.systemFont(ofSize: size, weight: weight) as CTFont }
+centred("Talk to your agents.", font: system(.semibold, 52), alpha: 0.95, baseline: 196)
+centred("Push-to-talk dictation for macOS. On-device, free and open source.", font: system(.regular, 28), alpha: 0.62, baseline: 136)
 
 let png = NSBitmapImageRep(cgImage: ctx.makeImage()!).representation(using: .png, properties: [:])!
 for path in ["docs/images/social-preview.png", "site/social-preview.png"] {

@@ -192,7 +192,15 @@ final class AppModel {
     private func handle(_ event: DictationCoordinator.Event, at instant: ContinuousClock.Instant) {
         switch event {
         case .recordingStarted:
-            if settings.playSounds { SoundPlayer.playStart() }
+            if settings.playSounds {
+                SoundPlayer.playStart()
+            } else {
+                // Without the start sound, VoiceOver has nothing else to say a recording began.
+                NSAccessibility.post(
+                    element: NSApp as Any, notification: .announcementRequested,
+                    userInfo: [.announcement: String(localized: "Listening…"),
+                               .priority: NSAccessibilityPriorityLevel.medium.rawValue])
+            }
         case .recordingStopped:
             releaseInstant = instant
             if settings.playSounds { SoundPlayer.playStop() }
@@ -285,9 +293,9 @@ final class AppModel {
         return String(localized: "Download Speech Model Again")
     }
 
-    var canRetryEngine: Bool {
-        if case .failed = coordinator.engineStatus { return true }
-        return false
+    var engineFailure: EngineFailure? {
+        if case .failed(let failure) = coordinator.engineStatus { return failure }
+        return nil
     }
 
     var lastTranscriptSummary: String? {

@@ -134,7 +134,7 @@ struct OverlayPill: View {
         case .error(let failure):
             HStack(spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
+                    .symbolRenderingMode(.multicolor)
                 Text(failure.shortText)
                     .font(PillMetrics.font)
                     .foregroundStyle(.primary)
@@ -211,7 +211,8 @@ struct OverlayPill: View {
                         }
                         .transition(.opacity)
                 } else {
-                    LevelBars(level: level, count: 5, maxHeight: 20, opacity: 1, seeded: isPreview)
+                    // Coral while recording, so the disc never reads as the one waiting after release.
+                    LevelBars(level: level, count: 5, maxHeight: 20, opacity: 1, seeded: isPreview, color: .brandCoral)
                         .transition(.opacity)
                 }
             }

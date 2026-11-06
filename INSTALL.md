@@ -26,7 +26,7 @@ This compiles a release build, wraps it into `Pladder.app`, signs it, copies it 
 Settings opens by itself the first time, with what Pladder still needs at the top and the speech model's download below it.
 
 1. **Allow the microphone.** Click **Allow…** and accept the macOS prompt. That is what records your voice.
-2. **Allow Accessibility.** Click **Open System Settings…**; System Settings opens on the Accessibility list; switch Pladder on. That is what lets Pladder see the push-to-talk key in other apps, paste the result, and notice when you correct a word it got wrong. It does not need Input Monitoring.
+2. **Allow Accessibility.** Click **Allow…**, then **Open System Settings** in the alert; System Settings opens on the Accessibility list; switch Pladder on. That is what lets Pladder see the push-to-talk key in other apps, paste the result, and notice when you correct a word it got wrong. It does not need Input Monitoring.
 
    On a standard (non-administrator) account, ticking that box asks for an administrator password, so ask an admin to do it once — the grant is keyed to the app's code signature and survives updates. Without it Pladder still works in a reduced form: Option+Space works the same, any combination with a regular key can be recorded in Settings (a modifier-only key such as Right Command needs Accessibility, and Option+Space stands in for it until then), and the transcript is left on the clipboard for you to paste with ⌘V. Managed Macs can pre-approve Accessibility for Pladder with an MDM Privacy Preferences Policy Control (PPPC) profile, which needs no prompt at all.
 

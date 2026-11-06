@@ -76,6 +76,7 @@ struct LevelBars: View {
     let count: Int
     let maxHeight: CGFloat
     let opacity: Double
+    var color: Color = .primary
 
     private static let minScale: CGFloat = 0.1
 
@@ -83,11 +84,12 @@ struct LevelBars: View {
     @State private var heights: [CGFloat]
 
     // `seeded` pre-rolls the meter, so a replica that never sees a level shows a wave.
-    init(level: Float, count: Int, maxHeight: CGFloat, opacity: Double, seeded: Bool = false) {
+    init(level: Float, count: Int, maxHeight: CGFloat, opacity: Double, seeded: Bool = false, color: Color = .primary) {
         self.level = level
         self.count = count
         self.maxHeight = maxHeight
         self.opacity = opacity
+        self.color = color
 
         var meter = WaveformMeter(count: count)
         var initial = Array(repeating: Self.minScale, count: count)
@@ -104,7 +106,7 @@ struct LevelBars: View {
         HStack(alignment: .center, spacing: PillMetrics.barSpacing) {
             ForEach(0..<count, id: \.self) { index in
                 Capsule()
-                    .fill(Color.primary.opacity(opacity))
+                    .fill(color.opacity(opacity))
                     .frame(width: PillMetrics.barWidth, height: max(PillMetrics.barWidth, heights[index] * maxHeight))
             }
         }

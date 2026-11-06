@@ -26,7 +26,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ctrl"
+            "value": "Control"
           }
         }
       }
@@ -326,7 +326,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Linke Ctrl-Taste"
+            "value": "Linke Control-Taste"
           }
         }
       }
@@ -446,7 +446,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rechte Ctrl-Taste"
+            "value": "Rechte Control-Taste"
           }
         }
       }
