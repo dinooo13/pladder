@@ -31,6 +31,29 @@ enum Screenshots {
 
         // `--hero`: the site's hero picture, the real pill over a plain chat window, on the
         // site's own background so the glass samples what the visitor will see around it.
+        // `--settings-scene`: the app's real Settings window, toolbar and key window included,
+        // one capture per tab, light and dark.
+        if CommandLine.arguments.contains("--settings-scene") {
+            await captureSettingsScene(into: directory)
+            NSApp.terminate(nil)
+            return
+        }
+
+        // `--hero-frames`: the keyframes of the site's hero loop, and their durations.
+        if CommandLine.arguments.contains("--hero-frames") {
+            for scheme in [ColorScheme.light, .dark] {
+                let suffix = scheme == .dark ? "dark" : "light"
+                for frame in HeroLoop.frames {
+                    await capture(HeroFigure(composer: frame.composer, pill: frame.pill), size: HeroFigure.size,
+                                  scheme: scheme, to: directory.appending(path: "\(frame.name)-\(suffix).png"), opaque: true)
+                }
+            }
+            let durations = HeroLoop.frames.map { "\($0.name) \($0.seconds)" }.joined(separator: "\n")
+            try? durations.write(to: directory.appending(path: "durations.txt"), atomically: true, encoding: .utf8)
+            NSApp.terminate(nil)
+            return
+        }
+
         if CommandLine.arguments.contains("--hero") {
             for scheme in [ColorScheme.light, .dark] {
                 let suffix = scheme == .dark ? "dark" : "light"
@@ -104,6 +127,32 @@ enum Screenshots {
         try? await Task.sleep(for: .milliseconds(300))
         capture(window: window, to: url)
         window.orderOut(nil)
+    }
+
+    // Opens the Settings scene the way the menu does, from a SwiftUI view's `openSettings`,
+    // then picks each tab through `SettingsView.requestedTab`.
+    private static func captureSettingsScene(into directory: URL) async {
+        let opener = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1, height: 1), styleMask: [.borderless],
+                              backing: .buffered, defer: false)
+        opener.isReleasedWhenClosed = false
+        opener.contentView = NSHostingView(rootView: SettingsOpener())
+        opener.orderFrontRegardless()
+        try? await Task.sleep(for: .seconds(1.5))
+        guard let window = NSApp.windows.first(where: { $0.isVisible && $0.styleMask.contains(.titled) }) else {
+            print("screenshots: no Settings window")
+            return
+        }
+        for (scheme, suffix) in [(NSAppearance.Name.aqua, "light"), (.darkAqua, "dark")] {
+            NSApp.appearance = NSAppearance(named: scheme)
+            for (tab, name) in [(SettingsTab.general, "general"), (.text, "text"), (.dictionary, "dictionary")] {
+                SettingsView.requestedTab = tab
+                NSApp.activate(ignoringOtherApps: true)
+                window.makeKeyAndOrderFront(nil)
+                try? await Task.sleep(for: .seconds(1))
+                capture(window: window, to: directory.appending(path: "scene-\(name)-\(suffix).png"))
+            }
+        }
+        NSApp.appearance = nil
     }
 
     // The child inherits the Screen Recording grant of the terminal that launched
@@ -245,12 +294,36 @@ private struct StylesFigure: View {
     }
 }
 
+struct HeroPill {
+    var partial: String?
+    var presentation: OverlayPresentation = .settled
+}
+
+// The site's hero loop, a dictation from press to paste: each frame is the real pill and
+// window in one state, and the site's video crossfades between them for these durations.
+private enum HeroLoop {
+    static let frames: [(name: String, seconds: Double, composer: String?, pill: HeroPill?)] = [
+        ("01-empty", 0.9, nil, nil),
+        ("02-disc", 0.12, nil, HeroPill(partial: nil, presentation: .flyingIn)),
+        ("03-listening", 0.5, nil, HeroPill(partial: nil)),
+        ("04-yes", 0.35, nil, HeroPill(partial: "yes, and")),
+        ("05-add", 0.35, nil, HeroPill(partial: "yes, and add a test")),
+        ("06-done", 0.6, nil, HeroPill(partial: "yes, and add a test for it")),
+        ("07-gather", 0.12, nil, HeroPill(partial: "yes, and add a test for it", presentation: .flyingOut)),
+        ("08-pasted", 2.2, "Yes, and add a test for it.", nil),
+    ]
+}
+
 // The site's hero: a chat with an agent while the reply is still being said, so the
 // prompt box waits with its cursor and the Live pill shows the words, as it is.
 private struct HeroFigure: View {
     static let size = CGSize(width: 580, height: 420)
     static let compactSize = CGSize(width: 350, height: 284)
     var compact = false
+    // What the prompt box holds: nil is its placeholder with the cursor.
+    var composer: String?
+    // The pill, or none: the default is the still picture's.
+    var pill: HeroPill? = HeroPill(partial: "yes, and add a test for it")
     @Environment(\.colorScheme) private var scheme
 
     // The site's --hero colours, so the picture has no edge on the page.
@@ -262,14 +335,16 @@ private struct HeroFigure: View {
             window
                 .padding(.top, 16)
                 .padding(.horizontal, 20)
-            Pill(
-                state: .recording,
-                level: 0.6,
-                style: .liveTranscript,
-                partial: "yes, and add a test for it"
-            )
-            .scaleEffect(compact ? 0.8 : 1, anchor: .top)
-            .padding(.top, compact ? 224 : 348)
+            if let pill {
+                OverlayPill(
+                    state: .recording, level: 0.6, style: .liveTranscript, isPreview: true,
+                    partial: pill.partial, presentation: pill.presentation)
+                    .fixedSize()
+                    .compositingGroup()
+                    .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
+                    .scaleEffect(compact ? 0.8 : 1, anchor: .top)
+                    .padding(.top, compact ? 224 : 348)
+            }
         }
     }
 
@@ -294,22 +369,25 @@ private struct HeroFigure: View {
                     .background(.quaternary, in: RoundedRectangle(cornerRadius: 14))
                     .frame(maxWidth: .infinity, alignment: .trailing)
                 if !compact {
-                    (Text(verbatim: "It’s only kept in memory. Save it to ")
-                        + Text(verbatim: "UserDefaults").font(.system(size: 12, design: .monospaced))
-                        + Text(verbatim: "?"))
+                    Text("It’s only kept in memory. Save it to \(Text(verbatim: "UserDefaults").font(.system(size: 12, design: .monospaced)))?")
                         .foregroundStyle(.primary)
                 }
                 Spacer(minLength: 0)
                 HStack(alignment: .bottom) {
                     HStack(spacing: 1) {
-                        Rectangle().fill(Color.accentColor).frame(width: 2, height: 17)
-                        Text(verbatim: "Reply…")
-                            .foregroundStyle(.tertiary)
+                        if let composer {
+                            Text(verbatim: composer)
+                            Rectangle().fill(Color.accentColor).frame(width: 2, height: 17)
+                        } else {
+                            Rectangle().fill(Color.accentColor).frame(width: 2, height: 17)
+                            Text(verbatim: "Reply…")
+                                .foregroundStyle(.tertiary)
+                        }
                     }
                     Spacer()
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.system(size: 24))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(composer == nil ? AnyShapeStyle(.tertiary) : AnyShapeStyle(Color.accentColor))
                 }
                 .padding(14)
                 .background(RoundedRectangle(cornerRadius: 14).fill(Color(nsColor: .textBackgroundColor)))
@@ -324,5 +402,16 @@ private struct HeroFigure: View {
         .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(.separator))
         // Small enough to fade out inside the picture, which would otherwise cut it off.
         .shadow(color: .black.opacity(0.10), radius: 10, y: 4)
+    }
+}
+
+private struct SettingsOpener: View {
+    @Environment(\.openSettings) private var openSettings
+
+    var body: some View {
+        Color.clear.task {
+            NSApp.activate(ignoringOtherApps: true)
+            openSettings()
+        }
     }
 }
