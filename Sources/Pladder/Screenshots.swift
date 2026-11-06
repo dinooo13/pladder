@@ -39,17 +39,9 @@ enum Screenshots {
             return
         }
 
-        // `--hero-frames`: the keyframes of the site's hero loop, and their durations.
-        if CommandLine.arguments.contains("--hero-frames") {
-            for scheme in [ColorScheme.light, .dark] {
-                let suffix = scheme == .dark ? "dark" : "light"
-                for frame in HeroLoop.frames {
-                    await capture(HeroFigure(composer: frame.composer, pill: frame.pill), size: HeroFigure.size,
-                                  scheme: scheme, to: directory.appending(path: "\(frame.name)-\(suffix).png"), opaque: true)
-                }
-            }
-            let durations = HeroLoop.frames.map { "\($0.name) \($0.seconds)" }.joined(separator: "\n")
-            try? durations.write(to: directory.appending(path: "durations.txt"), atomically: true, encoding: .utf8)
+        // `--hero-video`: the site's hero film, the real window and pill through one dictation.
+        if CommandLine.arguments.contains("--hero-video") {
+            await HeroRecording.run(into: directory)
             NSApp.terminate(nil)
             return
         }
@@ -299,24 +291,9 @@ struct HeroPill {
     var presentation: OverlayPresentation = .settled
 }
 
-// The site's hero loop, a dictation from press to paste: each frame is the real pill and
-// window in one state, and the site's video crossfades between them for these durations.
-private enum HeroLoop {
-    static let frames: [(name: String, seconds: Double, composer: String?, pill: HeroPill?)] = [
-        ("01-empty", 0.9, nil, nil),
-        ("02-disc", 0.12, nil, HeroPill(partial: nil, presentation: .flyingIn)),
-        ("03-listening", 0.5, nil, HeroPill(partial: nil)),
-        ("04-yes", 0.35, nil, HeroPill(partial: "yes, and")),
-        ("05-add", 0.35, nil, HeroPill(partial: "yes, and add a test")),
-        ("06-done", 0.6, nil, HeroPill(partial: "yes, and add a test for it")),
-        ("07-gather", 0.12, nil, HeroPill(partial: "yes, and add a test for it", presentation: .flyingOut)),
-        ("08-pasted", 2.2, "Yes, and add a test for it.", nil),
-    ]
-}
-
 // The site's hero: a chat with an agent while the reply is still being said, so the
 // prompt box waits with its cursor and the Live pill shows the words, as it is.
-private struct HeroFigure: View {
+struct HeroFigure: View {
     static let size = CGSize(width: 580, height: 420)
     static let compactSize = CGSize(width: 350, height: 284)
     var compact = false
@@ -324,6 +301,8 @@ private struct HeroFigure: View {
     var composer: String?
     // The pill, or none: the default is the still picture's.
     var pill: HeroPill? = HeroPill(partial: "yes, and add a test for it")
+    // Driven over time for the film; the stills leave it nil.
+    var scene: HeroScene?
     @Environment(\.colorScheme) private var scheme
 
     // The site's --hero colours, so the picture has no edge on the page.
@@ -335,7 +314,20 @@ private struct HeroFigure: View {
             window
                 .padding(.top, 16)
                 .padding(.horizontal, 20)
-            if let pill {
+            if let scene {
+                if scene.showsPill {
+                    // Not a replica: its dot, bars and settling words behave as on a real take.
+                    OverlayPill(
+                        state: .recording, level: scene.level, style: .liveTranscript,
+                        partial: scene.partial, presentation: scene.presentation)
+                        .fixedSize()
+                        .compositingGroup()
+                        .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
+                        .animation(OverlayMotion.morphAnimation, value: scene.presentation)
+                        .padding(.top, 348)
+                        .transition(.opacity.combined(with: .offset(y: 24)))
+                }
+            } else if let pill {
                 OverlayPill(
                     state: .recording, level: 0.6, style: .liveTranscript, isPreview: true,
                     partial: pill.partial, presentation: pill.presentation)
@@ -375,7 +367,7 @@ private struct HeroFigure: View {
                 Spacer(minLength: 0)
                 HStack(alignment: .bottom) {
                     HStack(spacing: 1) {
-                        if let composer {
+                        if let composer = scene?.composer ?? composer {
                             Text(verbatim: composer)
                             Rectangle().fill(Color.accentColor).frame(width: 2, height: 17)
                         } else {
@@ -387,7 +379,7 @@ private struct HeroFigure: View {
                     Spacer()
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.system(size: 24))
-                        .foregroundStyle(composer == nil ? AnyShapeStyle(.tertiary) : AnyShapeStyle(Color.accentColor))
+                        .foregroundStyle((scene?.composer ?? composer) == nil ? AnyShapeStyle(.tertiary) : AnyShapeStyle(Color.accentColor))
                 }
                 .padding(14)
                 .background(RoundedRectangle(cornerRadius: 14).fill(Color(nsColor: .textBackgroundColor)))
