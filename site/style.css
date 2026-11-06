@@ -552,7 +552,12 @@ td.us a { color: inherit; }
 /* Narrower screens */
 
 @media (max-width: 900px) {
-  .hero { grid-template-columns: 1fr; padding-top: 32px; }
+  /* One column: the headline, then the picture it is about, then the words and the
+     button, then the keys. The text block's children join the hero's grid to interleave. */
+  .hero { grid-template-columns: 1fr; padding-top: 32px; row-gap: 24px; }
+  .hero-text { display: contents; }
+  .hero h1 { order: -2; }
+  .visual { order: -1; margin-bottom: 8px; }
   .styles { grid-template-columns: repeat(2, 1fr); }
 }
 
