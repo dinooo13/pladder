@@ -166,7 +166,15 @@ kbd.key-v { min-width: 34px; min-height: 30px; align-items: center; justify-cont
 /* The film replaces the still only where motion is welcome and the screen is wide; the
    selectors carry .visual so they outrank the img rule above. */
 /* Behind the film until it paints: its own first frame, so it does not pop in. */
-.visual .film { display: none; width: 100%; height: auto; background: var(--bg) url("media/hero-film-first-light.jpg") center / cover no-repeat; }
+.visual .film { display: none; width: 100%; height: auto; background: var(--bg) url("media/hero-film-first-light.jpg") center / cover no-repeat;
+  /* Video decoders render the page colour a level or two off; the edge fades into the
+     page so that never shows as a box. */
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 10px, #000 calc(100% - 10px), transparent),
+    linear-gradient(to bottom, transparent, #000 10px, #000 calc(100% - 10px), transparent);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to right, transparent, #000 10px, #000 calc(100% - 10px), transparent),
+    linear-gradient(to bottom, transparent, #000 10px, #000 calc(100% - 10px), transparent);
+  mask-composite: intersect; }
 @media (prefers-color-scheme: dark) {
   .visual .film { background-image: url("media/hero-film-first-dark.jpg"); }
 }

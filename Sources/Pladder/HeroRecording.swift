@@ -100,7 +100,7 @@ final class HeroScene {
         await pause(OverlayMotion.flightDuration)
         let passes: [(Double, String?)] = [
             (0.45, nil), (0.4, "yes, and"), (0.4, "yes, and add a test that"),
-            (0.55, "yes, and add a test that flips it and relaunches"),
+            (0.55, "yes, and add a test that relaunches the app"),
         ]
         for (seconds, words) in passes {
             overlay.partialTranscript = words
@@ -109,7 +109,7 @@ final class HeroScene {
         // The release: the row gathers, the paste lands 0.2 s in, then the disc dives.
         overlay.presentation = .flyingOut
         await pause(0.2)
-        composer = "Yes, and add a test that flips it and relaunches."
+        composer = "Yes, and add a test that relaunches the app."
         await pause(OverlayMotion.morphDuration - 0.2)
         withAnimation(.easeIn(duration: OverlayMotion.flightDuration)) {
             pillOffset = 60

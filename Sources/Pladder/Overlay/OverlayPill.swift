@@ -62,6 +62,18 @@ struct OverlayPill: View {
 
     private var isCopied: Bool { state == .copied }
 
+    // Which row is up; an error's text changes with its failure, its row does not.
+    private var rowKey: Int {
+        switch phase {
+        case .empty: 0
+        case .recording: 1
+        case .transcribing: 2
+        case .polishing: 3
+        case .copied: 4
+        case .error: 5
+        }
+    }
+
     // An error and the clipboard hint carry text, which needs the Compact row's width.
     private var needsRow: Bool { isError || isCopied || style != .minimal }
 
@@ -98,6 +110,9 @@ struct OverlayPill: View {
                 .transition(contentHandover)
         } else {
             compactContent
+                // Each state its own view, so the clipboard hint replaces the bars rather than
+                // fading in over them while they fade out.
+                .id(rowKey)
                 .frame(minHeight: 32)
                 .padding(.horizontal, 18)
                 .padding(.vertical, 12)
