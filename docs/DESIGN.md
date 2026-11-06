@@ -140,7 +140,9 @@ one 16 px corner radius for its own boxes. No JavaScript and nothing from anothe
 
 The hero is T3 Code's chat drawn in HTML and CSS, with the Live pill over it: text, so
 it is sharp at any size and follows the visitor's light or dark mode. It fits its
-column whole; nothing runs off the page. The README's hero picture is rendered from
+column whole; nothing runs off the page. On one column (phones and narrow windows) the
+hero reads headline, picture, words and button, then the keys: the picture stays next
+to the claim it shows. The README's hero picture is rendered from
 the same markup, so the two never drift apart.
 
 ## Checking a change
