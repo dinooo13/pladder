@@ -21,52 +21,12 @@
         }
       }
     },
-    "%@ is part of the push-to-talk key, so it can never be pressed separately.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ gehört zur Sprechtaste und kann deshalb nie allein gedrückt werden."
-          }
-        }
-      }
-    },
-    "A single dot that turns into a level meter.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ein einzelner Punkt, der zur Pegelanzeige wird."
-          }
-        }
-      }
-    },
-    "A small pill with a level meter, above the Dock.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Eine kleine Kapsel mit Pegelanzeige, über dem Dock."
-          }
-        }
-      }
-    },
     "Accessibility": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
             "value": "Bedienungshilfen"
-          }
-        }
-      }
-    },
-    "Add Examples": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Beispiele hinzufügen"
           }
         }
       }
@@ -87,16 +47,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nach jedem Diktat ein Leerzeichen einfügen"
-          }
-        }
-      }
-    },
-    "Add a word Pladder keeps mishearing and what it should be.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Füge ein Wort hinzu, das Pladder immer wieder falsch versteht, und wie es heißen soll."
           }
         }
       }
@@ -381,16 +331,6 @@
         }
       }
     },
-    "For a dictation of one sentence up to ten words, such as a reply to an agent.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Für ein Diktat aus einem Satz mit bis zu zehn Wörtern, etwa eine Antwort an einen Agenten."
-          }
-        }
-      }
-    },
     "General": {
       "localizations": {
         "de": {
@@ -586,7 +526,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Andere Töne beim Aufnehmen stummschalten"
+            "value": "Andere Audiowiedergabe beim Aufnehmen stummschalten"
           }
         }
       }
@@ -607,16 +547,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Noch keine Wörter"
-          }
-        }
-      }
-    },
-    "Nothing on screen: the menu bar icon follows your voice. Errors still appear.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nichts auf dem Bildschirm: Das Symbol in der Menüleiste folgt deiner Stimme. Fehler erscheinen trotzdem."
           }
         }
       }
@@ -851,32 +781,12 @@
         }
       }
     },
-    "Short replies": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Kurze Antworten"
-          }
-        }
-      }
-    },
     "Shortcuts": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
             "value": "Kurzbefehle"
-          }
-        }
-      }
-    },
-    "Shows the words as you speak them.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Zeigt die Wörter, während du sie sprichst."
           }
         }
       }
@@ -1161,32 +1071,12 @@
         }
       }
     },
-    "“Run the tests” is pasted as “run the tests”. “I” and “API” keep theirs.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "„Tests starten“ wird als „tests starten“ eingefügt. „API“ behält seinen."
-          }
-        }
-      }
-    },
     "“Yes.” is pasted as “Yes”.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
             "value": "„Ja.“ wird als „Ja“ eingefügt."
-          }
-        }
-      }
-    },
-    "A one-time 700 MB download.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Einmaliger Download von 700 MB."
           }
         }
       }
@@ -1291,16 +1181,6 @@
         }
       }
     },
-    "Recommended. A one-time 600 MB download.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Empfohlen. Einmaliger Download von 600 MB."
-          }
-        }
-      }
-    },
     "Record Shortcut": {
       "localizations": {
         "de": {
@@ -1371,16 +1251,6 @@
         }
       }
     },
-    "A row with Heard as left empty fixes near misses of its word, such as a name that comes out nearly right.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Eine Zeile mit leerem „Gehört als“ korrigiert Beinahe-Treffer ihres Worts, etwa einen Namen, der fast richtig ankommt."
-          }
-        }
-      }
-    },
     "About Pladder": {
       "localizations": {
         "de": {
@@ -1411,16 +1281,6 @@
         }
       }
     },
-    "clode": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "clode"
-          }
-        }
-      }
-    },
     "Click into any text field, hold %@ and talk.": {
       "localizations": {
         "de": {
@@ -1447,16 +1307,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Das Sprachmodell konnte nicht geladen werden: %@"
-          }
-        }
-      }
-    },
-    "Dismiss All": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Alle ignorieren"
           }
         }
       }
@@ -1531,26 +1381,6 @@
         }
       }
     },
-    "Press while holding the talk key to press Return after pasting.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bei gehaltener Sprechtaste drücken, dann wird nach dem Einfügen Return gedrückt, also gesendet."
-          }
-        }
-      }
-    },
-    "Something went wrong. Details are in the Pladder menu.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Etwas ist schiefgegangen. Details stehen im Pladder-Menü."
-          }
-        }
-      }
-    },
     "The connection to Hugging Face isn’t secure, so the download was stopped. Check the network, then try again.": {
       "localizations": {
         "de": {
@@ -1587,6 +1417,136 @@
           "stringUnit": {
             "state": "translated",
             "value": "Während der Aufnahme"
+          }
+        }
+      }
+    },
+    "%@ is part of the talk key, so it can never be pressed separately.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ gehört zur Sprechtaste und kann deshalb nie allein gedrückt werden."
+          }
+        }
+      }
+    },
+    "Add Word": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wort hinzufügen"
+          }
+        }
+      }
+    },
+    "Add a word Pladder keeps mishearing and what it should be, or a name it should learn.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Füge ein Wort hinzu, das Pladder immer wieder falsch versteht, und wie es heißen soll, oder einen Namen, den es lernen soll."
+          }
+        }
+      }
+    },
+    "Couldn’t load the speech model.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Sprachmodell konnte nicht gestartet werden."
+          }
+        }
+      }
+    },
+    "Most accurate. 600 MB.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Am genauesten. 600 MB."
+          }
+        }
+      }
+    },
+    "Output": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ausgabe"
+          }
+        }
+      }
+    },
+    "Press while talking to send the text with Return.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beim Sprechen drücken, um den Text mit der Eingabetaste zu senden."
+          }
+        }
+      }
+    },
+    "Something went wrong. Open the Pladder menu for details.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Etwas ist schiefgegangen. Details stehen im Pladder-Menü."
+          }
+        }
+      }
+    },
+    "The last two apply to a dictation of one sentence up to ten words, such as a reply to an agent.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die letzten beiden gelten für ein Diktat aus einem Satz mit bis zu zehn Wörtern, etwa eine Antwort an einen Agenten."
+          }
+        }
+      }
+    },
+    "The original Parakeet. 700 MB.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das ursprüngliche Parakeet. 700 MB."
+          }
+        }
+      }
+    },
+    "The speech model download stopped.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Download des Sprachmodells wurde unterbrochen."
+          }
+        }
+      }
+    },
+    "any close match": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ähnliche Wörter"
+          }
+        }
+      }
+    },
+    "“Run the tests” is pasted as “run the tests”. “I” and “API” keep their capital.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "„Mach weiter“ wird als „mach weiter“ eingefügt. „API“ behält seine Großbuchstaben."
           }
         }
       }

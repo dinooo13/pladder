@@ -17,6 +17,8 @@
   --key-line: #D4D4D8;
   --focus: #D9431F;
   --radius: 16px;
+  --tile-top: #323238;
+  --tile-bottom: #18181B;
   --text: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
@@ -32,6 +34,9 @@
     --key: #1F1F22;
     --key-line: #3F3F46;
     --focus: #FF8F73;
+    /* The mark's dark tile, lifted so it does not sink into the page. */
+    --tile-top: #45454C;
+    --tile-bottom: #2A2A2E;
   }
 }
 
@@ -76,7 +81,7 @@ del { text-decoration-thickness: 0.08em; color: var(--faint); }
 .skip:focus { top: 1rem; }
 
 /* SF Pro Display at these sizes; a little negative tracking, as Apple sets it. */
-h1, h2, h3 { margin: 0; font-weight: 600; line-height: 1.1; text-wrap: balance; }
+h1, h2, h3 { margin: 0; font-weight: 600; line-height: 1.1; letter-spacing: -0.01em; text-wrap: balance; }
 h2 { font-size: clamp(30px, 3.4vw, 44px); margin-bottom: 16px; }
 
 .btn {
@@ -144,7 +149,7 @@ kbd.key-v { min-width: 34px; min-height: 30px; align-items: center; justify-cont
   gap: 40px 48px;
 }
 .hero-text { display: flex; flex-direction: column; gap: 24px; }
-.hero h1 { font-size: clamp(44px, 5vw, 64px); line-height: 1.04; letter-spacing: -0.005em; }
+.hero h1 { font-size: clamp(44px, 5vw, 64px); line-height: 1.04; }
 .intro { font-size: 19px; line-height: 1.55; color: var(--muted); max-width: 30em; }
 .intro a { color: var(--ink); }
 .get { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
@@ -166,7 +171,13 @@ kbd.key-v { min-width: 34px; min-height: 30px; align-items: center; justify-cont
 .lede { font-size: 19px; color: var(--muted); max-width: 36em; margin-bottom: 32px; }
 .note { font-size: 15px; color: var(--muted); max-width: 44em; }
 .note a { color: var(--ink); }
-#speed .lede { margin-bottom: 16px; }
+/* The page's one large type: the measurement the product is about. */
+.figures { display: flex; flex-wrap: wrap; gap: 24px 64px; margin: 8px 0 28px; }
+.figures div { display: flex; flex-direction: column-reverse; justify-content: flex-end; gap: 6px; max-width: 18em; }
+.figures dd { font-size: clamp(56px, 7vw, 88px); font-weight: 600; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.figures dd a { text-decoration: none; }
+.figures dd a:hover { text-decoration: underline; text-decoration-thickness: 2px; }
+.figures dt { font-size: 15px; color: var(--muted); }
 
 .label { font-size: 14px; font-weight: 600; color: var(--muted); margin-bottom: 10px; }
 .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 16px; }
@@ -208,7 +219,7 @@ thead th.us { color: var(--ink); }
 tbody th { font-weight: 600; width: 24%; }
 tbody td { color: var(--muted); }
 th.us, td.us { background: var(--soft); }
-td.us { color: var(--ink); font-weight: 600; }
+td.us { color: var(--ink); }
 td.us a { color: inherit; }
 .fine { margin-top: 12px; font-size: 13px; color: var(--faint); max-width: 60em; }
 

@@ -10,12 +10,21 @@ extension UnavailableReason {
         switch self {
         case .starting: String(localized: "Starting…")
         case .loadingModel: String(localized: "Loading the speech model…")
-        case .engineFailed(let failure): failure.text
+        case .engineFailed(let failure): failure.headline
         }
     }
 }
 
 extension EngineFailure {
+    // One line for the menu, which does not wrap; `text` is the whole sentence.
+    var headline: String {
+        switch self {
+        case .download: String(localized: "The speech model download stopped.")
+        case .incompleteFiles: String(localized: "The speech model’s files are incomplete.")
+        case .loadFailed: String(localized: "Couldn’t load the speech model.")
+        }
+    }
+
     var text: String {
         switch self {
         case .download(let reason):
@@ -69,7 +78,7 @@ extension DictationFailure {
         switch self {
         case .microphone: String(localized: "Couldn’t use the microphone.")
         case .engineNotLoaded, .pasteKeystroke: text
-        case .other: String(localized: "Something went wrong. Details are in the Pladder menu.")
+        case .other: String(localized: "Something went wrong. Open the Pladder menu for details.")
         }
     }
 }
@@ -143,6 +152,7 @@ enum MenuStatus {
         case .transcribing: return String(localized: "Transcribing…")
         case .polishing: return String(localized: "Polishing…")
         case .inserting: return String(localized: "Pasting…")
+        // The menu is where the pill's short version sends the user, so it keeps the detail.
         case .error(let failure): return failure.text
         case .copied: return String(localized: "Copied. Press ⌘V to paste.")
         case .idle:
@@ -156,7 +166,7 @@ enum MenuStatus {
                 return String(localized: "Downloading the speech model…")
             case .loading: return String(localized: "Loading the speech model…")
             case .unloaded: return String(localized: "The speech model isn’t loaded.")
-            case .failed(let failure): return failure.text
+            case .failed(let failure): return failure.headline
             case .ready: return readyLine(chords)
             }
         }
@@ -228,7 +238,7 @@ extension HotkeyWarning {
         case .sendKeyNeedsAccessibility:
             String(localized: "The send key needs Accessibility.")
         case .sendKeyInsideChord(let key):
-            String(localized: "\(key.displayName) is part of the push-to-talk key, so it can never be pressed separately.")
+            String(localized: "\(key.displayName) is part of the talk key, so it can never be pressed separately.")
         }
     }
 }

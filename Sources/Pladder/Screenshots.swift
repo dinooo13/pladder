@@ -224,15 +224,18 @@ private struct StylesFigure: View {
             .padding(.horizontal, 14)
             .frame(width: 290, height: 28)
             .background(.ultraThinMaterial)
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text("Listening…").foregroundStyle(.secondary)
                 Divider()
+                Text("Copy Last Dictation")
+                Divider()
+                Text("About Pladder")
                 Text("Settings…")
                 Text("Quit Pladder")
             }
-            .font(.system(size: 13))
-            .padding(10)
-            .frame(width: 150, alignment: .leading)
+            .font(.system(size: 12))
+            .padding(9)
+            .frame(width: 160, alignment: .leading)
             .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 10))
             .padding(.trailing, 70)
         }
@@ -279,7 +282,6 @@ private struct HeroFigure: View {
             }
             .padding(.horizontal, 16)
             .frame(height: 44)
-            Divider()
             VStack(alignment: .leading, spacing: 16) {
                 Text(verbatim: "Why does dark mode reset?")
                     .padding(.horizontal, 14)
@@ -310,8 +312,9 @@ private struct HeroFigure: View {
             .padding(18)
         }
         .frame(height: 324)
-        .background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.separator))
+        // macOS 26 window corners.
+        .background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(.separator))
         // Small enough to fade out inside the picture, which would otherwise cut it off.
         .shadow(color: .black.opacity(0.10), radius: 10, y: 4)
     }

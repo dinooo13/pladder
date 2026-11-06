@@ -177,7 +177,7 @@ private struct ShortcutsSection: View {
                 )
             } label: {
                 Text("Send")
-                Text("Press while holding the talk key to press Return after pasting.")
+                Text("Press while talking to send the text with Return.")
             }
             if let warning = HotkeyWarning.forSendKey(
                 model.settings.submitKey, hotkey: model.settings.hotkey,
@@ -203,8 +203,6 @@ private struct OverlaySection: View {
             }
         } header: {
             Text("While recording")
-        } footer: {
-            Text(verbatim: model.settings.overlayStyle.summary)
         }
     }
 }
@@ -240,12 +238,4 @@ extension OverlayStyle {
         }
     }
 
-    var summary: String {
-        switch self {
-        case .compact: String(localized: "A small pill with a level meter, above the Dock.")
-        case .minimal: String(localized: "A single dot that turns into a level meter.")
-        case .liveTranscript: String(localized: "Shows the words as you speak them.")
-        case .menuBar: String(localized: "Nothing on screen: the menu bar icon follows your voice. Errors still appear.")
-        }
-    }
 }

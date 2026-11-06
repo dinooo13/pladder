@@ -120,8 +120,14 @@ private struct MenuContent: View {
     var body: some View {
         Text(model.statusLine)
 
-        if model.canRetryEngine {
-            Button(model.retryEngineTitle) { model.retryEngine() }
+        if let failure = model.engineFailure {
+            // The whole sentence as the subtitle: a menu does not wrap the status line.
+            Button {
+                model.retryEngine()
+            } label: {
+                Text(model.retryEngineTitle)
+                Text(failure.text)
+            }
         }
 
         // Right under the status: these are what stops dictation working.
@@ -151,11 +157,7 @@ private struct MenuContent: View {
                         model.corrections.accept(proposal)
                     }
                 }
-                if model.corrections.proposals.count == 1 {
-                    Button("Dismiss") { model.corrections.dismissAll() }
-                } else {
-                    Button("Dismiss All") { model.corrections.dismissAll() }
-                }
+                Button("Dismiss") { model.corrections.dismissAll() }
             }
         }
 

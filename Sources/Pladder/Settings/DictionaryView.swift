@@ -39,11 +39,8 @@ struct DictionaryView: View {
             } header: {
                 Text("Words and replacements")
             } footer: {
-                VStack(alignment: .leading, spacing: 6) {
-                    if !cyclicIDs.isEmpty {
-                        WarningLabel(String(localized: "Two rules undo each other, so both are ignored."))
-                    }
-                    Text("A row with Heard as left empty fixes near misses of its word, such as a name that comes out nearly right.")
+                if !cyclicIDs.isEmpty {
+                    WarningLabel(String(localized: "Two rules undo each other, so both are ignored."))
                 }
             }
         }
@@ -67,12 +64,12 @@ struct DictionaryView: View {
                 HStack(spacing: 4) {
                     if cyclicIDs.contains(row.wrappedValue.id) {
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
+                            .symbolRenderingMode(.multicolor)
                             .help("This rule undoes another one, so it is ignored.")
                     }
                     DictionaryField(
                         text: row.from,
-                        prompt: "clode",
+                        prompt: "any close match",
                         cell: DictionaryCell(id: row.wrappedValue.id, column: .from),
                         focus: $focusedCell
                     )
@@ -108,9 +105,9 @@ struct DictionaryView: View {
         ContentUnavailableView {
             Label("No Words Yet", systemImage: "character.book.closed")
         } description: {
-            Text("Add a word Pladder keeps mishearing and what it should be.")
+            Text("Add a word Pladder keeps mishearing and what it should be, or a name it should learn.")
         } actions: {
-            Button("Add Examples", action: addExamples)
+            Button("Add Word", action: addEntry)
         }
         .frame(maxWidth: .infinity, minHeight: 220)
     }
@@ -197,15 +194,6 @@ struct DictionaryView: View {
         focusedCell = nil
         model.settings.dictionary.removeAll { selection.contains($0.id) }
         selection.removeAll()
-    }
-
-    private func addExamples() {
-        merge([
-            DictionaryEntry(from: "claude code", to: "Claude Code"),
-            DictionaryEntry(from: "clode", to: "Claude"),
-            DictionaryEntry(from: "get hub", to: "GitHub"),
-            DictionaryEntry(from: "", to: "ChatGPT"),
-        ])
     }
 
     // MARK: Import and export

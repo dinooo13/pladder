@@ -48,9 +48,9 @@ struct HotkeyRecorderField: View {
             .frame(width: 136, height: 24)
             // The system fill, as a bordered control uses: a text-background well is a black
             // hole on the grouped form in dark mode.
-            .background(.fill.tertiary, in: Capsule())
+            .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 7))
             .overlay(
-                Capsule()
+                RoundedRectangle(cornerRadius: 8)
                     .strokeBorder(Color(nsColor: .keyboardFocusIndicatorColor), lineWidth: 3)
                     .padding(-2)
                     .opacity(recorder.isRecording ? 1 : 0)

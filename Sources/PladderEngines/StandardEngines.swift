@@ -6,14 +6,14 @@ public enum StandardEngines {
     public static let parakeet = EngineRegistry.Entry(
         id: FluidAudioIncrementalEngine.engineID,
         displayName: "Parakeet TDT v3",
-        detail: "A one-time 700 MB download.",
+        detail: "The original Parakeet. 700 MB.",
         make: { FluidAudioIncrementalEngine(model: .v3) }
     )
 
     public static let parakeetUltra = EngineRegistry.Entry(
         id: FluidAudioIncrementalEngine.ultraEngineID,
         displayName: "Parakeet Ultra",
-        detail: "Recommended. A one-time 600 MB download.",
+        detail: "Most accurate. 600 MB.",
         make: { FluidAudioIncrementalEngine(model: .ultra) }
     )
 
