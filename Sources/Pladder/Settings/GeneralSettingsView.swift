@@ -151,7 +151,7 @@ private struct ShortcutsSection: View {
             LabeledContent {
                 HotkeyRecorderField(
                     title: "Talk key",
-                    hint: "Hold to record, release to paste. Escape discards.",
+                    hint: String(localized: "Hold to record, release to paste. Escape discards."),
                     hotkey: $model.settings.hotkey,
                     setHotkeySuspended: model.setHotkeySuspended,
                     requiresRegularKey: model.hotkeys.hotkeyNeedsRegularKey,
@@ -169,7 +169,7 @@ private struct ShortcutsSection: View {
             LabeledContent {
                 HotkeyRecorderField(
                     title: "Hands-free key",
-                    hint: "Tap to start, tap again to paste.",
+                    hint: String(localized: "Tap to start, tap again to paste."),
                     hotkey: $model.settings.toggleHotkey,
                     setHotkeySuspended: model.setHotkeySuspended,
                     requiresRegularKey: model.hotkeys.hotkeyNeedsRegularKey,
@@ -189,7 +189,7 @@ private struct ShortcutsSection: View {
             LabeledContent {
                 HotkeyRecorderField(
                     title: "Send key",
-                    hint: "Press while talking to send the text with Return.",
+                    hint: String(localized: "Press while talking to send the text with Return."),
                     hotkey: $model.settings.submitKey,
                     setHotkeySuspended: model.setHotkeySuspended,
                     allowsEmpty: true

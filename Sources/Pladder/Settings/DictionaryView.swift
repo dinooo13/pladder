@@ -124,7 +124,6 @@ struct DictionaryView: View {
                     .frame(width: 20, height: 20)
             }
             .buttonStyle(.borderless)
-            .help("Add a rule")
             .accessibilityLabel("Add a rule")
 
             Button(action: removeSelected) {
@@ -133,7 +132,6 @@ struct DictionaryView: View {
             }
             .buttonStyle(.borderless)
             .disabled(selection.isEmpty)
-            .help("Remove the selected rules")
             .accessibilityLabel("Remove the selected rules")
 
             Spacer()

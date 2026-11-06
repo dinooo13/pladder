@@ -10,7 +10,7 @@ import SwiftUI
 struct HotkeyRecorderField: View {
     let title: LocalizedStringKey
     // The row's subtitle, so moving by control still hears what the key does.
-    var hint: LocalizedStringKey = ""
+    var hint: String = ""
     @Binding var hotkey: Hotkey
     var setHotkeySuspended: (Bool) -> Void
     // Without Accessibility a chord goes to Carbon, which needs one regular key, so a
@@ -34,7 +34,6 @@ struct HotkeyRecorderField: View {
                 }
                     .help(help)
                     .accessibilityLabel(title)
-                    .accessibilityHint(Text(hint))
                     .accessibilityValue(String(localized: "None"))
             } else {
                 field
@@ -100,7 +99,6 @@ struct HotkeyRecorderField: View {
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(title)
-            .accessibilityHint(Text(hint))
             .accessibilityAddTraits(.isButton)
             // After the element is formed, or the ignored children take the help with them.
             .help(help)
@@ -145,10 +143,12 @@ struct HotkeyRecorderField: View {
         return recorder.pending?.shortcutName ?? String(localized: "Type Shortcut")
     }
 
+    // On macOS a tooltip and an accessibility hint are one attribute, so this is both: what
+    // the key does, then how to change it, and while recording only how to finish.
     private var help: String {
-        recorder.isRecording
-            ? String(localized: "Press the keys to use. Escape cancels.")
-            : String(localized: "Click to record a new shortcut.")
+        if recorder.isRecording { return String(localized: "Press the keys to use. Escape cancels.") }
+        let change = String(localized: "Click to record a new shortcut.")
+        return hint.isEmpty ? change : hint + " " + change
     }
 }
 
