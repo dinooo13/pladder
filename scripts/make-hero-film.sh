@@ -22,9 +22,13 @@ swift build --product Pladder
 
 for scheme in light dark; do
   out="site/media/hero-film-$scheme"
-  ffmpeg -y -loglevel error -i "$FILMS/hero-film-$scheme.mov" -vf fps=30 \
-    -c:v libx264 -pix_fmt yuv420p -crf 20 -preset slow -movflags +faststart -an "$out.mp4"
-  ffmpeg -y -loglevel error -i "$out.mp4" -c:v libvpx-vp9 -pix_fmt yuv420p -crf 32 -b:v 0 -an "$out.webm"
+  # The last frame, the pasted reply, held for 0.9 s: the capture ends at the last change.
+  # Tagged BT.709, limited range, so browsers decode the page colour where it was.
+  ffmpeg -y -loglevel error -i "$FILMS/hero-film-$scheme.mov" -vf "fps=30,tpad=stop_mode=clone:stop_duration=0.9,scale=out_color_matrix=bt709:out_range=tv" \
+    -c:v libx264 -pix_fmt yuv420p -crf 20 -preset slow -movflags +faststart \
+    -colorspace bt709 -color_primaries bt709 -color_trc bt709 -color_range tv -an "$out.mp4"
+  ffmpeg -y -loglevel error -i "$out.mp4" -c:v libvpx-vp9 -pix_fmt yuv420p -crf 32 -b:v 0 \
+    -colorspace bt709 -color_primaries bt709 -color_trc bt709 -color_range tv -an "$out.webm"
   # Shown behind the film until it paints, so it does not pop in.
   ffmpeg -y -loglevel error -i "$out.mp4" -frames:v 1 -q:v 3 "site/media/hero-film-first-$scheme.jpg"
   echo "wrote $out.mp4 and $out.webm"

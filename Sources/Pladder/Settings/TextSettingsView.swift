@@ -45,6 +45,8 @@ struct TextSettingsView: View {
                     }
                     polishModelStatus
                 }
+            } header: {
+                Text("Polish")
             } footer: {
                 if model.settings.polishDictations {
                     Text(verbatim: model.settings.polishModel.summary)

@@ -29,7 +29,7 @@ struct PladderApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra(isInserted: .constant(!isDeveloperMode)) {
+        MenuBarExtra(isInserted: .constant(!isDeveloperMode || Screenshots.capturesMenu)) {
             MenuContent(model: model)
         } label: {
             MenuBarLabel(model: model)

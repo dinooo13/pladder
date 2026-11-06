@@ -178,19 +178,8 @@ private final class FilmWriter: NSObject, SCStreamOutput, @unchecked Sendable {
     func finish() async {
         await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
             queue.async {
-                // An unchanged window sends no frames, and a movie ends at its last sample, so
-                // the last frame is appended again at the end of the scene, on the capture's own
-                // host clock, to hold it there.
-                if let last = self.last {
-                    let end = CMClockGetTime(CMClockGetHostTimeClock())
-                    var timing = CMSampleTimingInfo(duration: .invalid, presentationTimeStamp: end, decodeTimeStamp: .invalid)
-                    var held: CMSampleBuffer?
-                    CMSampleBufferCreateCopyWithNewTiming(
-                        allocator: nil, sampleBuffer: last, sampleTimingEntryCount: 1,
-                        sampleTimingArray: &timing, sampleBufferOut: &held)
-                    if let held, self.input.isReadyForMoreMediaData { self.input.append(held) }
-                    self.writer.endSession(atSourceTime: end)
-                }
+                // The movie ends at the last change; make-hero-film.sh holds that frame.
+                if let last = self.last { self.writer.endSession(atSourceTime: last.presentationTimeStamp) }
                 self.input.markAsFinished()
                 self.writer.finishWriting { done.resume() }
             }
