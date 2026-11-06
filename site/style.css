@@ -161,16 +161,17 @@ kbd.key-v { min-width: 34px; min-height: 30px; align-items: center; justify-cont
 .keys { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
 .kgroup { display: inline-flex; align-items: center; gap: inherit; white-space: nowrap; }
 .visual { justify-self: end; width: 100%; max-width: 580px; }
-.visual img, .visual video { display: block; width: 100%; height: auto; }
-/* The loop replaces the still only where motion is welcome and the screen is wide. */
-.loop { display: none; }
+.visual img { display: block; width: 100%; height: auto; }
+/* The film replaces the still only where motion is welcome and the screen is wide; the
+   selectors carry .visual so they outrank the img rule above. */
+.visual .loop { display: none; width: 100%; height: auto; }
 @media (prefers-reduced-motion: no-preference) and (min-width: 641px) {
   .visual:has(.loop) picture { display: none; }
-  .loop-light { display: block; }
+  .visual .loop-light { display: block; }
 }
 @media (prefers-reduced-motion: no-preference) and (min-width: 641px) and (prefers-color-scheme: dark) {
-  .loop-light { display: none; }
-  .loop-dark { display: block; }
+  .visual .loop-light { display: none; }
+  .visual .loop-dark { display: block; }
 }
 
 /* Sections: plain text on one background, a hairline between them. */

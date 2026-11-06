@@ -176,8 +176,9 @@ struct OverlayPill: View {
             }
             // Grows with the words and never narrows within a take: a width that followed the
             // text both ways would jitter on every pass. The height follows the lines, one to three.
+            // Not animated: an animated step laid the new words out at the old width, one word
+            // short, and the step is rare enough that a snap reads as deliberate.
             .frame(width: hugsContent ? nil : Self.liveRowLead + liveTextWidth, alignment: .leading)
-            .animation(.smooth(duration: 0.2), value: liveTextWidth)
             .onChange(of: partial) { _, new in
                 widestText = max(widestText, LiveTranscriptMetrics.lineWidth(of: new ?? ""))
             }

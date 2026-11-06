@@ -80,12 +80,16 @@ struct HotkeyRecorderField: View {
                 RoundedRectangle(cornerRadius: 8)
                     .strokeBorder(Color(nsColor: .keyboardFocusIndicatorColor), lineWidth: 3)
                     .padding(-2)
-                    .opacity(recorder.isRecording ? 1 : 0)
+                    .opacity(recorder.isRecording || keyboardFocused ? 1 : 0)
             )
-            .contentShape(Rectangle())
+            .contentShape(RoundedRectangle(cornerRadius: 7))
             .onTapGesture { toggleRecording() }
-            // Full Keyboard Access: Tab reaches the field, Space starts recording.
-            .focusable(!recorder.isRecording)
+            // Reached by Tab only with Full Keyboard Access, like a button, so the window does
+            // not open with a ring on it and Space does not start recording by surprise. The
+            // ring is drawn here, rounded like the field, rather than the square system one.
+            .focusable(!recorder.isRecording, interactions: .activate)
+            .focusEffectDisabled()
+            .focused($keyboardFocused)
             .onKeyPress(keys: [.space, .return]) { _ in
                 guard !recorder.isRecording else { return .ignored }
                 toggleRecording()
@@ -98,6 +102,8 @@ struct HotkeyRecorderField: View {
             .accessibilityValue(recorder.isRecording ? String(localized: "Recording a shortcut") : hotkey.displayName)
             .accessibilityAction { toggleRecording() }
     }
+
+    @FocusState private var keyboardFocused: Bool
 
     private var isEmpty: Bool { hotkey.keyCodes.isEmpty }
     private var showsClear: Bool { allowsEmpty && !isEmpty && !recorder.isRecording }
