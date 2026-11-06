@@ -25,5 +25,7 @@ for scheme in light dark; do
   ffmpeg -y -loglevel error -i "$FILMS/hero-film-$scheme.mov" -vf fps=30 \
     -c:v libx264 -pix_fmt yuv420p -crf 20 -preset slow -movflags +faststart -an "$out.mp4"
   ffmpeg -y -loglevel error -i "$out.mp4" -c:v libvpx-vp9 -pix_fmt yuv420p -crf 32 -b:v 0 -an "$out.webm"
+  # Shown behind the film until it paints, so it does not pop in.
+  ffmpeg -y -loglevel error -i "$out.mp4" -frames:v 1 -q:v 3 "site/media/hero-film-first-$scheme.jpg"
   echo "wrote $out.mp4 and $out.webm"
 done

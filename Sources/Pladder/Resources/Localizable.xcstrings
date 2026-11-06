@@ -1571,16 +1571,6 @@
         }
       }
     },
-    "Click here, hold %@ and say hello": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hier klicken, %@ gedrückt halten und Hallo sagen"
-          }
-        }
-      }
-    },
     "Then click into any text field, hold %@ and talk.": {
       "localizations": {
         "de": {
@@ -1597,6 +1587,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Das funktioniert genauso in jeder App mit einem Textfeld."
+          }
+        }
+      }
+    },
+    "Hold %@ and say hello": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ gedrückt halten und „Hallo“ sagen"
           }
         }
       }

@@ -94,7 +94,7 @@ struct OverlayPill: View {
                 .padding(.vertical, 12)
                 .frame(minWidth: 140)
                 .opacity(gathering ? 0 : 1)
-                .animation(.easeOut(duration: OverlayMotion.morphDuration * 0.6), value: gathering)
+                .animation(.easeOut(duration: OverlayMotion.morphDuration * 0.3), value: gathering)
                 .transition(contentHandover)
         } else {
             compactContent
@@ -103,7 +103,7 @@ struct OverlayPill: View {
                 .padding(.vertical, 12)
                 .frame(minWidth: 140)
                 .opacity(gathering ? 0 : 1)
-                .animation(.easeOut(duration: OverlayMotion.morphDuration * 0.6), value: gathering)
+                .animation(.easeOut(duration: OverlayMotion.morphDuration * 0.3), value: gathering)
                 .transition(contentHandover)
         }
     }
