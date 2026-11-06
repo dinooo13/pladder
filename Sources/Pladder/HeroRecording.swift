@@ -6,7 +6,8 @@ import PladderCore
 
 // `--screenshots <dir> --hero-video`: the site's hero as a film of one dictation, the real
 // window and pill animating through it, recorded with ScreenCaptureKit from that one
-// window only, so nothing else on the screen is ever captured.
+// window only: the filter includes no other window and the frame is cropped to it, so
+// nothing else on the screen is ever captured.
 @MainActor
 enum HeroRecording {
     static func run(into directory: URL) async {
@@ -50,7 +51,19 @@ enum HeroRecording {
         config.showsCursor = false
         config.pixelFormat = kCVPixelFormatType_32BGRA
         let writer = try FilmWriter(url: url, width: config.width, height: config.height)
-        let stream = SCStream(filter: SCContentFilter(desktopIndependentWindow: target), configuration: config, delegate: nil)
+        // The display's composite, limited to this one window and cropped to it: a
+        // desktop-independent capture of the window missed the glass mid-morph, which the
+        // window server draws only on the composited screen.
+        guard let display = content.displays.first(where: { $0.frame.contains(window.frame.origin) }) ?? content.displays.first else {
+            throw CocoaError(.featureUnsupported)
+        }
+        let screenHeight = NSScreen.screens.first?.frame.height ?? display.frame.height
+        config.sourceRect = CGRect(
+            x: window.frame.minX - display.frame.minX,
+            y: screenHeight - window.frame.maxY - display.frame.minY,
+            width: size.width, height: size.height)
+        let filter = SCContentFilter(display: display, including: [target])
+        let stream = SCStream(filter: filter, configuration: config, delegate: nil)
         try stream.addStreamOutput(writer, type: .screen, sampleHandlerQueue: writer.queue)
         try await stream.startCapture()
         await scene.play()
@@ -59,36 +72,47 @@ enum HeroRecording {
     }
 }
 
-// One dictation, timed as the app times it: the pill appears after the 150 ms present
-// delay, the words arrive in passes, and the paste lands about 0.2 s after the release.
+// One dictation, timed as the app times it: the pill rises in, the words arrive in
+// passes, and at the release the row gathers into the disc while the reply is pasted
+// 0.2 s later, before the disc dives. The pill is the app's own `OverlayView` on its own
+// `OverlayModel`, so every morph and fade is the one the panel shows.
 @MainActor
 @Observable
 final class HeroScene {
     var composer: String?
-    var showsPill = false
-    var presentation: OverlayPresentation = .flyingIn
-    var partial: String?
-    var level: Float = 0
+    let overlay: OverlayModel = {
+        let model = OverlayModel()
+        model.style = .liveTranscript
+        model.presentation = .settled
+        return model
+    }()
+    // The panel's own motion, which the window stands in for: rising in, diving out.
+    var pillOffset: CGFloat = 24
+    var pillOpacity: Double = 0
 
     func play() async {
         await pause(0.4)
-        // The row rises in; the panel's flight from the screen's edge has no edge to come
-        // from in a picture of one window.
-        presentation = .settled
-        showsPill = true
+        overlay.state = .recording
+        withAnimation(.easeOut(duration: OverlayMotion.flightDuration)) {
+            pillOffset = 0
+            pillOpacity = 1
+        }
         await pause(OverlayMotion.flightDuration)
         let passes: [(Double, String?)] = [(0.55, nil), (0.45, "yes, and"), (0.45, "yes, and add a test"), (0.55, "yes, and add a test for it")]
         for (seconds, words) in passes {
-            partial = words
+            overlay.partialTranscript = words
             await speak(for: seconds)
         }
-        level = 0
-        presentation = .flyingOut
-        await pause(OverlayMotion.morphDuration)
-        showsPill = false
-        await pause(0.2 - OverlayMotion.morphDuration + 0.2)
+        // The release: the row gathers, the paste lands 0.2 s in, then the disc dives.
+        overlay.presentation = .flyingOut
+        await pause(0.2)
         composer = "Yes, and add a test for it."
-        await pause(1.2)
+        await pause(OverlayMotion.morphDuration - 0.2)
+        withAnimation(.easeIn(duration: OverlayMotion.flightDuration)) {
+            pillOffset = 60
+            pillOpacity = 0
+        }
+        await pause(OverlayMotion.flightDuration + 1.4)
     }
 
     // A speaking voice's level, so the bars move as they do on a real take.
@@ -96,7 +120,7 @@ final class HeroScene {
         let start = Date()
         var t = 0.0
         while Date().timeIntervalSince(start) < seconds {
-            level = Float(0.35 + 0.3 * abs(sin(t * 2.3)) + 0.15 * abs(sin(t * 7.1)))
+            overlay.level = Float(0.35 + 0.3 * abs(sin(t * 2.3)) + 0.15 * abs(sin(t * 7.1)))
             t += 0.05
             await pause(0.05)
         }

@@ -981,16 +981,6 @@
         }
       }
     },
-    "Click into any text field, hold %@ and talk.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "In ein Textfeld klicken, %@ gedrückt halten und sprechen."
-          }
-        }
-      }
-    },
     "Click to record a new shortcut.": {
       "localizations": {
         "de": {
@@ -1567,6 +1557,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "%1$lld %% von %2$lld MB"
+          }
+        }
+      }
+    },
+    "Try it": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ausprobieren"
+          }
+        }
+      }
+    },
+    "Click here, hold %@ and say hello": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hier klicken, %@ gedrückt halten und Hallo sagen"
+          }
+        }
+      }
+    },
+    "Then click into any text field, hold %@ and talk.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dann in ein Textfeld klicken, %@ gedrückt halten und sprechen."
+          }
+        }
+      }
+    },
+    "It works the same in every app with a text field.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das funktioniert genauso in jeder App mit einem Textfeld."
           }
         }
       }

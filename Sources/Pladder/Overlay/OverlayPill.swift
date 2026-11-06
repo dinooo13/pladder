@@ -22,12 +22,17 @@ struct OverlayPill: View {
 
     private var flying: Bool { presentation != .settled }
 
+    // The release: the row stays and fades while the capsule closes around it into the
+    // disc. Swapping in the disc's own view here left the capsule no width to shrink from,
+    // so the row vanished and a disc popped in.
+    private var gathering: Bool { presentation == .flyingOut && needsRow && state.isRecording }
+
     var body: some View {
         GlassEffectContainer(spacing: 14) {
             content
                 // In flight the pill is proposed the disc's width, at rest its own, animated with the
                 // same spring both ways, so contracting and expanding run at one rate.
-                .frame(width: flying ? Self.minimalDiameter : nil)
+                .frame(width: flying ? Self.minimalDiameter : nil, height: gathering ? Self.minimalDiameter : nil)
                 // What arrives inside fades in over the same span, so the row is faint while the
                 // capsule is small; the clip keeps it inside the capsule.
                 .clipShape(Capsule())
@@ -73,7 +78,7 @@ struct OverlayPill: View {
     private var content: some View {
         // Minimal shares the flying branch, so its bars and dot keep their identity, and
         // their state, across the arrival.
-        if flying || !needsRow {
+        if (flying && !gathering) || !needsRow {
             // A fixed square, so the disc never changes size between the dot, the wave and the
             // spinner.
             minimalContent
@@ -88,6 +93,8 @@ struct OverlayPill: View {
                 .padding(.horizontal, 18)
                 .padding(.vertical, 12)
                 .frame(minWidth: 140)
+                .opacity(gathering ? 0 : 1)
+                .animation(.easeOut(duration: OverlayMotion.morphDuration * 0.6), value: gathering)
                 .transition(contentHandover)
         } else {
             compactContent
@@ -95,6 +102,8 @@ struct OverlayPill: View {
                 .padding(.horizontal, 18)
                 .padding(.vertical, 12)
                 .frame(minWidth: 140)
+                .opacity(gathering ? 0 : 1)
+                .animation(.easeOut(duration: OverlayMotion.morphDuration * 0.6), value: gathering)
                 .transition(contentHandover)
         }
     }
@@ -196,15 +205,15 @@ struct OverlayPill: View {
 
     static var liveTextWidth: CGFloat { liveRowWidth - liveRowLead }
 
-    // In steps, never narrowing within a take: a third for "Listening…", two thirds from the
-    // first words, then the whole row. The capsule grows from its centre, so a width that
-    // followed every word would slide the words sideways on every pass; this way they move
-    // at most once.
+    // In steps, never narrowing within a take: a third, then the whole row. The capsule grows
+    // from its centre, so a width that followed every word would slide the words sideways on
+    // every pass.
     private var liveTextWidth: CGFloat {
         let needed = max(widestText, LiveTranscriptMetrics.lineWidth(of: partial ?? ""))
         let third = (Self.liveTextWidth / 3).rounded()
-        guard needed > 0 else { return third }
-        return needed <= third * 2 ? third * 2 : Self.liveTextWidth
+        // A reply that fits a third stays there; past it the row goes straight to its
+        // full width, so the words move at most once and a short reply has no empty glass.
+        return needed <= third ? third : Self.liveTextWidth
     }
 
     // Five 3 pt bars with 3 pt gaps are 27 × 20 pt, inside the disc with room to spare.

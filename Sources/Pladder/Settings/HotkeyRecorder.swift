@@ -28,7 +28,7 @@ struct HotkeyRecorderField: View {
             if isEmpty && !recorder.isRecording {
                 // The width on the label, so the bezel lines up with the recorded fields.
                 Button { toggleRecording() } label: {
-                    Text("Record Shortcut").frame(minWidth: 112)
+                    Text("Record Shortcut").frame(minWidth: Self.fieldWidth - 24)
                 }
                     .help(help)
                     .accessibilityLabel(title)
@@ -71,7 +71,7 @@ struct HotkeyRecorderField: View {
                 }
             }
             .padding(.horizontal, 8)
-            .frame(minWidth: 136, minHeight: 24)
+            .frame(minWidth: Self.fieldWidth, minHeight: 24)
             .fixedSize()
             // The system fill, as a bordered control uses: a text-background well is a black
             // hole on the grouped form in dark mode.
@@ -104,6 +104,15 @@ struct HotkeyRecorderField: View {
     }
 
     @FocusState private var keyboardFocused: Bool
+
+    // As wide as the Record Shortcut button in this language, so every field in the section
+    // shares one right edge and one width.
+    @MainActor static let fieldWidth: CGFloat = {
+        let label = NSAttributedString(
+            string: String(localized: "Record Shortcut"),
+            attributes: [.font: NSFont.systemFont(ofSize: NSFont.systemFontSize)])
+        return max(136, (label.size().width + 24 + 12).rounded(.up))
+    }()
 
     private var isEmpty: Bool { hotkey.keyCodes.isEmpty }
     private var showsClear: Bool { allowsEmpty && !isEmpty && !recorder.isRecording }
