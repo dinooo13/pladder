@@ -13,10 +13,7 @@ import Testing
 
     @Test func eachReactionFollowsOnlyItsOwnKeys() {
         #expect(change { $0.hotkey = .rightCommand } == SettingsChange(hotkey: true))
-        #expect(change { $0.appearance = .dark } == SettingsChange(appearance: true))
         #expect(change { $0.overlayStyle = .minimal } == SettingsChange(overlayStyle: true))
-        #expect(change { $0.overlayGlass.toggle() } == SettingsChange(overlayStyle: true))
-        #expect(change { $0.overlayAnimationSpeed = .instant } == SettingsChange(overlaySpeed: true))
         #expect(change { $0.polishModel = .s1Mini8Bit } == SettingsChange(polish: true))
         #expect(change { $0.polishDictations.toggle() } == SettingsChange(polish: true))
     }
@@ -31,9 +28,9 @@ import Testing
 
     @Test func editsTogetherRedoEachOfTheirReactions() {
         let both = change {
-            $0.appearance = .light
+            $0.overlayStyle = .minimal
             $0.polishModel = .s1Mini
         }
-        #expect(both == SettingsChange(appearance: true, polish: true))
+        #expect(both == SettingsChange(overlayStyle: true, polish: true))
     }
 }

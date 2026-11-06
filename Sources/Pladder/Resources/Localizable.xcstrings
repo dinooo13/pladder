@@ -31,22 +31,22 @@
         }
       }
     },
-    "A dictation of one sentence up to ten words is pasted without its first capital. “I” and words such as “API” keep theirs.": {
+    "A single dot that turns into a level meter.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ein Diktat aus einem Satz mit bis zu zehn Wörtern wird ohne Großbuchstaben am Anfang eingefügt. „I“ und Wörter wie „API“ behalten ihn."
+            "value": "Ein einzelner Punkt, der zur Pegelanzeige wird."
           }
         }
       }
     },
-    "A dictation of one sentence up to ten words, such as “Yes” or a command, is pasted without its final period.": {
+    "A small pill with a level meter, above the Dock.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ein Diktat aus einem Satz mit bis zu zehn Wörtern, etwa „Ja“ oder ein Befehl, wird ohne Schlusspunkt eingefügt."
+            "value": "Eine kleine Pille mit Pegelanzeige, über dem Dock."
           }
         }
       }
@@ -61,12 +61,12 @@
         }
       }
     },
-    "Add": {
+    "Add Examples": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Hinzufügen"
+            "value": "Beispiele hinzufügen"
           }
         }
       }
@@ -81,42 +81,112 @@
         }
       }
     },
-    "Add examples": {
+    "Add a space after each dictation": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Beispiele hinzufügen"
+            "value": "Nach jedem Diktat ein Leerzeichen einfügen"
           }
         }
       }
     },
-    "Animation": {
+    "Add a word Pladder keeps mishearing and what it should be.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Animation"
+            "value": "Füge ein Wort hinzu, das Pladder immer wieder falsch versteht, und wie es heißen soll."
           }
         }
       }
     },
-    "Appearance": {
+    "Add to Dictionary": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Erscheinungsbild"
+            "value": "Zum Wörterbuch hinzufügen"
           }
         }
       }
     },
-    "Append a space after each dictation": {
+    "Adds about half a second. A one-time 1.5 GB download from Hugging Face; trained on English, also handles German and Spanish.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nach jedem Diktat ein Leerzeichen anfügen"
+            "value": "Kostet etwa eine halbe Sekunde. Einmaliger Download von 1,5 GB von Hugging Face; auf Englisch trainiert, kann auch Deutsch und Spanisch."
+          }
+        }
+      }
+    },
+    "Adds about half a second. A one-time 805 MB download from Hugging Face; trained on English, also handles German and Spanish.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kostet etwa eine halbe Sekunde. Einmaliger Download von 805 MB von Hugging Face; auf Englisch trainiert, kann auch Deutsch und Spanisch."
+          }
+        }
+      }
+    },
+    "Allow Accessibility Access…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zugriff auf Bedienungshilfen erlauben …"
+          }
+        }
+      }
+    },
+    "Allow Microphone Access…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zugriff auf das Mikrofon erlauben …"
+          }
+        }
+      }
+    },
+    "Allow…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erlauben …"
+          }
+        }
+      }
+    },
+    "Apple Intelligence": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence"
+          }
+        }
+      }
+    },
+    "Apple Intelligence is off, so dictations paste as dictated. Turn it on in System Settings.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence ist aus, deshalb fügen Diktate den Text so ein, wie er diktiert wurde. Schalte es in den Systemeinstellungen ein."
+          }
+        }
+      }
+    },
+    "Apple Intelligence is unavailable, so dictations paste as dictated.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence ist nicht verfügbar, deshalb fügen Diktate den Text so ein, wie er diktiert wurde."
           }
         }
       }
@@ -131,32 +201,42 @@
         }
       }
     },
-    "Auto": {
+    "Beta": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Automatisch"
+            "value": "Beta"
           }
         }
       }
     },
-    "Background": {
+    "Built into macOS. Adds one to two seconds to each dictation.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Hintergrund"
+            "value": "In macOS eingebaut. Kostet ein bis zwei Sekunden pro Diktat."
           }
         }
       }
     },
-    "Chill": {
+    "Checking the download…": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Gemächlich"
+            "value": "Download wird geprüft…"
+          }
+        }
+      }
+    },
+    "Cleanup": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aufräumen"
           }
         }
       }
@@ -201,32 +281,72 @@
         }
       }
     },
-    "Could not create the paste keystroke. Try again, or restart Pladder.": {
+    "Copy Last Dictation": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Der Tastendruck zum Einfügen konnte nicht ausgelöst werden. Versuch es noch mal oder starte Pladder neu."
+            "value": "Letztes Diktat kopieren"
           }
         }
       }
     },
-    "Could not read that file. It should be a JSON array of { from, to, matchCase }.": {
+    "Couldn’t Export the Dictionary": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Die Datei konnte nicht gelesen werden. Erwartet wird ein JSON-Array aus { from, to, matchCase }."
+            "value": "Wörterbuch konnte nicht exportiert werden"
           }
         }
       }
     },
-    "Could not write that file: %@": {
+    "Couldn’t Import the Dictionary": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Die Datei konnte nicht gespeichert werden: %@"
+            "value": "Wörterbuch konnte nicht importiert werden"
+          }
+        }
+      }
+    },
+    "Couldn’t download the speech model: %@.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Sprachmodell konnte nicht geladen werden: %@."
+          }
+        }
+      }
+    },
+    "Couldn’t load the speech model: %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Sprachmodell konnte nicht gestartet werden: %@"
+          }
+        }
+      }
+    },
+    "Couldn’t paste. Try again, or restart Pladder.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einfügen fehlgeschlagen. Versuche es noch einmal oder starte Pladder neu."
+          }
+        }
+      }
+    },
+    "Couldn’t use the microphone: %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Mikrofon ist nicht verfügbar: %@"
           }
         }
       }
@@ -237,26 +357,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Eigene Wörter"
-          }
-        }
-      }
-    },
-    "Dark": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dunkel"
-          }
-        }
-      }
-    },
-    "Denied. Enable it in System Settings.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Abgelehnt. In den Systemeinstellungen aktivieren."
           }
         }
       }
@@ -281,42 +381,52 @@
         }
       }
     },
-    "Download failed: %@ (Retry resumes it)": {
+    "Downloading %@…": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Download fehlgeschlagen: %@ (Wiederholen setzt ihn fort)"
+            "value": "%@ wird geladen…"
           }
         }
       }
     },
-    "Each dictation runs through these in order before it is inserted.": {
+    "Downloading the speech model…": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Jedes Diktat läuft der Reihe nach durch diese Schritte, bevor es eingefügt wird."
+            "value": "Sprachmodell wird geladen …"
           }
         }
       }
     },
-    "Engine": {
+    "Downloading the speech model… %lld%%": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Engine"
+            "value": "Sprachmodell wird geladen … %lld %%"
           }
         }
       }
     },
-    "Error: %@": {
+    "Downloads when polish is on.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Fehler: %@"
+            "value": "Wird geladen, sobald „Diktate polieren“ an ist."
+          }
+        }
+      }
+    },
+    "Drops “uh”, “um” and “äh”.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entfernt „äh“, „ähm“ und „uh“."
           }
         }
       }
@@ -331,12 +441,22 @@
         }
       }
     },
-    "Flat": {
+    "Fixes self-corrections, lists and punctuation before pasting.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Flach"
+            "value": "Korrigiert Selbstkorrekturen, Listen und Satzzeichen vor dem Einfügen."
+          }
+        }
+      }
+    },
+    "For a dictation of one sentence up to ten words, such as a reply to an agent.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Für ein Diktat aus einem Satz mit bis zu zehn Wörtern, etwa eine Antwort an einen Agenten."
           }
         }
       }
@@ -351,42 +471,12 @@
         }
       }
     },
-    "Glass": {
+    "Hands-free": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Glas"
-          }
-        }
-      }
-    },
-    "Grant Accessibility…": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bedienungshilfen erlauben…"
-          }
-        }
-      }
-    },
-    "Grant Microphone…": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mikrofon erlauben…"
-          }
-        }
-      }
-    },
-    "Granted.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Erlaubt."
+            "value": "Freihändig"
           }
         }
       }
@@ -401,22 +491,62 @@
         }
       }
     },
-    "Hold to record, release to insert. Press the send key while recording and Return is pressed after the text. Click a field and press any key combination to assign it.": {
+    "Hold %@ to dictate": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Halten zum Aufnehmen, loslassen zum Einfügen. Drückst du während der Aufnahme die Sendetaste, wird nach dem Text Enter gedrückt. Klick auf ein Feld und drück eine Tastenkombination, um sie zuzuweisen."
+            "value": "%@ halten zum Diktieren"
           }
         }
       }
     },
-    "Hugging Face rate limit": {
+    "Hold %@ to dictate (Secure Keyboard Entry is on)": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rate-Limit bei Hugging Face"
+            "value": "%@ halten zum Diktieren (sichere Tastatureingabe ist an)"
+          }
+        }
+      }
+    },
+    "Hold %@ to dictate, then press ⌘V": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ halten zum Diktieren, dann ⌘V drücken"
+          }
+        }
+      }
+    },
+    "Hold to record, release to paste.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Halten zum Aufnehmen, loslassen zum Einfügen."
+          }
+        }
+      }
+    },
+    "Hold to record, release to paste. Escape discards a recording.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Halten zum Aufnehmen, loslassen zum Einfügen. Escape verwirft eine Aufnahme."
+          }
+        }
+      }
+    },
+    "Hugging Face is limiting downloads": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hugging Face begrenzt die Downloads"
           }
         }
       }
@@ -441,42 +571,22 @@
         }
       }
     },
+    "Import or export the dictionary": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wörterbuch importieren oder exportieren"
+          }
+        }
+      }
+    },
     "Import…": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
             "value": "Importieren…"
-          }
-        }
-      }
-    },
-    "Inserting…": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Einfügen…"
-          }
-        }
-      }
-    },
-    "Key": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Taste"
-          }
-        }
-      }
-    },
-    "Last: %@": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Zuletzt: %@"
           }
         }
       }
@@ -491,42 +601,32 @@
         }
       }
     },
-    "Learned “%@” → “%@”?": {
+    "Leave Heard as empty to teach a word, such as a name, that comes out nearly right.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "„%1$@“ → „%2$@“ ins Wörterbuch?"
+            "value": "Lass „Gehört als“ leer, um ein Wort wie einen Namen beizubringen, das fast richtig ankommt."
           }
         }
       }
     },
-    "Leave Heard as empty to list a word that should be repaired when it comes out nearly right.": {
+    "Lets Pladder paste for you. Without it, the text is copied and you press ⌘V.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lass „Gehört als“ leer, um ein Wort einzutragen, das korrigiert werden soll, wenn es fast richtig erkannt wird."
+            "value": "Damit fügt Pladder den Text für dich ein. Ohne wird er kopiert und du drückst ⌘V."
           }
         }
       }
     },
-    "Leave out the period after a short sentence": {
+    "Listening…": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kein Punkt nach einem kurzen Satz"
-          }
-        }
-      }
-    },
-    "Light": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hell"
+            "value": "Hört zu …"
           }
         }
       }
@@ -541,22 +641,12 @@
         }
       }
     },
-    "Loading model": {
+    "Loading the speech model…": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Modell lädt"
-          }
-        }
-      }
-    },
-    "Ludicrous": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Wahnsinnig"
+            "value": "Sprachmodell wird gestartet …"
           }
         }
       }
@@ -571,12 +661,12 @@
         }
       }
     },
-    "Menu": {
+    "Menu Bar": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Menü"
+            "value": "Menüleiste"
           }
         }
       }
@@ -591,16 +681,6 @@
         }
       }
     },
-    "Microphone: %@": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mikrofon: %@"
-          }
-        }
-      }
-    },
     "Minimal": {
       "localizations": {
         "de": {
@@ -611,122 +691,92 @@
         }
       }
     },
-    "Model could not be loaded: %@": {
+    "Model": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Modell konnte nicht geladen werden: %@"
+            "value": "Modell"
           }
         }
       }
     },
-    "Model failed: %@": {
+    "More": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Modellfehler: %@"
+            "value": "Mehr"
           }
         }
       }
     },
-    "Model files incomplete (Retry re-downloads them)": {
+    "Mute other audio while recording": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Modelldateien unvollständig (Wiederholen lädt sie neu)"
+            "value": "Andere Audiowiedergabe während der Aufnahme stummschalten"
           }
         }
       }
     },
-    "Model: downloading %lld%%": {
+    "NVIDIA’s Parakeet, on the Neural Engine. A one-time 700 MB download.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Modell: Download %lld %%"
+            "value": "Parakeet von NVIDIA, auf der Neural Engine. Einmaliger Download von 700 MB."
           }
         }
       }
     },
-    "Model: downloading…": {
+    "Needed to hear you. Nothing you say leaves this Mac.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Modell: Download…"
+            "value": "Nötig, um dich zu hören. Nichts, was du sagst, verlässt diesen Mac."
           }
         }
       }
     },
-    "Model: loading…": {
+    "No Words Yet": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Modell: wird geladen…"
+            "value": "Noch keine Wörter"
           }
         }
       }
     },
-    "Model: not loaded": {
+    "No capital": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Modell: nicht geladen"
+            "value": "Kein Großbuchstabe"
           }
         }
       }
     },
-    "Mute audio while dictating": {
+    "No period": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ton beim Diktieren stummschalten"
+            "value": "Kein Punkt"
           }
         }
       }
     },
-    "Moondream's post-training of Parakeet TDT v3 via FluidAudio: fewer misheard words at the same speed, runs on the Neural Engine. ~600 MB download on first use.": {
+    "Nothing on screen: the menu bar icon follows your voice. Errors still appear.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Moondreams Nachtraining von Parakeet TDT v3 über FluidAudio: weniger falsch verstandene Wörter bei gleicher Geschwindigkeit, läuft auf der Neural Engine. Beim ersten Start ca. 600 MB Download."
-          }
-        }
-      }
-    },
-    "NVIDIA Parakeet via FluidAudio, runs on the Neural Engine. ~700 MB download on first use.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "NVIDIA Parakeet über FluidAudio, läuft auf der Neural Engine. Beim ersten Start ca. 700 MB Download."
-          }
-        }
-      }
-    },
-    "Needed for a modifier-only key such as Right Command, for the send key and for pasting. Without it Option+Space still works and the text is copied for you to paste with ⌘V; a standard account needs an administrator to switch it on.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nötig für eine reine Sondertaste wie die rechte Befehlstaste, für die Sendetaste und fürs Einfügen. Ohne sie funktioniert Wahltaste + Leertaste weiterhin, der Text wird aber nur kopiert, du fügst ihn dann mit ⌘V ein. In einem Standardaccount muss ein Admin das einschalten."
-          }
-        }
-      }
-    },
-    "Not requested yet.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Noch nicht angefragt."
+            "value": "Nichts auf dem Bildschirm: Das Symbol in der Menüleiste folgt deiner Stimme. Fehler erscheinen trotzdem."
           }
         }
       }
@@ -761,22 +811,12 @@
         }
       }
     },
-    "Open Settings…": {
+    "Open System Settings…": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Einstellungen öffnen…"
-          }
-        }
-      }
-    },
-    "Output": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ausgabe"
+            "value": "Systemeinstellungen öffnen …"
           }
         }
       }
@@ -791,12 +831,72 @@
         }
       }
     },
+    "Paste and send": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einfügen und senden"
+          }
+        }
+      }
+    },
+    "Paste the replacement exactly as written, even at the start of a sentence.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Den Ersatz genau so einfügen, wie er geschrieben ist, auch am Satzanfang."
+          }
+        }
+      }
+    },
+    "Pasted as": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eingefügt als"
+          }
+        }
+      }
+    },
+    "Pasting…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wird eingefügt …"
+          }
+        }
+      }
+    },
     "Permissions": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
             "value": "Berechtigungen"
+          }
+        }
+      }
+    },
+    "Pladder": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pladder"
+          }
+        }
+      }
+    },
+    "Pladder %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pladder %@"
           }
         }
       }
@@ -811,6 +911,26 @@
         }
       }
     },
+    "Polish": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feinschliff"
+          }
+        }
+      }
+    },
+    "Polish with on-device AI": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feinschliff mit KI auf dem Mac"
+          }
+        }
+      }
+    },
     "Polishing…": {
       "localizations": {
         "de": {
@@ -821,12 +941,32 @@
         }
       }
     },
+    "Press it while recording and Return follows the text, to send a message or run a command.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Während der Aufnahme drücken, und nach dem Text folgt ein Zeilenumbruch, um eine Nachricht zu senden oder einen Befehl auszuführen."
+          }
+        }
+      }
+    },
     "Press keys…": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
             "value": "Tasten drücken…"
+          }
+        }
+      }
+    },
+    "Press once to start recording and again to paste. Set it to the push-to-talk key and a short tap starts hands-free while a hold works as before.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einmal drücken zum Aufnehmen, noch einmal zum Einfügen. Ist es dieselbe Taste wie zum Sprechen, startet ein kurzes Tippen freihändig, und Halten funktioniert wie bisher."
           }
         }
       }
@@ -871,42 +1011,12 @@
         }
       }
     },
-    "Processing": {
+    "Push to talk": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Verarbeitung"
-          }
-        }
-      }
-    },
-    "Processors": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Schritte"
-          }
-        }
-      }
-    },
-    "Push to Talk": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Push-to-Talk"
-          }
-        }
-      }
-    },
-    "Quick": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Flott"
+            "value": "Zum Sprechen halten"
           }
         }
       }
@@ -921,32 +1031,22 @@
         }
       }
     },
-    "Ready — hold %@": {
+    "Recommended. Parakeet v3 retrained by Moondream: a fifth fewer misheard words at the same speed. A one-time 600 MB download.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bereit — %@ halten"
+            "value": "Empfohlen. Parakeet v3, von Moondream nachtrainiert: ein Fünftel weniger falsch verstandene Wörter bei gleichem Tempo. Einmaliger Download von 600 MB."
           }
         }
       }
     },
-    "Ready — hold %@ (Accessibility is off)": {
+    "Recording a shortcut": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bereit — %@ halten (Bedienungshilfen sind aus)"
-          }
-        }
-      }
-    },
-    "Ready — hold %@ (Secure Keyboard Entry is on)": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bereit — %@ halten (Sichere Tastatureingabe ist an)"
+            "value": "Kurzbefehl wird aufgenommen"
           }
         }
       }
@@ -971,7 +1071,7 @@
         }
       }
     },
-    "Remove fillers": {
+    "Remove filler words": {
       "localizations": {
         "de": {
           "stringUnit": {
@@ -1011,22 +1111,32 @@
         }
       }
     },
-    "Retry Model Download": {
+    "S1-mini by Superwhisper": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Modell-Download wiederholen"
+            "value": "S1-mini von Superwhisper"
           }
         }
       }
     },
-    "Rules": {
+    "S1-mini by Superwhisper, 8-bit": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Regeln"
+            "value": "S1-mini von Superwhisper, 8 Bit"
+          }
+        }
+      }
+    },
+    "Say “comma”, “question mark” or “new paragraph” to type them.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sag „Komma“, „Fragezeichen“ oder „neuer Absatz“, um sie zu schreiben."
           }
         }
       }
@@ -1041,26 +1151,6 @@
         }
       }
     },
-    "Send key": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sendetaste"
-          }
-        }
-      }
-    },
-    "Separates consecutive dictations so pasted runs stay readable.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Damit aufeinanderfolgende Diktate nicht zusammenkleben."
-          }
-        }
-      }
-    },
     "Settings…": {
       "localizations": {
         "de": {
@@ -1071,72 +1161,82 @@
         }
       }
     },
-    "Shown while you dictate, flying up from the bottom edge as a circle and expanding into place. Menu relies on the wave in the menu bar alone; errors still appear.": {
+    "Short replies": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Wird beim Diktieren angezeigt: kommt als Kreis vom unteren Bildschirmrand hoch und faltet sich an Ort und Stelle auf. „Menü“ zeigt nur die Welle in der Menüleiste; Fehler erscheinen trotzdem."
+            "value": "Kurze Antworten"
           }
         }
       }
     },
-    "Sounds & Startup": {
+    "Shortcuts": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Töne & Start"
+            "value": "Kurzbefehle"
           }
         }
       }
     },
-    "Speech model is not loaded yet.": {
+    "Shows the words as you speak them.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Das Sprachmodell ist noch nicht geladen."
+            "value": "Zeigt die Wörter, während du sie sprichst."
           }
         }
       }
     },
-    "Start a short sentence in lowercase": {
+    "So the next dictation does not run into this one.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kurzen Satz klein beginnen"
+            "value": "Damit das nächste Diktat nicht an dieses anstößt."
           }
         }
       }
     },
-    "Starting": {
+    "Speech model": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Wird gestartet"
+            "value": "Sprachmodell"
           }
         }
       }
     },
-    "Strips hesitation sounds like “uh” and “um” from English, German and Spanish transcripts.": {
+    "Spoken punctuation": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Entfernt Füllwörter wie „äh“ und „ähm“ aus englischen, deutschen und spanischen Transkripten."
+            "value": "Gesprochene Satzzeichen"
           }
         }
       }
     },
-    "Style": {
+    "Starting…": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Stil"
+            "value": "Startet …"
+          }
+        }
+      }
+    },
+    "Suggested Corrections": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vorgeschlagene Korrekturen"
           }
         }
       }
@@ -1151,12 +1251,62 @@
         }
       }
     },
-    "Tap the toggle key to start recording and tap it again to insert. Set it to the same combination as the key and a short tap toggles while a hold still works as before. Escape discards a recording. Delete clears a field.": {
+    "Text": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tipp die Start/Stopp-Taste an, um die Aufnahme zu starten, und tipp sie noch mal an, um einzufügen. Gibst du ihr dieselbe Kombination wie der Taste, startet und stoppt ein kurzes Antippen, und Halten funktioniert wie bisher. Esc verwirft eine Aufnahme. Die Löschtaste leert ein Feld."
+            "value": "Text"
+          }
+        }
+      }
+    },
+    "The Apple Intelligence model is still downloading, so dictations paste as dictated for now.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Modell für Apple Intelligence wird noch geladen, deshalb fügen Diktate den Text vorerst so ein, wie er diktiert wurde."
+          }
+        }
+      }
+    },
+    "The download did not match the published model and was deleted, so dictations paste as dictated.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Download passte nicht zum veröffentlichten Modell und wurde gelöscht, Diktate werden deshalb unverändert eingefügt."
+          }
+        }
+      }
+    },
+    "The download stopped, so dictations paste as dictated.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Download wurde abgebrochen, Diktate werden deshalb unverändert eingefügt."
+          }
+        }
+      }
+    },
+    "The file should be a dictionary exported from Pladder.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Datei sollte ein aus Pladder exportiertes Wörterbuch sein."
+          }
+        }
+      }
+    },
+    "The model could not be saved, probably for lack of disk space, so dictations paste as dictated.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Modell konnte nicht gespeichert werden, vermutlich fehlt Speicherplatz. Diktate werden deshalb unverändert eingefügt."
           }
         }
       }
@@ -1167,6 +1317,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "Die Sendetaste braucht die Bedienungshilfen."
+          }
+        }
+      }
+    },
+    "The speech model isn’t loaded yet.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Sprachmodell ist noch nicht geladen."
+          }
+        }
+      }
+    },
+    "The speech model isn’t loaded.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Sprachmodell ist nicht geladen."
+          }
+        }
+      }
+    },
+    "The speech model’s files are incomplete.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Dateien des Sprachmodells sind unvollständig."
+          }
+        }
+      }
+    },
+    "This Mac cannot run Apple Intelligence, so dictations paste as dictated.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieser Mac kann Apple Intelligence nicht ausführen, deshalb fügen Diktate den Text so ein, wie er diktiert wurde."
           }
         }
       }
@@ -1191,16 +1381,6 @@
         }
       }
     },
-    "Toggle key": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Start/Stopp-Taste"
-          }
-        }
-      }
-    },
     "Transcribing…": {
       "localizations": {
         "de": {
@@ -1221,12 +1401,42 @@
         }
       }
     },
-    "Try a sentence": {
+    "Try Again": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Satz ausprobieren"
+            "value": "Erneut versuchen"
+          }
+        }
+      }
+    },
+    "Try it": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ausprobieren"
+          }
+        }
+      }
+    },
+    "Turned off for Pladder. Turn it on in System Settings to dictate.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Für Pladder ausgeschaltet. Schalte es in den Systemeinstellungen ein, um zu diktieren."
+          }
+        }
+      }
+    },
+    "Two rules undo each other, so both are ignored.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zwei Regeln heben sich auf und werden beide ignoriert."
           }
         }
       }
@@ -1237,16 +1447,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Gib einen Satz ein und sieh, was die Regeln daraus machen"
-          }
-        }
-      }
-    },
-    "Whole words only. Longer phrases win. Case is carried over at the start of a sentence unless Match case is on.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nur ganze Wörter. Längere Wendungen gewinnen. Am Satzanfang wird die Großschreibung übernommen, außer „Groß-/Kleinschreibung beachten“ ist an."
           }
         }
       }
@@ -1281,12 +1481,32 @@
         }
       }
     },
+    "Words and replacements": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wörter und Ersetzungen"
+          }
+        }
+      }
+    },
     "a file arrived damaged": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
             "value": "eine Datei kam beschädigt an"
+          }
+        }
+      }
+    },
+    "as you speak": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "beim Sprechen"
           }
         }
       }
@@ -1331,16 +1551,6 @@
         }
       }
     },
-    "see it as you speak": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "live mitlesen"
-          }
-        }
-      }
-    },
     "spoken form": {
       "localizations": {
         "de": {
@@ -1371,212 +1581,32 @@
         }
       }
     },
-    "⚠️ “a” → “b” and “b” → “a” undo each other; these rules are ignored.": {
+    "“%@” → “%@”": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "⚠️ „a“ → „b“ und „b“ → „a“ heben sich gegenseitig auf; diese Regeln werden ignoriert."
+            "value": "„%@“ → „%@“"
           }
         }
       }
     },
-    "Polish dictations": {
+    "“Run the tests” is pasted as “run the tests”. “I” and “API” keep theirs.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Diktate polieren"
+            "value": "„Tests starten“ wird als „tests starten“ eingefügt. „API“ behält seinen."
           }
         }
       }
     },
-    "Experimental": {
+    "“Yes.” is pasted as “Yes”.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Experimentell"
-          }
-        }
-      }
-    },
-    "Apple Intelligence is off, so dictations paste as dictated. Turn it on in System Settings.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Apple Intelligence ist aus, deshalb fügen Diktate den Text so ein, wie er diktiert wurde. Schalte es in den Systemeinstellungen ein."
-          }
-        }
-      }
-    },
-    "This Mac cannot run Apple Intelligence, so dictations paste as dictated.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dieser Mac kann Apple Intelligence nicht ausführen, deshalb fügen Diktate den Text so ein, wie er diktiert wurde."
-          }
-        }
-      }
-    },
-    "The Apple Intelligence model is still downloading, so dictations paste as dictated for now.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Das Modell für Apple Intelligence wird noch geladen, deshalb fügen Diktate den Text vorerst so ein, wie er diktiert wurde."
-          }
-        }
-      }
-    },
-    "Apple Intelligence is unavailable, so dictations paste as dictated.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Apple Intelligence ist nicht verfügbar, deshalb fügen Diktate den Text so ein, wie er diktiert wurde."
-          }
-        }
-      }
-    },
-    "Spoken punctuation": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gesprochene Satzzeichen"
-          }
-        }
-      }
-    },
-    "Turns spoken marks such as “comma”, “question mark” and “new paragraph” into the marks themselves, in English, German and Spanish.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Macht aus gesprochenen Zeichen wie „Komma“, „Fragezeichen“ und „neuer Absatz“ die Zeichen selbst, auf Englisch, Deutsch und Spanisch."
-          }
-        }
-      }
-    },
-    "Model": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Modell"
-          }
-        }
-      }
-    },
-    "Apple Intelligence": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Apple Intelligence"
-          }
-        }
-      }
-    },
-    "S1-mini by Superwhisper (1.5 GB)": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "S1-mini von Superwhisper (1,5 GB)"
-          }
-        }
-      }
-    },
-    "S1-mini by Superwhisper, 8-bit (805 MB)": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "S1-mini von Superwhisper, 8 Bit (805 MB)"
-          }
-        }
-      }
-    },
-    "Downloads when polish is on.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Wird geladen, sobald „Diktate polieren“ an ist."
-          }
-        }
-      }
-    },
-    "Downloading %@…": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ wird geladen…"
-          }
-        }
-      }
-    },
-    "Checking the download…": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Download wird geprüft…"
-          }
-        }
-      }
-    },
-    "Try Again": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Erneut versuchen"
-          }
-        }
-      }
-    },
-    "The download stopped, so dictations paste as dictated.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Der Download wurde abgebrochen, Diktate werden deshalb unverändert eingefügt."
-          }
-        }
-      }
-    },
-    "The download did not match the published model and was deleted, so dictations paste as dictated.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Der Download passte nicht zum veröffentlichten Modell und wurde gelöscht, Diktate werden deshalb unverändert eingefügt."
-          }
-        }
-      }
-    },
-    "The model could not be saved, probably for lack of disk space, so dictations paste as dictated.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Das Modell konnte nicht gespeichert werden, vermutlich fehlt Speicherplatz. Diktate werden deshalb unverändert eingefügt."
-          }
-        }
-      }
-    },
-    "Before the text is pasted, the model cleans it up on this Mac: self-corrections, spoken punctuation, lists. Apple Intelligence adds one to two seconds to every dictation, S1-mini by Superwhisper about half a second. S1-mini is trained on English, also handles German and Spanish, and is downloaded once from Hugging Face when you pick it. Anything a model cannot fix is pasted as dictated.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bevor der Text eingefügt wird, bereinigt ihn das Modell auf diesem Mac: Selbstkorrekturen, gesprochene Satzzeichen, Listen. Apple Intelligence braucht dafür ein bis zwei Sekunden pro Diktat, S1-mini von Superwhisper etwa eine halbe. S1-mini ist auf Englisch trainiert, kann auch Deutsch und Spanisch und wird einmalig von Hugging Face geladen, wenn du es auswählst. Was ein Modell nicht bereinigen kann, wird unverändert eingefügt."
+            "value": "„Ja.“ wird als „Ja“ eingefügt."
           }
         }
       }

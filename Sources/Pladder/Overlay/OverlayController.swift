@@ -7,6 +7,7 @@ import PladderSystem
 @MainActor
 final class OverlayController {
     private let coordinator: DictationCoordinator
+    private let reduceMotion: @MainActor () -> Bool
     private let model = OverlayModel()
     private lazy var panel = OverlayPanel(model: model)
 
@@ -27,8 +28,15 @@ final class OverlayController {
     // inside this, so a press the tracker will cancel never shows the pill.
     private static let presentDelay: Duration = .milliseconds(150)
 
-    init(coordinator: DictationCoordinator) {
+    // How long an error stays: long enough to read two lines.
+    private static let errorDuration: Duration = .seconds(4)
+
+    init(
+        coordinator: DictationCoordinator,
+        reduceMotion: @escaping @MainActor () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+    ) {
         self.coordinator = coordinator
+        self.reduceMotion = reduceMotion
     }
 
     func start() {
@@ -50,17 +58,8 @@ final class OverlayController {
         holdingDisc = false
     }
 
-    func applyAppearance(_ appearance: Appearance) {
-        model.appearance = appearance
-    }
-
-    func applyStyle(_ style: OverlayStyle, glass: Bool) {
+    func applyStyle(_ style: OverlayStyle) {
         model.style = style
-        model.glass = glass
-    }
-
-    func applySpeed(_ speed: OverlayAnimationSpeed) {
-        model.speed = speed
     }
 
     private func observe() {
@@ -110,10 +109,11 @@ final class OverlayController {
                 return
             }
             // A polish takes seconds: the pill stays up and says so until `.idle` dives it out.
+            // Named for the step that takes the time, so the label does not change twice.
             if coordinator.willPolish {
                 heldForPolish = true
                 model.partialTranscript = nil
-                model.state = .transcribing
+                model.state = .polishing
                 cancelHide()
                 return
             }
@@ -141,12 +141,14 @@ final class OverlayController {
             model.state = state
             cancelHide()
             present(flight: false)
-            scheduleHide(after: .seconds(2), flight: false)
+            if case .error(let failure) = state { announce(failure.text) }
+            scheduleHide(after: Self.errorDuration, flight: false)
         case .copied:
             // The coordinator holds `.copied` for its duration; the `.idle` branch hides it.
             model.state = state
             cancelHide()
             present(flight: false)
+            announce(String(localized: "Copied — press ⌘V"))
         case .idle, .unavailable:
             // The model is not updated: the pill leaves with what it showed. The clipboard hint
             // and a pill held for polish dive like a pasted dictation; a discard and an error fade.
@@ -166,8 +168,10 @@ final class OverlayController {
 
     // Errors and the clipboard hint skip the flight and fade in where the pill rests:
     // they must be immediate.
-    private func present(flight: Bool) {
+    private func present(flight requested: Bool) {
         guard !visible else { return }
+        // Reduce Motion: the pill fades in place, and so every exit fades too.
+        let flight = requested && !reduceMotion()
         visible = true
         holdingDisc = false
         if flight {
@@ -208,7 +212,8 @@ final class OverlayController {
         hideTask = nil
     }
 
-    private func scheduleHide(after delay: Duration, flight: Bool) {
+    private func scheduleHide(after delay: Duration, flight requested: Bool) {
+        let flight = requested && !reduceMotion()
         hideTask?.cancel()
         hideTask = Task { [weak self] in
             try? await Task.sleep(for: delay)
@@ -216,7 +221,7 @@ final class OverlayController {
             self.visible = false
             if flight {
                 self.model.presentation = .flyingOut
-                try? await Task.sleep(for: .seconds(self.model.speed.morphDuration))
+                try? await Task.sleep(for: .seconds(OverlayMotion.morphDuration))
                 guard !Task.isCancelled, !self.visible else { return }
                 // Nothing pasted yet (a cold engine, a release inside an engine pass), so the disc
                 // waits with a spinner until the `.idle` branch sends it down.
@@ -239,9 +244,20 @@ final class OverlayController {
 
     private func dive() async {
         panel.hide(flight: true)
-        try? await Task.sleep(for: .seconds(model.speed.flightDuration))
+        try? await Task.sleep(for: .seconds(OverlayMotion.flightDuration))
         guard !Task.isCancelled, !visible else { return }
         park()
+    }
+
+    // The pill ignores the mouse and never takes focus, so VoiceOver hears it only this way.
+    private func announce(_ text: String) {
+        NSAccessibility.post(
+            element: NSApp as Any,
+            notification: .announcementRequested,
+            userInfo: [
+                .announcement: text,
+                .priority: NSAccessibilityPriorityLevel.high.rawValue,
+            ])
     }
 
     // `OverlayPill` restarts the Minimal dot when the phase leaves `.recording`, so a model

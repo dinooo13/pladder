@@ -6,18 +6,13 @@ import PladderCore
 // what is drawn.
 enum PillMetrics {
     static let fontSize: CGFloat = 13
-    static let font = Font.system(size: fontSize, weight: .medium, design: .rounded)
-    @MainActor static let nsFont: NSFont = {
-        let base = NSFont.systemFont(ofSize: fontSize, weight: .medium)
-        guard let descriptor = base.fontDescriptor.withDesign(.rounded),
-              let rounded = NSFont(descriptor: descriptor, size: fontSize)
-        else { return base }
-        return rounded
-    }()
+    static let font = Font.system(size: fontSize, weight: .medium)
+    @MainActor static let nsFont = NSFont.systemFont(ofSize: fontSize, weight: .medium)
     static let rowSpacing: CGFloat = 10
     static let dotSize: CGFloat = 8
     static let barWidth: CGFloat = 3
     static let barSpacing: CGFloat = 3
+    static let barsHeight: CGFloat = 24
 
     static func barsWidth(count: Int) -> CGFloat {
         CGFloat(count) * barWidth + CGFloat(max(count - 1, 0)) * barSpacing
@@ -36,13 +31,13 @@ struct RecordingDot: View {
         Circle()
             .fill(Color.brandCoral)
             .frame(width: size, height: size)
-            .shadow(color: Color.brandCoral.opacity(0.6), radius: 4)
     }
 }
 
+// Glass only: Reduce Transparency already turns it opaque, so there is no switch of its own.
 struct PillBackground: ViewModifier {
-    let glass: Bool
     var namespace: Namespace.ID?
+    @Environment(\.colorSchemeContrast) private var contrast
 
     // One shape for row and disc: a capsule in a square is a circle, so the morph is only
     // the size. `AnyShape` cannot interpolate between two shape types; a `Circle` would snap.
@@ -50,7 +45,7 @@ struct PillBackground: ViewModifier {
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if glass {
+        Group {
             if let namespace {
                 content
                     .glassEffect(.regular, in: shape)
@@ -59,10 +54,12 @@ struct PillBackground: ViewModifier {
                 content
                     .glassEffect(.regular, in: shape)
             }
-        } else {
-            content
-                .background(Color(nsColor: .windowBackgroundColor), in: shape)
-                .overlay(shape.stroke(Color(nsColor: .separatorColor), lineWidth: 1))
+        }
+        // Increase Contrast: glass on a dark window otherwise has no edge at all.
+        .overlay {
+            if contrast == .increased {
+                shape.strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
+            }
         }
     }
 }

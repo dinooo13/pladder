@@ -22,8 +22,10 @@ enum MenuBarIcon {
             case .recording:
                 let amp = CGFloat(WaveformMeter.amplitude(for: level))
                 self = .recording(step: Int((amp * CGFloat(Self.levelSteps - 1)).rounded()))
+            // Starting, loading and the first download are work, not failure.
             case .transcribing, .polishing, .inserting: self = .busy
-            case .unavailable, .error: self = .off
+            case .unavailable(.starting), .unavailable(.loadingModel): self = .busy
+            case .unavailable(.engineFailed), .error: self = .off
             }
         }
     }

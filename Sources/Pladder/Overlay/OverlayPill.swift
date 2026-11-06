@@ -6,14 +6,13 @@ struct OverlayPill: View {
     let state: DictationState
     var level: Float = 0
     let style: OverlayStyle
-    let glass: Bool
     var isPreview: Bool = false
     var partial: String?
     var hugsContent: Bool = false
     // In flight, or off screen, the pill is always the Minimal disc; replicas never fly.
     var presentation: OverlayPresentation = .settled
-    var animationSpeed: OverlayAnimationSpeed = .quick
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace private var glassNamespace
     @State private var showDot = true
     @State private var pulsing = false
@@ -31,8 +30,8 @@ struct OverlayPill: View {
                 // What arrives inside fades in over the same span, so the row is faint while the
                 // capsule is small; the clip keeps it inside the capsule.
                 .clipShape(Capsule())
-                .animation(animationSpeed.morphAnimation, value: flying)
-                .modifier(PillBackground(glass: glass, namespace: glassNamespace))
+                .animation(OverlayMotion.morphAnimation, value: flying)
+                .modifier(PillBackground(namespace: glassNamespace))
         }
         .task(id: phase) {
             guard !isPreview else { return }
@@ -63,7 +62,7 @@ struct OverlayPill: View {
     // before the arriving one shows and nothing slides into a shrinking capsule.
     private var contentHandover: AnyTransition {
         .asymmetric(
-            insertion: .opacity.animation(animationSpeed.contentFade),
+            insertion: .opacity.animation(OverlayMotion.contentFade),
             removal: .opacity.animation(.easeOut(duration: 0.08))
         )
     }
@@ -104,7 +103,7 @@ struct OverlayPill: View {
         case .recording:
             HStack(spacing: PillMetrics.rowSpacing) {
                 RecordingDot()
-                LevelBars(level: level, count: 14, maxHeight: 32, opacity: 1, seeded: isPreview)
+                LevelBars(level: level, count: 14, maxHeight: PillMetrics.barsHeight, opacity: 1, seeded: isPreview)
             }
         case .transcribing:
             HStack(spacing: PillMetrics.rowSpacing) {
@@ -137,9 +136,10 @@ struct OverlayPill: View {
                 Text(failure.text)
                     .font(PillMetrics.font)
                     .foregroundStyle(.primary)
-                    .lineLimit(1)
+                    .lineLimit(2)
                     .truncationMode(.tail)
-                    .frame(maxWidth: 232)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 240, alignment: .leading)
             }
         case .inserting, .idle, .unavailable:
             Color.clear.frame(width: 100)
@@ -154,12 +154,20 @@ struct OverlayPill: View {
         case .recording:
             HStack(spacing: PillMetrics.rowSpacing) {
                 RecordingDot()
-                LevelBars(level: level, count: Self.liveBarCount, maxHeight: 24, opacity: 1, seeded: isPreview)
-                LiveTranscriptText(
-                    text: partial ?? "",
-                    hugs: hugsContent,
-                    width: hugsContent ? Self.previewTextWidth : Self.liveTextWidth
-                )
+                LevelBars(level: level, count: Self.liveBarCount, maxHeight: PillMetrics.barsHeight, opacity: 1, seeded: isPreview)
+                if let partial, !partial.isEmpty {
+                    LiveTranscriptText(
+                        text: partial,
+                        hugs: hugsContent,
+                        width: hugsContent ? Self.previewTextWidth : Self.liveTextWidth
+                    )
+                } else {
+                    // Until the first pass lands, so the wide capsule never reads as empty.
+                    Text("Listening…")
+                        .font(PillMetrics.font)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: hugsContent ? nil : .infinity, alignment: .leading)
+                }
             }
             // A width that followed the text would jitter on every pass; the height follows
             // the lines, one to three.
@@ -177,7 +185,7 @@ struct OverlayPill: View {
         + PillMetrics.barsWidth(count: liveBarCount) + PillMetrics.rowSpacing
 
     static var liveTextWidth: CGFloat { liveRowWidth - liveRowLead }
-    static let previewTextWidth: CGFloat = 62
+    static let previewTextWidth: CGFloat = 84
 
     // Five 3 pt bars with 3 pt gaps are 27 × 20 pt, inside the disc with room to spare.
     static let minimalDiameter: CGFloat = 44
@@ -193,7 +201,7 @@ struct OverlayPill: View {
                     RecordingDot()
                         .scaleEffect(pulsing && !needsRow ? 1.3 : 1.0)
                         .onAppear {
-                            guard !isPreview else { return }
+                            guard !isPreview, !reduceMotion else { return }
                             withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
                                 pulsing = true
                             }

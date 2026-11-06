@@ -27,7 +27,7 @@ public struct DictationSettings: Sendable, Equatable {
             dropPeriod: settings.shortSentenceWithoutPeriod, dropCapital: settings.shortSentenceWithoutCapital)
         muteOutputWhileDictating = settings.muteOutputWhileDictating
         liveTranscript = settings.overlayStyle == .liveTranscript
-        copiedHoldDuration = settings.overlayAnimationSpeed.copiedHoldDuration
+        copiedHoldDuration = .seconds(1)
     }
 
     public init(engineID: EngineID) {

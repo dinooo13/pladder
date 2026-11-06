@@ -23,17 +23,19 @@ This compiles a release build, wraps it into `Pladder.app`, signs it, copies it 
 
 ## First launch
 
-1. **Grant Microphone** when macOS asks. That is what records your voice.
-2. **Grant Accessibility** when prompted. System Settings opens on the Accessibility list; switch Pladder on. That is what lets Pladder see the push-to-talk key in other apps, paste the result, and notice when you correct a word it got wrong. It does not need Input Monitoring.
+Settings opens by itself the first time, with what Pladder still needs at the top and the speech model's download below it.
+
+1. **Allow the microphone.** Click **Allow…** and accept the macOS prompt. That is what records your voice.
+2. **Allow Accessibility.** Click **Open System Settings…**; System Settings opens on the Accessibility list; switch Pladder on. That is what lets Pladder see the push-to-talk key in other apps, paste the result, and notice when you correct a word it got wrong. It does not need Input Monitoring.
 
    On a standard (non-administrator) account, ticking that box asks for an administrator password, so ask an admin to do it once — the grant is keyed to the app's code signature and survives updates. Without it Pladder still works in a reduced form: Option+Space works the same, any combination with a regular key can be recorded in Settings (a modifier-only key such as Right Command needs Accessibility, and Option+Space stands in for it until then), and the transcript is left on the clipboard for you to paste with ⌘V. Managed Macs can pre-approve Accessibility for Pladder with an MDM Privacy Preferences Policy Control (PPPC) profile, which needs no prompt at all.
 
    Apple Intelligence, if it is on, powers learned corrections and, if you pick it, the experimental polish; nothing else needs it.
-3. **Wait for the model.** The first run downloads the Parakeet Ultra CoreML models from Hugging Face into `~/Library/Application Support/FluidAudio/Models` and compiles them. The menu bar icon shows progress, and the push-to-talk key is disabled until the engine is ready. This happens once; later launches load in well under a second.
+3. **Wait for the model.** The first run downloads the Parakeet Ultra CoreML models from Hugging Face into `~/Library/Application Support/FluidAudio/Models` and compiles them. Settings and the menu show the progress, the menu bar icon is dimmed meanwhile, and the push-to-talk key is disabled until the model is ready. This happens once; later launches load in well under a second.
 
 Then click into any text field, hold **Option+Space**, say something, and let go.
 
-If a permission was missed, the menu bar menu offers **Grant Accessibility…** and **Grant Microphone…**, and the General tab of Settings shows both with a one-click fix.
+If a permission was missed, the menu bar menu offers **Allow Accessibility Access…** and **Allow Microphone Access…** right under its status line, and the General tab of Settings lists what is missing at the top.
 
 ## Updating
 
@@ -152,7 +154,7 @@ The app icon is `Assets/AppIcon.icon`, an Icon Composer document; `bundle.sh` co
 ## Troubleshooting
 
 **The key does nothing.**
-Check the menu bar menu. If it says the model is loading or downloading, wait. If it offers **Grant Accessibility…**, the grant is missing; it is keyed to the code signature, so a rebuild with an ad-hoc signature resets it.
+Check the menu bar menu. If it says the model is loading or downloading, wait. If it offers **Allow Accessibility Access…**, the grant is missing; it is keyed to the code signature, so a rebuild with an ad-hoc signature resets it.
 
 **macOS asks for permissions after every build.**
 The app was signed ad-hoc. Install a development certificate so the signature stays stable; see [Signing](#signing). It also asks once after a move between an Apple Development and a Developer ID signature, such as from a self-built copy to the downloaded one.

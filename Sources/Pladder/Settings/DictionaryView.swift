@@ -14,7 +14,7 @@ struct DictionaryView: View {
 
     @State private var selection = Set<DictionaryEntry.ID>()
     @State private var sample = "i tried clode in claude code today"
-    @State private var errorMessage: String?
+    @State private var failure: FileFailure?
     @FocusState private var focusedCell: DictionaryCell?
 
     private var entries: [DictionaryEntry] { model.settings.dictionary }
@@ -29,29 +29,29 @@ struct DictionaryView: View {
                 table
                 toolbar
             } header: {
-                Text("Rules")
+                Text("Words and replacements")
             } footer: {
-                VStack(alignment: .leading, spacing: 4) {
-                    FootnoteText("Whole words only. Longer phrases win. Case is carried over at the start of a sentence unless Match case is on.")
-                    FootnoteText("Leave Heard as empty to list a word that should be repaired when it comes out nearly right.")
+                VStack(alignment: .leading, spacing: 6) {
                     if !cyclicIDs.isEmpty {
-                        FootnoteText("⚠️ \u{201c}a\u{201d} → \u{201c}b\u{201d} and \u{201c}b\u{201d} → \u{201c}a\u{201d} undo each other; these rules are ignored.")
+                        WarningLabel(String(localized: "Two rules undo each other, so both are ignored."))
                     }
+                    FootnoteText("Leave Heard as empty to teach a word, such as a name, that comes out nearly right.")
                 }
             }
 
-            Section("Try a sentence") {
+            Section("Try it") {
                 testArea
             }
         }
         .formStyle(.grouped)
         .alert(
-            "Dictionary",
-            isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })
-        ) {
-            Button("OK") { errorMessage = nil }
-        } message: {
-            Text(errorMessage ?? "")
+            failure?.title ?? "",
+            isPresented: Binding(get: { failure != nil }, set: { if !$0 { failure = nil } }),
+            presenting: failure
+        ) { _ in
+            Button("OK") { failure = nil }
+        } message: { failure in
+            Text(failure.message)
         }
     }
 
@@ -89,40 +89,66 @@ struct DictionaryView: View {
             TableColumn("Match case") { row in
                 Toggle("Match case", isOn: row.matchCase)
                     .labelsHidden()
+                    .help("Paste the replacement exactly as written, even at the start of a sentence.")
             }
             .width(76)
         }
         // An empty table otherwise paints striped placeholder rows, which reads as broken.
         .alternatingRowBackgrounds(.disabled)
+        .overlay {
+            if entries.isEmpty {
+                VStack(spacing: 8) {
+                    Text("No Words Yet")
+                        .font(.headline)
+                    Text("Add a word Pladder keeps mishearing and what it should be.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    Button("Add Examples", action: addExamples)
+                        .buttonStyle(.link)
+                }
+                .padding(.horizontal, 40)
+                .padding(.top, 24)
+            }
+        }
         .frame(minHeight: 220)
         .onDeleteCommand(perform: removeSelected)
     }
 
     // MARK: Toolbar
 
+    // The macOS list layout: add and remove at the leading edge, the rest in a menu.
     private var toolbar: some View {
-        HStack(spacing: 8) {
-            if entries.isEmpty {
-                Button("Add examples", action: addExamples)
-                    .buttonStyle(.link)
-            }
-
-            Spacer()
-
-            Button("Import…", action: importEntries)
-            Button("Export…", action: exportEntries)
-                .disabled(entries.isEmpty)
-
+        HStack(spacing: 4) {
             Button(action: addEntry) {
                 Image(systemName: "plus")
+                    .frame(width: 16, height: 16)
             }
             .help("Add a rule")
+            .accessibilityLabel("Add a rule")
 
             Button(action: removeSelected) {
                 Image(systemName: "minus")
+                    .frame(width: 16, height: 16)
             }
             .disabled(selection.isEmpty)
             .help("Remove the selected rules")
+            .accessibilityLabel("Remove the selected rules")
+
+            Spacer()
+
+            Menu {
+                Button("Import…", action: importEntries)
+                Button("Export…", action: exportEntries)
+                    .disabled(entries.isEmpty)
+            } label: {
+                Image(systemName: "ellipsis.circle")
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Import or export the dictionary")
+            .accessibilityLabel("More")
         }
         .controlSize(.small)
     }
@@ -134,12 +160,17 @@ struct DictionaryView: View {
             TextField("", text: $sample, prompt: Text("Type a sentence to see how the rules change it"))
                 .labelsHidden()
                 .textFieldStyle(.roundedBorder)
-            Text(testResult.isEmpty ? "—" : testResult)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
-                .lineLimit(2)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            Label {
+                Text(testResult.isEmpty ? "—" : testResult)
+                    .textSelection(.enabled)
+                    .lineLimit(2)
+            } icon: {
+                Image(systemName: "arrow.turn.down.right")
+                    .accessibilityLabel("Pasted as")
+            }
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -170,7 +201,7 @@ struct DictionaryView: View {
         merge([
             DictionaryEntry(from: "claude code", to: "Claude Code"),
             DictionaryEntry(from: "clode", to: "Claude"),
-            DictionaryEntry(from: "speak up", to: "Pladder"),
+            DictionaryEntry(from: "pull request", to: "PR"),
             DictionaryEntry(from: "", to: "ChatGPT"),
         ])
     }
@@ -187,7 +218,9 @@ struct DictionaryView: View {
             let data = try Data(contentsOf: url)
             merge(try JSONDecoder().decode([DictionaryEntry].self, from: data))
         } catch {
-            errorMessage = String(localized: "Could not read that file. It should be a JSON array of { from, to, matchCase }.")
+            failure = FileFailure(
+                title: String(localized: "Couldn’t Import the Dictionary"),
+                message: String(localized: "The file should be a dictionary exported from Pladder."))
         }
     }
 
@@ -201,13 +234,20 @@ struct DictionaryView: View {
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             try encoder.encode(entries).write(to: url, options: .atomic)
         } catch {
-            errorMessage = String(localized: "Could not write that file: \(error.localizedDescription)")
+            failure = FileFailure(
+                title: String(localized: "Couldn’t Export the Dictionary"),
+                message: error.localizedDescription)
         }
     }
 
     private func merge(_ incoming: [DictionaryEntry]) {
         model.settings.dictionary.merge(incoming)
     }
+}
+
+private struct FileFailure {
+    let title: String
+    let message: String
 }
 
 // Edits a draft and writes back on submit or focus loss, so typing does not save

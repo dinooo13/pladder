@@ -22,6 +22,9 @@ final class AppModel {
     private(set) var launchAtLoginError: String?
     // Can change behind the app's back in System Settings: re-read when settings open.
     private(set) var launchAtLoginEnabled = LaunchAtLogin.isEnabled
+    // No settings file yet: Settings opens once, with the permissions and the download in it.
+    @ObservationIgnored private(set) var isFirstLaunch: Bool
+    @ObservationIgnored private var started = false
 
     @ObservationIgnored private let store: SettingsStore
     @ObservationIgnored private let overlay: OverlayController
@@ -64,6 +67,7 @@ final class AppModel {
         self.registry = registry
 
         location.migrateLegacySettingsIfNeeded()
+        isFirstLaunch = !FileManager.default.fileExists(atPath: location.settingsURL.path)
         store = SettingsStore(url: location.settingsURL, defaults: Settings(engineID: StandardEngines.defaultEntry.id))
         // One read: the store moves an undecodable file aside on load, so a second read
         // could see different settings.
@@ -72,6 +76,8 @@ final class AppModel {
         if registry.entry(for: initial.engineID) == nil, let fallback = registry.available.first {
             initial.engineID = fallback.id
         }
+        // Only these have a switch any more; one left off by an older build would be stuck.
+        initial.disabledProcessors.formIntersection(StandardProcessors.switchable)
         storedSettings = initial
 
         let permissions = PermissionMonitor()
@@ -114,13 +120,22 @@ final class AppModel {
     // MARK: Lifecycle
 
     func start() {
-        applyAppearance(settings.appearance)
-        overlay.applyStyle(settings.overlayStyle, glass: settings.overlayGlass)
-        overlay.applySpeed(settings.overlayAnimationSpeed)
+        started = true
+        overlay.applyStyle(settings.overlayStyle)
         permissions.start()
         overlay.start()
         coordinator.start()
         polish.apply(model: settings.polishModel, polishing: settings.polishDictations)
+        // Written now, so only this launch counts as the first.
+        if isFirstLaunch { try? store.save(settings) }
+    }
+
+    // True once, on the first launch only, and never for the demo or the screenshots,
+    // which do not start the model.
+    func takeFirstLaunch() -> Bool {
+        guard started, isFirstLaunch else { return false }
+        isFirstLaunch = false
+        return true
     }
 
     func shutdown() async {
@@ -149,14 +164,8 @@ final class AppModel {
         let change = SettingsChange(from: old, to: settings)
         let monitor = change.hotkey ? hotkeys.hotkeyChanged(to: settings.hotkey) : nil
         coordinator.update(DictationSettings(settings), standInHotkey: hotkeys.standInHotkey, monitor: monitor)
-        if change.appearance {
-            applyAppearance(settings.appearance)
-        }
         if change.overlayStyle {
-            overlay.applyStyle(settings.overlayStyle, glass: settings.overlayGlass)
-        }
-        if change.overlaySpeed {
-            overlay.applySpeed(settings.overlayAnimationSpeed)
+            overlay.applyStyle(settings.overlayStyle)
         }
         if change.polish {
             polish.apply(model: settings.polishModel, polishing: settings.polishDictations)
@@ -166,11 +175,6 @@ final class AppModel {
         } catch {
             Self.settingsLog.error("could not save settings: \(error.localizedDescription, privacy: .public)")
         }
-    }
-
-    private func applyAppearance(_ appearance: Appearance) {
-        NSApp.appearance = appearance.nsAppearance
-        overlay.applyAppearance(appearance)
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {
@@ -264,15 +268,5 @@ final class AppModel {
 
     var lastTranscriptSummary: String? {
         coordinator.lastTranscript.flatMap { MenuStatus.summary(of: $0.text) }
-    }
-}
-
-extension Appearance {
-    var nsAppearance: NSAppearance? {
-        switch self {
-        case .system: nil
-        case .light: NSAppearance(named: .aqua)
-        case .dark: NSAppearance(named: .darkAqua)
-        }
     }
 }

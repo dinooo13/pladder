@@ -12,7 +12,7 @@
 # so it is safe to run while another Pladder is in use.
 #
 # Usage: scripts/overlay-demo.sh [dir] [--style compact|minimal|liveTranscript]
-#                                      [--speed instant|quick|expressive]
+#                                      [--reduce-motion]
 #        (default dir: /tmp/pladder-overlay-demo)
 set -euo pipefail
 

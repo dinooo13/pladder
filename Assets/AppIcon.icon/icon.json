@@ -3,8 +3,8 @@
     {
       "value" : {
         "linear-gradient" : [
-          "srgb:0.16863,0.18431,0.33333,1.00000",
-          "srgb:0.09020,0.09804,0.20000,1.00000"
+          "srgb:0.19608,0.19608,0.21961,1.00000",
+          "srgb:0.09412,0.09412,0.10588,1.00000"
         ],
         "orientation" : {
           "start" : {
@@ -22,8 +22,8 @@
       "appearance" : "dark",
       "value" : {
         "linear-gradient" : [
-          "srgb:0.14902,0.15294,0.18039,1.00000",
-          "srgb:0.06667,0.06667,0.08235,1.00000"
+          "srgb:0.15294,0.15294,0.16471,1.00000",
+          "srgb:0.06275,0.06275,0.07059,1.00000"
         ],
         "orientation" : {
           "start" : {
@@ -45,7 +45,20 @@
           "glass" : true,
           "image-name" : "caret.svg",
           "name" : "caret"
-        },
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "specular" : true,
+      "translucency" : {
+        "enabled" : false,
+        "value" : 0
+      }
+    },
+    {
+      "layers" : [
         {
           "glass" : true,
           "image-name" : "bars.svg",

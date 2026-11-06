@@ -25,7 +25,7 @@ Press the send key, V by default, at any point while you hold the push-to-talk k
 
 ### Toggle
 
-For a long dictation, record a toggle key in Settings: one tap starts a recording, the next tap inserts it. Give it the same combination as the push-to-talk key and that key does both: tap to start and tap again to insert, or hold and release as before. It is off by default, because a stray tap would otherwise leave the microphone open.
+For a long dictation, record a **Hands-free** key in Settings: one tap starts a recording, the next tap pastes it. Give it the same combination as the push-to-talk key and that key does both: tap to start and tap again to paste, or hold and release as before. It is off by default, because a stray tap would otherwise leave the microphone open.
 
 ### Escape
 
@@ -43,7 +43,7 @@ A dictionary turns what the model hears into what you meant. "clode code" become
 
 ### Learned corrections
 
-Correct a word by hand after a dictation and Pladder offers to remember it: a line in the menu reads "Learned “x” → “y”? Add / Dismiss". Nothing is added until you say so. The pair is checked on device first, so only a plausible mishearing is offered, and a change of case never is. This needs Accessibility and Apple Intelligence. Terminals show a screen rather than a text field, so nothing is learned there. What Pladder reads to notice a correction is in [PRIVACY.md](PRIVACY.md).
+Correct a word by hand after a dictation and Pladder offers to remember it: the menu lists it under Suggested Corrections as “x” → “y”, with **Add to Dictionary** and **Dismiss**. Nothing is added until you say so. The pair is checked on device first, so only a plausible mishearing is offered, and a change of case never is. This needs Accessibility and Apple Intelligence. Terminals show a screen rather than a text field, so nothing is learned there. What Pladder reads to notice a correction is in [PRIVACY.md](PRIVACY.md).
 
 ## Cleaning up the text
 
@@ -57,7 +57,7 @@ Say "comma" and get one. "Question mark", "new paragraph", German "Fragezeichen"
 
 ### Polish
 
-Turn on **Polish dictations** in Settings, Processing, and a small model cleans the transcript on your Mac before it is pasted: "wait, no, Friday" becomes "Friday", "first… second…" becomes a list. It is experimental and off by default, because it sits between letting go and the paste. Transcripts under four words are pasted as they are, and anything a model cannot fix is pasted as dictated.
+Turn on **Polish with on-device AI** in Settings, Text, and a small model cleans the transcript on your Mac before it is pasted: "wait, no, Friday" becomes "Friday", "first… second…" becomes a list. It is marked Beta and off by default, because it sits between letting go and the paste. Transcripts under four words are pasted as they are, and anything a model cannot fix is pasted as dictated.
 
 Pick the model below the toggle:
 
@@ -68,7 +68,7 @@ How the models compare is in [BENCHMARKS.md](BENCHMARKS.md).
 
 ## The pill
 
-A small pill at the bottom of the screen shows a red dot and a live level meter while you speak, and is gone the moment you let go; the pasted text is the confirmation. Only when transcription takes longer than usual — the first dictation after launch, say — does a spinner say so. It never takes focus from the app you are typing into. Show as much or as little of it as you like.
+A small pill just above the Dock shows a coral dot and a live level meter while you speak, and is gone the moment you let go; the pasted text is the confirmation. Only when transcription takes longer than usual — the first dictation after launch, say — does a spinner say so. It never takes focus from the app you are typing into. Show as much or as little of it as you like.
 
 <p align="center">
   <picture>
@@ -82,11 +82,11 @@ A small pill at the bottom of the screen shows a red dot and a live level meter 
 - **Live.** The words as they are recognised, while you are still speaking. The wider pill costs a little more of the chip than the others; the text it shows is only a preview, and what gets pasted is always the full recording.
 - **Menu Bar.** Nothing on the desktop at all. The wave in the menu bar is the only sign.
 
-Each comes in Liquid Glass or a flat fill, in light, dark or whatever the system is doing.
+Each is Liquid Glass in the system's light or dark appearance. With Reduce Motion on, the pill fades in and out instead of flying; with Reduce Transparency, the glass turns opaque.
 
 ## While you dictate
 
-Turn on **Mute audio while dictating** in Settings and music or a call is muted while you speak, so it does not end up in the microphone. It starts 200 ms into a recording, so a quick tap never touches the sound, and it leaves a device you had muted yourself alone. It is off by default.
+Turn on **Mute other audio while recording** in Settings and music or a call is muted while you speak, so it does not end up in the microphone. It starts 200 ms into a recording, so a quick tap never touches the sound, and it leaves a device you had muted yourself alone. It is off by default.
 
 ## Languages
 

@@ -15,6 +15,22 @@ enum Screenshots {
     static func run(into directory: URL) async {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
+        // `--settings`: each Settings tab, for reviewing the window without opening it.
+        if CommandLine.arguments.contains("--settings") {
+            let model = AppModel(location: .scratch)
+            for scheme in [ColorScheme.light, .dark] {
+                let suffix = scheme == .dark ? "dark" : "light"
+                await capture(GeneralSettingsView(model: model), size: CGSize(width: 540, height: 820), scheme: scheme,
+                              to: directory.appending(path: "settings-general-\(suffix).png"), opaque: true)
+                await capture(DictionaryView(model: model), size: CGSize(width: 540, height: 620), scheme: scheme,
+                              to: directory.appending(path: "settings-dictionary-\(suffix).png"), opaque: true)
+                await capture(TextSettingsView(model: model), size: CGSize(width: 540, height: 720), scheme: scheme,
+                              to: directory.appending(path: "settings-text-\(suffix).png"), opaque: true)
+            }
+            NSApp.terminate(nil)
+            return
+        }
+
         for scheme in [ColorScheme.light, .dark] {
             let suffix = scheme == .dark ? "dark" : "light"
             // Four tiles of 290 pt, 24 pt between them and 16 pt of padding either side.
@@ -25,15 +41,17 @@ enum Screenshots {
         NSApp.terminate(nil)
     }
 
-    private static func capture<Figure: View>(_ figure: Figure, size: CGSize, scheme: ColorScheme, to url: URL) async {
+    private static func capture<Figure: View>(
+        _ figure: Figure, size: CGSize, scheme: ColorScheme, to url: URL, opaque: Bool = false
+    ) async {
         let window = NSWindow(
             contentRect: NSRect(origin: .zero, size: size),
             styleMask: [.borderless],
             backing: .buffered,
             defer: false
         )
-        window.backgroundColor = .clear
-        window.isOpaque = false
+        window.backgroundColor = opaque ? .windowBackgroundColor : .clear
+        window.isOpaque = opaque
         window.hasShadow = false
         window.isReleasedWhenClosed = false
         window.level = .floating
@@ -70,29 +88,7 @@ enum Screenshots {
 // MARK: - Views
 
 private struct Wallpaper: View {
-    @Environment(\.colorScheme) private var scheme
-
-    var body: some View {
-        ZStack {
-            DesktopWash(scheme: scheme)
-            GeometryReader { proxy in
-                let w = proxy.size.width
-                let h = proxy.size.height
-                Circle()
-                    .fill(scheme == .dark ? Color(red: 0.55, green: 0.40, blue: 0.95) : Color.white)
-                    .opacity(scheme == .dark ? 0.35 : 0.45)
-                    .frame(width: w * 0.5)
-                    .blur(radius: w * 0.09)
-                    .position(x: w * 0.22, y: h * 0.15)
-                Circle()
-                    .fill(scheme == .dark ? Color(red: 0.20, green: 0.70, blue: 0.90) : Color(red: 0.95, green: 0.80, blue: 1.0))
-                    .opacity(0.35)
-                    .frame(width: w * 0.45)
-                    .blur(radius: w * 0.08)
-                    .position(x: w * 0.82, y: h * 0.95)
-            }
-        }
-    }
+    var body: some View { DesktopWash() }
 }
 
 private struct Pill: View {
@@ -103,7 +99,7 @@ private struct Pill: View {
     var partial: String?
 
     var body: some View {
-        OverlayPill(state: state, level: level, style: style, glass: true, isPreview: true, partial: partial)
+        OverlayPill(state: state, level: level, style: style, isPreview: true, partial: partial)
             // The proposed size would squeeze the glass but not the row inside it, so the pill
             // takes its own size and is scaled to fit.
             .fixedSize()
@@ -149,7 +145,7 @@ private struct StylesFigure: View {
                 .frame(width: 290, height: 190)
                 .clipShape(RoundedRectangle(cornerRadius: 16))
             Text(title)
-                .font(.system(size: 17, weight: .medium, design: .rounded))
+                .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(.primary)
         }
     }

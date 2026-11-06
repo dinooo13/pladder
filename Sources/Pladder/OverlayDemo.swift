@@ -32,21 +32,20 @@ enum OverlayDemo {
 
     static func run() async {
         let style = argument(after: "--style").flatMap(OverlayStyle.init(rawValue:)) ?? .compact
-        let speed = argument(after: "--speed").flatMap(OverlayAnimationSpeed.init(rawValue:)) ?? .quick
+        let reduceMotion = CommandLine.arguments.contains("--reduce-motion")
         // Room for the recording to start before the first pill.
         try? await Task.sleep(for: .seconds(1))
         for scenario in scenarios {
-            await play(scenario, style: style, speed: speed)
+            await play(scenario, style: style, reduceMotion: reduceMotion)
         }
         log("done")
         NSApp.terminate(nil)
     }
 
-    private static func play(_ scenario: Scenario, style: OverlayStyle, speed: OverlayAnimationSpeed) async {
+    private static func play(_ scenario: Scenario, style: OverlayStyle, reduceMotion: Bool) async {
         var settings = Settings(engineID: EchoEngine.engineID)
         settings.polishDictations = scenario.polish
         settings.overlayStyle = style
-        settings.overlayAnimationSpeed = speed
         let registry = EngineRegistry([
             .init(id: EchoEngine.engineID, displayName: "Echo", detail: "") {
                 EchoEngine(text: scenario.text, delay: scenario.engineDelay)
@@ -61,10 +60,8 @@ enum OverlayDemo {
             hotkeyMonitor: DemoHotkey(),
             makePipeline: { _ in ProcessorPipeline([]) }
         )
-        let overlay = OverlayController(coordinator: coordinator)
-        overlay.applyAppearance(.system)
-        overlay.applyStyle(style, glass: true)
-        overlay.applySpeed(speed)
+        let overlay = OverlayController(coordinator: coordinator, reduceMotion: { reduceMotion })
+        overlay.applyStyle(style)
         coordinator.start()
         overlay.start()
         while !coordinator.engineStatus.isReady {

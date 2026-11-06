@@ -1,24 +1,7 @@
 import Foundation
 
-public enum Appearance: String, Codable, Sendable, CaseIterable, Equatable {
-    case system, light, dark
-}
-
 public enum OverlayStyle: String, Codable, Sendable, CaseIterable, Equatable {
     case menuBar, minimal, compact, liveTranscript
-}
-
-public enum OverlayAnimationSpeed: String, Codable, Sendable, CaseIterable, Equatable {
-    case instant, quick, expressive
-
-    // Scales with the speed too: without Accessibility the hint follows every dictation.
-    public var copiedHoldDuration: Duration {
-        switch self {
-        case .instant: .milliseconds(700)
-        case .quick: .seconds(1)
-        case .expressive: .seconds(1.5)
-        }
-    }
 }
 
 public enum PolishModel: String, Codable, Sendable, CaseIterable, Equatable {
@@ -41,10 +24,7 @@ public struct Settings: Codable, Sendable, Equatable {
     public var shortSentenceWithoutCapital: Bool
     public var playSounds: Bool
     public var muteOutputWhileDictating: Bool
-    public var appearance: Appearance
     public var overlayStyle: OverlayStyle
-    public var overlayGlass: Bool
-    public var overlayAnimationSpeed: OverlayAnimationSpeed
 
     // The defaults, here and nowhere else: the decoder starts from them too.
     public init(engineID: EngineID) {
@@ -61,17 +41,14 @@ public struct Settings: Codable, Sendable, Equatable {
         shortSentenceWithoutCapital = false
         playSounds = true
         muteOutputWhileDictating = false
-        appearance = .system
         overlayStyle = .compact
-        overlayGlass = true
-        overlayAnimationSpeed = .quick
     }
 
     private enum CodingKeys: String, CodingKey {
         case engineID, hotkey, submitKey, polishDictations, polishModel, toggleHotkey
         case disabledProcessors, dictionary, appendTrailingSpace, shortSentenceWithoutPeriod, shortSentenceWithoutCapital
         case playSounds
-        case muteOutputWhileDictating, appearance, overlayStyle, overlayGlass, overlayAnimationSpeed
+        case muteOutputWhileDictating, overlayStyle
     }
 
     private enum LegacyKeys: String, CodingKey {
@@ -79,7 +56,12 @@ public struct Settings: Codable, Sendable, Equatable {
     }
 
     // Dropped on save, unlike keys this build does not know, which may be a newer build's.
-    static let retiredKeys = [LegacyKeys.polishHotkey.rawValue, "launchAtLogin"]
+    // The appearance, background and speed settings follow the system now: Light or Dark,
+    // Reduce Transparency and Reduce Motion.
+    static let retiredKeys = [
+        LegacyKeys.polishHotkey.rawValue, "launchAtLogin",
+        "appearance", "overlayGlass", "overlayAnimationSpeed",
+    ]
 
     // Key by key on top of the defaults: a value this build cannot read keeps its
     // default. See docs/ARCHITECTURE.md, "Settings file".
@@ -122,10 +104,7 @@ public struct Settings: Codable, Sendable, Equatable {
         if let value = read(Bool.self, .shortSentenceWithoutCapital) { shortSentenceWithoutCapital = value }
         if let value = read(Bool.self, .playSounds) { playSounds = value }
         if let value = read(Bool.self, .muteOutputWhileDictating) { muteOutputWhileDictating = value }
-        if let value = read(Appearance.self, .appearance) { appearance = value }
         if let value = read(OverlayStyle.self, .overlayStyle) { overlayStyle = value }
-        if let value = read(Bool.self, .overlayGlass) { overlayGlass = value }
-        if let value = read(OverlayAnimationSpeed.self, .overlayAnimationSpeed) { overlayAnimationSpeed = value }
     }
 
     public mutating func setProcessor(_ id: String, enabled: Bool) {

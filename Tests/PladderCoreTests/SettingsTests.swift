@@ -19,10 +19,7 @@ import Testing
             settings.shortSentenceWithoutCapital = true
             settings.playSounds = false
             settings.muteOutputWhileDictating = true
-            settings.appearance = .light
             settings.overlayStyle = .menuBar
-            settings.overlayGlass = false
-            settings.overlayAnimationSpeed = .instant
             try store.save(settings)
             #expect(store.load() == settings)
         }
@@ -55,15 +52,13 @@ import Testing
 
     private static let entryJSON = #"{"id":"6E36117C-6200-4C7E-BFB8-6FA228542578","from":"a","to":"b","matchCase":false}"#
 
-    @Test(arguments: ["appearance", "overlayStyle", "overlayAnimationSpeed", "polishModel"])
+    @Test(arguments: ["overlayStyle", "polishModel"])
     func anUnknownCaseKeepsItsDefaultAndTheRest(key: String) throws {
         let json = #"{"engineID":"echo","polishDictations":true,"\#(key)":"someFutureCase","dictionary":[\#(Self.entryJSON)]}"#
         let decoded = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
         let defaults = Self.defaults
         #expect(decoded.polishDictations)
-        #expect(decoded.appearance == defaults.appearance)
         #expect(decoded.overlayStyle == defaults.overlayStyle)
-        #expect(decoded.overlayAnimationSpeed == defaults.overlayAnimationSpeed)
         #expect(decoded.polishModel == defaults.polishModel)
         #expect(decoded.dictionary.map(\.to) == ["b"])
     }
@@ -98,7 +93,7 @@ import Testing
     }
 
     @Test func aFileWithSomethingDroppedLoadsAndIsCopiedAside() throws {
-        let json = #"{"engineID":"echo","appearance":"someFutureCase","dictionary":[\#(Self.entryJSON)]}"#
+        let json = #"{"engineID":"echo","polishModel":"someFutureCase","dictionary":[\#(Self.entryJSON)]}"#
         try withStore(file: json) { store, url in
             #expect(store.load().dictionary.count == 1)
             #expect(FileManager.default.fileExists(atPath: url.path))
@@ -134,15 +129,15 @@ import Testing
     }
 
     @Test func savingKeepsAValueThisBuildCouldNotRead() throws {
-        try withStore(file: #"{"engineID":"echo","overlayStyle":"newStyle","appearance":"futureCase"}"#) { store, url in
+        try withStore(file: #"{"engineID":"echo","overlayStyle":"newStyle","polishModel":"futureCase"}"#) { store, url in
             var settings = store.load()
             #expect(settings.overlayStyle == Self.defaults.overlayStyle)
             settings.playSounds = false
-            settings.appearance = .dark
+            settings.polishModel = .s1Mini
             try store.save(settings)
             let object = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
             #expect(object["overlayStyle"] as? String == "newStyle")
-            #expect(object["appearance"] as? String == "dark")
+            #expect(object["polishModel"] as? String == "s1Mini")
             #expect(object["playSounds"] as? Bool == false)
             #expect(store.load() == settings)
         }
@@ -181,12 +176,12 @@ import Testing
     @Test func savingKeepsKeysANewerBuildWrote() throws {
         try withStore(file: #"{"engineID":"echo","someFutureSetting":{"on":true},"playSounds":false}"#) { store, url in
             var settings = store.load()
-            settings.appearance = .dark
+            settings.overlayStyle = .minimal
             try store.save(settings)
             let object = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
             #expect((object["someFutureSetting"] as? [String: Bool]) == ["on": true])
             #expect(store.load() == settings)
-            #expect(store.load().appearance == .dark)
+            #expect(store.load().overlayStyle == .minimal)
         }
     }
 

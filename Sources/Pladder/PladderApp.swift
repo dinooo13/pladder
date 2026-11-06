@@ -32,7 +32,7 @@ struct PladderApp: App {
         MenuBarExtra(isInserted: .constant(!isDeveloperMode)) {
             MenuContent(model: model)
         } label: {
-            Image(nsImage: model.menuBarImage)
+            MenuBarLabel(model: model)
         }
         .menuBarExtraStyle(.menu)
 
@@ -84,6 +84,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+private struct MenuBarLabel: View {
+    let model: AppModel
+    @Environment(\.openSettings) private var openSettings
+
+    var body: some View {
+        Image(nsImage: model.menuBarImage)
+            .accessibilityLabel("Pladder")
+            .accessibilityValue(model.statusLine)
+            // The label is the one view that exists from launch, so the first launch opens
+            // Settings from here.
+            .task {
+                guard model.takeFirstLaunch() else { return }
+                showSettings(openSettings)
+            }
+    }
+}
+
+// An accessory app is never active, so a plain `openSettings()` puts the window behind
+// whatever the user was using.
+@MainActor
+private func showSettings(_ openSettings: OpenSettingsAction) {
+    NSApp.activate(ignoringOtherApps: true)
+    openSettings()
+    Task { @MainActor in
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.windows.first { $0.isVisible && $0.canBecomeKey }?.makeKeyAndOrderFront(nil)
+    }
+}
+
 private struct MenuContent: View {
     let model: AppModel
     @Environment(\.openSettings) private var openSettings
@@ -92,51 +121,45 @@ private struct MenuContent: View {
         Text(model.statusLine)
 
         if model.canRetryEngine {
-            Button("Retry Model Download") { model.retryEngine() }
+            Button("Try Again") { model.retryEngine() }
+        }
+
+        // Right under the status: these are what stops dictation working.
+        if model.permissions.needsMicrophone {
+            Button("Allow Microphone Access…") { model.permissions.grantMicrophone() }
+        }
+        if model.permissions.needsAccessibility {
+            Button("Allow Accessibility Access…") { model.permissions.grantAccessibility() }
         }
 
         if let last = model.lastTranscriptSummary {
             Divider()
-            Button("Last: \(last)") { model.copyLastTranscript() }
+            Button {
+                model.copyLastTranscript()
+            } label: {
+                Text("Copy Last Dictation")
+                Text(last)
+            }
         }
 
         // A menu line, not a toast: the pill is click-through, and a proposal arriving a
         // minute later should wait, not interrupt.
         if !model.corrections.proposals.isEmpty {
             Divider()
-            ForEach(model.corrections.proposals) { proposal in
-                Menu("Learned “\(proposal.pair.heard)” → “\(proposal.pair.corrected)”?") {
-                    Button("Add") { model.corrections.accept(proposal) }
-                    Button("Dismiss") { model.corrections.dismiss(proposal) }
+            Section("Suggested Corrections") {
+                ForEach(model.corrections.proposals) { proposal in
+                    Menu("“\(proposal.pair.heard)” → “\(proposal.pair.corrected)”") {
+                        Button("Add to Dictionary") { model.corrections.accept(proposal) }
+                        Button("Dismiss") { model.corrections.dismiss(proposal) }
+                    }
                 }
             }
         }
 
         Divider()
 
-        Button("Settings…") {
-            // An accessory app is never active, so a plain `openSettings()` puts the window
-            // behind whatever the user was using.
-            NSApp.activate(ignoringOtherApps: true)
-            openSettings()
-            Task { @MainActor in
-                NSApp.activate(ignoringOtherApps: true)
-                NSApp.windows.first { $0.isVisible && $0.canBecomeKey }?.makeKeyAndOrderFront(nil)
-            }
-        }
+        Button("Settings…") { showSettings(openSettings) }
             .keyboardShortcut(",", modifiers: .command)
-
-        if model.permissions.needsAnyPermission {
-            Divider()
-            if model.permissions.needsAccessibility {
-                Button("Grant Accessibility…") { model.permissions.grantAccessibility() }
-            }
-            if model.permissions.needsMicrophone {
-                Button("Grant Microphone…") { model.permissions.grantMicrophone() }
-            }
-        }
-
-        Divider()
 
         Button("Quit Pladder") { NSApp.terminate(nil) }
             .keyboardShortcut("q", modifiers: .command)

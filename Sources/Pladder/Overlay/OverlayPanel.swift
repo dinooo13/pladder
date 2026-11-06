@@ -18,8 +18,12 @@ final class OverlayPanel: NSPanel {
     // for the whole fade.
     static let fadeOutDuration: TimeInterval = 0.25
 
-    // Far enough below the resting frame to start and end behind the screen's bottom edge.
-    private static func flightDistance(for height: CGFloat) -> CGFloat { height + 80 }
+    // Above the Dock when it shows, and never closer than this to the screen's edge.
+    private static let dockClearance: CGFloat = 12
+    private static let edgeClearance: CGFloat = 64
+
+    // The bottom of the screen the pill rests on: flights start and end behind it.
+    private var screenBottom: CGFloat = 0
 
     private let model: OverlayModel
 
@@ -63,18 +67,15 @@ final class OverlayPanel: NSPanel {
     func show(flight: Bool, onArrival: (@MainActor @Sendable () -> Void)? = nil) {
         generation &+= 1
         let token = generation
-        // A borderless panel that is never key or main does not reliably follow an
-        // `NSApp.appearance` change, so it is re-synced on every show.
-        appearance = NSApp.appearance
         let final = targetFrame()
         alphaValue = 1
         // `orderFrontRegardless`: an accessory app is never active.
         if flight {
             // Below the bottom edge the window is clipped, so nothing flashes on the way up.
-            setFrame(final.offsetBy(dx: 0, dy: -Self.flightDistance(for: final.height)), display: false)
+            setFrame(final.offsetBy(dx: 0, dy: -flightDistance(from: final)), display: false)
             orderFrontRegardless()
             NSAnimationContext.runAnimationGroup({ context in
-                context.duration = model.speed.flightDuration
+                context.duration = OverlayMotion.flightDuration
                 context.timingFunction = CAMediaTimingFunction(name: .easeOut)
                 animator().setFrame(final, display: true)
             }, completionHandler: { [weak self] in
@@ -103,10 +104,10 @@ final class OverlayPanel: NSPanel {
         let token = generation
         if flight {
             NSAnimationContext.runAnimationGroup({ context in
-                context.duration = model.speed.flightDuration
+                context.duration = OverlayMotion.flightDuration
                 context.timingFunction = CAMediaTimingFunction(name: .easeIn)
                 animator().setFrame(
-                    frame.offsetBy(dx: 0, dy: -Self.flightDistance(for: frame.height)),
+                    frame.offsetBy(dx: 0, dy: -flightDistance(from: frame)),
                     display: true)
             }, completionHandler: { [weak self] in
                 MainActor.assumeIsolated {
@@ -135,13 +136,17 @@ final class OverlayPanel: NSPanel {
         let screen = NSScreen.screens.first { $0.frame.contains(mouse) }
             ?? NSScreen.main
             ?? NSScreen.screens.first
-        guard let frame = screen?.frame else { return self.frame }
+        guard let screen else { return self.frame }
+        let frame = screen.frame
+        screenBottom = frame.minY
         let size = Self.size(for: model.style)
-        return NSRect(
-            x: frame.midX - size.width / 2,
-            y: frame.minY + 64,
-            width: size.width,
-            height: size.height
-        )
+        // `visibleFrame` leaves out the Dock, so the pill never sits on top of it.
+        let y = max(frame.minY + Self.edgeClearance, screen.visibleFrame.minY + Self.dockClearance)
+        return NSRect(x: frame.midX - size.width / 2, y: y, width: size.width, height: size.height)
+    }
+
+    // Down until the whole panel is behind the screen's bottom edge, which clips it.
+    private func flightDistance(from frame: NSRect) -> CGFloat {
+        frame.minY - screenBottom + frame.height
     }
 }

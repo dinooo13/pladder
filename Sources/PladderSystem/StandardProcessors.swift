@@ -23,6 +23,10 @@ public enum StandardProcessors {
         },
     ]
 
+    // The rest always run: an empty dictionary already does nothing, and nobody wants
+    // stray spaces.
+    public static let switchable: Set<String> = [FillerRemover.processorID, SpokenPunctuation.processorID]
+
     public static func pipeline(for settings: DictationSettings) -> ProcessorPipeline {
         ProcessorPipeline(entries.map { $0.make(settings) })
     }
