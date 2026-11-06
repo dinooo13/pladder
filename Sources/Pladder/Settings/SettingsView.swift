@@ -7,31 +7,41 @@ struct SettingsView: View {
     var body: some View {
         TabView {
             GeneralSettingsView(model: model)
+                .frame(height: model.needsSetup ? 800 : 640)
                 .tabItem { Label("General", systemImage: "gearshape") }
 
             DictionaryView(model: model)
+                .frame(height: model.settings.dictionary.isEmpty ? 460 : 560)
                 .tabItem { Label("Dictionary", systemImage: "character.book.closed") }
 
             TextSettingsView(model: model)
-                .tabItem { Label("Text", systemImage: "text.word.spacing") }
+                .frame(height: model.settings.polishDictations ? 580 : 500)
+                .tabItem { Label("Text", systemImage: "textformat") }
         }
         // No material or glass on the window: Apple's own settings windows are plain. The
-        // fixed width keeps switching tabs from resizing the window sideways.
+        // fixed width keeps switching tabs from resizing the window sideways; each tab is as
+        // tall as its content, as in the system's own settings windows.
         .frame(width: 540)
-        .frame(minHeight: 540)
     }
 }
 
+// The sentence stays in the label colour; only the symbol carries the warning, since
+// orange body text on the grouped form fails contrast.
 struct WarningLabel: View {
     let text: String
 
     init(_ text: String) { self.text = text }
 
     var body: some View {
-        Label(text, systemImage: "exclamationmark.triangle")
-            .font(.callout)
-            .foregroundStyle(.orange)
-            .fixedSize(horizontal: false, vertical: true)
+        Label {
+            Text(text)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        } icon: {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .symbolRenderingMode(.multicolor)
+                .accessibilityLabel("Warning")
+        }
     }
 }
 
@@ -39,40 +49,20 @@ struct PermissionRow: View {
     let title: LocalizedStringKey
     let detail: String
     let buttonTitle: String
+    var isPrimary = false
     let action: @MainActor () -> Void
 
     var body: some View {
         LabeledContent {
-            Button(buttonTitle) { action() }
-                .buttonStyle(.borderedProminent)
-        } label: {
-            Label {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                    Text(detail)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            } icon: {
-                Image(systemName: "exclamationmark.circle.fill")
-                    .foregroundStyle(.orange)
-                    .accessibilityHidden(true)
+            if isPrimary {
+                Button(buttonTitle) { action() }
+                    .buttonStyle(.borderedProminent)
+            } else {
+                Button(buttonTitle) { action() }
             }
+        } label: {
+            Text(title)
+            Text(detail)
         }
-    }
-}
-
-struct FootnoteText: View {
-    private let text: Text
-
-    init(_ key: LocalizedStringKey) { text = Text(key) }
-    init(verbatim text: String) { self.text = Text(text) }
-
-    var body: some View {
-        text
-            .font(.callout)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
     }
 }

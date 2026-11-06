@@ -8,7 +8,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme-hero-dark.png">
-    <img src="docs/images/readme-hero-light.png" width="900" alt="Talk to your agents. T3 Code with the reply “Yes, and add a test for it.” in its prompt box, dictated with Pladder, whose recording pill shows the words as they are spoken. Hold Option+Space to talk, tap V to send.">
+    <img src="docs/images/readme-hero-light.png" width="900" alt="Talk to your agents. A chat with a coding agent, the reply “Yes, and add a test for it.” in its prompt box, and Pladder’s recording pill below it showing the words as they are spoken. Hold Option+Space to talk, tap V to send.">
   </picture>
 </p>
 
@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg"><img src="docs/images/readme-download.png" width="228" alt="Download Pladder for Mac"></a><br>
+  <a href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg"><img src="docs/images/readme-download.png" width="200" alt="Download Pladder for Mac"></a><br>
   <sub>Free · No subscription · Works offline</sub>
 </p>
 

@@ -8,7 +8,6 @@
 <link rel="canonical" href="https://dinooo13.github.io/pladder/privacy/">
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="../apple-touch-icon.png">
-<link rel="preload" href="../fonts/outfit.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="../style.css">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
@@ -27,8 +26,7 @@
 <body>
 <a class="skip" href="#main">Skip to content</a>
 
-<header class="top-band page-band">
-<div class="top">
+<header class="top">
   <a class="brand" href="../">
     <svg width="34" height="34" viewBox="0 0 1024 1024" aria-hidden="true"><defs><linearGradient id="ink" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#323238"/><stop offset="1" stop-color="#18181B"/></linearGradient></defs><path fill="url(#ink)" d="M229.07 0L794.93 0C956.78 0 1024 67.22 1024 229.07L1024 794.93C1024 956.78 956.78 1024 794.93 1024L229.07 1024C67.22 1024 0 956.78 0 794.93L0 229.07C0 67.22 67.22 0 229.07 0Z"/><g fill="#F4F4F5"><rect x="168" y="392" width="80" height="240" rx="40"/><rect x="302" y="280" width="80" height="464" rx="40"/><rect x="436" y="344" width="80" height="336" rx="40"/><rect x="570" y="416" width="80" height="192" rx="40"/></g><g fill="#FF6A47"><rect x="718" y="244" width="80" height="536" rx="40"/><rect x="660" y="244" width="196" height="80" rx="40"/><rect x="660" y="700" width="196" height="80" rx="40"/></g></svg>
     <span>Pladder</span>
@@ -38,9 +36,8 @@
     <a class="in-page" href="./" aria-current="page">Privacy</a>
     <a class="in-page" href="../#compare">Compare</a>
     <a class="in-page" href="../#faq">FAQ</a>
-    <a class="btn btn-small" href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg">Get it free</a>
+    <a class="btn btn-small" href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg">Download</a>
   </nav>
-</div>
 </header>
 
 <main class="page" id="main">
@@ -57,7 +54,7 @@
 <p>When you fix a word by hand right after a dictation, Pladder can offer to add the fix to your dictionary. To notice it, it watches the field it pasted into for up to a minute, through the macOS Accessibility permission. It reads only the words it pasted and a little around them, keeps nothing, and asks before it adds anything. The check that a correction makes sense runs on Apple's on-device model.</p>
 
 <h2>Polish</h2>
-<p>The optional, experimental polish also runs on your Mac: either Apple's on-device model, which is part of macOS, or S1-mini by Superwhisper, which runs on your Mac's graphics chip.</p>
+<p>The optional polish, marked Beta, also runs on your Mac: either Apple's on-device model, which is part of macOS, or S1-mini by Superwhisper, which runs on your Mac's graphics chip.</p>
 
 <h2>The network</h2>
 <p>Pladder makes no network requests except two kinds of one-time download from Hugging Face:</p>
@@ -74,7 +71,7 @@
 <p>Pladder is open source under the MIT license. The model downloads are its only network code: FluidAudio's downloader for the speech model, and <a href="https://github.com/dinooo13/pladder/blob/main/Sources/PladderRefine/ModelFiles.swift">ModelFiles.swift</a> for S1-mini. The same facts, for developers, are in <a href="https://github.com/dinooo13/pladder/blob/main/docs/PRIVACY.md">docs/PRIVACY.md</a>.</p>
 
 <h2>This website</h2>
-<p>This site sets no cookies, runs no analytics and loads nothing from other servers: no outside fonts, no scripts, no tracking pixels. Every file, its one typeface included, comes from GitHub Pages, which hosts it and, like any web host, sees the requests.</p>
+<p>This site sets no cookies, runs no analytics and loads nothing from other servers: no outside fonts, no scripts, no tracking pixels. Every file comes from GitHub Pages, which hosts it and, like any web host, sees the requests.</p>
 
 <p class="back"><a class="btn" href="https://github.com/dinooo13/pladder/releases/latest/download/Pladder.dmg">Download for Mac</a></p>
 </main>
@@ -82,9 +79,9 @@
 <footer class="foot">
   <div>
     <p><em>Pladder</em> is Low German for “to babble”. Made by <a href="https://github.com/dinooo13">Fabian Meyer</a>.</p>
-    <p>Last updated <time datetime="2026-11-02">2 November 2026</time>.</p>
+    <p>Last updated <time datetime="2026-11-06">6 November 2026</time>.</p>
   </div>
-  <nav aria-label="Footer"><a href="../">Home</a><a href="https://github.com/dinooo13/pladder">Source</a><a href="https://github.com/dinooo13/pladder/blob/main/docs/USAGE.md">Usage</a><a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md">Benchmarks</a><a href="../llms.txt">llms.txt</a></nav>
+  <nav aria-label="Footer"><a href="../">Home</a><a href="https://github.com/dinooo13/pladder">Source</a><a href="https://github.com/dinooo13/pladder/blob/main/docs/USAGE.md">Usage</a><a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md">Benchmarks</a></nav>
 </footer>
 </body>
 </html>

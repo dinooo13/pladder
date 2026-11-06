@@ -125,7 +125,7 @@ struct OverlayPill: View {
             HStack(spacing: 8) {
                 Image(systemName: "doc.on.clipboard")
                     .foregroundStyle(.secondary)
-                Text("Copied — press ⌘V")
+                Text("Copied. Press ⌘V to paste.")
                     .font(PillMetrics.font)
                     .foregroundStyle(.primary)
             }
@@ -133,7 +133,7 @@ struct OverlayPill: View {
             HStack(spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
-                Text(failure.text)
+                Text(failure.shortText)
                     .font(PillMetrics.font)
                     .foregroundStyle(.primary)
                     .lineLimit(2)
@@ -159,7 +159,8 @@ struct OverlayPill: View {
                     LiveTranscriptText(
                         text: partial,
                         hugs: hugsContent,
-                        width: hugsContent ? Self.previewTextWidth : Self.liveTextWidth
+                        width: hugsContent ? Self.previewTextWidth : Self.liveTextWidth,
+                        settled: isPreview
                     )
                 } else {
                     // Until the first pass lands, so the wide capsule never reads as empty.
@@ -208,7 +209,7 @@ struct OverlayPill: View {
                         }
                         .transition(.opacity)
                 } else {
-                    LevelBars(level: level, count: 5, maxHeight: 20, opacity: 0.8, seeded: isPreview)
+                    LevelBars(level: level, count: 5, maxHeight: 20, opacity: 1, seeded: isPreview)
                         .transition(.opacity)
                 }
             }

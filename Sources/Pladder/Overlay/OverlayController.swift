@@ -148,7 +148,7 @@ final class OverlayController {
             model.state = state
             cancelHide()
             present(flight: false)
-            announce(String(localized: "Copied — press ⌘V"))
+            announce(String(localized: "Copied. Press ⌘V to paste."))
         case .idle, .unavailable:
             // The model is not updated: the pill leaves with what it showed. The clipboard hint
             // and a pill held for polish dive like a pasted dictation; a discard and an error fade.

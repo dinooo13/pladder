@@ -44,11 +44,20 @@ final class PermissionMonitor {
         onRefresh()
     }
 
+    // The system alert first, which has its own button to System Settings; opening the pane
+    // as well put two system windows up at once. Once the alert has been seen this launch,
+    // the pane directly, since macOS shows the alert only for an app not yet in the list.
     func grantAccessibility() {
-        Permissions.requestAccessibility()
-        Permissions.openAccessibilitySettings()
+        if promptedForAccessibility {
+            Permissions.openAccessibilitySettings()
+        } else {
+            promptedForAccessibility = true
+            Permissions.requestAccessibility()
+        }
         startPolling()
     }
+
+    @ObservationIgnored private var promptedForAccessibility = false
 
     func grantMicrophone() {
         Task { [weak self] in

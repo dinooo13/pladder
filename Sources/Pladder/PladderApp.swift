@@ -121,7 +121,7 @@ private struct MenuContent: View {
         Text(model.statusLine)
 
         if model.canRetryEngine {
-            Button("Try Again") { model.retryEngine() }
+            Button(model.retryEngineTitle) { model.retryEngine() }
         }
 
         // Right under the status: these are what stops dictation working.
@@ -145,7 +145,6 @@ private struct MenuContent: View {
         // A menu line, not a toast: the pill is click-through, and a proposal arriving a
         // minute later should wait, not interrupt.
         if !model.corrections.proposals.isEmpty {
-            Divider()
             Section("Suggested Corrections") {
                 ForEach(model.corrections.proposals) { proposal in
                     Menu("“\(proposal.pair.heard)” → “\(proposal.pair.corrected)”") {

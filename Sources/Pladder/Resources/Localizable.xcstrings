@@ -201,16 +201,6 @@
         }
       }
     },
-    "Beta": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Beta"
-          }
-        }
-      }
-    },
     "Built into macOS. Adds one to two seconds to each dictation.": {
       "localizations": {
         "de": {
@@ -226,7 +216,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Download wird geprüft…"
+            "value": "Download wird geprüft …"
           }
         }
       }
@@ -267,16 +257,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kompakt"
-          }
-        }
-      }
-    },
-    "Copied — press ⌘V": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Kopiert — ⌘V drücken"
           }
         }
       }
@@ -386,7 +366,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ wird geladen…"
+            "value": "%@ wird geladen …"
           }
         }
       }
@@ -411,16 +391,6 @@
         }
       }
     },
-    "Downloads when polish is on.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Wird geladen, sobald „Diktate polieren“ an ist."
-          }
-        }
-      }
-    },
     "Drops “uh”, “um” and “äh”.": {
       "localizations": {
         "de": {
@@ -436,7 +406,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Exportieren…"
+            "value": "Exportieren …"
           }
         }
       }
@@ -496,7 +466,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ halten zum Diktieren"
+            "value": "Zum Diktieren %@ gedrückt halten"
           }
         }
       }
@@ -506,7 +476,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ halten zum Diktieren (sichere Tastatureingabe ist an)"
+            "value": "Zum Diktieren %@ gedrückt halten (sichere Tastatureingabe ist an)"
           }
         }
       }
@@ -516,27 +486,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ halten zum Diktieren, dann ⌘V drücken"
-          }
-        }
-      }
-    },
-    "Hold to record, release to paste.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Halten zum Aufnehmen, loslassen zum Einfügen."
-          }
-        }
-      }
-    },
-    "Hold to record, release to paste. Escape discards a recording.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Halten zum Aufnehmen, loslassen zum Einfügen. Escape verwirft eine Aufnahme."
+            "value": "Zum Diktieren %@ gedrückt halten, dann ⌘V drücken"
           }
         }
       }
@@ -586,7 +536,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Importieren…"
+            "value": "Importieren …"
           }
         }
       }
@@ -596,7 +546,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bei der Anmeldung öffnen"
+            "value": "Beim Anmelden öffnen"
           }
         }
       }
@@ -716,17 +666,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Andere Audiowiedergabe während der Aufnahme stummschalten"
-          }
-        }
-      }
-    },
-    "NVIDIA’s Parakeet, on the Neural Engine. A one-time 700 MB download.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Parakeet von NVIDIA, auf der Neural Engine. Einmaliger Download von 700 MB."
+            "value": "Andere Töne beim Aufnehmen stummschalten"
           }
         }
       }
@@ -747,26 +687,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Noch keine Wörter"
-          }
-        }
-      }
-    },
-    "No capital": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Kein Großbuchstabe"
-          }
-        }
-      }
-    },
-    "No period": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Kein Punkt"
           }
         }
       }
@@ -796,7 +716,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nur %@ angekommen…"
+            "value": "Nur %@ angekommen …"
           }
         }
       }
@@ -831,16 +751,6 @@
         }
       }
     },
-    "Paste and send": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Einfügen und senden"
-          }
-        }
-      }
-    },
     "Paste the replacement exactly as written, even at the start of a sentence.": {
       "localizations": {
         "de": {
@@ -867,16 +777,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Wird eingefügt …"
-          }
-        }
-      }
-    },
-    "Permissions": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Berechtigungen"
           }
         }
       }
@@ -911,16 +811,6 @@
         }
       }
     },
-    "Polish": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Feinschliff"
-          }
-        }
-      }
-    },
     "Polish with on-device AI": {
       "localizations": {
         "de": {
@@ -936,37 +826,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Überarbeiten…"
-          }
-        }
-      }
-    },
-    "Press it while recording and Return follows the text, to send a message or run a command.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Während der Aufnahme drücken, und nach dem Text folgt ein Zeilenumbruch, um eine Nachricht zu senden oder einen Befehl auszuführen."
-          }
-        }
-      }
-    },
-    "Press keys…": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tasten drücken…"
-          }
-        }
-      }
-    },
-    "Press once to start recording and again to paste. Set it to the push-to-talk key and a short tap starts hands-free while a hold works as before.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Einmal drücken zum Aufnehmen, noch einmal zum Einfügen. Ist es dieselbe Taste wie zum Sprechen, startet ein kurzes Tippen freihändig, und Halten funktioniert wie bisher."
+            "value": "Feinschliff …"
           }
         }
       }
@@ -1031,42 +891,12 @@
         }
       }
     },
-    "Recommended. Parakeet v3 retrained by Moondream: a fifth fewer misheard words at the same speed. A one-time 600 MB download.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Empfohlen. Parakeet v3, von Moondream nachtrainiert: ein Fünftel weniger falsch verstandene Wörter bei gleichem Tempo. Einmaliger Download von 600 MB."
-          }
-        }
-      }
-    },
     "Recording a shortcut": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
             "value": "Kurzbefehl wird aufgenommen"
-          }
-        }
-      }
-    },
-    "Recording — press %@ to stop": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aufnahme läuft — zum Beenden %@ drücken"
-          }
-        }
-      }
-    },
-    "Recording…": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aufnahme…"
           }
         }
       }
@@ -1156,7 +986,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Einstellungen…"
+            "value": "Einstellungen …"
           }
         }
       }
@@ -1386,7 +1216,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Transkription…"
+            "value": "Wird transkribiert …"
           }
         }
       }
@@ -1501,16 +1331,6 @@
         }
       }
     },
-    "as you speak": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "beim Sprechen"
-          }
-        }
-      }
-    },
     "cancelled": {
       "localizations": {
         "de": {
@@ -1547,16 +1367,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ersetzung"
-          }
-        }
-      }
-    },
-    "spoken form": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "gesprochene Form"
           }
         }
       }
@@ -1607,6 +1417,246 @@
           "stringUnit": {
             "state": "translated",
             "value": "„Ja.“ wird als „Ja“ eingefügt."
+          }
+        }
+      }
+    },
+    "A one-time 700 MB download.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einmaliger Download von 700 MB."
+          }
+        }
+      }
+    },
+    "Clear": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Löschen"
+          }
+        }
+      }
+    },
+    "Copied. Press ⌘V to paste.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kopiert. Zum Einfügen ⌘V drücken."
+          }
+        }
+      }
+    },
+    "Couldn’t use the microphone.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Mikrofon ist nicht verfügbar."
+          }
+        }
+      }
+    },
+    "Download Speech Model Again": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sprachmodell erneut laden"
+          }
+        }
+      }
+    },
+    "Drop the final period": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Schlusspunkt weglassen"
+          }
+        }
+      }
+    },
+    "Get Started": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erste Schritte"
+          }
+        }
+      }
+    },
+    "Hello": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hallo"
+          }
+        }
+      }
+    },
+    "Hold to record, release to paste. Escape discards.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Halten zum Aufnehmen, loslassen zum Einfügen. Escape verwirft."
+          }
+        }
+      }
+    },
+    "Listening… Press %@ to stop.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hört zu … Zum Beenden %@ drücken."
+          }
+        }
+      }
+    },
+    "Load Speech Model Again": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sprachmodell erneut starten"
+          }
+        }
+      }
+    },
+    "Polish (Beta)": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feinschliff (Beta)"
+          }
+        }
+      }
+    },
+    "Press while holding push to talk, and Return follows the text.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drücken, während die Sprechtaste gehalten wird, und nach dem Text folgt ein Zeilenumbruch."
+          }
+        }
+      }
+    },
+    "Recommended. A one-time 600 MB download.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Empfohlen. Einmaliger Download von 600 MB."
+          }
+        }
+      }
+    },
+    "Record Shortcut": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kurzbefehl aufnehmen"
+          }
+        }
+      }
+    },
+    "Send": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Senden"
+          }
+        }
+      }
+    },
+    "So music or a call does not end up in the dictation.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Damit Musik oder ein Anruf nicht im Diktat landet."
+          }
+        }
+      }
+    },
+    "Something went wrong. The menu has the details.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Etwas ist schiefgegangen. Details stehen im Menü."
+          }
+        }
+      }
+    },
+    "Start with a lowercase letter": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mit Kleinbuchstaben beginnen"
+          }
+        }
+      }
+    },
+    "Tap to start, tap again to paste.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tippen zum Starten, noch einmal tippen zum Einfügen."
+          }
+        }
+      }
+    },
+    "Then click into any text field, hold %@ and talk.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dann in ein Textfeld klicken, %@ gedrückt halten und sprechen."
+          }
+        }
+      }
+    },
+    "Type Shortcut": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kurzbefehl eingeben"
+          }
+        }
+      }
+    },
+    "Warning": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Warnung"
+          }
+        }
+      }
+    },
+    "similar words": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ähnliche Wörter"
           }
         }
       }

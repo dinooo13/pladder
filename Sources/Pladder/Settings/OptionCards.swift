@@ -11,8 +11,6 @@ struct OptionCardRow<Option: Hashable, Thumbnail: View>: View {
     let name: (Option) -> String
     @ViewBuilder let thumbnail: (Option) -> Thumbnail
 
-    @FocusState private var focused: Bool
-
     init(
         title: String,
         selection: Binding<Option>,
@@ -33,7 +31,6 @@ struct OptionCardRow<Option: Hashable, Thumbnail: View>: View {
                 OptionCard(
                     title: name(option),
                     isSelected: selection == option,
-                    showsFocus: focused && selection == option,
                     action: { selection = option }
                 ) {
                     thumbnail(option)
@@ -42,8 +39,6 @@ struct OptionCardRow<Option: Hashable, Thumbnail: View>: View {
         }
         .frame(maxWidth: .infinity)
         .focusable()
-        .focused($focused)
-        .focusEffectDisabled()
         .onMoveCommand { direction in
             guard let index = options.firstIndex(of: selection) else { return }
             switch direction {
@@ -64,7 +59,6 @@ struct OptionCardRow<Option: Hashable, Thumbnail: View>: View {
 struct OptionCard<Thumbnail: View>: View {
     let title: String
     let isSelected: Bool
-    var showsFocus = false
     let action: @MainActor () -> Void
     @ViewBuilder let thumbnail: Thumbnail
 
@@ -88,14 +82,8 @@ struct OptionCard<Thumbnail: View>: View {
                     .padding(3)
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
-                            .strokeBorder(Color.accentColor, lineWidth: 2.5)
+                            .strokeBorder(Color.accentColor, lineWidth: 2)
                             .opacity(isSelected ? 1 : 0)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .strokeBorder(Color.accentColor.opacity(0.35), lineWidth: 3)
-                            .padding(-3)
-                            .opacity(showsFocus ? 1 : 0)
                     )
                 Text(title)
                     .font(.callout)
@@ -144,32 +132,38 @@ struct OverlayStyleThumbnail: View {
                 level: Self.previewLevel,
                 style: .liveTranscript,
                 isPreview: true,
-                partial: String(localized: "as you speak"),
+                partial: String(localized: "Hello"),
                 hugsContent: true
             )
             // Proposed at the card's width the glass shrinks but the row does not, and the dot
             // ends up outside the capsule.
             .fixedSize()
-            .scaleEffect(0.55)
+            .scaleEffect(0.62)
             .padding(.bottom, 4)
         }
     }
 
+    // A strip of menu bar with its neighbours, so the card reads as the menu bar and not as
+    // an empty desktop.
     private var menuBar: some View {
-        // Resized, not scaled: `scaleEffect` keeps the 22×16 layout and would push the strip
-        // to the icon's height.
-        Rectangle()
-            .fill(.background.opacity(0.7))
-            .frame(height: 14)
-            .overlay(alignment: .trailing) {
-                Image(nsImage: MenuBarIcon.image(for: .recording, level: Self.previewLevel))
-                    .resizable()
-                    .renderingMode(.template)
-                    .aspectRatio(contentMode: .fit)
-                    .frame(height: 10)
-                    .foregroundStyle(.primary)
-                    .padding(.trailing, 8)
-            }
+        HStack(spacing: 7) {
+            Spacer()
+            // Resized, not scaled: `scaleEffect` keeps the 22×16 layout and would push the
+            // strip to the icon's height.
+            Image(nsImage: MenuBarIcon.image(for: .recording, level: Self.previewLevel))
+                .resizable()
+                .renderingMode(.template)
+                .aspectRatio(contentMode: .fit)
+                .frame(height: 11)
+            Image(systemName: "wifi")
+            Image(systemName: "battery.75percent")
+            Text(verbatim: "9:41")
+        }
+        .font(.system(size: 9, weight: .medium))
+        .foregroundStyle(.primary)
+        .padding(.horizontal, 8)
+        .frame(height: 18)
+        .background(.background.opacity(0.75))
     }
 }
 
@@ -180,8 +174,8 @@ struct DesktopWash: View {
     var body: some View {
         LinearGradient(
             colors: scheme == .dark
-                ? [Color(white: 0.30), Color(white: 0.16)]
-                : [Color(white: 0.93), Color(white: 0.80)],
+                ? [Color(white: 0.34), Color(white: 0.14)]
+                : [Color(white: 0.90), Color(white: 0.70)],
             startPoint: .top,
             endPoint: .bottom
         )

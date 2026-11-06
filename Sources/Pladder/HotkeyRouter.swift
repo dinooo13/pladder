@@ -61,9 +61,11 @@ final class HotkeyRouter {
     var usesCarbonForSecureInput: Bool { routing.accessibilityTrusted && routing.source == .carbon }
     var hotkeyNeedsRegularKey: Bool { !routing.accessibilityTrusted }
 
-    // Named as the matching monitor sees it: the tap tells Left from Right, Carbon cannot.
+    // The glyph form a menu uses, "⌥Space"; a modifier-only chord keeps its side in words
+    // on the tap, which can tell Left from Right, and loses it on Carbon, which cannot.
     func displayName(of chord: Hotkey) -> String {
-        routing.source == .tap ? chord.displayName : chord.sideAgnosticDisplayName
+        guard chord.isModifierOnly else { return chord.shortcutName }
+        return routing.source == .tap ? chord.displayName : chord.sideAgnosticDisplayName
     }
 
     func refreshSystemShortcuts() {
