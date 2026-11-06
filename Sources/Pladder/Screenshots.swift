@@ -315,18 +315,12 @@ struct HeroFigure: View {
                 .padding(.top, 16)
                 .padding(.horizontal, 20)
             if let scene {
-                if scene.showsPill {
-                    // Not a replica: its dot, bars and settling words behave as on a real take.
-                    OverlayPill(
-                        state: .recording, level: scene.level, style: .liveTranscript,
-                        partial: scene.partial, presentation: scene.presentation)
-                        .fixedSize()
-                        .compositingGroup()
-                        .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
-                        .animation(OverlayMotion.morphAnimation, value: scene.presentation)
-                        .padding(.top, 348)
-                        .transition(.opacity.combined(with: .offset(y: 24)))
-                }
+                // The overlay panel's content as the app shows it, at the panel's size.
+                OverlayView(model: scene.overlay)
+                    .frame(width: 480, height: 140)
+                    .offset(y: scene.pillOffset)
+                    .opacity(scene.pillOpacity)
+                    .padding(.top, 306)
             } else if let pill {
                 OverlayPill(
                     state: .recording, level: 0.6, style: .liveTranscript, isPreview: true,

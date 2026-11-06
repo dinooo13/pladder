@@ -27,6 +27,8 @@ struct GeneralSettingsView: View {
 
 private struct GetStartedSection: View {
     @Bindable var model: AppModel
+    // Only for trying the gesture once: never saved, gone with the section.
+    @State private var practice = ""
 
     private var permissions: PermissionMonitor { model.permissions }
 
@@ -60,11 +62,19 @@ private struct GetStartedSection: View {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                 }
+                // The first dictation, right where setup ends: the gesture is learnt by doing it.
+                TextField("Try it", text: $practice, prompt: Text("Click here, hold \(model.holdShortcut) and say hello"))
+                    .textFieldStyle(.roundedBorder)
+                    .labelsHidden()
             }
         } header: {
             Text("Get Started")
         } footer: {
-            Text("Click into any text field, hold \(model.holdShortcut) and talk.")
+            if model.needsSetup {
+                Text("Then click into any text field, hold \(model.holdShortcut) and talk.")
+            } else {
+                Text("It works the same in every app with a text field.")
+            }
         }
     }
 

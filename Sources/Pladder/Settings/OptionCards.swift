@@ -38,7 +38,9 @@ struct OptionCardRow<Option: Hashable, Thumbnail: View>: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .focusable()
+        // Reached by Tab with Full Keyboard Access, not focused when the window opens, where a
+        // square ring around the whole row was the first thing on screen.
+        .focusable(interactions: .activate)
         .onMoveCommand { direction in
             guard let index = options.firstIndex(of: selection) else { return }
             switch direction {
