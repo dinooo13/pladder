@@ -302,7 +302,7 @@ private struct HeroFigure: View {
                     Spacer()
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.system(size: 24))
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(.tertiary)
                 }
                 .padding(14)
                 .background(RoundedRectangle(cornerRadius: 14).fill(Color(nsColor: .textBackgroundColor)))

@@ -545,13 +545,23 @@ which the pill renders in an `OverlayPanel` that never takes focus.
 - **Arrival.** The pill appears 150 ms into a recording, so a Cmd+C that the
   interruption rule cancels never shows it. It flies up from the bottom edge
   as the Minimal disc and expands into its style.
+- **Place.** Above the Dock (`visibleFrame`), centred on the screen the
+  pointer is on. Within the 150 ms, a detached task reads the focused text
+  field's frame through Accessibility (`FocusedField`, 100 ms timeout); if
+  the pill would cover it, `OverlayPlacement` lifts it just above the field,
+  unless the field is a whole terminal or the lift would leave the screen.
+  An app slow to answer costs the pill its new place, never its timing.
 - **Release.** The model is left as it was, so the recording row gathers
   into the disc and dives; the paste is the confirmation. If nothing has
   been pasted by the time the disc has gathered, it waits with a spinner
   until the coordinator goes idle.
 - **Polish** keeps the pill up and says "Polishing…" until idle.
 - **The clipboard hint and errors** show in every style, Menu Bar included,
-  and fade in where the pill rests; a failed paste must never be silent.
+  and fade in and out where the pill rests; a failed paste must never be
+  silent. Without Accessibility every dictation ends in the hint, so the row
+  stays up at release and turns into it rather than gathering into the disc
+  and growing back. Errors stay 4 s, the hint 2.5 s.
+- **Reduce Motion** replaces every flight and morph with a fade in place.
 - **Menu Bar style** shows nothing else; the menu bar glyph is the feedback.
 
 `scripts/overlay-demo.sh` plays every path with stand-ins and records it.

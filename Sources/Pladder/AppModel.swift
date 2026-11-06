@@ -106,7 +106,7 @@ final class AppModel {
         self.coordinator = coordinator
         hotkeys.attach(coordinator)
         corrections = CorrectionInbox(dismissedURL: location.dismissedCorrectionsURL)
-        overlay = OverlayController(coordinator: coordinator)
+        overlay = OverlayController(coordinator: coordinator, pastes: { [permissions] in permissions.accessibilityTrusted })
 
         events.handler = { [weak self] in self?.handle($0.0, at: $0.1) }
         corrections.dictionary = { [weak self] in self?.settings.dictionary ?? [] }

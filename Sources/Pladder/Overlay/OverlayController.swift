@@ -8,6 +8,9 @@ import PladderSystem
 final class OverlayController {
     private let coordinator: DictationCoordinator
     private let reduceMotion: @MainActor () -> Bool
+    // Without Accessibility every dictation ends in the clipboard hint, so the row stays up
+    // at release and turns into the hint instead of gathering into a disc and growing back.
+    private let pastes: @MainActor () -> Bool
     private let model = OverlayModel()
     private lazy var panel = OverlayPanel(model: model)
 
@@ -33,10 +36,12 @@ final class OverlayController {
 
     init(
         coordinator: DictationCoordinator,
-        reduceMotion: @escaping @MainActor () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+        reduceMotion: @escaping @MainActor () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion },
+        pastes: @escaping @MainActor () -> Bool = { true }
     ) {
         self.coordinator = coordinator
         self.reduceMotion = reduceMotion
+        self.pastes = pastes
     }
 
     func start() {
@@ -119,6 +124,11 @@ final class OverlayController {
             }
             // Only the first `.transcribing` acts, and a pill that was never up stays down.
             guard visible else { return }
+            guard pastes() else {
+                model.partialTranscript = nil
+                cancelHide()
+                return
+            }
             scheduleHide(after: .zero, flight: true)
         case .polishing:
             guard model.style != .menuBar else {
@@ -194,8 +204,12 @@ final class OverlayController {
     private func schedulePresent() {
         guard !visible, presentTask == nil else { return }
         presentTask = Task { [weak self] in
+            // Off the main thread and inside the present delay: an app slow to answer
+            // Accessibility costs the pill its new place, never its timing.
+            let field = Task.detached(priority: .userInitiated) { FocusedField.frame() }
             try? await Task.sleep(for: Self.presentDelay)
             guard !Task.isCancelled, let self, self.running else { return }
+            self.panel.avoiding = await field.value
             self.presentTask = nil
             guard self.coordinator.state.isRecording, self.model.style != .menuBar else { return }
             self.cancelHide()

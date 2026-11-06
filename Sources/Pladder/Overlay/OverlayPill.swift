@@ -161,7 +161,7 @@ struct OverlayPill: View {
                     LiveTranscriptText(
                         text: partial,
                         hugs: hugsContent,
-                        width: hugsContent ? Self.previewTextWidth : Self.liveTextWidth,
+                        width: hugsContent ? nil : Self.liveTextWidth,
                         settled: isPreview
                     )
                 } else {
@@ -188,7 +188,6 @@ struct OverlayPill: View {
         + PillMetrics.barsWidth(count: liveBarCount) + PillMetrics.rowSpacing
 
     static var liveTextWidth: CGFloat { liveRowWidth - liveRowLead }
-    static let previewTextWidth: CGFloat = 84
 
     // Five 3 pt bars with 3 pt gaps are 27 × 20 pt, inside the disc with room to spare.
     static let minimalDiameter: CGFloat = 44
@@ -211,8 +210,10 @@ struct OverlayPill: View {
                         }
                         .transition(.opacity)
                 } else {
-                    // Coral while recording, so the disc never reads as the one waiting after release.
-                    LevelBars(level: level, count: 5, maxHeight: 20, opacity: 1, seeded: isPreview, color: .brandCoral)
+                    // Coral while the microphone is live, grey once the disc gathers at release, so
+                    // the colour always means "listening".
+                    LevelBars(level: level, count: 5, maxHeight: 20, opacity: 1, seeded: isPreview,
+                              color: presentation == .flyingOut ? .primary : .brandCoral)
                         .transition(.opacity)
                 }
             }

@@ -166,7 +166,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Aufräumen"
+            "value": "Bereinigen"
           }
         }
       }
@@ -216,7 +216,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Das Sprachmodell konnte nicht gestartet werden: %@"
+            "value": "Das Sprachmodell konnte nicht geladen werden: %@"
           }
         }
       }
@@ -276,7 +276,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ wird geladen …"
+            "value": "%@ wird heruntergeladen …"
           }
         }
       }
@@ -286,7 +286,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sprachmodell wird geladen …"
+            "value": "Sprachmodell wird heruntergeladen …"
           }
         }
       }
@@ -296,7 +296,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sprachmodell wird geladen … %lld %%"
+            "value": "Sprachmodell wird heruntergeladen … %lld %%"
           }
         }
       }
@@ -321,32 +321,12 @@
         }
       }
     },
-    "Fixes self-corrections, lists and punctuation before pasting.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Korrigiert Selbstkorrekturen, Listen und Satzzeichen vor dem Einfügen."
-          }
-        }
-      }
-    },
     "General": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
             "value": "Allgemein"
-          }
-        }
-      }
-    },
-    "Hands-free": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Freihand-Taste"
           }
         }
       }
@@ -426,7 +406,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Beim Anmelden öffnen"
+            "value": "Bei der Anmeldung öffnen"
           }
         }
       }
@@ -466,17 +446,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sprachmodell wird gestartet …"
-          }
-        }
-      }
-    },
-    "Match case": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Groß-/Kleinschreibung beachten"
+            "value": "Sprachmodell wird geladen …"
           }
         }
       }
@@ -561,32 +531,12 @@
         }
       }
     },
-    "Only %@ arrived…": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nur %@ angekommen …"
-          }
-        }
-      }
-    },
     "Only %@ reached Pladder. If you pressed a regular key too, macOS or another app owns that shortcut; try a different key, for example Control+Shift+D.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
             "value": "Bei Pladder ist nur %@ angekommen. Falls du auch eine normale Taste gedrückt hast, gehört der Kurzbefehl macOS oder einer anderen App; probier eine andere Taste, zum Beispiel Control-Umschalt-D."
-          }
-        }
-      }
-    },
-    "Open System Settings…": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Systemeinstellungen öffnen …"
           }
         }
       }
@@ -641,32 +591,12 @@
         }
       }
     },
-    "Polish with on-device AI": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Feinschliff mit KI auf dem Mac"
-          }
-        }
-      }
-    },
     "Polishing…": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
             "value": "Wird verfeinert …"
-          }
-        }
-      }
-    },
-    "Push to talk": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sprechtaste"
           }
         }
       }
@@ -781,16 +711,6 @@
         }
       }
     },
-    "Shortcuts": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Kurzbefehle"
-          }
-        }
-      }
-    },
     "So the next dictation does not run into this one.": {
       "localizations": {
         "de": {
@@ -856,7 +776,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Das Modell für Apple Intelligence wird noch geladen, deshalb fügen Diktate den Text vorerst so ein, wie er diktiert wurde."
+            "value": "Das Modell für Apple Intelligence wird noch heruntergeladen, deshalb fügen Diktate den Text vorerst so ein, wie er diktiert wurde."
           }
         }
       }
@@ -907,16 +827,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Die Sendetaste braucht die Bedienungshilfen."
-          }
-        }
-      }
-    },
-    "The speech model isn’t loaded yet.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Das Sprachmodell ist noch nicht geladen."
           }
         }
       }
@@ -1031,42 +941,12 @@
         }
       }
     },
-    "Without Accessibility, %@ cannot be detected, so %@ stands in for it until Accessibility is granted. Record a combination with a regular key to choose your own.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ohne Bedienungshilfen wird %1$@ nicht erkannt, deshalb springt %2$@ ein, bis die Bedienungshilfen erlaubt sind. Nimm eine Kombination mit einer normalen Taste auf, wenn du eine eigene willst."
-          }
-        }
-      }
-    },
-    "Without Accessibility, %@ cannot be detected, so the toggle key is off until Accessibility is granted.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ohne Bedienungshilfen wird %@ nicht erkannt, deshalb ist die Freihand-Taste aus, bis die Bedienungshilfen erlaubt sind."
-          }
-        }
-      }
-    },
     "Without a modifier, %@ can no longer be typed in other apps while Pladder is running.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
             "value": "Ohne Sondertaste lässt sich %@ in anderen Apps nicht mehr tippen, solange Pladder läuft."
-          }
-        }
-      }
-    },
-    "Words and replacements": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Wörter und Ersetzungen"
           }
         }
       }
@@ -1116,7 +996,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sprachmodell erneut laden"
+            "value": "Sprachmodell erneut herunterladen"
           }
         }
       }
@@ -1127,16 +1007,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Schlusspunkt weglassen"
-          }
-        }
-      }
-    },
-    "Hello": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hallo"
           }
         }
       }
@@ -1166,17 +1036,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sprachmodell erneut starten"
-          }
-        }
-      }
-    },
-    "Polish (Beta)": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Feinschliff (Beta)"
+            "value": "Sprachmodell erneut laden"
           }
         }
       }
@@ -1187,16 +1047,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kurzbefehl aufnehmen"
-          }
-        }
-      }
-    },
-    "Send": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Senden"
           }
         }
       }
@@ -1306,17 +1156,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Das Sprachmodell konnte nicht geladen werden: %@"
-          }
-        }
-      }
-    },
-    "Get started": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Erste Schritte"
+            "value": "Das Sprachmodell konnte nicht heruntergeladen werden: %@"
           }
         }
       }
@@ -1346,7 +1186,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Keine Internetverbindung. Das Sprachmodell wird geladen, sobald du online bist."
+            "value": "Keine Internetverbindung. Das Sprachmodell wird heruntergeladen, sobald du online bist."
           }
         }
       }
@@ -1356,7 +1196,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ein Teil des Sprachmodells kam beschädigt an. Erneutes Laden ersetzt diesen Teil."
+            "value": "Ein Teil des Sprachmodells kam beschädigt an. Erneutes Herunterladen ersetzt diesen Teil."
           }
         }
       }
@@ -1411,16 +1251,6 @@
         }
       }
     },
-    "While recording": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Während der Aufnahme"
-          }
-        }
-      }
-    },
     "%@ is part of the talk key, so it can never be pressed separately.": {
       "localizations": {
         "de": {
@@ -1456,7 +1286,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Das Sprachmodell konnte nicht gestartet werden."
+            "value": "Das Sprachmodell konnte nicht geladen werden."
           }
         }
       }
@@ -1501,26 +1331,6 @@
         }
       }
     },
-    "The last two apply to a dictation of one sentence up to ten words, such as a reply to an agent.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Die letzten beiden gelten für ein Diktat aus einem Satz mit bis zu zehn Wörtern, etwa eine Antwort an einen Agenten."
-          }
-        }
-      }
-    },
-    "The original Parakeet. 700 MB.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Das ursprüngliche Parakeet. 700 MB."
-          }
-        }
-      }
-    },
     "The speech model download stopped.": {
       "localizations": {
         "de": {
@@ -1547,6 +1357,186 @@
           "stringUnit": {
             "state": "translated",
             "value": "„Mach weiter“ wird als „mach weiter“ eingefügt. „API“ behält seine Großbuchstaben."
+          }
+        }
+      }
+    },
+    "A little less accurate. 700 MB.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Etwas weniger genau. 700 MB."
+          }
+        }
+      }
+    },
+    "Dismiss All": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alle verwerfen"
+          }
+        }
+      }
+    },
+    "Exact case": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exakt"
+          }
+        }
+      }
+    },
+    "For a dictation of one sentence up to ten words, such as a reply to an agent.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Für ein Diktat aus einem Satz mit bis zu zehn Wörtern, etwa eine Antwort an einen Agenten."
+          }
+        }
+      }
+    },
+    "Get Started": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erste Schritte"
+          }
+        }
+      }
+    },
+    "Hands-free key": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Freihandtaste"
+          }
+        }
+      }
+    },
+    "Keyboard Shortcuts": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tastenkombinationen"
+          }
+        }
+      }
+    },
+    "Open System Settings": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Systemeinstellungen öffnen"
+          }
+        }
+      }
+    },
+    "Polish before pasting": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vor dem Einfügen verfeinern"
+          }
+        }
+      }
+    },
+    "Recording Indicator": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aufnahmeanzeige"
+          }
+        }
+      }
+    },
+    "Send key": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sendetaste"
+          }
+        }
+      }
+    },
+    "Short Replies": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kurze Antworten"
+          }
+        }
+      }
+    },
+    "Talk key": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sprechtaste"
+          }
+        }
+      }
+    },
+    "The speech model is still loading. Try again in a moment.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Sprachmodell wird noch geladen. Versuche es gleich noch einmal."
+          }
+        }
+      }
+    },
+    "Without Accessibility, %@ can’t be detected, so the hands-free key is off until you allow it.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ohne Bedienungshilfen wird %@ nicht erkannt, deshalb ist die Freihandtaste aus, bis du sie erlaubst."
+          }
+        }
+      }
+    },
+    "Without Accessibility, %@ can’t be detected. %@ works in its place until you allow it.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ohne Bedienungshilfen wird %1$@ nicht erkannt. Bis du sie erlaubst, funktioniert %2$@ an ihrer Stelle."
+          }
+        }
+      }
+    },
+    "Beta. On-device AI fixes self-corrections, lists and punctuation.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beta. KI auf dem Mac korrigiert Selbstkorrekturen, Listen und Satzzeichen."
+          }
+        }
+      }
+    },
+    "Hi": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hi"
           }
         }
       }

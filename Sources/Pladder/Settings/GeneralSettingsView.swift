@@ -37,7 +37,7 @@ private struct GetStartedSection: View {
                     title: "Microphone",
                     detail: microphoneDetail,
                     buttonTitle: permissions.microphoneStatus == .notDetermined
-                        ? String(localized: "Allow…") : String(localized: "Open System Settings…"),
+                        ? String(localized: "Allow…") : String(localized: "Open System Settings"),
                     isPrimary: true,
                     action: permissions.grantMicrophone
                 )
@@ -47,7 +47,7 @@ private struct GetStartedSection: View {
                     title: "Accessibility",
                     detail: String(localized: "Lets Pladder paste for you. Without it, the text is copied and you press ⌘V."),
                     buttonTitle: permissions.promptedForAccessibility
-                        ? String(localized: "Open System Settings…") : String(localized: "Allow…"),
+                        ? String(localized: "Open System Settings") : String(localized: "Allow…"),
                     isPrimary: !permissions.needsMicrophone,
                     action: permissions.grantAccessibility
                 )
@@ -62,7 +62,7 @@ private struct GetStartedSection: View {
                 }
             }
         } header: {
-            Text("Get started")
+            Text("Get Started")
         } footer: {
             Text("Click into any text field, hold \(model.holdShortcut) and talk.")
         }
@@ -131,17 +131,17 @@ private struct ShortcutsSection: View {
     @Bindable var model: AppModel
 
     var body: some View {
-        Section("Shortcuts") {
+        Section("Keyboard Shortcuts") {
             LabeledContent {
                 HotkeyRecorderField(
-                    title: "Push to talk",
+                    title: "Talk key",
                     hotkey: $model.settings.hotkey,
                     setHotkeySuspended: model.setHotkeySuspended,
                     requiresRegularKey: model.hotkeys.hotkeyNeedsRegularKey,
                     systemShortcuts: model.hotkeys.systemShortcuts
                 )
             } label: {
-                Text("Push to talk")
+                Text("Talk key")
                 Text("Hold to record, release to paste. Escape discards.")
             }
             if let warning = HotkeyWarning.forKey(
@@ -151,7 +151,7 @@ private struct ShortcutsSection: View {
             }
             LabeledContent {
                 HotkeyRecorderField(
-                    title: "Hands-free",
+                    title: "Hands-free key",
                     hotkey: $model.settings.toggleHotkey,
                     setHotkeySuspended: model.setHotkeySuspended,
                     requiresRegularKey: model.hotkeys.hotkeyNeedsRegularKey,
@@ -159,7 +159,7 @@ private struct ShortcutsSection: View {
                     systemShortcuts: model.hotkeys.systemShortcuts
                 )
             } label: {
-                Text("Hands-free")
+                Text("Hands-free key")
                 Text("Tap to start, tap again to paste.")
             }
             if let warning = HotkeyWarning.forToggle(
@@ -170,13 +170,13 @@ private struct ShortcutsSection: View {
             }
             LabeledContent {
                 HotkeyRecorderField(
-                    title: "Send",
+                    title: "Send key",
                     hotkey: $model.settings.submitKey,
                     setHotkeySuspended: model.setHotkeySuspended,
                     allowsEmpty: true
                 )
             } label: {
-                Text("Send")
+                Text("Send key")
                 Text("Press while talking to send the text with Return.")
             }
             if let warning = HotkeyWarning.forSendKey(
@@ -194,15 +194,16 @@ private struct OverlaySection: View {
     var body: some View {
         Section {
             OptionCardRow(
-                title: String(localized: "While recording"),
+                title: String(localized: "Recording Indicator"),
                 selection: $model.settings.overlayStyle,
-                options: OverlayStyle.allCases,
+                // The site's order, from the most shown to the least.
+                options: [.compact, .minimal, .liveTranscript, .menuBar],
                 name: \.displayName
             ) { style in
                 OverlayStyleThumbnail(style: style)
             }
         } header: {
-            Text("While recording")
+            Text("Recording Indicator")
         }
     }
 }

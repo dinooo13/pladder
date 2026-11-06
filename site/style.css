@@ -5,12 +5,13 @@
 
 :root {
   color-scheme: light dark;
+  /* macOS's own greys, as Apple's pages and System Settings use them. */
   --bg: #FFFFFF;
-  --ink: #18181B;
-  --muted: #52525B;
-  --faint: #71717A;
-  --line: #E4E4E7;
-  --soft: #F4F4F5;
+  --ink: #1D1D1F;
+  --muted: #56565C;
+  --faint: #6E6E73;
+  --line: #E3E3E8;
+  --soft: #F5F5F7;
   --coral: #FF6A47;
   --coral-ink: #18181B;
   --key: #FFFFFF;
@@ -26,11 +27,11 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #111113;
-    --ink: #FAFAFA;
-    --muted: #A1A1AA;
-    --faint: #8E8E96;
-    --line: #27272A;
-    --soft: #1A1A1D;
+    --ink: #F5F5F7;
+    --muted: #A1A1A6;
+    --faint: #8E8E93;
+    --line: #2C2C2E;
+    --soft: #1C1C1E;
     --key: #1F1F22;
     --key-line: #3F3F46;
     --focus: #FF8F73;
@@ -161,8 +162,9 @@ kbd.key-v { min-width: 34px; min-height: 30px; align-items: center; justify-cont
 
 /* Sections: plain text on one background, a hairline between them. */
 
+/* Narrower than the hero, so a section's text never leaves half the page empty. */
 .sec {
-  max-width: 1120px;
+  max-width: 880px;
   margin: 0 auto;
   padding: 88px 24px;
   border-top: 1px solid var(--line);
@@ -173,7 +175,7 @@ kbd.key-v { min-width: 34px; min-height: 30px; align-items: center; justify-cont
 .note a { color: var(--ink); }
 /* The page's one large type: the measurement the product is about. */
 .figures { display: flex; flex-wrap: wrap; gap: 24px 64px; margin: 8px 0 28px; }
-.figures div { display: flex; flex-direction: column-reverse; justify-content: flex-end; gap: 6px; max-width: 18em; }
+.figures div { display: flex; flex-direction: column-reverse; justify-content: flex-end; gap: 8px; max-width: 26em; }
 .figures dd { font-size: clamp(56px, 7vw, 88px); font-weight: 600; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .figures dd a { text-decoration: none; }
 .figures dd a:hover { text-decoration: underline; text-decoration-thickness: 2px; }
@@ -183,9 +185,10 @@ kbd.key-v { min-width: 34px; min-height: 30px; align-items: center; justify-cont
 .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 16px; }
 .block { border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
 .block:last-child { border-color: color-mix(in srgb, var(--coral) 45%, var(--line)); }
-.mono { font: 15px/1.6 var(--mono); }
-.block:first-child .mono { color: var(--muted); }
+/* Typed is a terminal line; said is speech, so it is set as text. */
+.mono { font: 15px/1.6 var(--mono); color: var(--muted); }
 .mono::before { content: "> "; color: var(--faint); }
+.spoken { font-size: 17px; line-height: 1.55; }
 
 .facts {
   margin-top: 48px;

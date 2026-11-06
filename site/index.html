@@ -58,11 +58,6 @@
         },
         {
           "@type": "Question",
-          "name": "How is it different from macOS Dictation and Whisper apps?",
-          "acceptedAnswer": {"@type": "Answer", "text": "Pladder is push-to-talk: it records only while you hold the key and pastes the whole text when you let go, into any app. It runs Parakeet Ultra, a post-training of NVIDIA's Parakeet TDT v3, rather than Whisper, and transcribes while you are still speaking, so the wait after you let go stays the same for a sentence or for five minutes."}
-        },
-        {
-          "@type": "Question",
           "name": "Will it run on my Mac, and in my language?",
           "acceptedAnswer": {"@type": "Answer", "text": "Any Mac with an Apple chip, M1 or newer, on macOS 26 or later; the benchmarks are taken on an M1, so every newer chip is faster. It understands the 25 European languages of Parakeet, among them English, German, French, Spanish, Italian, Portuguese, Dutch, Polish and Ukrainian, and detects the language as you speak."}
         }
@@ -117,15 +112,11 @@
   <p class="lede">No spinning wheel, no upload. Pladder transcribes while you are still talking, so the wait after you let go is the same for one sentence or five minutes.</p>
   <dl class="figures">
     <div>
-      <dt>from letting go to the text on screen, the median over real dictations</dt>
+      <dt>from letting go to the text on screen, the median over real dictations on an M1, the oldest Mac Pladder runs on</dt>
       <dd><a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#what-a-dictation-waits-for">0.195 s</a></dd>
     </div>
-    <div>
-      <dt>after five minutes of talking</dt>
-      <dd><a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#parakeet-ultra">0.261 s</a></dd>
-    </div>
   </dl>
-  <p class="note">Measured on an M1, the oldest Mac Pladder runs on. <a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md">Read the benchmark</a>.</p>
+  <p class="note">Five minutes of talking still paste in <a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#parakeet-ultra">0.261 s</a>. <a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md">Read the benchmark</a>.</p>
 </section>
 
 <section class="sec" id="prompts" aria-labelledby="prompts-title">
@@ -138,7 +129,7 @@
     </div>
     <div class="block">
       <p class="label">Said</p>
-      <p class="mono">The dark mode toggle in settings forgets its state after a restart. Save it, load it on launch, and add a test that flips it and relaunches.</p>
+      <p class="spoken">“The dark mode toggle in settings forgets its state after a restart. Save it, load it on launch, and add a test that flips it and relaunches.”</p>
     </div>
   </div>
   <dl class="facts">
@@ -146,8 +137,6 @@
     <div><dt><del>clode code</del> becomes Claude Code</dt><dd>A dictionary fixes the names speech models trip over: tools, libraries, your project's jargon.</dd></div>
     <div><dt>No more “um”</dt><dd>Filler words are dropped before the text is pasted.</dd></div>
     <div><dt>Learns your names</dt><dd>Fix a word once and Pladder offers to remember it.</dd></div>
-    <div><dt>Your clipboard, untouched</dt><dd>Whatever you had copied is still there afterwards.</dd></div>
-    <div><dt>25 languages</dt><dd>English, German, French, Spanish and the rest of Europe, detected as you speak.</dd></div>
   </dl>
 </section>
 
@@ -176,7 +165,6 @@
         <tr><th scope="row">Free plan limits</th><td data-label="Pladder" class="us">None. The best model is included.</td><td data-label="Wispr Flow">Weekly word cap</td><td data-label="Superwhisper">Whisper models only. Parakeet needs Pro.</td></tr>
         <tr><th scope="row">Speed</th><td data-label="Pladder" class="us"><span><a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#what-a-dictation-waits-for">0.2 s</a>, measured in public</span></td><td data-label="Wispr Flow">No public benchmark to rerun</td><td data-label="Superwhisper">No public benchmark to rerun</td></tr>
         <tr><th scope="row">Where your voice goes</th><td data-label="Pladder" class="us">Nowhere. It stays on your Mac.</td><td data-label="Wispr Flow">To their cloud servers</td><td data-label="Superwhisper">Your Mac, or the cloud with Pro cloud models</td></tr>
-        <tr><th scope="row">Works offline</th><td data-label="Pladder" class="us">Always</td><td data-label="Wispr Flow">No</td><td data-label="Superwhisper">Only with local models</td></tr>
       </tbody>
     </table>
   </div>
@@ -204,10 +192,6 @@
     <details>
       <summary>Will it run on my Mac, and in my language?</summary>
       <p>Any Mac with an Apple chip, M1 or newer, on macOS 26 or later; the benchmarks are taken on an M1, so every newer chip is faster. It understands the 25 European languages of Parakeet, among them English, German, French, Spanish, Italian, Portuguese, Dutch, Polish and Ukrainian, and detects the language as you speak.</p>
-    </details>
-    <details>
-      <summary>How is it different from macOS Dictation and Whisper apps?</summary>
-      <p>Pladder is push-to-talk: it records only while you hold the key and pastes the whole text when you let go, into any app. It runs Parakeet Ultra, a post-training of NVIDIA's Parakeet TDT v3, rather than Whisper, and transcribes while you are still speaking, so the wait after you let go stays the same for a sentence or for five minutes.</p>
     </details>
   </div>
 </section>

@@ -132,13 +132,13 @@ struct OverlayStyleThumbnail: View {
                 level: Self.previewLevel,
                 style: .liveTranscript,
                 isPreview: true,
-                partial: String(localized: "Hello"),
+                partial: String(localized: "Hi"),
                 hugsContent: true
             )
             // Proposed at the card's width the glass shrinks but the row does not, and the dot
             // ends up outside the capsule.
             .fixedSize()
-            .scaleEffect(0.62)
+            .scaleEffect(0.8)
             .padding(.bottom, 4)
         }
     }
