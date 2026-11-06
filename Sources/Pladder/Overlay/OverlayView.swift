@@ -16,7 +16,7 @@ struct OverlayView: View {
         )
             // Glass carries its own edge highlight; this only lifts the pill off a light desktop.
             .compositingGroup()
-            .shadow(color: .black.opacity(0.16), radius: 8, y: 3)
+            .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
             .animation(.smooth(duration: 0.25), value: phase)
             .animation(OverlayMotion.morphAnimation, value: model.presentation)
             .frame(maxWidth: .infinity, maxHeight: .infinity)

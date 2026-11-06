@@ -166,18 +166,19 @@ let document: [String: Any] = [
         ["appearance": "dark", "value": gradient(Palette.darkTop, Palette.darkBottom)],
     ],
     // The caret in a group of its own without translucency: the tile showing through
-    // turned its coral brown towards the bottom.
+    // turned its coral brown towards the bottom. No specular on either group: it drew a
+    // black hairline round every shape and rendered the caret at #ED7352, not the coral.
     "groups": [
         [
             "layers": [layer("caret")],
             "shadow": ["kind": "neutral", "opacity": 0.5],
-            "specular": true,
+            "specular": false,
             "translucency": ["enabled": false, "value": 0],
         ],
         [
             "layers": [layer("bars")],
             "shadow": ["kind": "neutral", "opacity": 0.5],
-            "specular": true,
+            "specular": false,
             "translucency": ["enabled": true, "value": 0.5],
         ],
     ],

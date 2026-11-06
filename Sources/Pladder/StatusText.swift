@@ -58,6 +58,16 @@ extension DictationFailure {
         case .other(let detail): detail
         }
     }
+
+    // For the pill's two lines: the sentence without the system's own detail, which the
+    // menu still shows in full.
+    var shortText: String {
+        switch self {
+        case .microphone: String(localized: "Couldn’t use the microphone.")
+        case .engineNotLoaded, .pasteKeystroke: text
+        case .other: String(localized: "Something went wrong. The menu has the details.")
+        }
+    }
 }
 
 extension OnDeviceModelAvailability {
@@ -124,13 +134,13 @@ enum MenuStatus {
         switch state {
         case .recording:
             // The Menu style has no pill, so this line is its latched cue.
-            guard isLatched else { return String(localized: "Recording…") }
-            return String(localized: "Recording — press \(chords.stop) to stop")
+            guard isLatched else { return String(localized: "Listening…") }
+            return String(localized: "Listening… Press \(chords.stop) to stop.")
         case .transcribing: return String(localized: "Transcribing…")
         case .polishing: return String(localized: "Polishing…")
         case .inserting: return String(localized: "Pasting…")
         case .error(let failure): return failure.text
-        case .copied: return String(localized: "Copied — press ⌘V")
+        case .copied: return String(localized: "Copied. Press ⌘V to paste.")
         case .idle:
             return readyLine(chords)
         case .unavailable:

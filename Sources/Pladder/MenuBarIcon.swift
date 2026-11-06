@@ -22,8 +22,10 @@ enum MenuBarIcon {
             case .recording:
                 let amp = CGFloat(WaveformMeter.amplitude(for: level))
                 self = .recording(step: Int((amp * CGFloat(Self.levelSteps - 1)).rounded()))
-            // Starting, loading and the first download are work, not failure.
-            case .transcribing, .polishing, .inserting: self = .busy
+            // A dictation on its way out is a fraction of a second: dimming for it would blink
+            // the icon to "off" after every take. Starting, loading and the first download are
+            // work, not failure, so they dim rather than slash.
+            case .transcribing, .polishing, .inserting: self = .idle
             case .unavailable(.starting), .unavailable(.loadingModel): self = .busy
             case .unavailable(.engineFailed), .error: self = .off
             }

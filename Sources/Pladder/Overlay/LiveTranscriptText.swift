@@ -9,6 +9,8 @@ struct LiveTranscriptText: View {
     let text: String
     var hugs: Bool = false
     var width: CGFloat?
+    // A replica has no earlier pass to compare with, so its words count as settled.
+    var settled = false
     static let maximumLines = 3
 
 
@@ -26,7 +28,7 @@ struct LiveTranscriptText: View {
     private var attributed: AttributedString {
         let shown = shown
         // The previous pass may have been cut to a different tail: compare from the end.
-        var stable = shown.commonPrefix(with: previous.suffix(shown.count))
+        var stable = settled ? shown : shown.commonPrefix(with: previous.suffix(shown.count))
         // A prefix stopping inside a word would paint half of it grey.
         if stable.count < shown.count, let lastSpace = stable.lastIndex(where: \.isWhitespace) {
             stable = String(stable[..<lastSpace])

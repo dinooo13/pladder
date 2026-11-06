@@ -238,7 +238,7 @@ final class AppModel {
     // Without Accessibility the stored chord may listen for nothing, so the stand-in is
     // named: "hold Right Command" would be a lie.
     private var menuChords: MenuStatus.Chords {
-        let standIn = hotkeys.standInHotkey?.sideAgnosticDisplayName
+        let standIn = hotkeys.standInHotkey?.shortcutName
         let hold = standIn ?? hotkeys.displayName(of: settings.hotkey)
         let toggle = settings.toggleHotkey
         let stop = !toggle.isEmpty && toggle.canonical != settings.hotkey.canonical
@@ -259,6 +259,23 @@ final class AppModel {
 
     func copyLastTranscript() {
         Task { await coordinator.copyLastTranscript() }
+    }
+
+    // Until dictation can work: a grant missing, or the speech model not ready yet.
+    var needsSetup: Bool {
+        switch coordinator.engineStatus {
+        case .downloading, .loading, .failed: true
+        case .ready, .unloaded: permissions.needsAnyPermission
+        }
+    }
+
+    var holdShortcut: String { menuChords.hold }
+
+    var retryEngineTitle: String {
+        if case .failed(.loadFailed) = coordinator.engineStatus {
+            return String(localized: "Load Speech Model Again")
+        }
+        return String(localized: "Download Speech Model Again")
     }
 
     var canRetryEngine: Bool {

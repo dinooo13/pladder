@@ -18,31 +18,62 @@ struct HotkeyRecorderField: View {
 
     @State private var recorder = HotkeyRecorder()
 
+    // A shortcut field as System Settings draws one: the keys in a rounded field, a
+    // placeholder when empty, a clear button, and the focus ring while recording.
     var body: some View {
-        VStack(alignment: .trailing, spacing: 2) {
-            Button {
-                if recorder.isRecording {
-                    recorder.cancel()
-                } else {
-                    recorder.begin(
-                        requiresRegularKey: requiresRegularKey,
-                        allowsEmpty: allowsEmpty,
-                        systemShortcuts: systemShortcuts,
-                        setHotkeySuspended: setHotkeySuspended
-                    ) { hotkey = $0 }
-                }
-            } label: {
+        VStack(alignment: .trailing, spacing: 4) {
+            HStack(spacing: 4) {
                 Text(label)
-                    .frame(minWidth: 140)
+                    .foregroundStyle(isEmpty && !recorder.isRecording ? .secondary : .primary)
                     .contentTransition(.numericText())
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity)
+                if allowsEmpty, !isEmpty, !recorder.isRecording {
+                    Button {
+                        hotkey = Hotkey(keyCodes: [])
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.tertiary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Clear")
+                    .accessibilityLabel("Clear")
+                }
             }
-            .buttonStyle(RecorderButtonStyle(isRecording: recorder.isRecording))
+            .padding(.horizontal, 8)
+            .frame(width: 132, height: 24)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color(nsColor: .controlBackgroundColor))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(Color(nsColor: .separatorColor))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 7)
+                    .strokeBorder(Color(nsColor: .keyboardFocusIndicatorColor), lineWidth: 3)
+                    .padding(-2)
+                    .opacity(recorder.isRecording ? 1 : 0)
+            )
+            .contentShape(Rectangle())
+            .onTapGesture { toggleRecording() }
+            // Full Keyboard Access: Tab reaches the field, Space starts recording.
+            .focusable(!recorder.isRecording)
+            .onKeyPress(keys: [.space, .return]) { _ in
+                guard !recorder.isRecording else { return .ignored }
+                toggleRecording()
+                return .handled
+            }
             .help(help)
+            .accessibilityElement(children: .ignore)
+            .accessibilityAddTraits(.isButton)
             .accessibilityValue(recorder.isRecording ? String(localized: "Recording a shortcut") : hotkey.displayName)
+            .accessibilityAction { toggleRecording() }
             if let notice = recorder.notice {
                 Text(notice)
                     .font(.callout)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.secondary)
                     .multilineTextAlignment(.trailing)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: 260, alignment: .trailing)
@@ -51,14 +82,31 @@ struct HotkeyRecorderField: View {
         .onDisappear { recorder.cancel() }
     }
 
+    private var isEmpty: Bool { hotkey.keyCodes.isEmpty }
+
+    private func toggleRecording() {
+        if recorder.isRecording {
+            recorder.cancel()
+        } else {
+            recorder.begin(
+                requiresRegularKey: requiresRegularKey,
+                allowsEmpty: allowsEmpty,
+                systemShortcuts: systemShortcuts,
+                setHotkeySuspended: setHotkeySuspended
+            ) { hotkey = $0 }
+        }
+    }
+
     private var label: String {
-        guard recorder.isRecording else { return hotkey.shortcutName }
+        guard recorder.isRecording else {
+            return isEmpty ? String(localized: "Record Shortcut") : hotkey.shortcutName
+        }
         // Naming the modifiers that did arrive is the honest version of "Needs a regular
         // key": macOS may have eaten the key before Pladder saw it.
         if let refused = recorder.refusedModifiers {
             return String(localized: "Only \(refused.sideAgnosticDisplayName) arrived…")
         }
-        return recorder.pending?.shortcutName ?? String(localized: "Press keys…")
+        return recorder.pending?.shortcutName ?? String(localized: "Type Shortcut")
     }
 
     // Whole sentences: a translation cannot be assembled from clauses.
@@ -76,21 +124,6 @@ struct HotkeyRecorderField: View {
             String(localized: "Click, then press the key or combination to use.")
         case (false, true):
             String(localized: "Click, then press the key or combination to use. Without Accessibility the key must include a regular key, for example Control+Shift+D.")
-        }
-    }
-}
-
-// Bordered at rest; while recording, the accent ring and tint of a focused field.
-private struct RecorderButtonStyle: PrimitiveButtonStyle {
-    let isRecording: Bool
-
-    func makeBody(configuration: Configuration) -> some View {
-        if isRecording {
-            Button(configuration)
-                .buttonStyle(.borderedProminent)
-        } else {
-            Button(configuration)
-                .buttonStyle(.bordered)
         }
     }
 }

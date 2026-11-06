@@ -6,14 +6,18 @@
 # so it is safe to run while another Pladder is in use; it shows a few
 # windows for a second or two.
 #
-# Usage: scripts/make-screenshots.sh [dir]   (default: docs/images)
+# Usage: scripts/make-screenshots.sh [dir] [--hero | --settings]   (default: docs/images)
+#   --hero      the site's hero picture, hero-light.png and hero-dark.png, which
+#               site/media/hero-* are encoded from
+#   --settings  each Settings tab, light and dark, for reviewing the window
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
-OUT="${1:-$ROOT/docs/images}"
+OUT="$ROOT/docs/images"
+if [[ $# -gt 0 && "$1" != --* ]]; then OUT="$1"; shift; fi
 
 "$ROOT/scripts/bundle.sh"
 # The binary directly, not `open`: screencapture then runs with this
 # terminal's Screen Recording grant.
-"$ROOT/dist/Pladder.app/Contents/MacOS/Pladder" --screenshots "$OUT"
+"$ROOT/dist/Pladder.app/Contents/MacOS/Pladder" --screenshots "$OUT" "$@"

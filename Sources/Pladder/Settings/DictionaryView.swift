@@ -13,7 +13,7 @@ struct DictionaryView: View {
     @Bindable var model: AppModel
 
     @State private var selection = Set<DictionaryEntry.ID>()
-    @State private var sample = "i tried clode in claude code today"
+    @State private var sample = ""
     @State private var failure: FileFailure?
     @FocusState private var focusedCell: DictionaryCell?
 
@@ -35,12 +35,14 @@ struct DictionaryView: View {
                     if !cyclicIDs.isEmpty {
                         WarningLabel(String(localized: "Two rules undo each other, so both are ignored."))
                     }
-                    FootnoteText("Leave Heard as empty to teach a word, such as a name, that comes out nearly right.")
+                    Text("Leave Heard as empty to teach a word, such as a name, that comes out nearly right.")
                 }
             }
 
-            Section("Try it") {
-                testArea
+            if !entries.isEmpty {
+                Section("Try it") {
+                    testArea
+                }
             }
         }
         .formStyle(.grouped)
@@ -68,10 +70,11 @@ struct DictionaryView: View {
                     }
                     DictionaryField(
                         text: row.from,
-                        prompt: "spoken form",
+                        prompt: "similar words",
                         cell: DictionaryCell(id: row.wrappedValue.id, column: .from),
                         focus: $focusedCell
                     )
+                    .accessibilityLabel("Heard as")
                 }
             }
             .width(min: 120, ideal: 170)
@@ -83,6 +86,7 @@ struct DictionaryView: View {
                     cell: DictionaryCell(id: row.wrappedValue.id, column: .to),
                     focus: $focusedCell
                 )
+                .accessibilityLabel("Replace with")
             }
             .width(min: 120, ideal: 170)
 
@@ -97,18 +101,13 @@ struct DictionaryView: View {
         .alternatingRowBackgrounds(.disabled)
         .overlay {
             if entries.isEmpty {
-                VStack(spacing: 8) {
-                    Text("No Words Yet")
-                        .font(.headline)
+                ContentUnavailableView {
+                    Label("No Words Yet", systemImage: "character.book.closed")
+                } description: {
                     Text("Add a word Pladder keeps mishearing and what it should be.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
+                } actions: {
                     Button("Add Examples", action: addExamples)
-                        .buttonStyle(.link)
                 }
-                .padding(.horizontal, 40)
-                .padding(.top, 24)
             }
         }
         .frame(minHeight: 220)
@@ -160,17 +159,18 @@ struct DictionaryView: View {
             TextField("", text: $sample, prompt: Text("Type a sentence to see how the rules change it"))
                 .labelsHidden()
                 .textFieldStyle(.roundedBorder)
-            Label {
-                Text(testResult.isEmpty ? "—" : testResult)
-                    .textSelection(.enabled)
-                    .lineLimit(2)
-            } icon: {
-                Image(systemName: "arrow.turn.down.right")
-                    .accessibilityLabel("Pasted as")
+            if !sample.isEmpty {
+                Label {
+                    Text(testResult)
+                        .textSelection(.enabled)
+                        .lineLimit(2)
+                } icon: {
+                    Image(systemName: "arrow.turn.down.right")
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("Pasted as")
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .font(.callout)
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -201,7 +201,7 @@ struct DictionaryView: View {
         merge([
             DictionaryEntry(from: "claude code", to: "Claude Code"),
             DictionaryEntry(from: "clode", to: "Claude"),
-            DictionaryEntry(from: "pull request", to: "PR"),
+            DictionaryEntry(from: "get hub", to: "GitHub"),
             DictionaryEntry(from: "", to: "ChatGPT"),
         ])
     }
