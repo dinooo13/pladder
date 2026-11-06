@@ -50,10 +50,13 @@ struct OptionCardRow<Option: Hashable, Thumbnail: View>: View {
             }
         }
         .accessibilityRepresentation {
+            // Its label hidden: the section heading above already says it, and VoiceOver read
+            // the words twice. The group keeps the title as its name.
             Picker(title, selection: $selection) {
                 ForEach(options, id: \.self) { Text(name($0)).tag($0) }
             }
             .pickerStyle(.radioGroup)
+            .labelsHidden()
         }
     }
 }

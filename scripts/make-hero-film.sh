@@ -26,6 +26,7 @@ for scheme in light dark; do
   # Tagged BT.709, limited range, so browsers decode the page colour where it was.
   ffmpeg -y -loglevel error -i "$FILMS/hero-film-$scheme.mov" -vf "fps=30,tpad=stop_mode=clone:stop_duration=0.9,scale=out_color_matrix=bt709:out_range=tv" \
     -c:v libx264 -pix_fmt yuv420p -crf 20 -preset slow -movflags +faststart \
+    -x264-params colorprim=bt709:transfer=bt709:colormatrix=bt709:range=tv \
     -colorspace bt709 -color_primaries bt709 -color_trc bt709 -color_range tv -an "$out.mp4"
   ffmpeg -y -loglevel error -i "$out.mp4" -c:v libvpx-vp9 -pix_fmt yuv420p -crf 32 -b:v 0 \
     -colorspace bt709 -color_primaries bt709 -color_trc bt709 -color_range tv -an "$out.webm"

@@ -21,6 +21,7 @@ struct PladderApp: App {
         if OverlayDemo.isRequested {
             Task { @MainActor in await OverlayDemo.run() }
         } else if let directory = Screenshots.directory {
+            Screenshots.appModel = model
             Task { @MainActor in await Screenshots.run(into: directory) }
         } else {
             AppDelegate.shutdown = { await model.shutdown() }

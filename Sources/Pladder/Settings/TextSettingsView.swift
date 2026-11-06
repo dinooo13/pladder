@@ -14,6 +14,7 @@ struct TextSettingsView: View {
                         Text(ProcessorText.name(id))
                         Text(ProcessorText.detail(id))
                     }
+                    .accessibilityHint(Text(ProcessorText.detail(id)))
                 }
             }
 
@@ -22,14 +23,17 @@ struct TextSettingsView: View {
                     Text("Add a space after each dictation")
                     Text("So the next dictation does not run into this one.")
                 }
+                .accessibilityHint(Text("So the next dictation does not run into this one."))
                 Toggle(isOn: $model.settings.shortSentenceWithoutPeriod) {
                     Text("Drop the period after a short reply")
                     Text("A one-sentence reply up to ten words: “Yes.” is pasted as “Yes”.")
                 }
+                .accessibilityHint(Text("A one-sentence reply up to ten words: “Yes.” is pasted as “Yes”."))
                 Toggle(isOn: $model.settings.shortSentenceWithoutCapital) {
                     Text("Start a short reply in lowercase")
                     Text("“Run the tests” is pasted as “run the tests”. “I” and “API” keep their capital.")
                 }
+                .accessibilityHint(Text("“Run the tests” is pasted as “run the tests”. “I” and “API” keep their capital."))
             }
 
             Section {
@@ -37,6 +41,7 @@ struct TextSettingsView: View {
                     Text("Polish before pasting")
                     Text("Beta. On-device AI fixes self-corrections, lists and punctuation.")
                 }
+                .accessibilityHint(Text("Beta. On-device AI fixes self-corrections, lists and punctuation."))
                 if model.settings.polishDictations {
                     Picker("Model", selection: $model.settings.polishModel) {
                         ForEach(PolishModel.allCases, id: \.self) { choice in

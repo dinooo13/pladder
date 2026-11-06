@@ -9,6 +9,8 @@ import SwiftUI
 // order. Escape alone cancels; Delete alone clears, where that is allowed.
 struct HotkeyRecorderField: View {
     let title: LocalizedStringKey
+    // The row's subtitle, so moving by control still hears what the key does.
+    var hint: LocalizedStringKey = ""
     @Binding var hotkey: Hotkey
     var setHotkeySuspended: (Bool) -> Void
     // Without Accessibility a chord goes to Carbon, which needs one regular key, so a
@@ -32,6 +34,7 @@ struct HotkeyRecorderField: View {
                 }
                     .help(help)
                     .accessibilityLabel(title)
+                    .accessibilityHint(Text(hint))
                     .accessibilityValue(String(localized: "None"))
             } else {
                 field
@@ -95,10 +98,12 @@ struct HotkeyRecorderField: View {
                 toggleRecording()
                 return .handled
             }
-            .help(help)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(title)
+            .accessibilityHint(Text(hint))
             .accessibilityAddTraits(.isButton)
+            // After the element is formed, or the ignored children take the help with them.
+            .help(help)
             .accessibilityValue(recorder.isRecording ? String(localized: "Recording a shortcut") : hotkey.displayName)
             .accessibilityAction { toggleRecording() }
     }
