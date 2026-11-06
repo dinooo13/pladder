@@ -22,6 +22,27 @@
   --tile-bottom: #18181B;
   --text: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /* The hero's drawn T3 Code window, in its own light and dark themes, and the pill. */
+  --app-bg: #FDFDFD;
+  --app-side: #FAFAFA;
+  --app-line: #E4E4E7;
+  --app-ink: #18181B;
+  --app-muted: #71717A;
+  --app-control: #F4F4F5;
+  --app-row: #FFFFFF;
+  --app-ring: rgba(228, 228, 231, 0.7);
+  --app-msg: #EBEBED;
+  --app-card: #FFFFFF;
+  --app-outline: rgba(0, 0, 0, 0.08);
+  --app-code: rgba(24, 24, 27, 0.08);
+  --app-primary: #3B50D6;
+  --app-info: #1D4ED8;
+  --app-add: #047857;
+  --app-del: #B91C1C;
+  --pill-bg: rgba(255, 255, 255, 0.62);
+  --pill-line: rgba(255, 255, 255, 0.75);
+  --pill-hi: rgba(255, 255, 255, 0.9);
+  --pill-ink: #1D1D1F;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -38,6 +59,26 @@
     /* The mark's dark tile, lifted so it does not sink into the page. */
     --tile-top: #45454C;
     --tile-bottom: #2A2A2E;
+    --app-bg: #000000;
+    --app-side: #000000;
+    --app-line: rgba(255, 255, 255, 0.08);
+    --app-ink: #F5F5F5;
+    --app-muted: #A3A3A3;
+    --app-control: #191A1D;
+    --app-row: rgba(255, 255, 255, 0.07);
+    --app-ring: transparent;
+    --app-msg: #1C1C1C;
+    --app-card: #111111;
+    --app-outline: rgba(255, 255, 255, 0.06);
+    --app-code: rgba(245, 245, 245, 0.1);
+    --app-primary: #4F68F0;
+    --app-info: #60A5FA;
+    --app-add: #34D399;
+    --app-del: #F87171;
+    --pill-bg: rgba(48, 48, 56, 0.62);
+    --pill-line: rgba(255, 255, 255, 0.14);
+    --pill-hi: rgba(255, 255, 255, 0.12);
+    --pill-ink: #F5F5F7;
   }
 }
 
@@ -149,7 +190,7 @@ kbd.key-v { min-width: 34px; min-height: 30px; align-items: center; justify-cont
   margin: 0 auto;
   padding: 56px 24px 24px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 580px);
+  grid-template-columns: minmax(0, 440px) minmax(0, 1fr);
   align-items: center;
   gap: 40px 48px;
 }
@@ -161,27 +202,211 @@ kbd.key-v { min-width: 34px; min-height: 30px; align-items: center; justify-cont
 .perks { font-size: 14px; color: var(--faint); }
 .keys { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
 .kgroup { display: inline-flex; align-items: center; gap: inherit; white-space: nowrap; }
-.visual { justify-self: end; width: 100%; max-width: 580px; }
-.visual img { display: block; width: 100%; height: auto; }
-/* The film replaces the still only where motion is welcome and the screen is wide; the
-   selectors carry .visual so they outrank the img rule above. */
-/* Behind the film until it paints: its own first frame, so it does not pop in. */
-.visual .film { display: none; width: 100%; height: auto; background: var(--bg) url("media/hero-film-first-light.jpg") center / cover no-repeat;
-  /* Video decoders render the page colour a level or two off; the edge fades into the
-     page so that never shows as a box. */
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 10px, #000 calc(100% - 10px), transparent),
-    linear-gradient(to bottom, transparent, #000 10px, #000 calc(100% - 10px), transparent);
-  -webkit-mask-composite: source-in;
-  mask-image: linear-gradient(to right, transparent, #000 10px, #000 calc(100% - 10px), transparent),
-    linear-gradient(to bottom, transparent, #000 10px, #000 calc(100% - 10px), transparent);
-  mask-composite: intersect; }
-@media (prefers-color-scheme: dark) {
-  .visual .film { background-image: url("media/hero-film-first-dark.jpg"); }
+/* T3 Code's chat, built from its MIT source, with Pladder's pill over it. Drawn at
+   760 design pixels and scaled by --u, one design pixel, so the whole window fits its
+   column. */
+.visual {
+  --u: min(1px, 100cqw / 760);
+  container-type: inline-size;
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
 }
-@media (prefers-reduced-motion: no-preference) and (min-width: 641px) {
-  .visual:has(.film) picture { display: none; }
-  .visual .film { display: block; }
+.t3 {
+  width: calc(760 * var(--u));
+  min-height: calc(480 * var(--u));
+  display: flex;
+  overflow: hidden;
+  background: var(--app-bg);
+  color: var(--app-ink);
+  border: 1px solid var(--app-line);
+  border-radius: calc(12 * var(--u));
+  box-shadow: 0 calc(24 * var(--u)) calc(56 * var(--u)) rgba(0, 0, 0, 0.12);
+  font: 400 calc(14 * var(--u))/1.5 var(--text);
+  text-align: left;
 }
+.t3 svg { flex: none; width: calc(13 * var(--u)); height: calc(13 * var(--u)); }
+.t3 .mute { color: var(--app-muted); }
+.t3-side {
+  flex: 0 0 calc(220 * var(--u));
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--app-side);
+  border-right: 1px solid var(--app-line);
+}
+.t3-title {
+  height: calc(52 * var(--u));
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: calc(10 * var(--u));
+  padding: 0 calc(12 * var(--u));
+  font-weight: 500;
+  white-space: nowrap;
+}
+.t3-title b { font-weight: 700; }
+.lights { display: flex; gap: calc(7 * var(--u)); }
+.lights i { width: calc(11 * var(--u)); height: calc(11 * var(--u)); border-radius: 50%; background: #FF5F57; }
+.lights i + i { background: #FEBC2E; }
+.lights i + i + i { background: #28C840; }
+.t3-search {
+  margin: 0 calc(8 * var(--u)) calc(6 * var(--u));
+  height: calc(32 * var(--u));
+  display: flex;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  padding: 0 calc(8 * var(--u));
+  border-radius: calc(6 * var(--u));
+  background: var(--app-control);
+  color: var(--app-muted);
+  font-weight: 500;
+}
+.t3-search svg { width: calc(15 * var(--u)); height: calc(15 * var(--u)); }
+.t3-group {
+  height: calc(32 * var(--u));
+  display: flex;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  padding: 0 calc(16 * var(--u));
+  font-size: calc(12 * var(--u));
+  font-weight: 500;
+  color: var(--app-muted);
+}
+.t3-group .rule { flex: 1; height: 1px; background: var(--app-line); }
+.t3-group.settled { margin-top: auto; padding-bottom: calc(8 * var(--u)); }
+.t3-threads { padding: 0 calc(8 * var(--u)); display: flex; flex-direction: column; gap: calc(4 * var(--u)); }
+.t3-thread { border-radius: calc(6 * var(--u)); padding: calc(8 * var(--u)) calc(10 * var(--u)); display: flex; flex-direction: column; gap: 1px; }
+.t3-thread.active { background: var(--app-row); box-shadow: inset 0 0 0 1px var(--app-ring); }
+.t3-thread .meta {
+  min-height: calc(20 * var(--u));
+  display: flex;
+  align-items: center;
+  gap: calc(6 * var(--u));
+  font-size: calc(12 * var(--u));
+  color: var(--app-muted);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.t3-thread .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.t3-thread .branch { margin-top: calc(2 * var(--u)); }
+.t3-thread .subject { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.badge {
+  flex: none;
+  width: calc(16 * var(--u));
+  height: calc(16 * var(--u));
+  border-radius: calc(4 * var(--u));
+  background: var(--app-control);
+  color: var(--app-ink);
+  display: grid;
+  place-items: center;
+  font-size: calc(9 * var(--u));
+  font-weight: 700;
+}
+.badge.coral { background: var(--coral); color: var(--coral-ink); }
+.status { display: flex; align-items: center; gap: calc(4 * var(--u)); font-weight: 500; color: var(--app-info); }
+.diff { font-family: var(--mono); }
+.diff .add { color: var(--app-add); }
+.diff .del { color: var(--app-del); }
+
+.t3-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.t3-crumbs {
+  height: calc(52 * var(--u));
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: calc(10 * var(--u));
+  padding: 0 calc(16 * var(--u));
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.t3-crumbs .square { flex: none; width: calc(14 * var(--u)); height: calc(14 * var(--u)); border-radius: calc(3 * var(--u)); background: var(--coral); }
+.t3-crumbs .name { overflow: hidden; text-overflow: ellipsis; }
+.t3-chat {
+  flex: 1 1 auto;
+  margin: 0 calc(16 * var(--u)) 0 calc(24 * var(--u));
+  padding: calc(12 * var(--u)) calc(16 * var(--u)) 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(16 * var(--u));
+}
+.t3-ask { align-self: flex-end; max-width: 80%; background: var(--app-msg); border-radius: calc(16 * var(--u)); padding: calc(12 * var(--u)); }
+.t3-worked {
+  display: flex;
+  align-items: center;
+  gap: calc(4 * var(--u));
+  padding: calc(4 * var(--u)) 0 calc(8 * var(--u));
+  border-bottom: 1px solid var(--app-line);
+  color: var(--app-muted);
+}
+.t3-worked svg { width: calc(14 * var(--u)); height: calc(14 * var(--u)); }
+.t3-chat p { padding: calc(2 * var(--u)) calc(4 * var(--u)); line-height: 1.65; }
+.t3-chat code { font: 0.85em var(--mono); padding: 0.1em 0.35em; border-radius: calc(4 * var(--u)); background: var(--app-code); }
+.t3-composer {
+  width: calc(100% - 56 * var(--u));
+  max-width: calc(560 * var(--u));
+  margin: calc(20 * var(--u)) auto 0 calc(40 * var(--u));
+  border-radius: calc(16 * var(--u));
+  background: var(--app-card);
+  box-shadow: 0 0 0 1px var(--app-outline), 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+.t3-composer p { padding: calc(14 * var(--u)) calc(16 * var(--u)) calc(8 * var(--u)); line-height: 1.65; }
+.t3-tools { display: flex; align-items: center; gap: calc(8 * var(--u)); padding: 0 calc(8 * var(--u)) calc(8 * var(--u)) calc(14 * var(--u)); color: var(--app-muted); }
+.t3-tools > svg { width: calc(16 * var(--u)); height: calc(16 * var(--u)); margin-right: auto; }
+.t3-model { padding: 0 calc(8 * var(--u)); font-weight: 500; color: var(--app-ink); white-space: nowrap; }
+.t3-send {
+  width: calc(32 * var(--u));
+  height: calc(32 * var(--u));
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--app-primary);
+  color: #FFFFFF;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.16);
+}
+.t3-foot {
+  width: calc(100% - 56 * var(--u));
+  max-width: calc(560 * var(--u));
+  margin: 0 auto 0 calc(40 * var(--u));
+  display: flex;
+  justify-content: space-between;
+  gap: calc(8 * var(--u));
+  padding: calc(8 * var(--u)) calc(8 * var(--u)) calc(76 * var(--u));
+  font-size: calc(12 * var(--u));
+  color: var(--app-muted);
+  white-space: nowrap;
+}
+
+/* Pladder's Live pill, to OverlayPill.swift's metrics and as wide as its words, centred
+   under the composer (220 + 40 + 242 design pixels in) and overlapping the window's lower
+   edge as the real one rests above the Dock. */
+.pill {
+  position: relative;
+  align-self: flex-start;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  margin: calc(-40 * var(--u)) 0 0 calc(502 * var(--u));
+  transform: translateX(-50%);
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-radius: 999px;
+  background: var(--pill-bg);
+  color: var(--pill-ink);
+  border: 1px solid var(--pill-line);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14), inset 0 1px 0 var(--pill-hi);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+}
+.rec { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--coral); }
+.wave { flex: none; display: flex; align-items: center; gap: 3px; height: 24px; opacity: 0.8; }
+.wave i { display: block; width: 3px; height: calc(var(--h) * 1px); border-radius: 2px; background: currentColor; }
+.said { min-width: 0; font-size: 13px; font-weight: 500; line-height: 1.35; }
 
 /* Sections: plain text on one background, a hairline between them. */
 
@@ -328,7 +553,6 @@ td.us a { color: inherit; }
 
 @media (max-width: 900px) {
   .hero { grid-template-columns: 1fr; padding-top: 32px; }
-  .visual { justify-self: center; }
   .styles { grid-template-columns: repeat(2, 1fr); }
 }
 
@@ -348,4 +572,9 @@ td.us a { color: inherit; }
   tbody td::before { content: attr(data-label); font-size: 14px; font-weight: 600; color: var(--faint); padding-top: 0.1em; }
   td.us::before { color: var(--ink); }
   kbd.key-space { padding-inline: 22px; }
+  /* On a phone the window drops its sidebar, so the chat stays legible. */
+  .visual { --u: min(1px, 100cqw / 540); }
+  .t3 { width: calc(540 * var(--u)); min-height: 0; }
+  .t3-side { display: none; }
+  .pill { margin-left: calc(282 * var(--u)); }
 }

@@ -42,32 +42,10 @@ enum Screenshots {
             return
         }
 
-        // `--hero`: the site's hero picture, the real pill over a plain chat window, on the
-        // site's own background so the glass samples what the visitor will see around it.
         // `--settings-scene`: the app's real Settings window, toolbar and key window included,
         // one capture per tab, light and dark.
         if CommandLine.arguments.contains("--settings-scene") {
             await captureSettingsScene(into: directory)
-            NSApp.terminate(nil)
-            return
-        }
-
-        // `--hero-video`: the site's hero film, the real window and pill through one dictation.
-        if CommandLine.arguments.contains("--hero-video") {
-            await HeroRecording.run(into: directory)
-            NSApp.terminate(nil)
-            return
-        }
-
-        if CommandLine.arguments.contains("--hero") {
-            for scheme in [ColorScheme.light, .dark] {
-                let suffix = scheme == .dark ? "dark" : "light"
-                await capture(HeroFigure(), size: HeroFigure.size, scheme: scheme,
-                              to: directory.appending(path: "hero-\(suffix).png"), opaque: true)
-                // A phone shows the picture at about half size, so it gets a narrower one.
-                await capture(HeroFigure(compact: true), size: HeroFigure.compactSize, scheme: scheme,
-                              to: directory.appending(path: "hero-mobile-\(suffix).png"), opaque: true)
-            }
             NSApp.terminate(nil)
             return
         }
@@ -83,7 +61,7 @@ enum Screenshots {
     }
 
     private static func capture<Figure: View>(
-        _ figure: Figure, size: CGSize, scheme: ColorScheme, to url: URL, opaque: Bool = false
+        _ figure: Figure, size: CGSize, scheme: ColorScheme, to url: URL
     ) async {
         let window = NSWindow(
             contentRect: NSRect(origin: .zero, size: size),
@@ -91,8 +69,8 @@ enum Screenshots {
             backing: .buffered,
             defer: false
         )
-        window.backgroundColor = opaque ? .windowBackgroundColor : .clear
-        window.isOpaque = opaque
+        window.backgroundColor = .clear
+        window.isOpaque = false
         window.hasShadow = false
         window.isReleasedWhenClosed = false
         window.level = .floating
@@ -406,115 +384,6 @@ private struct StylesFigure: View {
             .padding(.trailing, 70)
         }
         .clipShape(UnevenRoundedRectangle(topLeadingRadius: 16, topTrailingRadius: 16))
-    }
-}
-
-struct HeroPill {
-    var partial: String?
-    var presentation: OverlayPresentation = .settled
-}
-
-// The site's hero: a chat with an agent while the reply is still being said, so the
-// prompt box waits with its cursor and the Live pill shows the words, as it is.
-struct HeroFigure: View {
-    static let size = CGSize(width: 580, height: 420)
-    static let compactSize = CGSize(width: 350, height: 284)
-    var compact = false
-    // What the prompt box holds: nil is its placeholder with the cursor.
-    var composer: String?
-    // The pill, or none: the default is the still picture's.
-    var pill: HeroPill? = HeroPill(partial: "yes, and add a test that relaunches the app")
-    // Driven over time for the film; the stills leave it nil.
-    var scene: HeroScene?
-    @Environment(\.colorScheme) private var scheme
-
-    // The site's --hero colours, so the picture has no edge on the page.
-    private var page: Color { scheme == .dark ? Color(red: 0x11 / 255, green: 0x11 / 255, blue: 0x13 / 255) : .white }
-
-    var body: some View {
-        ZStack(alignment: .top) {
-            page
-            window
-                .padding(.top, 16)
-                .padding(.horizontal, 20)
-            if let scene {
-                // The overlay panel's content as the app shows it, at the panel's size.
-                OverlayView(model: scene.overlay)
-                    .frame(width: 480, height: 140)
-                    .offset(y: scene.pillOffset)
-                    .opacity(scene.pillOpacity)
-                    .padding(.top, 306)
-            } else if let pill {
-                OverlayPill(
-                    state: .recording, level: 0.6, style: .liveTranscript, isPreview: true,
-                    partial: compact ? "yes, and add a test" : pill.partial, hugsContent: compact,
-                    presentation: pill.presentation)
-                    .fixedSize()
-                    .compositingGroup()
-                    .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
-                    // Laid out at its own size and scaled after, so a long reply can never widen
-                    // the figure; on a phone it hugs a shorter one.
-                    .scaleEffect(compact ? 0.8 : 1, anchor: .top)
-                    .frame(width: compact ? Self.compactSize.width : nil)
-                    .padding(.top, compact ? 224 : 348)
-            }
-        }
-    }
-
-    private var window: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                ForEach([Color(red: 1, green: 0.37, blue: 0.34), Color(red: 1, green: 0.74, blue: 0.18), Color(red: 0.16, green: 0.78, blue: 0.25)], id: \.self) {
-                    Circle().fill($0).frame(width: 12, height: 12)
-                }
-                Spacer()
-                Text(verbatim: "Persist dark mode")
-                    .font(.system(size: 13, weight: .semibold))
-                Spacer()
-                Color.clear.frame(width: 52, height: 1)
-            }
-            .padding(.horizontal, 16)
-            .frame(height: 44)
-            VStack(alignment: .leading, spacing: 16) {
-                Text(verbatim: "Why does dark mode reset?")
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 14))
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                if !compact {
-                    Text("It’s only kept in memory. Save it to \(Text(verbatim: "UserDefaults").font(.system(size: 12, design: .monospaced)))?")
-                        .foregroundStyle(.primary)
-                }
-                Spacer(minLength: 0)
-                HStack(alignment: .bottom) {
-                    HStack(spacing: 1) {
-                        if let composer = scene?.composer ?? composer {
-                            Text(verbatim: composer)
-                            Rectangle().fill(Color.accentColor).frame(width: 2, height: 17)
-                        } else {
-                            Rectangle().fill(Color.accentColor).frame(width: 2, height: 17)
-                            Text(verbatim: "Reply…")
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
-                    Spacer()
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 24))
-                        .foregroundStyle((scene?.composer ?? composer) == nil ? AnyShapeStyle(.tertiary) : AnyShapeStyle(Color.accentColor))
-                }
-                .padding(14)
-                .background(RoundedRectangle(cornerRadius: 14).fill(Color(nsColor: .textBackgroundColor)))
-                .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(.separator))
-            }
-            .font(.system(size: 15))
-            .padding(18)
-        }
-        .frame(width: (compact ? Self.compactSize.width : Self.size.width) - 40, height: compact ? 196 : 324)
-        // macOS 26 window corners.
-        .background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(.separator))
-        // Small enough to fade out inside the picture, which would otherwise cut it off.
-        .shadow(color: .black.opacity(0.10), radius: 10, y: 4)
     }
 }
 

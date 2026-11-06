@@ -6,13 +6,11 @@
 # so it is safe to run while another Pladder is in use; it shows a few
 # windows for a second or two.
 #
-# Usage: scripts/make-screenshots.sh [dir] [--hero | --settings | --settings-scene [--accessibility] | --hero-video | --menu]   (default: docs/images)
-#   --hero      the site's hero picture, hero-light.png and hero-dark.png, which
-#               site/media/hero-* are encoded from
+# Usage: scripts/make-screenshots.sh [dir] [--settings | --settings-scene [--accessibility | --get-started] | --menu]   (default: docs/images)
 #   --settings  each Settings tab, light and dark, for reviewing the window
 #   --settings-scene  the real Settings window, toolbar and key window included
-#   --hero-video      the films scripts/make-hero-film.sh encodes for the site's hero
 #   --settings-scene --accessibility  the Settings window's accessibility tree, as text
+#   --settings-scene --get-started    the General tab at its tallest, with the end of Get Started
 #   --menu            the real menu of a status item of its own, opened in-process; the copy then exits
 set -euo pipefail
 

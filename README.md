@@ -8,7 +8,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme-hero-dark.png">
-    <img src="docs/images/readme-hero-light.png" width="900" alt="Talk to your agents. A chat with a coding agent, its prompt box waiting with the cursor in it, while Pladder’s recording pill below shows the reply as it is spoken: “yes, and add a test that relaunches the app”. Hold Option+Space to talk, tap V to send.">
+    <img src="docs/images/readme-hero-light.png" width="900" alt="Talk to your agents. T3 Code with the reply “Yes, and add a test for it.” in its prompt box, dictated with Pladder, whose recording pill shows the words as they are spoken. Hold Option+Space to talk, tap V to send.">
   </picture>
 </p>
 
