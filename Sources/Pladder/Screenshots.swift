@@ -300,7 +300,7 @@ struct HeroFigure: View {
     // What the prompt box holds: nil is its placeholder with the cursor.
     var composer: String?
     // The pill, or none: the default is the still picture's.
-    var pill: HeroPill? = HeroPill(partial: "yes, and add a test for it")
+    var pill: HeroPill? = HeroPill(partial: "yes, and add a test that flips it and relaunches")
     // Driven over time for the film; the stills leave it nil.
     var scene: HeroScene?
     @Environment(\.colorScheme) private var scheme

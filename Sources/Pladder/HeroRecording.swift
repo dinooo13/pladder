@@ -98,7 +98,10 @@ final class HeroScene {
             pillOpacity = 1
         }
         await pause(OverlayMotion.flightDuration)
-        let passes: [(Double, String?)] = [(0.55, nil), (0.45, "yes, and"), (0.45, "yes, and add a test"), (0.55, "yes, and add a test for it")]
+        let passes: [(Double, String?)] = [
+            (0.45, nil), (0.4, "yes, and"), (0.4, "yes, and add a test that"),
+            (0.55, "yes, and add a test that flips it and relaunches"),
+        ]
         for (seconds, words) in passes {
             overlay.partialTranscript = words
             await speak(for: seconds)
@@ -106,13 +109,13 @@ final class HeroScene {
         // The release: the row gathers, the paste lands 0.2 s in, then the disc dives.
         overlay.presentation = .flyingOut
         await pause(0.2)
-        composer = "Yes, and add a test for it."
+        composer = "Yes, and add a test that flips it and relaunches."
         await pause(OverlayMotion.morphDuration - 0.2)
         withAnimation(.easeIn(duration: OverlayMotion.flightDuration)) {
             pillOffset = 60
             pillOpacity = 0
         }
-        await pause(OverlayMotion.flightDuration + 1.4)
+        await pause(OverlayMotion.flightDuration + 0.9)
     }
 
     // A speaking voice's level, so the bars move as they do on a real take.
@@ -175,9 +178,19 @@ private final class FilmWriter: NSObject, SCStreamOutput, @unchecked Sendable {
     func finish() async {
         await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
             queue.async {
-                // To now, on the capture's own host clock: an unchanged window sends no frames,
-                // so the last one is held to the end of the scene.
-                if self.last != nil { self.writer.endSession(atSourceTime: CMClockGetTime(CMClockGetHostTimeClock())) }
+                // An unchanged window sends no frames, and a movie ends at its last sample, so
+                // the last frame is appended again at the end of the scene, on the capture's own
+                // host clock, to hold it there.
+                if let last = self.last {
+                    let end = CMClockGetTime(CMClockGetHostTimeClock())
+                    var timing = CMSampleTimingInfo(duration: .invalid, presentationTimeStamp: end, decodeTimeStamp: .invalid)
+                    var held: CMSampleBuffer?
+                    CMSampleBufferCreateCopyWithNewTiming(
+                        allocator: nil, sampleBuffer: last, sampleTimingEntryCount: 1,
+                        sampleTimingArray: &timing, sampleBufferOut: &held)
+                    if let held, self.input.isReadyForMoreMediaData { self.input.append(held) }
+                    self.writer.endSession(atSourceTime: end)
+                }
                 self.input.markAsFinished()
                 self.writer.finishWriting { done.resume() }
             }

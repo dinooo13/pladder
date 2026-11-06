@@ -63,7 +63,7 @@ private struct GetStartedSection: View {
                         .foregroundStyle(.green)
                 }
                 // The first dictation, right where setup ends: the gesture is learnt by doing it.
-                TextField("Try it", text: $practice, prompt: Text("Click here, hold \(model.holdShortcut) and say hello"))
+                TextField("Try it", text: $practice, prompt: Text("Hold \(model.holdShortcut) and say hello"))
                     .textFieldStyle(.roundedBorder)
                     .labelsHidden()
             }
