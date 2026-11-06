@@ -68,7 +68,7 @@ struct DictionaryView: View {
                     DictionaryField(
                         text: row.from,
                         help: "Leave empty to fix near misses of the replacement, such as a name that comes out nearly right.",
-                        prompt: "optional",
+                        prompt: "Optional",
                         cell: DictionaryCell(id: row.wrappedValue.id, column: .from),
                         focus: $focusedCell
                     )
@@ -96,6 +96,7 @@ struct DictionaryView: View {
                     .frame(maxWidth: .infinity)
             }
             .width(76)
+            .alignment(.center)
         }
         .alternatingRowBackgrounds(.disabled)
         .frame(minHeight: 220)

@@ -195,11 +195,13 @@ struct OverlayPill: View {
 
     static var liveTextWidth: CGFloat { liveRowWidth - liveRowLead }
 
-    // The widest the words have been this take, from "Listening…" up to the full row.
+    // In three steps, a third, two thirds and the whole row, never narrowing within a take:
+    // the capsule grows from its centre, so a width that followed every word would slide the
+    // words sideways on every pass, and this way they move at most twice.
     private var liveTextWidth: CGFloat {
-        let floor = LiveTranscriptMetrics.lineWidth(of: String(localized: "Listening…"))
-        let now = LiveTranscriptMetrics.lineWidth(of: partial ?? "")
-        return min(max(widestText, now, floor).rounded(.up), Self.liveTextWidth)
+        let needed = max(widestText, LiveTranscriptMetrics.lineWidth(of: partial ?? ""))
+        let steps = [1, 2, 3].map { (Self.liveTextWidth * CGFloat($0) / 3).rounded() }
+        return steps.first { $0 >= needed } ?? Self.liveTextWidth
     }
 
     // Five 3 pt bars with 3 pt gaps are 27 × 20 pt, inside the disc with room to spare.

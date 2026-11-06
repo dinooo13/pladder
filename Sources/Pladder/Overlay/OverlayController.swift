@@ -164,6 +164,8 @@ final class OverlayController {
             // polish dives like a pasted dictation; the clipboard hint, a discard and an error
             // fade where they are, since nothing was pasted.
             let flight = heldForPolish
+            // The polish is done: the disc dives empty, not still spinning.
+            if heldForPolish { model.state = .idle }
             heldForPolish = false
             // The disc has already gathered and was waiting for this.
             if holdingDisc {

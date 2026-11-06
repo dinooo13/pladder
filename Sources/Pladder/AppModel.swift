@@ -192,6 +192,12 @@ final class AppModel {
     private func handle(_ event: DictationCoordinator.Event, at instant: ContinuousClock.Instant) {
         switch event {
         case .recordingStarted:
+            settleTask?.cancel()
+            settleTask = Task { [weak self] in
+                try? await Task.sleep(for: .milliseconds(150))
+                guard !Task.isCancelled, let self, self.coordinator.state.isRecording else { return }
+                self.recordingSettled = true
+            }
             if settings.playSounds {
                 SoundPlayer.playStart()
             } else {
@@ -202,6 +208,8 @@ final class AppModel {
                                .priority: NSAccessibilityPriorityLevel.medium.rawValue])
             }
         case .recordingStopped:
+            settleTask?.cancel()
+            recordingSettled = false
             releaseInstant = instant
             if settings.playSounds { SoundPlayer.playStop() }
         case .inserted(let insertion):
@@ -220,6 +228,8 @@ final class AppModel {
             releaseInstant = nil
         case .recordingDiscarded:
             // No paste, so no timing line, but the microphone went off and the user should hear it.
+            settleTask?.cancel()
+            recordingSettled = false
             releaseInstant = nil
             if settings.playSounds { SoundPlayer.playStop() }
         case .keyboardBounceObserved:
@@ -231,9 +241,18 @@ final class AppModel {
 
     // MARK: Menu
 
+    // With Menu bar only the glyph is the whole recording signal, so it turns into a tile;
+    // with a pill on screen that would be a third signal beside the pill and the orange dot.
     var menuBarImage: NSImage {
-        MenuBarIcon.image(for: coordinator.state, level: coordinator.inputLevel)
+        MenuBarIcon.image(
+            for: coordinator.state, level: coordinator.inputLevel,
+            tile: settings.overlayStyle == .menuBar && recordingSettled)
     }
+
+    // After the pill's own present delay, so a Cmd+C with a lone-Command talk key never
+    // flashes the tile.
+    private(set) var recordingSettled = false
+    @ObservationIgnored private var settleTask: Task<Void, Never>?
 
     var statusLine: String {
         MenuStatus.line(

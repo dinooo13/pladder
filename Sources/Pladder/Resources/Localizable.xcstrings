@@ -661,16 +661,6 @@
         }
       }
     },
-    "Speech model": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sprachmodell"
-          }
-        }
-      }
-    },
     "Spoken punctuation": {
       "localizations": {
         "de": {
@@ -1446,7 +1436,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Korrigiert Beinahe-Treffer der Wörterbuchwörter, deren „Gehört als“ leer ist."
+            "value": "Korrigiert Beinahe-Treffer der Wörter im Wörterbuch, deren „Gehört als“ leer ist."
           }
         }
       }
@@ -1486,7 +1476,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kurze Antwort kleingeschrieben beginnen"
+            "value": "Kurze Antworten klein beginnen"
           }
         }
       }
@@ -1541,16 +1531,6 @@
         }
       }
     },
-    "optional": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "optional"
-          }
-        }
-      }
-    },
     "Leave empty to fix near misses of the replacement, such as a name that comes out nearly right.": {
       "localizations": {
         "de": {
@@ -1567,6 +1547,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Was stattdessen eingefügt wird."
+          }
+        }
+      }
+    },
+    "Optional": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Optional"
+          }
+        }
+      }
+    },
+    "%lld%% of %lld MB": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld %% von %2$lld MB"
           }
         }
       }
