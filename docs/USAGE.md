@@ -43,7 +43,7 @@ A dictionary turns what the model hears into what you meant. "clode code" become
 
 ### Learned corrections
 
-Correct a word by hand after a dictation and Pladder offers to remember it: the menu lists it under Suggested Corrections as “x” → “y”, with **Add to Dictionary** and **Dismiss**. Nothing is added until you say so. The pair is checked on device first, so only a plausible mishearing is offered, and a change of case never is. This needs Accessibility and Apple Intelligence. Terminals show a screen rather than a text field, so nothing is learned there. What Pladder reads to notice a correction is in [PRIVACY.md](PRIVACY.md).
+Correct a word by hand after a dictation and Pladder offers to remember it: the menu lists it under Suggested Corrections as **Add “x” → “y” to Dictionary**, with **Dismiss** below. Nothing is added until you say so. The pair is checked on device first, so only a plausible mishearing is offered, and a change of case never is. This needs Accessibility and Apple Intelligence. Terminals show a screen rather than a text field, so nothing is learned there. What Pladder reads to notice a correction is in [PRIVACY.md](PRIVACY.md).
 
 ## Cleaning up the text
 
@@ -73,14 +73,14 @@ A small pill just above the Dock shows a coral dot and a live level meter while 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="images/styles-dark.png">
-    <img src="images/styles-light.png" width="900" alt="The Pladder pill while dictating, in its four styles: Compact with a level meter, Minimal disc, Live transcript, Menu Bar glyph">
+    <img src="images/styles-light.png" width="900" alt="The Pladder pill while dictating, in its four styles: Compact with a level meter, Minimal disc, Live transcript, Menu bar only">
   </picture>
 </p>
 
 - **Compact.** The full pill with the level meter. You always know it is listening.
 - **Minimal.** A small disc with a pulse. Enough to see it is on, not enough to look at.
 - **Live.** The words as they are recognised, while you are still speaking. The wider pill costs a little more of the chip than the others; the text it shows is only a preview, and what gets pasted is always the full recording.
-- **Menu Bar.** Nothing on the desktop at all. The wave in the menu bar is the only sign.
+- **Menu bar only.** Nothing on the desktop at all. The wave in the menu bar is the only sign.
 
 Each is Liquid Glass in the system's light or dark appearance. With Reduce Motion on, the pill fades in and out instead of flying; with Reduce Transparency, the glass turns opaque.
 

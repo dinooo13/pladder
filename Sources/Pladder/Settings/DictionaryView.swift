@@ -26,8 +26,16 @@ struct DictionaryView: View {
     var body: some View {
         Form {
             Section {
-                table
+                // No table while it is empty: its header and the empty state would collide.
+                if entries.isEmpty {
+                    emptyState
+                } else {
+                    table
+                }
                 toolbar
+                if !entries.isEmpty {
+                    testArea
+                }
             } header: {
                 Text("Words and replacements")
             } footer: {
@@ -35,13 +43,7 @@ struct DictionaryView: View {
                     if !cyclicIDs.isEmpty {
                         WarningLabel(String(localized: "Two rules undo each other, so both are ignored."))
                     }
-                    Text("Leave Heard as empty to teach a word, such as a name, that comes out nearly right.")
-                }
-            }
-
-            if !entries.isEmpty {
-                Section("Try it") {
-                    testArea
+                    Text("A row with Heard as left empty fixes near misses of its word, such as a name that comes out nearly right.")
                 }
             }
         }
@@ -70,7 +72,7 @@ struct DictionaryView: View {
                     }
                     DictionaryField(
                         text: row.from,
-                        prompt: "similar words",
+                        prompt: "clode",
                         cell: DictionaryCell(id: row.wrappedValue.id, column: .from),
                         focus: $focusedCell
                     )
@@ -82,7 +84,7 @@ struct DictionaryView: View {
             TableColumn("Replace with") { row in
                 DictionaryField(
                     text: row.to,
-                    prompt: "replacement",
+                    prompt: "Claude",
                     cell: DictionaryCell(id: row.wrappedValue.id, column: .to),
                     focus: $focusedCell
                 )
@@ -97,21 +99,20 @@ struct DictionaryView: View {
             }
             .width(76)
         }
-        // An empty table otherwise paints striped placeholder rows, which reads as broken.
         .alternatingRowBackgrounds(.disabled)
-        .overlay {
-            if entries.isEmpty {
-                ContentUnavailableView {
-                    Label("No Words Yet", systemImage: "character.book.closed")
-                } description: {
-                    Text("Add a word Pladder keeps mishearing and what it should be.")
-                } actions: {
-                    Button("Add Examples", action: addExamples)
-                }
-            }
-        }
         .frame(minHeight: 220)
         .onDeleteCommand(perform: removeSelected)
+    }
+
+    private var emptyState: some View {
+        ContentUnavailableView {
+            Label("No Words Yet", systemImage: "character.book.closed")
+        } description: {
+            Text("Add a word Pladder keeps mishearing and what it should be.")
+        } actions: {
+            Button("Add Examples", action: addExamples)
+        }
+        .frame(maxWidth: .infinity, minHeight: 220)
     }
 
     // MARK: Toolbar
@@ -141,7 +142,8 @@ struct DictionaryView: View {
                 Button("Export…", action: exportEntries)
                     .disabled(entries.isEmpty)
             } label: {
-                Image(systemName: "ellipsis.circle")
+                Image(systemName: "ellipsis")
+                    .frame(width: 16, height: 16)
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)

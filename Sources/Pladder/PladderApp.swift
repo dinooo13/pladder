@@ -147,16 +147,24 @@ private struct MenuContent: View {
         if !model.corrections.proposals.isEmpty {
             Section("Suggested Corrections") {
                 ForEach(model.corrections.proposals) { proposal in
-                    Menu("“\(proposal.pair.heard)” → “\(proposal.pair.corrected)”") {
-                        Button("Add to Dictionary") { model.corrections.accept(proposal) }
-                        Button("Dismiss") { model.corrections.dismiss(proposal) }
+                    Button("Add “\(proposal.pair.heard)” → “\(proposal.pair.corrected)” to Dictionary") {
+                        model.corrections.accept(proposal)
                     }
+                }
+                if model.corrections.proposals.count == 1 {
+                    Button("Dismiss") { model.corrections.dismissAll() }
+                } else {
+                    Button("Dismiss All") { model.corrections.dismissAll() }
                 }
             }
         }
 
         Divider()
 
+        Button("About Pladder") {
+            NSApp.activate(ignoringOtherApps: true)
+            NSApp.orderFrontStandardAboutPanel(nil)
+        }
         Button("Settings…") { showSettings(openSettings) }
             .keyboardShortcut(",", modifiers: .command)
 

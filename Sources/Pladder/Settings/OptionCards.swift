@@ -157,7 +157,7 @@ struct OverlayStyleThumbnail: View {
                 .frame(height: 11)
             Image(systemName: "wifi")
             Image(systemName: "battery.75percent")
-            Text(verbatim: "9:41")
+            Image(systemName: "switch.2")
         }
         .font(.system(size: 9, weight: .medium))
         .foregroundStyle(.primary)

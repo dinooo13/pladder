@@ -57,7 +57,7 @@ final class PermissionMonitor {
         startPolling()
     }
 
-    @ObservationIgnored private var promptedForAccessibility = false
+    private(set) var promptedForAccessibility = false
 
     func grantMicrophone() {
         Task { [weak self] in

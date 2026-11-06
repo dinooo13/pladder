@@ -271,6 +271,13 @@ final class AppModel {
 
     var holdShortcut: String { menuChords.hold }
 
+    // Latched for the launch: once setup was needed, Get Started stays to say it is done.
+    var showsGetStarted: Bool {
+        if needsSetup { setupSeen = true }
+        return setupSeen
+    }
+    @ObservationIgnored private var setupSeen = false
+
     var retryEngineTitle: String {
         if case .failed(.loadFailed) = coordinator.engineStatus {
             return String(localized: "Load Speech Model Again")

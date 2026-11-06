@@ -1,27 +1,44 @@
 import SwiftUI
 import PladderCore
 
+enum SettingsTab: Hashable {
+    case general, text, dictionary
+}
+
 struct SettingsView: View {
     @Bindable var model: AppModel
+    @State var tab: SettingsTab = .general
 
     var body: some View {
-        TabView {
+        TabView(selection: $tab) {
             GeneralSettingsView(model: model)
-                .frame(height: model.needsSetup ? 800 : 640)
+                .fittingContent()
                 .tabItem { Label("General", systemImage: "gearshape") }
-
-            DictionaryView(model: model)
-                .frame(height: model.settings.dictionary.isEmpty ? 460 : 560)
-                .tabItem { Label("Dictionary", systemImage: "character.book.closed") }
+                .tag(SettingsTab.general)
 
             TextSettingsView(model: model)
-                .frame(height: model.settings.polishDictations ? 580 : 500)
+                .fittingContent()
                 .tabItem { Label("Text", systemImage: "textformat") }
+                .tag(SettingsTab.text)
+
+            DictionaryView(model: model)
+                .fittingContent()
+                .tabItem { Label("Dictionary", systemImage: "character.book.closed") }
+                .tag(SettingsTab.dictionary)
         }
         // No material or glass on the window: Apple's own settings windows are plain. The
-        // fixed width keeps switching tabs from resizing the window sideways; each tab is as
-        // tall as its content, as in the system's own settings windows.
+        // fixed width keeps switching tabs from resizing the window sideways.
         .frame(width: 540)
+    }
+}
+
+extension View {
+    // A grouped Form is a scroll view and proposes no height of its own; fixed vertically
+    // with scrolling off it takes its content's, so each tab is as tall as what it shows,
+    // as in the system's own settings windows.
+    func fittingContent() -> some View {
+        scrollDisabled(true)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 

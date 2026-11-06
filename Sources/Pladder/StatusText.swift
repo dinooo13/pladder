@@ -19,8 +19,8 @@ extension EngineFailure {
     var text: String {
         switch self {
         case .download(let reason):
-            // Try Again resumes the partial download rather than starting the ~460 MB over.
-            String(localized: "Couldn’t download the speech model: \(reason.text).")
+            // Downloading again resumes the partial download rather than starting it over.
+            reason.text
         case .incompleteFiles:
             String(localized: "The speech model’s files are incomplete.")
         case .loadFailed(let detail):
@@ -29,20 +29,24 @@ extension EngineFailure {
     }
 }
 
+// Whole sentences, each with what happens next: the download resumes where it stopped.
 extension DownloadFailure {
     var text: String {
         switch self {
-        case .serverError: String(localized: "Hugging Face returned an error")
-        case .rateLimited: String(localized: "Hugging Face is limiting downloads")
-        case .stalled: String(localized: "the transfer stalled")
-        case .damagedFile: String(localized: "a file arrived damaged")
-        case .noConnection: String(localized: "no connection")
-        case .timedOut: String(localized: "timed out")
-        case .tls: String(localized: "TLS error")
-        case .cancelled: String(localized: "cancelled")
-        case .network: String(localized: "network error")
+        case .serverError, .rateLimited:
+            String(localized: "Hugging Face, where the speech model comes from, isn’t answering right now. Try again in a few minutes.")
+        case .stalled, .timedOut, .network:
+            String(localized: "The speech model download stopped. It picks up where it left off when you try again.")
+        case .damagedFile:
+            String(localized: "Part of the speech model arrived damaged. Downloading it again replaces that part.")
+        case .noConnection:
+            String(localized: "No internet connection. The speech model downloads once you’re online.")
+        case .tls:
+            String(localized: "The connection to Hugging Face isn’t secure, so the download was stopped. Check the network, then try again.")
+        case .cancelled:
+            String(localized: "The speech model download was cancelled.")
         // The downloader's own wording, which nothing here can translate.
-        case .other(let detail): detail
+        case .other(let detail): String(localized: "Couldn’t download the speech model: \(detail)")
         }
     }
 }
@@ -65,7 +69,7 @@ extension DictationFailure {
         switch self {
         case .microphone: String(localized: "Couldn’t use the microphone.")
         case .engineNotLoaded, .pasteKeystroke: text
-        case .other: String(localized: "Something went wrong. The menu has the details.")
+        case .other: String(localized: "Something went wrong. Details are in the Pladder menu.")
         }
     }
 }

@@ -26,7 +26,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ gehört zur Push-to-Talk-Taste und kann deshalb nie allein gedrückt werden."
+            "value": "%@ gehört zur Sprechtaste und kann deshalb nie allein gedrückt werden."
           }
         }
       }
@@ -46,7 +46,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Eine kleine Pille mit Pegelanzeige, über dem Dock."
+            "value": "Eine kleine Kapsel mit Pegelanzeige, über dem Dock."
           }
         }
       }
@@ -97,16 +97,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Füge ein Wort hinzu, das Pladder immer wieder falsch versteht, und wie es heißen soll."
-          }
-        }
-      }
-    },
-    "Add to Dictionary": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Zum Wörterbuch hinzufügen"
           }
         }
       }
@@ -231,26 +221,6 @@
         }
       }
     },
-    "Click, then press the key or combination to use.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Klicken, dann die Taste oder Kombination drücken."
-          }
-        }
-      }
-    },
-    "Click, then press the key or combination to use. Without Accessibility the key must include a regular key, for example Control+Shift+D.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Klicken, dann die Taste oder Kombination drücken. Ohne Bedienungshilfen braucht die Kombination eine normale Taste, zum Beispiel Ctrl + Umschalttaste + D."
-          }
-        }
-      }
-    },
     "Compact": {
       "localizations": {
         "de": {
@@ -287,16 +257,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Wörterbuch konnte nicht importiert werden"
-          }
-        }
-      }
-    },
-    "Couldn’t download the speech model: %@.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Das Sprachmodell konnte nicht geladen werden: %@."
           }
         }
       }
@@ -446,7 +406,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Freihändig"
+            "value": "Freihand-Taste"
           }
         }
       }
@@ -491,26 +451,6 @@
         }
       }
     },
-    "Hugging Face is limiting downloads": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hugging Face begrenzt die Downloads"
-          }
-        }
-      }
-    },
-    "Hugging Face returned an error": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hugging Face hat einen Fehler zurückgegeben"
-          }
-        }
-      }
-    },
     "Import": {
       "localizations": {
         "de": {
@@ -547,16 +487,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Beim Anmelden öffnen"
-          }
-        }
-      }
-    },
-    "Leave Heard as empty to teach a word, such as a name, that comes out nearly right.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Lass „Gehört als“ leer, um ein Wort wie einen Namen beizubringen, das fast richtig ankommt."
           }
         }
       }
@@ -607,16 +537,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Groß-/Kleinschreibung beachten"
-          }
-        }
-      }
-    },
-    "Menu Bar": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Menüleiste"
           }
         }
       }
@@ -726,7 +646,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bei Pladder ist nur %@ angekommen. Falls du auch eine normale Taste gedrückt hast, gehört der Kurzbefehl macOS oder einer anderen App; probier eine andere Taste, zum Beispiel Ctrl + Umschalttaste + D."
+            "value": "Bei Pladder ist nur %@ angekommen. Falls du auch eine normale Taste gedrückt hast, gehört der Kurzbefehl macOS oder einer anderen App; probier eine andere Taste, zum Beispiel Control-Umschalt-D."
           }
         }
       }
@@ -737,16 +657,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Systemeinstellungen öffnen …"
-          }
-        }
-      }
-    },
-    "Overlay": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Overlay"
           }
         }
       }
@@ -791,16 +701,6 @@
         }
       }
     },
-    "Pladder %@": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pladder %@"
-          }
-        }
-      }
-    },
     "Play start and stop sounds": {
       "localizations": {
         "de": {
@@ -826,47 +726,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Feinschliff …"
-          }
-        }
-      }
-    },
-    "Press the key or combination to use. Escape cancels, Delete clears.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Taste oder Kombination drücken. Esc bricht ab, die Löschtaste leert das Feld."
-          }
-        }
-      }
-    },
-    "Press the key or combination to use. Escape cancels, Delete clears. Without Accessibility the key must include a regular key, for example Control+Shift+D.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Taste oder Kombination drücken. Esc bricht ab, die Löschtaste leert das Feld. Ohne Bedienungshilfen braucht die Kombination eine normale Taste, zum Beispiel Ctrl + Umschalttaste + D."
-          }
-        }
-      }
-    },
-    "Press the key or combination to use. Escape cancels.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Taste oder Kombination drücken. Esc bricht ab."
-          }
-        }
-      }
-    },
-    "Press the key or combination to use. Escape cancels. Without Accessibility the key must include a regular key, for example Control+Shift+D.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Taste oder Kombination drücken. Esc bricht ab. Ohne Bedienungshilfen braucht die Kombination eine normale Taste, zum Beispiel Ctrl + Umschalttaste + D."
+            "value": "Wird verfeinert …"
           }
         }
       }
@@ -876,7 +736,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Zum Sprechen halten"
+            "value": "Sprechtaste"
           }
         }
       }
@@ -1071,16 +931,6 @@
         }
       }
     },
-    "TLS error": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "TLS-Fehler"
-          }
-        }
-      }
-    },
     "Text": {
       "localizations": {
         "de": {
@@ -1241,16 +1091,6 @@
         }
       }
     },
-    "Try it": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ausprobieren"
-          }
-        }
-      }
-    },
     "Turned off for Pladder. Turn it on in System Settings to dictate.": {
       "localizations": {
         "de": {
@@ -1296,7 +1136,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ohne Bedienungshilfen wird %@ nicht erkannt, deshalb ist die Start/Stopp-Taste aus, bis die Bedienungshilfen erlaubt sind."
+            "value": "Ohne Bedienungshilfen wird %@ nicht erkannt, deshalb ist die Freihand-Taste aus, bis die Bedienungshilfen erlaubt sind."
           }
         }
       }
@@ -1317,86 +1157,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Wörter und Ersetzungen"
-          }
-        }
-      }
-    },
-    "a file arrived damaged": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "eine Datei kam beschädigt an"
-          }
-        }
-      }
-    },
-    "cancelled": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "abgebrochen"
-          }
-        }
-      }
-    },
-    "network error": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Netzwerkfehler"
-          }
-        }
-      }
-    },
-    "no connection": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "keine Verbindung"
-          }
-        }
-      }
-    },
-    "replacement": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ersetzung"
-          }
-        }
-      }
-    },
-    "the transfer stalled": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "die Übertragung ist hängen geblieben"
-          }
-        }
-      }
-    },
-    "timed out": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Zeitüberschreitung"
-          }
-        }
-      }
-    },
-    "“%@” → “%@”": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "„%@“ → „%@“"
           }
         }
       }
@@ -1481,16 +1241,6 @@
         }
       }
     },
-    "Get Started": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Erste Schritte"
-          }
-        }
-      }
-    },
     "Hello": {
       "localizations": {
         "de": {
@@ -1506,7 +1256,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Halten zum Aufnehmen, loslassen zum Einfügen. Escape verwirft."
+            "value": "Halten zum Aufnehmen, loslassen zum Einfügen. Esc verwirft."
           }
         }
       }
@@ -1537,16 +1287,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Feinschliff (Beta)"
-          }
-        }
-      }
-    },
-    "Press while holding push to talk, and Return follows the text.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Drücken, während die Sprechtaste gehalten wird, und nach dem Text folgt ein Zeilenumbruch."
           }
         }
       }
@@ -1591,16 +1331,6 @@
         }
       }
     },
-    "Something went wrong. The menu has the details.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Etwas ist schiefgegangen. Details stehen im Menü."
-          }
-        }
-      }
-    },
     "Start with a lowercase letter": {
       "localizations": {
         "de": {
@@ -1616,17 +1346,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tippen zum Starten, noch einmal tippen zum Einfügen."
-          }
-        }
-      }
-    },
-    "Then click into any text field, hold %@ and talk.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dann in ein Textfeld klicken, %@ gedrückt halten und sprechen."
+            "value": "Antippen zum Starten, erneut antippen zum Einfügen."
           }
         }
       }
@@ -1651,12 +1371,222 @@
         }
       }
     },
-    "similar words": {
+    "A row with Heard as left empty fixes near misses of its word, such as a name that comes out nearly right.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "ähnliche Wörter"
+            "value": "Eine Zeile mit leerem „Gehört als“ korrigiert Beinahe-Treffer ihres Worts, etwa einen Namen, der fast richtig ankommt."
+          }
+        }
+      }
+    },
+    "About Pladder": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Über Pladder"
+          }
+        }
+      }
+    },
+    "Add “%@” → “%@” to Dictionary": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "„%1$@“ → „%2$@“ zum Wörterbuch hinzufügen"
+          }
+        }
+      }
+    },
+    "Claude": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude"
+          }
+        }
+      }
+    },
+    "clode": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "clode"
+          }
+        }
+      }
+    },
+    "Click into any text field, hold %@ and talk.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In ein Textfeld klicken, %@ gedrückt halten und sprechen."
+          }
+        }
+      }
+    },
+    "Click to record a new shortcut.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klicken, um einen neuen Kurzbefehl aufzunehmen."
+          }
+        }
+      }
+    },
+    "Couldn’t download the speech model: %@": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Sprachmodell konnte nicht geladen werden: %@"
+          }
+        }
+      }
+    },
+    "Dismiss All": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alle ignorieren"
+          }
+        }
+      }
+    },
+    "Get started": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erste Schritte"
+          }
+        }
+      }
+    },
+    "Hugging Face, where the speech model comes from, isn’t answering right now. Try again in a few minutes.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hugging Face, woher das Sprachmodell kommt, antwortet gerade nicht. Versuche es in ein paar Minuten noch einmal."
+          }
+        }
+      }
+    },
+    "Menu bar only": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nur Menüleiste"
+          }
+        }
+      }
+    },
+    "No internet connection. The speech model downloads once you’re online.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine Internetverbindung. Das Sprachmodell wird geladen, sobald du online bist."
+          }
+        }
+      }
+    },
+    "Part of the speech model arrived damaged. Downloading it again replaces that part.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ein Teil des Sprachmodells kam beschädigt an. Erneutes Laden ersetzt diesen Teil."
+          }
+        }
+      }
+    },
+    "Pladder is ready": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pladder ist bereit"
+          }
+        }
+      }
+    },
+    "Press the keys to use. Escape cancels.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die gewünschten Tasten drücken. Esc bricht ab."
+          }
+        }
+      }
+    },
+    "Press while holding the talk key to press Return after pasting.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bei gehaltener Sprechtaste drücken, dann wird nach dem Einfügen Return gedrückt, also gesendet."
+          }
+        }
+      }
+    },
+    "Something went wrong. Details are in the Pladder menu.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Etwas ist schiefgegangen. Details stehen im Pladder-Menü."
+          }
+        }
+      }
+    },
+    "The connection to Hugging Face isn’t secure, so the download was stopped. Check the network, then try again.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Verbindung zu Hugging Face ist nicht sicher, deshalb wurde der Download gestoppt. Prüfe das Netzwerk und versuche es dann noch einmal."
+          }
+        }
+      }
+    },
+    "The speech model download stopped. It picks up where it left off when you try again.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Download des Sprachmodells wurde unterbrochen. Beim nächsten Versuch geht er dort weiter, wo er aufgehört hat."
+          }
+        }
+      }
+    },
+    "The speech model download was cancelled.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Download des Sprachmodells wurde abgebrochen."
+          }
+        }
+      }
+    },
+    "While recording": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Während der Aufnahme"
           }
         }
       }
