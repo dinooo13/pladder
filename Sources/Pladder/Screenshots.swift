@@ -170,6 +170,10 @@ enum Screenshots {
             }
             return
         }
+        // `--get-started`: the General tab at its tallest, with the end of Get Started.
+        if CommandLine.arguments.contains("--get-started") {
+            appModel?.reviewShowsGetStarted = true
+        }
         for (scheme, suffix) in [(NSAppearance.Name.aqua, "light"), (.darkAqua, "dark")] {
             NSApp.appearance = NSAppearance(named: scheme)
             for (tab, name) in [(SettingsTab.general, "general"), (.text, "text"), (.dictionary, "dictionary")] {

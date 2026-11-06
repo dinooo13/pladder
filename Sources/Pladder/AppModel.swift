@@ -296,11 +296,18 @@ final class AppModel {
         }
     }
 
+    // Loading a model already on disk is every launch's few seconds, not setup: it shows in
+    // the speech model's own section, so Settings opened then is not a Get Started window.
+    private var needsFirstSetup: Bool {
+        if case .loading = coordinator.engineStatus { return permissions.needsAnyPermission }
+        return needsSetup
+    }
+
     var holdShortcut: String { menuChords.hold }
 
     // Latched for the launch: once setup was needed, Get Started stays to say it is done.
     var showsGetStarted: Bool {
-        if needsSetup { setupSeen = true }
+        if needsFirstSetup { setupSeen = true }
         return setupSeen || reviewShowsGetStarted
     }
     // Only the review captures set it, to show the section's end state.
