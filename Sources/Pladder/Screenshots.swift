@@ -12,8 +12,19 @@ enum Screenshots {
         return URL(filePath: args[index + 1])
     }
 
+    static var capturesMenu: Bool { CommandLine.arguments.contains("--menu") }
+
     static func run(into directory: URL) async {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        // `--menu`: the real menu of this copy's own status item, opened in-process and closed
+        // with an Escape posted to this app alone, in the system's appearance; menus do not
+        // follow `NSApp.appearance`.
+        if capturesMenu {
+            await captureMenu(into: directory)
+            NSApp.terminate(nil)
+            return
+        }
 
         // `--settings`: each Settings tab, for reviewing the window without opening it.
         if CommandLine.arguments.contains("--settings") {
@@ -134,6 +145,20 @@ enum Screenshots {
             print("screenshots: no Settings window")
             return
         }
+        // What VoiceOver is given, tab by tab: role, label, value and help of every element,
+        // in the order it walks them.
+        if CommandLine.arguments.contains("--accessibility") {
+            for (tab, name) in [(SettingsTab.general, "general"), (.text, "text"), (.dictionary, "dictionary")] {
+                SettingsView.requestedTab = tab
+                try? await Task.sleep(for: .seconds(1))
+                var lines: [String] = []
+                describe(window, depth: 0, into: &lines)
+                try? lines.joined(separator: "\n").write(
+                    to: directory.appending(path: "accessibility-\(name).txt"), atomically: true, encoding: .utf8)
+                print("wrote accessibility-\(name).txt")
+            }
+            return
+        }
         for (scheme, suffix) in [(NSAppearance.Name.aqua, "light"), (.darkAqua, "dark")] {
             NSApp.appearance = NSAppearance(named: scheme)
             for (tab, name) in [(SettingsTab.general, "general"), (.text, "text"), (.dictionary, "dictionary")] {
@@ -145,6 +170,93 @@ enum Screenshots {
             }
         }
         NSApp.appearance = nil
+    }
+
+    private static func captureMenu(into directory: URL) async {
+        try? await Task.sleep(for: .seconds(1.5))
+        func find(_ view: NSView) -> NSButton? {
+            if let button = view as? NSButton, String(describing: type(of: view)).contains("StatusBarButton") { return button }
+            for sub in view.subviews { if let found = find(sub) { return found } }
+            return nil
+        }
+        guard let button = NSApp.windows.compactMap({ $0.contentView.flatMap(find) }).first else {
+            print("screenshots: no status item")
+            return
+        }
+        do {
+            let url = directory.appending(path: "menu.png")
+            let pid = ProcessInfo.processInfo.processIdentifier
+            // The menu tracks in a nested run loop, so the capture runs beside it and then
+            // closes it from the main queue, which that loop still serves.
+            DispatchQueue.global().asyncAfter(deadline: .now() + 0.8) {
+                let windows = (CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]]) ?? []
+                let menu = windows.first {
+                    ($0[kCGWindowOwnerPID as String] as? Int32) == pid && (($0[kCGWindowLayer as String] as? Int) ?? 0) > 24
+                        && (($0[kCGWindowBounds as String] as? [String: CGFloat])?["Height"] ?? 0) > 40
+                }
+                if let number = menu?[kCGWindowNumber as String] as? Int {
+                    let process = Process()
+                    process.executableURL = URL(filePath: "/usr/sbin/screencapture")
+                    process.arguments = ["-x", "-o", "-l", String(number), url.path]
+                    try? process.run()
+                    process.waitUntilExit()
+                    print("wrote \(url.lastPathComponent)")
+                } else {
+                    print("screenshots: no menu window")
+                }
+                DispatchQueue.main.async {
+                    if let escape = NSEvent.keyEvent(
+                        with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                        windowNumber: 0, context: nil, characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}",
+                        isARepeat: false, keyCode: 53) {
+                        NSApp.postEvent(escape, atStart: true)
+                    }
+                }
+            }
+            button.performClick(nil)
+        }
+    }
+
+    // Through the Accessibility API, as VoiceOver reads it, from this process's own tree.
+    private static func describe(_ window: NSWindow, depth: Int, into lines: inout [String]) {
+        let app = AXUIElementCreateApplication(ProcessInfo.processInfo.processIdentifier)
+        var windows: CFTypeRef?
+        AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &windows)
+        for element in (windows as? [AXUIElement]) ?? [] {
+            walk(element, depth: 0, into: &lines)
+        }
+    }
+
+    private static func walk(_ element: AXUIElement, depth: Int, into lines: inout [String]) {
+        guard depth < 40 else { return }
+        func string(_ attribute: String) -> String {
+            var value: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success, let value else { return "" }
+            if let text = value as? String { return text }
+            if let number = value as? NSNumber { return number.stringValue }
+            return ""
+        }
+        let role = string(kAXRoleAttribute)
+        var titled: CFTypeRef?
+        var linkedTitle = ""
+        if AXUIElementCopyAttributeValue(element, kAXTitleUIElementAttribute as CFString, &titled) == .success,
+           let titled, CFGetTypeID(titled) == AXUIElementGetTypeID() {
+            var text: CFTypeRef?
+            AXUIElementCopyAttributeValue(titled as! AXUIElement, kAXValueAttribute as CFString, &text)
+            linkedTitle = (text as? String) ?? ""
+        }
+        let traits = [
+            ("label", string(kAXDescriptionAttribute)), ("title", string(kAXTitleAttribute)),
+            ("titled by", linkedTitle), ("value", string(kAXValueAttribute)), ("help", string(kAXHelpAttribute)),
+        ].filter { !$0.1.isEmpty }.map { "\($0.0): \($0.1)" }
+        if !(["AXGroup", "AXScrollArea", "AXUnknown"].contains(role) && traits.isEmpty) {
+            lines.append(String(repeating: "  ", count: min(depth, 12)) + role + (traits.isEmpty ? "" : "  " + traits.joined(separator: "  ")))
+        }
+        var children: CFTypeRef?
+        AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &children)
+        for child in (children as? [AXUIElement]) ?? [] {
+            walk(child, depth: depth + 1, into: &lines)
+        }
     }
 
     // The child inherits the Screen Recording grant of the terminal that launched

@@ -101,24 +101,26 @@ struct OverlayPill: View {
         // Compact row in every style. Live has its own recording row and Compact's for the rest.
         else if style == .liveTranscript && !isError {
             liveContent
-                .frame(minHeight: 32)
-                .padding(.horizontal, 18)
-                .padding(.vertical, 12)
-                .frame(minWidth: 140)
                 .opacity(gathering ? 0 : 1)
                 .animation(.easeOut(duration: OverlayMotion.morphDuration * 0.3), value: gathering)
-                .transition(contentHandover)
-        } else {
-            compactContent
-                // Each state its own view, so the clipboard hint replaces the bars rather than
-                // fading in over them while they fade out.
                 .id(rowKey)
                 .frame(minHeight: 32)
                 .padding(.horizontal, 18)
                 .padding(.vertical, 12)
                 .frame(minWidth: 140)
+                .transition(contentHandover)
+        } else {
+            compactContent
+                // The fade sits inside the identity: each row state is its own view, so a
+                // gathered row leaves at the opacity it gathered to instead of coming back
+                // under the clipboard hint while it is replaced.
                 .opacity(gathering ? 0 : 1)
                 .animation(.easeOut(duration: OverlayMotion.morphDuration * 0.3), value: gathering)
+                .id(rowKey)
+                .frame(minHeight: 32)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
+                .frame(minWidth: 140)
                 .transition(contentHandover)
         }
     }
