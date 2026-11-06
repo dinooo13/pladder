@@ -8,6 +8,7 @@ import SwiftUI
 // The chord is committed once every key is let go, so it can be built up in any
 // order. Escape alone cancels; Delete alone clears, where that is allowed.
 struct HotkeyRecorderField: View {
+    let title: LocalizedStringKey
     @Binding var hotkey: Hotkey
     var setHotkeySuspended: (Bool) -> Void
     // Without Accessibility a chord goes to Carbon, which needs one regular key, so a
@@ -23,12 +24,15 @@ struct HotkeyRecorderField: View {
     var body: some View {
         VStack(alignment: .trailing, spacing: 4) {
             HStack(spacing: 4) {
+                // Balances the clear button, so the keys stay centred in the field.
+                if showsClear {
+                    Color.clear.frame(width: 14, height: 1)
+                }
                 Text(label)
                     .foregroundStyle(isEmpty && !recorder.isRecording ? .secondary : .primary)
-                    .contentTransition(.numericText())
                     .lineLimit(1)
                     .frame(maxWidth: .infinity)
-                if allowsEmpty, !isEmpty, !recorder.isRecording {
+                if showsClear {
                     Button {
                         hotkey = Hotkey(keyCodes: [])
                     } label: {
@@ -41,17 +45,12 @@ struct HotkeyRecorderField: View {
                 }
             }
             .padding(.horizontal, 8)
-            .frame(width: 132, height: 24)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color(nsColor: .controlBackgroundColor))
-            )
+            .frame(width: 136, height: 24)
+            // The system fill, as a bordered control uses: a text-background well is a black
+            // hole on the grouped form in dark mode.
+            .background(.fill.tertiary, in: Capsule())
             .overlay(
-                RoundedRectangle(cornerRadius: 6)
-                    .strokeBorder(Color(nsColor: .separatorColor))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 7)
+                Capsule()
                     .strokeBorder(Color(nsColor: .keyboardFocusIndicatorColor), lineWidth: 3)
                     .padding(-2)
                     .opacity(recorder.isRecording ? 1 : 0)
@@ -67,6 +66,7 @@ struct HotkeyRecorderField: View {
             }
             .help(help)
             .accessibilityElement(children: .ignore)
+            .accessibilityLabel(title)
             .accessibilityAddTraits(.isButton)
             .accessibilityValue(recorder.isRecording ? String(localized: "Recording a shortcut") : hotkey.displayName)
             .accessibilityAction { toggleRecording() }
@@ -83,6 +83,7 @@ struct HotkeyRecorderField: View {
     }
 
     private var isEmpty: Bool { hotkey.keyCodes.isEmpty }
+    private var showsClear: Bool { allowsEmpty && !isEmpty && !recorder.isRecording }
 
     private func toggleRecording() {
         if recorder.isRecording {
@@ -109,22 +110,10 @@ struct HotkeyRecorderField: View {
         return recorder.pending?.shortcutName ?? String(localized: "Type Shortcut")
     }
 
-    // Whole sentences: a translation cannot be assembled from clauses.
     private var help: String {
-        switch (recorder.isRecording, requiresRegularKey) {
-        case (true, false):
-            allowsEmpty
-                ? String(localized: "Press the key or combination to use. Escape cancels, Delete clears.")
-                : String(localized: "Press the key or combination to use. Escape cancels.")
-        case (true, true):
-            allowsEmpty
-                ? String(localized: "Press the key or combination to use. Escape cancels, Delete clears. Without Accessibility the key must include a regular key, for example Control+Shift+D.")
-                : String(localized: "Press the key or combination to use. Escape cancels. Without Accessibility the key must include a regular key, for example Control+Shift+D.")
-        case (false, false):
-            String(localized: "Click, then press the key or combination to use.")
-        case (false, true):
-            String(localized: "Click, then press the key or combination to use. Without Accessibility the key must include a regular key, for example Control+Shift+D.")
-        }
+        recorder.isRecording
+            ? String(localized: "Press the keys to use. Escape cancels.")
+            : String(localized: "Click to record a new shortcut.")
     }
 }
 

@@ -20,12 +20,10 @@ enum Screenshots {
             let model = AppModel(location: .scratch)
             for scheme in [ColorScheme.light, .dark] {
                 let suffix = scheme == .dark ? "dark" : "light"
-                await capture(GeneralSettingsView(model: model), size: CGSize(width: 540, height: model.needsSetup ? 800 : 640), scheme: scheme,
-                              to: directory.appending(path: "settings-general-\(suffix).png"), opaque: true)
-                await capture(DictionaryView(model: model), size: CGSize(width: 540, height: 460), scheme: scheme,
-                              to: directory.appending(path: "settings-dictionary-\(suffix).png"), opaque: true)
-                await capture(TextSettingsView(model: model), size: CGSize(width: 540, height: 500), scheme: scheme,
-                              to: directory.appending(path: "settings-text-\(suffix).png"), opaque: true)
+                for (tab, name) in [(SettingsTab.general, "general"), (.text, "text"), (.dictionary, "dictionary")] {
+                    await captureWindow(SettingsView(model: model, tab: tab), scheme: scheme,
+                                        to: directory.appending(path: "settings-\(name)-\(suffix).png"))
+                }
             }
             NSApp.terminate(nil)
             return
@@ -81,6 +79,30 @@ enum Screenshots {
         window.orderOut(nil)
     }
 
+    // A titled window sized as SwiftUI sizes it, so the tab bar, the title and the height
+    // are what the real Settings window shows.
+    private static func captureWindow<Content: View>(_ content: Content, scheme: ColorScheme, to url: URL) async {
+        let host = NSHostingView(rootView: content.environment(\.colorScheme, scheme))
+        let window = NSWindow(
+            contentRect: NSRect(origin: .zero, size: host.fittingSize),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "General"
+        window.isReleasedWhenClosed = false
+        window.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
+        window.contentView = host
+        window.toolbarStyle = .preference
+        window.center()
+        window.orderFrontRegardless()
+        try? await Task.sleep(for: .milliseconds(700))
+        window.setContentSize(host.fittingSize)
+        try? await Task.sleep(for: .milliseconds(300))
+        capture(window: window, to: url)
+        window.orderOut(nil)
+    }
+
     // The child inherits the Screen Recording grant of the terminal that launched
     // Pladder, which is why the script runs the binary directly, not through `open`.
     private static func capture(window: NSWindow, to url: URL) {
@@ -99,8 +121,29 @@ enum Screenshots {
 
 // MARK: - Views
 
+// A quiet desktop with soft shapes in it, so the glass has something to bend; a flat
+// grey makes it look like plastic.
 private struct Wallpaper: View {
-    var body: some View { DesktopWash() }
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        GeometryReader { proxy in
+            let w = proxy.size.width, h = proxy.size.height
+            ZStack {
+                DesktopWash()
+                Circle()
+                    .fill(scheme == .dark ? Color(white: 0.42) : .white)
+                    .frame(width: w * 0.7)
+                    .blur(radius: w * 0.12)
+                    .position(x: w * 0.2, y: h * 0.1)
+                Circle()
+                    .fill(Color(red: 1, green: 0.42, blue: 0.28).opacity(scheme == .dark ? 0.18 : 0.14))
+                    .frame(width: w * 0.55)
+                    .blur(radius: w * 0.12)
+                    .position(x: w * 0.9, y: h * 0.95)
+            }
+        }
+    }
 }
 
 private struct Pill: View {
@@ -109,14 +152,15 @@ private struct Pill: View {
     var style: OverlayStyle = .compact
     var scale: CGFloat = 1
     var partial: String?
+    var hugs = false
 
     var body: some View {
-        OverlayPill(state: state, level: level, style: style, isPreview: true, partial: partial)
+        OverlayPill(state: state, level: level, style: style, isPreview: true, partial: partial, hugsContent: hugs)
             // The proposed size would squeeze the glass but not the row inside it, so the pill
             // takes its own size and is scaled to fit.
             .fixedSize()
             .compositingGroup()
-            .shadow(color: .black.opacity(0.16), radius: 8, y: 3)
+            .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
             .scaleEffect(scale)
     }
 }
@@ -127,22 +171,23 @@ private struct StylesFigure: View {
     var body: some View {
         HStack(alignment: .top, spacing: 24) {
             tile("Compact") {
-                Pill(state: .recording, level: 0.6, scale: 1.15)
+                Pill(state: .recording, level: 0.6, scale: 1.4)
             }
             tile("Minimal") {
-                Pill(state: .recording, level: 0.6, style: .minimal, scale: 1.15)
+                Pill(state: .recording, level: 0.6, style: .minimal, scale: 1.6)
             }
             tile("Live") {
-                // The real live row at its real width, scaled to fit the tile.
+                // The live row hugging a few words, so they read at the tile's size.
                 Pill(
                     state: .recording,
                     level: 0.6,
                     style: .liveTranscript,
-                    scale: 0.6,
-                    partial: "the words show up as you say them, right here"
+                    scale: 1.05,
+                    partial: "as you speak",
+                    hugs: true
                 )
             }
-            tile("Menu Bar") {
+            tile("Menu bar only") {
                 Color.clear
             }
             .overlay(alignment: .top) { menuBar }
@@ -162,25 +207,41 @@ private struct StylesFigure: View {
         }
     }
 
+    // The menu bar with the glyph following the voice, and its menu saying so.
     private var menuBar: some View {
-        HStack(spacing: 14) {
-            Spacer()
-            Image(nsImage: MenuBarIcon.image(for: .recording, level: 0.6))
-                .renderingMode(.template)
-            Image(systemName: "wifi")
-            Image(systemName: "battery.75percent")
-            Text("9:41")
-                .font(.system(size: 13, weight: .medium))
+        VStack(alignment: .trailing, spacing: 6) {
+            HStack(spacing: 14) {
+                Spacer()
+                Image(nsImage: MenuBarIcon.image(for: .recording, level: 0.6))
+                    .renderingMode(.template)
+                    .padding(.horizontal, 4)
+                    .background(.primary.opacity(0.12), in: RoundedRectangle(cornerRadius: 4))
+                Image(systemName: "wifi")
+                Image(systemName: "battery.75percent")
+                Image(systemName: "switch.2")
+            }
+            .foregroundStyle(scheme == .dark ? .white : .black)
+            .padding(.horizontal, 14)
+            .frame(width: 290, height: 28)
+            .background(.ultraThinMaterial)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Listening…").foregroundStyle(.secondary)
+                Divider()
+                Text("Settings…")
+                Text("Quit Pladder")
+            }
+            .font(.system(size: 13))
+            .padding(10)
+            .frame(width: 150, alignment: .leading)
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 10))
+            .padding(.trailing, 70)
         }
-        .foregroundStyle(scheme == .dark ? .white : .black)
-        .padding(.horizontal, 14)
-        .frame(width: 290, height: 28)
-        .background(.ultraThinMaterial)
         .clipShape(UnevenRoundedRectangle(topLeadingRadius: 16, topTrailingRadius: 16))
     }
 }
 
-// The site's hero: a chat with an agent, the reply being dictated, and the Live pill.
+// The site's hero: a chat with an agent while the reply is still being said, so the
+// prompt box waits with its cursor and the Live pill shows the words, as it is.
 private struct HeroFigure: View {
     static let size = CGSize(width: 580, height: 420)
     @Environment(\.colorScheme) private var scheme
@@ -200,7 +261,7 @@ private struct HeroFigure: View {
                 style: .liveTranscript,
                 partial: "yes, and add a test for it"
             )
-            .padding(.top, 326)
+            .padding(.top, 348)
         }
     }
 
@@ -232,8 +293,9 @@ private struct HeroFigure: View {
                 Spacer(minLength: 0)
                 HStack(alignment: .bottom) {
                     HStack(spacing: 1) {
-                        Text(verbatim: "Yes, and add a test for it.")
                         Rectangle().fill(Color.accentColor).frame(width: 2, height: 17)
+                        Text(verbatim: "Reply…")
+                            .foregroundStyle(.tertiary)
                     }
                     Spacer()
                     Image(systemName: "arrow.up.circle.fill")

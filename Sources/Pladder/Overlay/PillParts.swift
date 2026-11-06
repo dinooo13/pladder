@@ -7,7 +7,9 @@ import PladderCore
 enum PillMetrics {
     static let fontSize: CGFloat = 13
     static let font = Font.system(size: fontSize, weight: .medium)
-    @MainActor static let nsFont = NSFont.systemFont(ofSize: fontSize, weight: .medium)
+    // The live words in regular: medium on glass reads as bold over three lines.
+    static let transcriptFont = Font.system(size: fontSize, weight: .regular)
+    @MainActor static let nsFont = NSFont.systemFont(ofSize: fontSize, weight: .regular)
     static let rowSpacing: CGFloat = 10
     static let dotSize: CGFloat = 8
     static let barWidth: CGFloat = 3
@@ -38,6 +40,12 @@ struct RecordingDot: View {
 struct PillBackground: ViewModifier {
     var namespace: Namespace.ID?
     @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.colorScheme) private var scheme
+
+    private var rim: Color {
+        if contrast == .increased { return Color(nsColor: .separatorColor) }
+        return scheme == .dark ? .white.opacity(0.14) : .black.opacity(0.06)
+    }
 
     // One shape for row and disc: a capsule in a square is a circle, so the morph is only
     // the size. `AnyShape` cannot interpolate between two shape types; a `Circle` would snap.
@@ -55,11 +63,10 @@ struct PillBackground: ViewModifier {
                     .glassEffect(.regular, in: shape)
             }
         }
-        // Increase Contrast: glass on a dark window otherwise has no edge at all.
+        // A hairline rim always: regular glass over a dark window otherwise has no edge at
+        // all. Increase Contrast makes it a full separator line.
         .overlay {
-            if contrast == .increased {
-                shape.strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
-            }
+            shape.strokeBorder(rim, lineWidth: contrast == .increased ? 1 : 0.5)
         }
     }
 }
@@ -97,7 +104,7 @@ struct LevelBars: View {
         HStack(alignment: .center, spacing: PillMetrics.barSpacing) {
             ForEach(0..<count, id: \.self) { index in
                 Capsule()
-                    .fill(.primary.opacity(opacity))
+                    .fill(Color.primary.opacity(opacity))
                     .frame(width: PillMetrics.barWidth, height: max(PillMetrics.barWidth, heights[index] * maxHeight))
             }
         }

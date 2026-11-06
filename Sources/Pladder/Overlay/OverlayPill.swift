@@ -109,6 +109,7 @@ struct OverlayPill: View {
             HStack(spacing: PillMetrics.rowSpacing) {
                 ProgressView()
                     .controlSize(.small)
+                    .tint(.primary)
                 Text("Transcribing…")
                     .font(PillMetrics.font)
                     .foregroundStyle(.primary)
@@ -117,6 +118,7 @@ struct OverlayPill: View {
             HStack(spacing: PillMetrics.rowSpacing) {
                 ProgressView()
                     .controlSize(.small)
+                    .tint(.primary)
                 Text("Polishing…")
                     .font(PillMetrics.font)
                     .foregroundStyle(.primary)
@@ -216,6 +218,7 @@ struct OverlayPill: View {
         case .transcribing, .polishing:
             ProgressView()
                 .controlSize(.small)
+                .tint(.primary)
         case .copied:
             // The disc the hint collapses into keeps its glyph, so what slides away still says
             // what happened.

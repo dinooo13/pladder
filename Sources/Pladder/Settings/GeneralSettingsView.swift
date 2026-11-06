@@ -6,8 +6,9 @@ struct GeneralSettingsView: View {
 
     var body: some View {
         Form {
-            // First, and only until dictation can work: what is missing, and the download.
-            if model.needsSetup {
+            // First, until dictation can work, and for the rest of that session with a line
+            // saying it is ready, so finishing setup has an end rather than a vanishing section.
+            if model.showsGetStarted {
                 GetStartedSection(model: model)
             }
             StartupSection(model: model)
@@ -45,16 +46,25 @@ private struct GetStartedSection: View {
                 PermissionRow(
                     title: "Accessibility",
                     detail: String(localized: "Lets Pladder paste for you. Without it, the text is copied and you press ⌘V."),
-                    buttonTitle: String(localized: "Allow…"),
+                    buttonTitle: permissions.promptedForAccessibility
+                        ? String(localized: "Open System Settings…") : String(localized: "Allow…"),
                     isPrimary: !permissions.needsMicrophone,
                     action: permissions.grantAccessibility
                 )
             }
             SpeechModelProgress(model: model)
+            if !model.needsSetup {
+                Label {
+                    Text("Pladder is ready")
+                } icon: {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                }
+            }
         } header: {
-            Text("Get Started")
+            Text("Get started")
         } footer: {
-            Text("Then click into any text field, hold \(model.holdShortcut) and talk.")
+            Text("Click into any text field, hold \(model.holdShortcut) and talk.")
         }
     }
 
@@ -124,6 +134,7 @@ private struct ShortcutsSection: View {
         Section("Shortcuts") {
             LabeledContent {
                 HotkeyRecorderField(
+                    title: "Push to talk",
                     hotkey: $model.settings.hotkey,
                     setHotkeySuspended: model.setHotkeySuspended,
                     requiresRegularKey: model.hotkeys.hotkeyNeedsRegularKey,
@@ -140,6 +151,7 @@ private struct ShortcutsSection: View {
             }
             LabeledContent {
                 HotkeyRecorderField(
+                    title: "Hands-free",
                     hotkey: $model.settings.toggleHotkey,
                     setHotkeySuspended: model.setHotkeySuspended,
                     requiresRegularKey: model.hotkeys.hotkeyNeedsRegularKey,
@@ -158,13 +170,14 @@ private struct ShortcutsSection: View {
             }
             LabeledContent {
                 HotkeyRecorderField(
+                    title: "Send",
                     hotkey: $model.settings.submitKey,
                     setHotkeySuspended: model.setHotkeySuspended,
                     allowsEmpty: true
                 )
             } label: {
                 Text("Send")
-                Text("Press while holding push to talk, and Return follows the text.")
+                Text("Press while holding the talk key to press Return after pasting.")
             }
             if let warning = HotkeyWarning.forSendKey(
                 model.settings.submitKey, hotkey: model.settings.hotkey,
@@ -181,7 +194,7 @@ private struct OverlaySection: View {
     var body: some View {
         Section {
             OptionCardRow(
-                title: String(localized: "Overlay"),
+                title: String(localized: "While recording"),
                 selection: $model.settings.overlayStyle,
                 options: OverlayStyle.allCases,
                 name: \.displayName
@@ -189,7 +202,7 @@ private struct OverlaySection: View {
                 OverlayStyleThumbnail(style: style)
             }
         } header: {
-            Text("Overlay")
+            Text("While recording")
         } footer: {
             Text(verbatim: model.settings.overlayStyle.summary)
         }
@@ -210,12 +223,8 @@ private struct SpeechModelSection: View {
                 // The registry's own text, localized where it is built.
                 Text(verbatim: model.registry.entry(for: model.settings.engineID)?.detail ?? "")
             }
-            if !model.needsSetup {
+            if !model.showsGetStarted {
                 SpeechModelProgress(model: model)
-            }
-        } footer: {
-            if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String {
-                Text(verbatim: String(localized: "Pladder \(version)"))
             }
         }
     }
@@ -224,7 +233,7 @@ private struct SpeechModelSection: View {
 extension OverlayStyle {
     var displayName: String {
         switch self {
-        case .menuBar: String(localized: "Menu Bar")
+        case .menuBar: String(localized: "Menu bar only")
         case .minimal: String(localized: "Minimal")
         case .compact: String(localized: "Compact")
         case .liveTranscript: String(localized: "Live")

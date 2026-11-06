@@ -48,7 +48,7 @@ body {
 }
 
 p, figure, dl, dd { margin: 0; }
-a { color: inherit; text-decoration-color: var(--line); text-decoration-thickness: 1px; text-underline-offset: 0.2em; }
+a { color: inherit; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); text-decoration-thickness: 1px; text-underline-offset: 0.2em; }
 a:hover { text-decoration-color: currentColor; }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; border-radius: 4px; }
 img { display: block; max-width: 100%; height: auto; }
@@ -76,9 +76,8 @@ del { text-decoration-thickness: 0.08em; color: var(--faint); }
 .skip:focus { top: 1rem; }
 
 /* SF Pro Display at these sizes; a little negative tracking, as Apple sets it. */
-h1, h2, h3 { margin: 0; font-weight: 700; letter-spacing: -0.012em; line-height: 1.1; text-wrap: balance; }
+h1, h2, h3 { margin: 0; font-weight: 600; line-height: 1.1; text-wrap: balance; }
 h2 { font-size: clamp(30px, 3.4vw, 44px); margin-bottom: 16px; }
-h2 a { text-decoration-color: var(--coral); text-decoration-thickness: 0.06em; }
 
 .btn {
   display: inline-flex;
@@ -103,7 +102,7 @@ kbd.key {
   min-width: 42px;
   min-height: 38px;
   vertical-align: middle;
-  font: 500 11px/1 var(--text);
+  font: 500 12px/1 var(--text);
   color: var(--ink);
   background: var(--key);
   border: 1px solid var(--key-line);
@@ -111,7 +110,7 @@ kbd.key {
   border-radius: 7px;
   padding: 5px 7px;
 }
-kbd.key .glyph { font-size: 13px; }
+kbd.key .glyph { font-size: 14px; }
 kbd.key-space { justify-content: flex-end; align-items: center; padding-inline: 36px; }
 kbd.key-v { min-width: 34px; min-height: 30px; align-items: center; justify-content: center; font-size: 14px; background: var(--coral); color: var(--coral-ink); border-color: rgba(0, 0, 0, 0.14); }
 
@@ -127,8 +126,8 @@ kbd.key-v { min-width: 34px; min-height: 30px; align-items: center; justify-cont
   justify-content: space-between;
   gap: 12px 32px;
 }
-.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-size: 19px; font-weight: 600; letter-spacing: -0.01em; }
-.brand svg { width: 28px; height: 28px; }
+.brand { display: flex; align-items: center; text-decoration: none; color: var(--ink); }
+.brand svg { display: block; height: 27px; width: auto; }
 .top nav { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 24px; font-size: 14px; color: var(--muted); }
 .top nav a:not(.btn) { text-decoration: none; padding: 10px 0; }
 .top nav a:not(.btn):hover, .top nav a[aria-current] { color: var(--ink); }
@@ -145,7 +144,7 @@ kbd.key-v { min-width: 34px; min-height: 30px; align-items: center; justify-cont
   gap: 40px 48px;
 }
 .hero-text { display: flex; flex-direction: column; gap: 24px; }
-.hero h1 { font-size: clamp(44px, 5vw, 64px); line-height: 1.04; letter-spacing: -0.018em; }
+.hero h1 { font-size: clamp(44px, 5vw, 64px); line-height: 1.04; letter-spacing: -0.005em; }
 .intro { font-size: 19px; line-height: 1.55; color: var(--muted); max-width: 30em; }
 .intro a { color: var(--ink); }
 .get { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }

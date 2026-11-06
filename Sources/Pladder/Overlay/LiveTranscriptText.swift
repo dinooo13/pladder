@@ -42,7 +42,7 @@ struct LiveTranscriptText: View {
 
     var body: some View {
         Text(attributed)
-            .font(PillMetrics.font)
+            .font(PillMetrics.transcriptFont)
             .multilineTextAlignment(.leading)
             // A backstop only: `shown` has already been cut to fit.
             .lineLimit(hugs ? 2 : Self.maximumLines)

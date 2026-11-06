@@ -52,6 +52,10 @@ final class CorrectionInbox {
         addRules([DictionaryEntry(from: proposal.pair.heard, to: proposal.pair.corrected)])
     }
 
+    func dismissAll() {
+        for proposal in proposals { dismiss(proposal) }
+    }
+
     func dismiss(_ proposal: CorrectionProposal) {
         proposals.removeAll { $0.id == proposal.id }
         let dismissed = self.dismissed
