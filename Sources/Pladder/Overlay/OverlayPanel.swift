@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import PladderCore
+import PladderSystem
 
 // Never takes focus from the app being typed into: non-activating, never key, and
 // click-through.
@@ -18,9 +19,11 @@ final class OverlayPanel: NSPanel {
     // for the whole fade.
     static let fadeOutDuration: TimeInterval = 0.25
 
-    // Above the Dock when it shows, and never closer than this to the screen's edge.
-    private static let dockClearance: CGFloat = 12
-    private static let edgeClearance: CGFloat = 64
+    // The pill's own height in the row styles; the Live row grows above it.
+    private static let pillHeight: CGFloat = 56
+
+    // The focused text field, read at the press; the pill rests above it if it would cover it.
+    var avoiding: CGRect?
 
     // The bottom of the screen the pill rests on: flights start and end behind it.
     private var screenBottom: CGFloat = 0
@@ -137,12 +140,12 @@ final class OverlayPanel: NSPanel {
             ?? NSScreen.main
             ?? NSScreen.screens.first
         guard let screen else { return self.frame }
-        let frame = screen.frame
-        screenBottom = frame.minY
-        let size = Self.size(for: model.style)
+        screenBottom = screen.frame.minY
         // `visibleFrame` leaves out the Dock, so the pill never sits on top of it.
-        let y = max(frame.minY + Self.edgeClearance, screen.visibleFrame.minY + Self.dockClearance)
-        return NSRect(x: frame.midX - size.width / 2, y: y, width: size.width, height: size.height)
+        return OverlayPlacement(
+            screen: screen.frame, visible: screen.visibleFrame,
+            panel: Self.size(for: model.style), pillHeight: Self.pillHeight
+        ).frame(avoiding: avoiding)
     }
 
     // Down until the whole panel is behind the screen's bottom edge, which clips it.

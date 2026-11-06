@@ -65,7 +65,7 @@ extension DictationFailure {
         switch self {
         // AVFoundation's description, already in the system language.
         case .microphone(let detail): String(localized: "Couldn’t use the microphone: \(detail)")
-        case .engineNotLoaded: String(localized: "The speech model isn’t loaded yet.")
+        case .engineNotLoaded: String(localized: "The speech model is still loading. Try again in a moment.")
         case .pasteKeystroke:
             String(localized: "Couldn’t paste. Try again, or restart Pladder.")
         case .other(let detail): detail
@@ -228,13 +228,13 @@ extension HotkeyWarning {
     @MainActor var text: String {
         switch self {
         case .standIn(let stored, let standIn):
-            String(localized: "Without Accessibility, \(stored.displayName) cannot be detected, so \(standIn.sideAgnosticDisplayName) stands in for it until Accessibility is granted. Record a combination with a regular key to choose your own.")
+            String(localized: "Without Accessibility, \(stored.displayName) can’t be detected. \(standIn.sideAgnosticDisplayName) works in its place until you allow it.")
         case .systemShortcut(let owner, let chord):
             String(localized: "\(owner.sideAgnosticDisplayName) is a macOS keyboard shortcut, so \(chord.displayName) may never reach Pladder. Record another combination.")
         case .noModifier(let hotkey):
             String(localized: "Without a modifier, \(hotkey.displayName) can no longer be typed in other apps while Pladder is running.")
         case .toggleNeedsAccessibility(let toggle):
-            String(localized: "Without Accessibility, \(toggle.displayName) cannot be detected, so the toggle key is off until Accessibility is granted.")
+            String(localized: "Without Accessibility, \(toggle.displayName) can’t be detected, so the hands-free key is off until you allow it.")
         case .sendKeyNeedsAccessibility:
             String(localized: "The send key needs Accessibility.")
         case .sendKeyInsideChord(let key):

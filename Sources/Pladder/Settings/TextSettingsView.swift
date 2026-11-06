@@ -17,11 +17,14 @@ struct TextSettingsView: View {
                 }
             }
 
-            Section {
+            Section("Output") {
                 Toggle(isOn: $model.settings.appendTrailingSpace) {
                     Text("Add a space after each dictation")
                     Text("So the next dictation does not run into this one.")
                 }
+            }
+
+            Section {
                 Toggle(isOn: $model.settings.shortSentenceWithoutPeriod) {
                     Text("Drop the final period")
                     Text("“Yes.” is pasted as “Yes”.")
@@ -31,15 +34,15 @@ struct TextSettingsView: View {
                     Text("“Run the tests” is pasted as “run the tests”. “I” and “API” keep their capital.")
                 }
             } header: {
-                Text("Output")
+                Text("Short Replies")
             } footer: {
-                Text("The last two apply to a dictation of one sentence up to ten words, such as a reply to an agent.")
+                Text("For a dictation of one sentence up to ten words, such as a reply to an agent.")
             }
 
             Section {
                 Toggle(isOn: $model.settings.polishDictations) {
-                    Text("Polish with on-device AI")
-                    Text("Fixes self-corrections, lists and punctuation before pasting.")
+                    Text("Polish before pasting")
+                    Text("Beta. On-device AI fixes self-corrections, lists and punctuation.")
                 }
                 if model.settings.polishDictations {
                     Picker("Model", selection: $model.settings.polishModel) {
@@ -49,8 +52,6 @@ struct TextSettingsView: View {
                     }
                     polishModelStatus
                 }
-            } header: {
-                Text("Polish (Beta)")
             } footer: {
                 if model.settings.polishDictations {
                     Text(verbatim: model.settings.polishModel.summary)

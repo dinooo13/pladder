@@ -32,12 +32,10 @@ struct DictionaryView: View {
                 } else {
                     table
                 }
-                toolbar
                 if !entries.isEmpty {
+                    toolbar
                     testArea
                 }
-            } header: {
-                Text("Words and replacements")
             } footer: {
                 if !cyclicIDs.isEmpty {
                     WarningLabel(String(localized: "Two rules undo each other, so both are ignored."))
@@ -89,8 +87,8 @@ struct DictionaryView: View {
             }
             .width(min: 120, ideal: 170)
 
-            TableColumn("Match case") { row in
-                Toggle("Match case", isOn: row.matchCase)
+            TableColumn("Exact case") { row in
+                Toggle("Exact case", isOn: row.matchCase)
                     .labelsHidden()
                     .help("Paste the replacement exactly as written, even at the start of a sentence.")
             }
@@ -119,15 +117,17 @@ struct DictionaryView: View {
         HStack(spacing: 4) {
             Button(action: addEntry) {
                 Image(systemName: "plus")
-                    .frame(width: 16, height: 16)
+                    .frame(width: 20, height: 20)
             }
+            .buttonStyle(.borderless)
             .help("Add a rule")
             .accessibilityLabel("Add a rule")
 
             Button(action: removeSelected) {
                 Image(systemName: "minus")
-                    .frame(width: 16, height: 16)
+                    .frame(width: 20, height: 20)
             }
+            .buttonStyle(.borderless)
             .disabled(selection.isEmpty)
             .help("Remove the selected rules")
             .accessibilityLabel("Remove the selected rules")

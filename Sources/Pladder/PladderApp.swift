@@ -157,7 +157,11 @@ private struct MenuContent: View {
                         model.corrections.accept(proposal)
                     }
                 }
-                Button("Dismiss") { model.corrections.dismissAll() }
+                if model.corrections.proposals.count > 1 {
+                    Button("Dismiss All") { model.corrections.dismissAll() }
+                } else {
+                    Button("Dismiss") { model.corrections.dismissAll() }
+                }
             }
         }
 

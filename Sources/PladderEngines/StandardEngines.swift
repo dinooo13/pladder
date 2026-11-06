@@ -6,7 +6,7 @@ public enum StandardEngines {
     public static let parakeet = EngineRegistry.Entry(
         id: FluidAudioIncrementalEngine.engineID,
         displayName: "Parakeet TDT v3",
-        detail: "The original Parakeet. 700 MB.",
+        detail: "A little less accurate. 700 MB.",
         make: { FluidAudioIncrementalEngine(model: .v3) }
     )
 

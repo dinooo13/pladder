@@ -45,7 +45,8 @@ struct HotkeyRecorderField: View {
                 }
             }
             .padding(.horizontal, 8)
-            .frame(width: 136, height: 24)
+            .frame(minWidth: 136, minHeight: 24)
+            .fixedSize()
             // The system fill, as a bordered control uses: a text-background well is a black
             // hole on the grouped form in dark mode.
             .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 7))
@@ -104,9 +105,7 @@ struct HotkeyRecorderField: View {
         }
         // Naming the modifiers that did arrive is the honest version of "Needs a regular
         // key": macOS may have eaten the key before Pladder saw it.
-        if let refused = recorder.refusedModifiers {
-            return String(localized: "Only \(refused.sideAgnosticDisplayName) arrived…")
-        }
+        // The notice under the field says what was refused; the field stays short.
         return recorder.pending?.shortcutName ?? String(localized: "Type Shortcut")
     }
 
