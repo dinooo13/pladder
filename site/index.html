@@ -107,24 +107,56 @@
     </div>
     <p class="keys"><span class="kgroup">Hold <kbd class="key"><span class="glyph" aria-hidden="true">⌥</span><span>option</span></kbd> <kbd class="key key-space">space</kbd> to talk,</span> <span class="kgroup">tap <kbd class="key key-v">V</kbd> to send.</span></p>
   </div>
-  <figure class="visual">
-    <picture>
-      <source type="image/avif" media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset="media/hero-mobile-dark.avif">
-      <source type="image/webp" media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset="media/hero-mobile-dark.webp">
-      <source type="image/avif" media="(max-width: 640px)" srcset="media/hero-mobile-light.avif">
-      <source type="image/webp" media="(max-width: 640px)" srcset="media/hero-mobile-light.webp">
-      <source type="image/avif" media="(prefers-color-scheme: dark)" srcset="media/hero-dark.avif">
-      <source type="image/webp" media="(prefers-color-scheme: dark)" srcset="media/hero-dark.webp">
-      <source type="image/avif" srcset="media/hero-light.avif">
-      <img src="media/hero-light.webp" width="580" height="420" fetchpriority="high" alt="A chat with a coding agent, its prompt box waiting with the cursor in it, while Pladder’s recording pill below shows the reply as it is spoken: “yes, and add a test that relaunches the app”.">
-    </picture>
-    <!-- The app’s own window and pill through one dictation, played once; the still for Reduce Motion and phones. -->
-    <video class="film" autoplay muted playsinline width="580" height="420" aria-label="A dictation in a chat with a coding agent: the prompt box waits while Pladder’s pill shows the reply as it is spoken, “yes, and add a test that relaunches the app”, and on release the reply is pasted into the box while the pill comes back to listen for the next prompt.">
-      <source media="(prefers-color-scheme: dark)" src="media/hero-film-dark.webm" type="video/webm">
-      <source media="(prefers-color-scheme: dark)" src="media/hero-film-dark.mp4" type="video/mp4">
-      <source src="media/hero-film-light.webm" type="video/webm">
-      <source src="media/hero-film-light.mp4" type="video/mp4">
-    </video>
+  <!-- T3 Code’s chat, drawn from its MIT source, with Pladder’s Live pill over it. -->
+  <figure class="visual" role="img" aria-label="T3 Code with the reply “Yes, and add a test for it.” in its prompt box, dictated with Pladder, whose recording pill shows the words as they are spoken.">
+    <div class="t3">
+      <div class="t3-side">
+        <div class="t3-title"><span class="lights"><i></i><i></i><i></i></span><span><b>T3</b> <span class="mute">Code</span></span></div>
+        <div class="t3-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search</div>
+        <div class="t3-group">Working <span class="rule"></span></div>
+        <div class="t3-threads">
+          <div class="t3-thread active">
+            <div class="meta"><span class="badge coral">P</span><span class="name">pladder</span><span class="status"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M10.1 2.2a10 10 0 0 1 3.8 0M17.6 3.7a10 10 0 0 1 2.7 2.7M21.8 10.1a10 10 0 0 1 0 3.8M20.3 17.6a10 10 0 0 1-2.7 2.7M13.9 21.8a10 10 0 0 1-3.8 0M6.4 20.3a10 10 0 0 1-2.7-2.7M2.2 13.9a10 10 0 0 1 0-3.8M3.7 6.4a10 10 0 0 1 2.7-2.7"/></svg>Working</span></div>
+            <div class="subject">Persist dark mode toggle</div>
+            <div class="meta branch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="8" r="2.5"/><path d="M6 8.5v7M18 10.5c0 4-6 3-11 5.5"/></svg><span>t3/dark-mode</span><span class="diff"><span class="add">+24</span> <span class="del">−3</span></span></div>
+          </div>
+          <div class="t3-thread">
+            <div class="meta"><span class="badge">W</span><span class="name">website</span><span>7m</span></div>
+            <div class="subject">Fix flaky login test</div>
+            <div class="meta branch">t3/login-test</div>
+          </div>
+          <div class="t3-thread">
+            <div class="meta"><span class="badge coral">P</span><span class="name">pladder</span><span>29m</span></div>
+            <div class="subject">Onboarding copy</div>
+            <div class="meta branch">t3/onboarding</div>
+          </div>
+        </div>
+        <div class="t3-group settled">Settled <span>12</span> ›</div>
+      </div>
+      <div class="t3-main">
+        <div class="t3-crumbs"><span class="square"></span><span class="mute">pladder</span><span class="mute">/</span><span class="name">Persist dark mode toggle</span></div>
+        <div class="t3-chat">
+          <div class="t3-ask">Why does dark mode reset?</div>
+          <div class="t3-worked">Worked for 20 seconds <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></div>
+          <p>It’s only kept in memory. Save it to <code>UserDefaults</code>?</p>
+        </div>
+        <div class="t3-composer">
+          <p>Yes, and add a test for it.</p>
+          <div class="t3-tools">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m21.4 11.1-8.5 8.5a5.5 5.5 0 0 1-7.8-7.8l8.5-8.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.8 1.8 0 0 1-2.6-2.6l7.8-7.8"/></svg>
+            <span class="t3-model">Opus 5.5 <span class="mute">High</span></span>
+            <span class="t3-send"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11.5V2.5M7 2.5L3 6.5M7 2.5L11 6.5"/></svg></span>
+          </div>
+        </div>
+        <div class="t3-foot"><span>Current checkout</span><span>t3/dark-mode</span></div>
+      </div>
+    </div>
+
+    <div class="pill">
+      <span class="rec"></span>
+      <span class="wave"><i style="--h:9"></i><i style="--h:17"></i><i style="--h:22"></i><i style="--h:14"></i><i style="--h:24"></i><i style="--h:12"></i><i style="--h:19"></i><i style="--h:8"></i></span>
+      <span class="said">yes, and add a test for it</span>
+    </div>
   </figure>
 </section>
 
