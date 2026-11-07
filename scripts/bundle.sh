@@ -13,7 +13,8 @@
 #   SCRATCH=<dir>      optional swift build --scratch-path
 #   CODESIGN_IDENTITY  signing identity; auto-detected, "-" forces ad-hoc
 #   MARKETING_VERSION  CFBundleShortVersionString of the bundled Info.plist
-#   BUILD_NUMBER       CFBundleVersion of the bundled Info.plist
+#   BUILD_NUMBER       CFBundleVersion of the bundled Info.plist; default: the
+#                      commit count
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -72,6 +73,11 @@ if [[ "$RELEASE" -eq 1 && "$CODESIGN_IDENTITY" != "Developer ID Application"* ]]
 	exit 1
 fi
 echo "Signing with: $CODESIGN_IDENTITY"
+# Without a public key the app has no updater, and a release would ship without one.
+if [[ "$RELEASE" -eq 1 && -z "$(/usr/libexec/PlistBuddy -c 'Print SUPublicEDKey' "$PLIST" 2>/dev/null)" ]]; then
+	echo "--release needs SUPublicEDKey in $PLIST (INSTALL.md, \"Update signing key\")" >&2
+	exit 1
+fi
 # A dev build stays offline: a secure timestamp asks Apple's server on every
 # signature.
 TIMESTAMP=--timestamp=none
@@ -97,14 +103,26 @@ LLAMA_BIN="$CONTENTS/Frameworks/llama.framework/Versions/A/llama"
 if lipo -archs "$LLAMA_BIN" | grep -q x86_64; then
 	lipo -remove x86_64 "$LLAMA_BIN" -output "$LLAMA_BIN"
 fi
+# Sparkle, the updater, linked the same way. Its XPC services are for sandboxed
+# apps only, and Pladder is not sandboxed, so they go.
+SPARKLE="$CONTENTS/Frameworks/Sparkle.framework"
+ditto "$BIN_DIR/Sparkle.framework" "$SPARKLE"
+rm -rf "$SPARKLE/XPCServices" "$SPARKLE/Versions/B/XPCServices"
+for bin in "$SPARKLE/Versions/B/Sparkle" "$SPARKLE/Versions/B/Autoupdate" \
+	"$SPARKLE/Versions/B/Updater.app/Contents/MacOS/Updater"; do
+	if lipo -archs "$bin" | grep -q x86_64; then
+		lipo -remove x86_64 "$bin" -output "$bin"
+	fi
+done
 install_name_tool -add_rpath "@executable_path/../Frameworks" "$CONTENTS/MacOS/Pladder"
 cp "$PLIST" "$CONTENTS/Info.plist"
 if [[ -n "${MARKETING_VERSION:-}" ]]; then
 	plutil -replace CFBundleShortVersionString -string "$MARKETING_VERSION" "$CONTENTS/Info.plist"
 fi
-if [[ -n "${BUILD_NUMBER:-}" ]]; then
-	plutil -replace CFBundleVersion -string "$BUILD_NUMBER" "$CONTENTS/Info.plist"
-fi
+# Sparkle offers a release only when its build number is higher, so a copy built
+# from a branch is never offered the release it already contains.
+BUILD_NUMBER="${BUILD_NUMBER:-$(git rev-list --count HEAD 2>/dev/null || echo 1)}"
+plutil -replace CFBundleVersion -string "$BUILD_NUMBER" "$CONTENTS/Info.plist"
 printf 'APPL????' > "$CONTENTS/PkgInfo"
 # App icon: Icon Composer's document, its layers drawn by scripts/make-icon.swift.
 # actool needs no Xcode project for it and writes Assets.car, which carries the
@@ -141,17 +159,21 @@ shopt -u nullglob
 
 # The hardened runtime only loads libraries signed by the app's own team, and
 # two ad-hoc signatures count as different teams, so an ad-hoc build would
-# refuse its own llama.framework at launch. It goes without the hardened
-# runtime; a certificate build keeps it.
+# refuse its own frameworks at launch. It goes without the hardened runtime;
+# a certificate build keeps it.
 RUNTIME=(--options runtime)
 if [[ "$CODESIGN_IDENTITY" == "-" ]]; then
 	RUNTIME=()
 fi
-# Inside out: the framework first, with the same identity.
-codesign --force --sign "$CODESIGN_IDENTITY" \
-	${RUNTIME[@]+"${RUNTIME[@]}"} \
-	"$TIMESTAMP" \
-	"$CONTENTS/Frameworks/llama.framework"
+sign() {
+	codesign --force --sign "$CODESIGN_IDENTITY" ${RUNTIME[@]+"${RUNTIME[@]}"} "$TIMESTAMP" "$1"
+}
+# Inside out, with the same identity, and never --deep: Sparkle's helpers each
+# get their own signature before the framework that holds them.
+sign "$CONTENTS/Frameworks/llama.framework"
+sign "$SPARKLE/Versions/B/Autoupdate"
+sign "$SPARKLE/Versions/B/Updater.app"
+sign "$SPARKLE"
 codesign --force --sign "$CODESIGN_IDENTITY" \
 	--entitlements "$ROOT/scripts/Pladder.entitlements" \
 	${RUNTIME[@]+"${RUNTIME[@]}"} \
