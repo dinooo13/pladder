@@ -86,9 +86,11 @@ private struct GetStartedSection: View {
     }
 }
 
-// Shown in Get Started while it lasts, and in the speech model's own section after.
+// Shown in Get Started while it lasts, and in the speech model's own section after, where
+// a load is only the Model row's subtitle: a switch of model is not setup.
 private struct SpeechModelProgress: View {
     let model: AppModel
+    var showsLoading = true
 
     var body: some View {
         switch model.coordinator.engineStatus {
@@ -106,8 +108,8 @@ private struct SpeechModelProgress: View {
                 }
             }
         case .loading:
-            ProgressView {
-                Text("Loading the speech model…")
+            if showsLoading {
+                BusyRow("Loading the speech model…")
             }
         case .failed(let failure):
             LabeledContent {
@@ -137,20 +139,14 @@ private struct StartupSection: View {
                 // Its own line, not the group's footer: the rest of the group is the user's.
                 Toggle(isOn: $model.settings.checksForUpdatesAutomatically) {
                     Text("Check for updates automatically")
-                    Text("Asks GitHub once a day for a newer Pladder. Sends nothing about you.")
                     if model.policy.updateChecks != nil {
                         Text(ManagedText.footer)
                     }
                 }
-                .accessibilityHint(Text("Asks GitHub once a day for a newer Pladder. Sends nothing about you."))
                 .disabled(model.policy.updateChecks != nil)
             }
             Toggle("Play start and stop sounds", isOn: $model.settings.playSounds)
-            Toggle(isOn: $model.settings.muteOutputWhileDictating) {
-                Text("Mute other audio while recording")
-                Text("So music or a call does not end up in the dictation.")
-            }
-            .accessibilityHint(Text("So music or a call does not end up in the dictation."))
+            Toggle("Mute other audio while recording", isOn: $model.settings.muteOutputWhileDictating)
         }
     }
 }
@@ -250,13 +246,12 @@ private struct SpeechModelSection: View {
                 }
             } label: {
                 Text("Model")
-                // The registry's own text, localized where it is built.
-                Text(verbatim: model.registry.entry(for: model.settings.engineID)?.detail ?? "")
+                Text(verbatim: detail)
             }
-            .accessibilityHint(Text(verbatim: model.registry.entry(for: model.settings.engineID)?.detail ?? ""))
+            .accessibilityHint(Text(verbatim: detail))
             .disabled(model.policy.pinsEngine)
             if !model.showsGetStarted {
-                SpeechModelProgress(model: model)
+                SpeechModelProgress(model: model, showsLoading: false)
             }
         } header: {
             Text("Speech Model")
@@ -265,6 +260,14 @@ private struct SpeechModelSection: View {
                 Text(ManagedText.footer)
             }
         }
+    }
+
+    private var detail: String {
+        if case .loading = model.coordinator.engineStatus, !model.showsGetStarted {
+            return String(localized: "Loading the speech model…")
+        }
+        // The registry's own text, localized where it is built.
+        return model.registry.entry(for: model.settings.engineID)?.detail ?? ""
     }
 
     private var engines: [EngineRegistry.Entry] {

@@ -100,6 +100,23 @@ struct WarningLabel: View {
     }
 }
 
+// Work under way, as System Settings shows it: the sentence, and a small spinner at the
+// trailing edge. The regular size is a 32 pt wheel that outweighs the form.
+struct BusyRow: View {
+    let text: LocalizedStringKey
+
+    init(_ text: LocalizedStringKey) { self.text = text }
+
+    var body: some View {
+        LabeledContent {
+            ProgressView()
+                .controlSize(.small)
+        } label: {
+            Text(text)
+        }
+    }
+}
+
 struct PermissionRow: View {
     let title: LocalizedStringKey
     let detail: String

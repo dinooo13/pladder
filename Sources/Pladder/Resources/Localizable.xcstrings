@@ -101,16 +101,6 @@
         }
       }
     },
-    "Asks GitHub once a day for a newer Pladder. Sends nothing about you.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fragt einmal am Tag bei GitHub nach einem neueren Pladder. Sendet nichts über dich."
-          }
-        }
-      }
-    },
     "Built into macOS. Adds one to two seconds to each dictation.": {
       "localizations": {
         "de": {
@@ -947,16 +937,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kurzbefehl aufnehmen"
-          }
-        }
-      }
-    },
-    "So music or a call does not end up in the dictation.": {
-      "localizations": {
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Damit Musik oder ein Anruf nicht im Diktat landet."
           }
         }
       }

@@ -42,7 +42,8 @@ Three rules decide most questions:
 - **Section headers in Title Case** ("Keyboard Shortcuts", "Recording Indicator");
   row labels in sentence case ("Mute other audio while recording").
 - **A row that needs explaining gets one short subtitle** under its label, saying
-  what it does or why, not how it works. The same sentence is the control's
+  what it does or why, not how it works. A label that already says it gets none
+  ("Check for updates automatically", "Mute other audio while recording"). The same sentence is the control's
   accessibility hint, so VoiceOver users moving control by control hear it too. On
   macOS `.help` and the accessibility hint are one attribute, so a control with help
   puts the hint first in it.
@@ -63,7 +64,13 @@ Three rules decide most questions:
   a well with the glyphs (⌥Space) and a clear button. All share one width per
   language. Focus rings only with Full Keyboard Access.
 - **Choices with a picture** (the recording indicator styles) are a radio group of
-  cards with a neutral thumbnail, focusable and announced as one group.
+  cards with a neutral thumbnail, focusable and announced as one group. Every pill is
+  drawn at one scale and centred, so the cards compare sizes as the real pills do.
+- **Work under way** is a sentence with an ellipsis. When it belongs to a row, a
+  model switch say, it takes that row's subtitle; otherwise it is a row of its own
+  with a small spinner at the trailing edge (`BusyRow`). A download shows its bar.
+  Never the regular-size spinner: it outweighs the form, and the menu and its icon
+  already say the model is loading.
 - **Empty states** use `ContentUnavailableView` with the one action that fills them,
   and hide the controls that only make sense with content (the dictionary's table,
   its add and remove buttons, its test field).
