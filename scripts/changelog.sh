@@ -37,7 +37,7 @@ fi
 cat <<EOF
 Requires macOS 26 or later on an Apple Silicon Mac (M1 or newer). Open \`Pladder.dmg\` and drag Pladder to Applications.
 
-- Pladder updates itself: choose Check for Updates… in the menu, or turn on automatic checks in Settings. A copy of 0.1.x has no updater yet; replace it by hand with this DMG once.
+- Pladder updates itself: choose Check for Updates… in the menu, or turn on automatic checks in Settings.
 - The speech model, about 600 MB, downloads from Hugging Face once, at first launch.
 - A move from a copy built yourself with an Apple Development certificate makes macOS ask for Microphone and Accessibility once more.
 
