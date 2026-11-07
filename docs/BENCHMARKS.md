@@ -407,6 +407,10 @@ per-stage breakdown and the audio length:
 /usr/bin/log show --last 1h --style compact --predicate 'subsystem == "de.dinooo13.pladder"'
 ```
 
+The unified log keeps these lines for about a day; the `perf-report` skill
+(`.claude/skills/perf-report`) copies them into a ledger and reports each
+week against "What a dictation waits for" above.
+
 The line looks like:
 
 ```
