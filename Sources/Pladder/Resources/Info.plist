@@ -36,5 +36,21 @@
 	<string>Pladder records your voice while you hold the talk key, or until you tap the hands-free key again, and transcribes it on this Mac.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<!-- Sparkle. The feed is the newest release's appcast.xml, which release.yml
+	     publishes. Without a public key the app shows no updater; a release
+	     build refuses to bundle without one. Automatic checks are off until the
+	     user turns them on in Settings (settings.json), and never ask at launch. -->
+	<key>SUFeedURL</key>
+	<string>https://github.com/dinooo13/pladder/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string></string>
+	<key>SUEnableAutomaticChecks</key>
+	<false/>
+	<key>SUEnableSystemProfiling</key>
+	<false/>
+	<key>SUAllowsAutomaticUpdates</key>
+	<false/>
+	<key>SUVerifyUpdateBeforeExtraction</key>
+	<true/>
 </dict>
 </plist>

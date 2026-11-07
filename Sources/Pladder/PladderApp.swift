@@ -174,9 +174,18 @@ private struct MenuContent: View {
 
         Divider()
 
+        // Only after a scheduled check found it: Sparkle's window waits for this click, so it
+        // never takes focus from a dictation.
+        if let version = model.updates.waitingVersion {
+            Button("Pladder \(version) is available — Install…") { model.updates.checkForUpdates() }
+        }
         Button("About Pladder") {
             NSApp.activate(ignoringOtherApps: true)
             NSApp.orderFrontStandardAboutPanel(nil)
+        }
+        if model.updates.isAvailable {
+            Button("Check for Updates…") { model.updates.checkForUpdates() }
+                .disabled(!model.updates.canCheck)
         }
         Button("Settings…") { showSettings(openSettings) }
             .keyboardShortcut(",", modifiers: .command)

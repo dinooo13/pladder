@@ -18,6 +18,9 @@ let package = Package(
         // own windows, run while the user is still speaking. Offered upstream;
         // when it lands, this goes back to the release line.
         .package(url: "https://github.com/dinooo13/FluidAudio.git", branch: "incremental-chunks"),
+        // In-app updates. A binary framework that scripts/bundle.sh embeds and signs;
+        // the app target alone links it.
+        .package(url: "https://github.com/sparkle-project/Sparkle.git", exact: "2.10.1"),
     ],
     targets: [
         // Pure logic. Imports Foundation only, so tests stay fast and engines
@@ -61,7 +64,10 @@ let package = Package(
         // The menu bar app.
         .executableTarget(
             name: "Pladder",
-            dependencies: ["PladderCore", "PladderAudio", "PladderSystem", "PladderEngines", "PladderRefine"],
+            dependencies: [
+                "PladderCore", "PladderAudio", "PladderSystem", "PladderEngines", "PladderRefine",
+                .product(name: "Sparkle", package: "Sparkle"),
+            ],
             // Info.plist is copied into the .app by scripts/bundle.sh; SwiftPM
             // refuses to treat it as a resource, so keep it out of the bundle.
             exclude: ["Resources/Info.plist"],

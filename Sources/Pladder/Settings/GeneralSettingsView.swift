@@ -133,6 +133,13 @@ private struct StartupSection: View {
             if let error = model.launchAtLoginError {
                 WarningLabel(error)
             }
+            if model.updates.isAvailable {
+                Toggle(isOn: $model.settings.checksForUpdatesAutomatically) {
+                    Text("Check for updates automatically")
+                    Text("Asks GitHub once a day for a newer Pladder. Sends nothing about you.")
+                }
+                .accessibilityHint(Text("Asks GitHub once a day for a newer Pladder. Sends nothing about you."))
+            }
             Toggle("Play start and stop sounds", isOn: $model.settings.playSounds)
             Toggle(isOn: $model.settings.muteOutputWhileDictating) {
                 Text("Mute other audio while recording")

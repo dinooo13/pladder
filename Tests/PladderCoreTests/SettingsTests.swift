@@ -20,6 +20,7 @@ import Testing
             settings.playSounds = false
             settings.muteOutputWhileDictating = true
             settings.overlayStyle = .menuBar
+            settings.checksForUpdatesAutomatically = true
             try store.save(settings)
             #expect(store.load() == settings)
         }
@@ -32,6 +33,10 @@ import Testing
         expected.dictionary = decoded.dictionary
         #expect(decoded.dictionary.count == 1)
         #expect(decoded == expected)
+    }
+
+    @Test func automaticUpdateChecksAreOffUntilTheUserTurnsThemOn() {
+        #expect(!Self.defaults.checksForUpdatesAutomatically)
     }
 
     @Test func legacyPolishChordMigratesToTheToggle() throws {

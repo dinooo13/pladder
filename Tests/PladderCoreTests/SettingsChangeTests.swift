@@ -16,6 +16,7 @@ import Testing
         #expect(change { $0.overlayStyle = .minimal } == SettingsChange(overlayStyle: true))
         #expect(change { $0.polishModel = .s1Mini8Bit } == SettingsChange(polish: true))
         #expect(change { $0.polishDictations.toggle() } == SettingsChange(polish: true))
+        #expect(change { $0.checksForUpdatesAutomatically.toggle() } == SettingsChange(updateChecks: true))
     }
 
     @Test func keysOnlyTheCoordinatorReadsRedoNothingInTheApp() {
