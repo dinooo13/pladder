@@ -229,8 +229,10 @@ jobs:
           sha=$(cut -d ' ' -f 1 dist/release/Pladder.dmg.sha256)
           ./scripts/cask.sh "$VERSION" "$sha" > "$RUNNER_TEMP/pladder.rb"
           api=repos/dinooo13/homebrew-tap/contents/Casks/pladder.rb
-          old=$(gh api "$api" --jq .sha)
-          gh api -X PUT "$api" -f message="pladder $VERSION" -f sha="$old" \
+          # The first release creates the file; every later one replaces it.
+          old=()
+          if sha_old=$(gh api "$api" --jq .sha 2>/dev/null); then old=(-f sha="$sha_old"); fi
+          gh api -X PUT "$api" -f message="pladder $VERSION" ${old[@]+"${old[@]}"} \
             -f content="$(base64 < "$RUNNER_TEMP/pladder.rb" | tr -d '\n')" \
             --jq .commit.html_url
       - name: Delete the tag of a release that was not published
