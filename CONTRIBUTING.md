@@ -4,7 +4,7 @@ Thanks for wanting to help. Pladder is small on purpose, so the most useful thin
 
 1. **The release-to-paste time.** Everything between letting go of the key and the paste. Nothing goes on that path without a before-and-after benchmark.
 2. **A minimal UI.** No new setting, window or overlay element unless a feature cannot work without it. Removing beats adding.
-3. **Privacy.** Audio and text never leave the Mac. No network calls, no telemetry, no accounts. The one-time model downloads from Hugging Face stay the only exception.
+3. **Privacy.** Audio and text never leave the Mac. No telemetry, no accounts. The only requests are the one-time model downloads from Hugging Face and the update check against this repository's releases, and they stay the only ones.
 
 A change that trades one of these for convenience will probably be turned down, however well it is written.
 

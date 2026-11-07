@@ -65,9 +65,13 @@ Three rules decide most questions:
 From top to bottom: the status line, then whatever needs the user (a missing grant,
 a failed model, each with its own item), then "Copy Last Dictation" with the
 transcript as its subtitle, then Suggested Corrections when there are any (Option
-turns each into its own Dismiss), then About Pladder and Settings…, and Quit Pladder
-alone below a divider. Menu text is short: a menu does not wrap, so a long sentence
-goes in a subtitle.
+turns each into its own Dismiss), then About Pladder, Check for Updates… and
+Settings…, and Quit Pladder alone below a divider. An update a scheduled check
+found is one line at the top of the About group, "Pladder 0.3.0 is available —
+Install…", there only until the user acts on it: it does not stop dictation, so it
+does not go up with the grants, and it never opens a window or changes the icon by
+itself. Menu text is short: a menu does not wrap, so a long sentence goes in a
+subtitle.
 
 ## The menu bar icon
 

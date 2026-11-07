@@ -18,7 +18,7 @@ that does not exist. Rename a section together with its pointers.
 | `PladderEngines` | `FluidAudioIncrementalEngine` and the engine catalog | FluidAudio |
 | `PladderSystem` | Hotkey monitors, paste, the Accessibility observer, output mute, key names, permissions, the transcript's language guess, the login item | AppKit, Carbon, CoreAudio, NaturalLanguage, ServiceManagement |
 | `PladderRefine` | The polish models, their downloads and the correction reviewer | FoundationModels, llama.cpp, NaturalLanguage, CryptoKit |
-| `Pladder` | The app: composition, menu, overlay, settings window, every user-facing sentence but the key names, which `PladderSystem` words from `KeyNames.xcstrings` | SwiftUI, AppKit |
+| `Pladder` | The app: composition, menu, overlay, settings window, the updater, every user-facing sentence but the key names, which `PladderSystem` words from `KeyNames.xcstrings` | SwiftUI, AppKit, Sparkle |
 | `PladderCLI` | `pladder-cli` | Everything but the app |
 | `PladderBench` | Word error rate for the benchmarks | Foundation |
 
@@ -118,7 +118,8 @@ cycle keeps the engine it started with.
 **Quitting.** `shutdown()` drops a recording, lets a dictation already on
 its way out finish, and waits for the speakers and the clipboard to be given
 back. The app delegate gives it 3 s; SIGTERM ends the process 5 s after the
-signal regardless.
+signal regardless. An update installs through this same quit
+([Updates](#updates)).
 
 ## Engine
 
@@ -523,6 +524,7 @@ redo. The parts split off it:
   Input every two seconds for the app's life.
 - `PolishModelController` owns the polish model, its download and its memory.
 - `CorrectionInbox` holds the learned-correction proposals.
+- `UpdateController` holds the updater ([Updates](#updates)).
 - `SettingsLocation` says where the files are; the overlay demo and the
   screenshots get a throwaway directory.
 - `OverlayController` drives the pill.
@@ -530,12 +532,58 @@ redo. The parts split off it:
 
 Views talk to `AppModel` and its parts, never to the coordinator.
 
-`PladderTests` tests the router, the polish controller and the inbox with
-their system parts swapped for fakes: the router's monitors (beside a real
-coordinator), the controller's model files and Metal warm-up, the inbox's
-Accessibility observer and reviewer. `AppModel` and the overlay need a
+`PladderTests` tests the router, the polish controller, the inbox and the
+update controller with their system parts swapped for fakes: the router's
+monitors (beside a real coordinator), the controller's model files and Metal
+warm-up, the inbox's Accessibility observer and reviewer, and Sparkle. `AppModel` and the overlay need a
 running `NSApplication`, so what they decide is a Core value instead:
 `HotkeyRouting` and `SettingsChange`.
+
+## Updates
+
+Sparkle 2 does the checking, downloading, verifying and installing.
+`UpdateController` owns it through `UpdaterBackend`, whose real
+implementation, `SparkleUpdaterBackend`, holds one `SPUUpdater` and Sparkle's
+standard user driver; the tests use a fake. Nothing of it is on the dictation
+path.
+
+- **The feed** is `releases/latest/download/appcast.xml`: `release.yml`
+  writes it with `scripts/appcast.sh` and attaches it to every release, so
+  the newest release's always answers. It has one item, whose DMG is at the
+  tag's own URL and carries an EdDSA signature (`SUPublicEDKey` in
+  Info.plist; `SUVerifyUpdateBeforeExtraction`, so a DMG is checked before it
+  is opened). Sparkle also requires the new app's Developer ID signature to
+  match the running one's. It offers a release when its build number, the
+  commit count on `main`, is higher; `bundle.sh` gives a self-built copy its
+  own commit count, so a branch is never offered the release it contains.
+- **The setting** is `checksForUpdatesAutomatically` in `settings.json`, off
+  by default, handed to `SPUUpdater.automaticallyChecksForUpdates` before
+  the updater starts and on every change. Sparkle keeps its own copy in the
+  app's user defaults, shared by every copy with the bundle ID, so the
+  settings file wins at each launch and a test copy with its own file never
+  checks because the live copy does. Info.plist sets
+  `SUEnableAutomaticChecks` to false, so Sparkle never asks at launch, and
+  turns off its system profile and its automatic downloads. With the setting
+  off no request is made until the user chooses Check for Updates….
+- **No window by surprise.** A window that took key focus during a
+  dictation would get the paste. Scheduled checks use Sparkle's gentle
+  reminders: `standardUserDriverShouldHandleShowingScheduledUpdate` returns
+  false, and the update becomes `waitingVersion`, one menu line, until the
+  user opens Sparkle's window from it or from Check for Updates…, or the
+  session ends. A user-initiated check always shows Sparkle's window; the
+  backend activates the app first, which an accessory app needs.
+- **Installing** goes through the normal quit. Sparkle's installer asks the
+  app to quit and waits for the process to end, with no deadline of its
+  own, so `applicationShouldTerminate` runs `shutdown()` with its 3 s, then
+  the bundle is replaced and relaunched. The Developer ID grant is keyed to
+  the team, so Microphone and Accessibility carry over. A copy anywhere the
+  user can write is updated in place; one running from the DMG or from a
+  translocated download gets Sparkle's own explanation to move it to
+  Applications first.
+- **Availability.** Without a feed URL and a public key in Info.plist, as
+  under `swift run`, there is no backend, and the menu item and the toggle
+  are not shown; a failed start hides them too and is logged in the
+  `updates` category. The overlay demo and the screenshots never start it.
 
 ## The overlay
 

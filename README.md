@@ -53,7 +53,7 @@ The engine is Parakeet Ultra, Moondream's post-training of NVIDIA's Parakeet TDT
 
 ## Private by construction
 
-Audio and text never leave the Mac. The microphone is open only while you hold the key, the transcript exists long enough to be pasted, and your clipboard is put back afterwards. There is no account, no telemetry and no update check. The only requests Pladder ever makes are one-time model downloads from Hugging Face: the speech model on first launch, and S1-mini by Superwhisper only if you pick it for polish. After that it works with Wi-Fi off. What Pladder does with your words, step by step, is in [docs/PRIVACY.md](docs/PRIVACY.md).
+Audio and text never leave the Mac. The microphone is open only while you hold the key, the transcript exists long enough to be pasted, and your clipboard is put back afterwards. There is no account and no telemetry. Pladder downloads its models once from Hugging Face: the speech model on first launch, and S1-mini by Superwhisper only if you pick it for polish. After that it works with Wi-Fi off. Updates come from this repository's releases, when you choose Check for Updates… or, if you turn it on in Settings, once a day; a check sends nothing about you. What Pladder does with your words, step by step, is in [docs/PRIVACY.md](docs/PRIVACY.md).
 
 ## Built for agents
 

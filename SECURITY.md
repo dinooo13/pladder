@@ -2,9 +2,9 @@
 
 ## Nothing leaves your Mac
 
-Pladder has no server, no account, no telemetry, no crash reporter and no update check. Your audio and your words never leave the Mac, so there is no copy of them anywhere else to leak, subpoena or breach.
+Pladder has no server, no account, no telemetry and no crash reporter. Your audio and your words never leave the Mac, so there is no copy of them anywhere else to leak, subpoena or breach.
 
-- **No network.** The only requests Pladder ever makes are one-time model downloads from Hugging Face: the speech model at first launch, and S1-mini only if you pick it for polish. After that it works with Wi-Fi off. All of its own network code is one file, [`ModelFiles.swift`](Sources/PladderRefine/ModelFiles.swift); the speech model comes through FluidAudio's downloader.
+- **Two kinds of request.** One-time model downloads from Hugging Face: the speech model at first launch, and S1-mini only if you pick it for polish. After that it works with Wi-Fi off. And the update check against this repository's releases, which runs when you choose Check for Updates…, or once a day if you turn automatic checks on in Settings; it fetches `appcast.xml` and sends nothing about you. Its own download code is [`ModelFiles.swift`](Sources/PladderRefine/ModelFiles.swift); the speech model comes through FluidAudio's downloader, the updates through [Sparkle](https://sparkle-project.org), which installs an update only when both its Developer ID and its EdDSA signature are valid.
 - **Audio stays in memory.** The microphone is open only while you hold the key, and macOS shows its orange indicator only then. Audio goes from the microphone to the Neural Engine and is dropped. It is never written to disk.
 - **Text is kept only as long as the paste needs it.** The transcript goes onto the clipboard for the paste, and your old clipboard comes back once the target app has read it. Pladder's log holds timings and word counts, never words.
 - **Everything else is on disk only on your Mac**: your settings, your dictionary, the corrections you dismissed, and the downloaded models, under `~/Library/Application Support/Pladder`.
@@ -21,7 +21,7 @@ Being honest about the edges is part of the model:
 
 ## Supported versions
 
-Only the [latest release](https://github.com/dinooo13/pladder/releases/latest) gets fixes. Pladder does not check for updates, so a fix reaches you only when you download it.
+Only the [latest release](https://github.com/dinooo13/pladder/releases/latest) gets fixes. Choose Check for Updates… in the menu to get one, or turn on automatic checks in Settings.
 
 ## Reporting a vulnerability
 

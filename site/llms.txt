@@ -10,7 +10,7 @@ Key facts:
 - The wait does not grow with length: the recording is transcribed while the key is held, so after five minutes of speech [0.261 s](https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#parakeet-ultra) of work is left at release.
 - Accuracy: [4.0 %](https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md#parakeet-ultra) word error rate on FLEURS English, German and Spanish test clips.
 - Engine: Parakeet Ultra, Moondream's post-training of NVIDIA's Parakeet TDT v3, on the Apple Neural Engine through FluidAudio.
-- Privacy: audio and text never leave the Mac. The only network requests are one-time model downloads from Hugging Face. No account, no telemetry, no update check.
+- Privacy: audio and text never leave the Mac. The only network requests are one-time model downloads from Hugging Face and the update check against the GitHub releases, which the user starts or turns on and which sends nothing about them. No account, no telemetry.
 - Languages: the 25 European languages of Parakeet, detected as you speak.
 - Price: free. License: MIT. Source: https://github.com/dinooo13/pladder
 - Compared with Wispr Flow and Superwhisper (their published plans, November 2026): both charge for Pro; Wispr Flow transcribes on its servers and has a weekly word cap on its free plan; Superwhisper's free plan has Whisper models only, and its Parakeet models need Pro. Pladder runs Parakeet on the Mac for free.
