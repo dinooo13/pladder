@@ -210,7 +210,9 @@ final class OverlayController {
         presentTask = Task { [weak self] in
             // Off the main thread and inside the present delay: an app slow to answer
             // Accessibility costs the pill its new place, never its timing.
-            let field = Task.detached(priority: .userInitiated) { FocusedField.frame() }
+            // Clipboard mode reads no other app's field, even with the grant.
+            let readsField = self?.pastes() ?? false
+            let field = Task.detached(priority: .userInitiated) { readsField ? FocusedField.frame() : nil }
             try? await Task.sleep(for: Self.presentDelay)
             guard !Task.isCancelled, let self, self.running else { return }
             self.panel.avoiding = await field.value

@@ -42,23 +42,36 @@ struct TextSettingsView: View {
                     Text("Beta. On-device AI fixes self-corrections, lists and punctuation.")
                 }
                 .accessibilityHint(Text("Beta. On-device AI fixes self-corrections, lists and punctuation."))
+                .disabled(model.policy.polishDictations != nil)
                 if model.settings.polishDictations {
                     Picker("Model", selection: $model.settings.polishModel) {
-                        ForEach(PolishModel.allCases, id: \.self) { choice in
+                        ForEach(model.policy.polishModels, id: \.self) { choice in
                             Text(choice.displayName).tag(choice)
                         }
                     }
+                    .disabled(model.policy.pinsPolishModel)
                     polishModelStatus
                 }
             } header: {
                 Text("Polish")
             } footer: {
-                if model.settings.polishDictations {
-                    Text(verbatim: model.settings.polishModel.summary)
+                VStack(alignment: .leading, spacing: 4) {
+                    if model.settings.polishDictations {
+                        Text(verbatim: model.settings.polishModel.summary)
+                    }
+                    if polishIsManaged {
+                        Text(ManagedText.footer)
+                    }
                 }
             }
         }
         .formStyle(.grouped)
+    }
+
+    // The model's picker is managed only while it is shown.
+    private var polishIsManaged: Bool {
+        model.policy.polishDictations != nil
+            || (model.settings.polishDictations && model.policy.allowedPolishModels != nil)
     }
 
     @ViewBuilder

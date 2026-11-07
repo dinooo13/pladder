@@ -395,7 +395,10 @@ the text and may offer a dictionary rule. Nothing of it runs before Cmd+V is
 posted. `CorrectionLearner` runs the stages in order, each cheaper than the
 next:
 
-1. **Reviewer available?** Without Apple Intelligence the field is not even
+1. **Switched on, reviewer available?** With "Suggest entries from my
+   corrections" off (`learnCorrections`, which a managed policy can force),
+   `CorrectionInbox` never hands the learner a paste, and drops a proposal
+   still on its way. Without Apple Intelligence the field is not even
    watched.
 2. **Watch** (`AXPasteObserver`). On its own thread, since every AX call
    blocks on the target app. The focused element must be a text area, text
@@ -457,6 +460,43 @@ wrote is lost to a load or a save:
 The coordinator sees only `DictationSettings`, and the app assigns a new
 value only when that part changed. `PLADDER_SETTINGS_PATH` points a test copy
 at a file of its own.
+
+## Managed policy
+
+An organisation fixes some choices with a configuration profile; what the
+keys do, for admins, is in [MANAGED.md](MANAGED.md). The parts:
+
+- **`ManagedPolicySource`** (`PladderSystem`) reads the profile's keys from the
+  app's preference domain with `CFPreferencesCopyAppValue`, and only those
+  `CFPreferencesAppValueIsForced` reports, which are the ones in the
+  root-owned `/Library/Managed Preferences`. A value the user wrote with
+  `defaults` is never forced. It calls `CFPreferencesAppSynchronize` before
+  every read, so a profile installed while the app runs is seen.
+- **`ManagedPolicy`** (`PladderCore`) is the value: a list per picker, an
+  optional Bool per toggle, and `clipboardMode`. `read` turns the raw
+  property-list values into it, dropping unknown IDs and ignoring a list with
+  no known one or a value of the wrong type (an `<integer>` for a Boolean
+  too), each reported as a `Problem` for the log.
+- **`AppModel`** keeps the user's `Settings`, which is all the file ever
+  holds, and the settings in effect, `policy.apply(to:)` of them; everything
+  else, the coordinator and the views included, sees only the latter. A view's
+  edit comes back through `userSettings(from:stored:)`: a managed value the
+  edit left as the policy set it keeps what the user had stored, so a save
+  never writes a managed value and removing the profile gives every choice
+  back.
+- **When.** At launch, before anything is built, so the first monitor is
+  already the right one, then on the permission poll, every two seconds;
+  applied only when it changed, through the same `SettingsChange` reactions a
+  user's edit gets. Nothing is read per dictation, so the release-to-paste
+  path is untouched.
+
+**Clipboard mode** is the state the app is in without Accessibility, kept on
+purpose: `PermissionMonitor` reports the grant as absent without checking it
+and never asks for it, so `HotkeyRouting` picks Carbon and the tap is never
+installed; `PasteboardOutput.setClipboardMode` copies instead of posting ⌘V
+even with the grant (one relaxed atomic load before the grant check); the
+overlay reads no focused field; and the learner never runs, since nothing is
+pasted.
 
 ## Superseded work
 
@@ -521,7 +561,8 @@ redo. The parts split off it:
 - `HotkeyRouter` holds both monitors and applies what `HotkeyRouting`
   decides: the tap or Carbon, and the stand-in chord.
 - `PermissionMonitor` polls Accessibility, the microphone and Secure Event
-  Input every two seconds for the app's life.
+  Input every two seconds for the app's life; the app reads the managed policy
+  on the same poll ([Managed policy](#managed-policy)).
 - `PolishModelController` owns the polish model, its download and its memory.
 - `CorrectionInbox` holds the learned-correction proposals.
 - `UpdateController` holds the updater ([Updates](#updates)).
@@ -537,7 +578,7 @@ update controller with their system parts swapped for fakes: the router's
 monitors (beside a real coordinator), the controller's model files and Metal
 warm-up, the inbox's Accessibility observer and reviewer, and Sparkle. `AppModel` and the overlay need a
 running `NSApplication`, so what they decide is a Core value instead:
-`HotkeyRouting` and `SettingsChange`.
+`HotkeyRouting`, `SettingsChange` and `ManagedPolicy`.
 
 ## Updates
 

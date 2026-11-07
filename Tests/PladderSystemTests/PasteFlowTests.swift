@@ -151,6 +151,19 @@ extension PasteboardTests {
             #expect(h.poster.keys == [PasteHarness.keyV])
         }
 
+        @Test func clipboardModeCopiesWithTheGrantAndPostsNoKey() async throws {
+            let h = PasteHarness(clipboard: "original")
+            h.output.setClipboardMode(true)
+
+            let result = try await h.output.insert("hello", submit: true)
+
+            #expect(result == .copied)
+            #expect(h.clipboard == "hello")
+            #expect(h.poster.keys.isEmpty)
+            h.output.setClipboardMode(false)
+            #expect(try await h.output.insert("again", submit: false) == .pasted)
+        }
+
         @Test func copyingTheLastTranscriptCarriesTheMarkersAndEndsThePendingRestore() async throws {
             let h = PasteHarness(clipboard: "original")
 

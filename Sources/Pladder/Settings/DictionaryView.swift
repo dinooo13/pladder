@@ -41,6 +41,22 @@ struct DictionaryView: View {
                     WarningLabel(String(localized: "Two rules undo each other, so both are ignored."))
                 }
             }
+            // The learner reads other apps' fields, so it gets a switch of its own, beside what it
+            // adds to; where it cannot run at all the switch would do nothing.
+            if model.canLearnCorrections {
+                Section {
+                    Toggle(isOn: $model.settings.learnCorrections) {
+                        Text("Suggest entries from my corrections")
+                        Text("When you fix a pasted word, the menu offers it as a rule.")
+                    }
+                    .accessibilityHint(Text("When you fix a pasted word, the menu offers it as a rule."))
+                    .disabled(model.policy.learnCorrections != nil)
+                } footer: {
+                    if model.policy.learnCorrections != nil {
+                        Text(ManagedText.footer)
+                    }
+                }
+            }
         }
         .formStyle(.grouped)
         .alert(

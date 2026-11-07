@@ -12,11 +12,12 @@ import Testing
     private let kotlen = CorrectionPair(heard: "Kotlen", corrected: "Kotlin")
 
     private func inbox(
-        pasting observations: [PasteObservation], reviewer: FakeCorrectionReviewer = FakeCorrectionReviewer()
+        pasting observations: [PasteObservation], reviewer: FakeCorrectionReviewer = FakeCorrectionReviewer(),
+        observer: FakePasteObserver? = nil
     ) throws -> (CorrectionInbox, URL) {
         let dismissedURL = try scratchDirectory("pladder-inbox").appending(path: "dismissed-corrections.json")
         let inbox = CorrectionInbox(
-            dismissedURL: dismissedURL, observer: FakePasteObserver(observations), reviewer: reviewer)
+            dismissedURL: dismissedURL, observer: observer ?? FakePasteObserver(observations), reviewer: reviewer)
         return (inbox, dismissedURL)
     }
 
@@ -87,5 +88,35 @@ import Testing
         await quiet.open()
         #expect(await waitUntil { inbox.proposals.contains { $0.pair == jemini } })
         #expect(inbox.proposals.map(\.pair) == [jemini])
+    }
+
+    @Test func switchedOffNoFieldIsWatched() async throws {
+        let observer = FakePasteObserver([Self.claudPaste])
+        let (inbox, _) = try inbox(pasting: [], observer: observer)
+        inbox.isLearning = false
+        inbox.pasted(Self.claudPaste.pasted)
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(observer.pasted.isEmpty)
+        #expect(inbox.proposals.isEmpty)
+    }
+
+    @Test func switchingOffDropsTheWaitingProposals() async throws {
+        let (inbox, _) = try inbox(pasting: [Self.claudPaste])
+        inbox.pasted(Self.claudPaste.pasted)
+        #expect(await waitUntil { inbox.proposals.count == 1 })
+        inbox.isLearning = false
+        #expect(inbox.proposals.isEmpty)
+    }
+
+    @Test func aProposalArrivingAfterSwitchingOffIsDropped() async throws {
+        let (inbox, _) = try inbox(pasting: [Self.claudPaste])
+        let quiet = Gate()
+        inbox.waitUntilQuiet = { await quiet.wait() }
+        inbox.pasted(Self.claudPaste.pasted)
+        #expect(await eventually { await quiet.arrivals == 1 })
+        inbox.isLearning = false
+        await quiet.open()
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(inbox.proposals.isEmpty)
     }
 }

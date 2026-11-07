@@ -13,6 +13,16 @@ enum Screenshots {
     }
 
     static var capturesMenu: Bool { CommandLine.arguments.contains("--menu") }
+
+    // Never the Mac's own profile, so a capture shows the same on every Mac. `--managed`: every
+    // managed control, disabled where a profile pins it; Clipboard mode would hide some of them.
+    static let readPolicy: AppModel.PolicyReader = { engines in
+        guard CommandLine.arguments.contains("--managed") else { return (.none, []) }
+        let policy = ManagedPolicy(
+            allowedEngines: engines.last.map { [$0] }, allowedPolishModels: [.appleIntelligence],
+            polishDictations: true, learnCorrections: false, updateChecks: false)
+        return (policy, [])
+    }
     // The app's own model, on the throwaway settings file, which the real Settings scene shows.
     static var appModel: AppModel?
 
@@ -30,7 +40,7 @@ enum Screenshots {
 
         // `--settings`: each Settings tab, for reviewing the window without opening it.
         if CommandLine.arguments.contains("--settings") {
-            let model = AppModel(location: .scratch)
+            let model = AppModel(location: .scratch, readPolicy: readPolicy)
             for scheme in [ColorScheme.light, .dark] {
                 let suffix = scheme == .dark ? "dark" : "light"
                 for (tab, name) in [(SettingsTab.general, "general"), (.text, "text"), (.dictionary, "dictionary")] {

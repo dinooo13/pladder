@@ -10,6 +10,10 @@ import PladderSystem
 final class CorrectionInbox {
     private(set) var proposals: [CorrectionProposal] = []
     static let maximumProposals = 3
+    // Off: no field is watched and no review runs; what was waiting goes with it.
+    var isLearning = true {
+        didSet { if !isLearning, !proposals.isEmpty { proposals = [] } }
+    }
     @ObservationIgnored var dictionary: () -> [DictionaryEntry] = { [] }
     @ObservationIgnored var addRules: ([DictionaryEntry]) -> Void = { _ in }
     @ObservationIgnored var waitUntilQuiet: @MainActor () async -> Void = {}
@@ -44,6 +48,7 @@ final class CorrectionInbox {
     private func waitForQuiet() async { await waitUntilQuiet() }
 
     func pasted(_ text: String) {
+        guard isLearning else { return }
         learner?.pasted(text)
     }
 
@@ -64,7 +69,7 @@ final class CorrectionInbox {
 
     private func propose(_ proposal: CorrectionProposal) {
         let key = proposal.pair.key
-        guard !proposals.contains(where: { $0.pair.key == key }),
+        guard isLearning, !proposals.contains(where: { $0.pair.key == key }),
               !dictionary().hasRule(for: proposal.pair.heard) else { return }
         proposals = Array(([proposal] + proposals).prefix(Self.maximumProposals))
     }

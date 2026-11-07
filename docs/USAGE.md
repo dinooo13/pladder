@@ -31,9 +31,9 @@ For a long dictation, record a **Hands-free** key in Settings: one tap starts a 
 
 Escape discards a recording without transcribing, held or toggled. It is taken only while a recording is on, so the rest of the time it keeps closing dialogs.
 
-### Without Accessibility
+### Clipboard mode, without Accessibility
 
-On an account that cannot grant Accessibility, Pladder still works in a reduced form: Option+Space behaves the same, any combination with a regular key can be recorded, and the transcript is left on the clipboard for you to paste with ⌘V. The send key needs Accessibility, like the paste. [INSTALL.md](../INSTALL.md#first-launch) explains the grant.
+On an account that cannot grant Accessibility, Pladder still works in Clipboard mode: Option+Space behaves the same, any combination with a regular key can be recorded, and the transcript is left on the clipboard for you to paste with ⌘V. The send key needs Accessibility, like the paste. [INSTALL.md](../INSTALL.md#first-launch) explains the grant. An organisation can also keep Pladder in Clipboard mode on purpose, even with the grant ([MANAGED.md](MANAGED.md)).
 
 ## Your words
 
@@ -43,7 +43,7 @@ A dictionary turns what the model hears into what you meant. "clode code" become
 
 ### Learned corrections
 
-Correct a word by hand after a dictation and Pladder offers to remember it: the menu lists it under Suggested Corrections as **Add “x” → “y” to Dictionary**, with **Dismiss** below. Nothing is added until you say so. The pair is checked on device first, so only a plausible mishearing is offered, and a change of case never is. This needs Accessibility and Apple Intelligence. Terminals show a screen rather than a text field, so nothing is learned there. What Pladder reads to notice a correction is in [PRIVACY.md](PRIVACY.md).
+Correct a word by hand after a dictation and Pladder offers to remember it: the menu lists it under Suggested Corrections as **Add “x” → “y” to Dictionary**, with **Dismiss** below. Nothing is added until you say so. The pair is checked on device first, so only a plausible mishearing is offered, and a change of case never is. This needs Accessibility and Apple Intelligence; turn it off with **Suggest entries from my corrections** in Settings, Dictionary. Terminals show a screen rather than a text field, so nothing is learned there. What Pladder reads to notice a correction is in [PRIVACY.md](PRIVACY.md).
 
 ## Cleaning up the text
 

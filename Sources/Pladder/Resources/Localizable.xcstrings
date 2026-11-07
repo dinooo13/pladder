@@ -1660,6 +1660,66 @@
           }
         }
       }
+    },
+    "In Clipboard mode, %@ can’t be detected. %@ works in its place.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Im Zwischenablagemodus wird %1$@ nicht erkannt. %2$@ funktioniert an ihrer Stelle."
+          }
+        }
+      }
+    },
+    "In Clipboard mode, %@ can’t be detected, so the hands-free key is off.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Im Zwischenablagemodus wird %@ nicht erkannt, deshalb ist die Freihandtaste aus."
+          }
+        }
+      }
+    },
+    "The send key doesn’t work in Clipboard mode.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Sendetaste funktioniert im Zwischenablagemodus nicht."
+          }
+        }
+      }
+    },
+    "Managed by your organisation.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Von deiner Organisation verwaltet."
+          }
+        }
+      }
+    },
+    "Suggest entries from my corrections": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einträge aus meinen Korrekturen vorschlagen"
+          }
+        }
+      }
+    },
+    "When you fix a pasted word, the menu offers it as a rule.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wenn du ein eingefügtes Wort korrigierst, bietet das Menü es als Regel an."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

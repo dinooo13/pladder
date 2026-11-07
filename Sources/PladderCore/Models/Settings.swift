@@ -26,6 +26,7 @@ public struct Settings: Codable, Sendable, Equatable {
     public var muteOutputWhileDictating: Bool
     public var overlayStyle: OverlayStyle
     public var checksForUpdatesAutomatically: Bool
+    public var learnCorrections: Bool
 
     // The defaults, here and nowhere else: the decoder starts from them too.
     public init(engineID: EngineID) {
@@ -44,6 +45,7 @@ public struct Settings: Codable, Sendable, Equatable {
         muteOutputWhileDictating = false
         overlayStyle = .compact
         checksForUpdatesAutomatically = false
+        learnCorrections = true
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -52,6 +54,7 @@ public struct Settings: Codable, Sendable, Equatable {
         case playSounds
         case muteOutputWhileDictating, overlayStyle
         case checksForUpdatesAutomatically
+        case learnCorrections
     }
 
     private enum LegacyKeys: String, CodingKey {
@@ -109,6 +112,7 @@ public struct Settings: Codable, Sendable, Equatable {
         if let value = read(Bool.self, .muteOutputWhileDictating) { muteOutputWhileDictating = value }
         if let value = read(OverlayStyle.self, .overlayStyle) { overlayStyle = value }
         if let value = read(Bool.self, .checksForUpdatesAutomatically) { checksForUpdatesAutomatically = value }
+        if let value = read(Bool.self, .learnCorrections) { learnCorrections = value }
     }
 
     public mutating func setProcessor(_ id: String, enabled: Bool) {

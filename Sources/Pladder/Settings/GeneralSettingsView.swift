@@ -134,11 +134,16 @@ private struct StartupSection: View {
                 WarningLabel(error)
             }
             if model.updates.isAvailable {
+                // Its own line, not the group's footer: the rest of the group is the user's.
                 Toggle(isOn: $model.settings.checksForUpdatesAutomatically) {
                     Text("Check for updates automatically")
                     Text("Asks GitHub once a day for a newer Pladder. Sends nothing about you.")
+                    if model.policy.updateChecks != nil {
+                        Text(ManagedText.footer)
+                    }
                 }
                 .accessibilityHint(Text("Asks GitHub once a day for a newer Pladder. Sends nothing about you."))
+                .disabled(model.policy.updateChecks != nil)
             }
             Toggle("Play start and stop sounds", isOn: $model.settings.playSounds)
             Toggle(isOn: $model.settings.muteOutputWhileDictating) {
@@ -171,7 +176,7 @@ private struct ShortcutsSection: View {
             if let warning = HotkeyWarning.forKey(
                 model.settings.hotkey, standIn: model.hotkeys.standInHotkey,
                 systemShortcuts: model.hotkeys.systemShortcuts) {
-                WarningLabel(warning.text)
+                WarningLabel(warning.text(inClipboardMode: model.policy.clipboardMode))
             }
             LabeledContent {
                 HotkeyRecorderField(
@@ -191,7 +196,7 @@ private struct ShortcutsSection: View {
                 model.settings.toggleHotkey, hotkey: model.settings.hotkey,
                 accessibilityTrusted: model.permissions.accessibilityTrusted,
                 systemShortcuts: model.hotkeys.systemShortcuts) {
-                WarningLabel(warning.text)
+                WarningLabel(warning.text(inClipboardMode: model.policy.clipboardMode))
             }
             LabeledContent {
                 HotkeyRecorderField(
@@ -208,7 +213,7 @@ private struct ShortcutsSection: View {
             if let warning = HotkeyWarning.forSendKey(
                 model.settings.submitKey, hotkey: model.settings.hotkey,
                 accessibilityTrusted: model.permissions.accessibilityTrusted) {
-                WarningLabel(warning.text)
+                WarningLabel(warning.text(inClipboardMode: model.policy.clipboardMode))
             }
         }
     }
@@ -240,7 +245,7 @@ private struct SpeechModelSection: View {
     var body: some View {
         Section {
             Picker(selection: $model.settings.engineID) {
-                ForEach(model.registry.available) { entry in
+                ForEach(engines) { entry in
                     Text(LocalizedStringKey(entry.displayName)).tag(entry.id)
                 }
             } label: {
@@ -249,12 +254,22 @@ private struct SpeechModelSection: View {
                 Text(verbatim: model.registry.entry(for: model.settings.engineID)?.detail ?? "")
             }
             .accessibilityHint(Text(verbatim: model.registry.entry(for: model.settings.engineID)?.detail ?? ""))
+            .disabled(model.policy.pinsEngine)
             if !model.showsGetStarted {
                 SpeechModelProgress(model: model)
             }
         } header: {
             Text("Speech Model")
+        } footer: {
+            if model.policy.allowedEngines != nil {
+                Text(ManagedText.footer)
+            }
         }
+    }
+
+    private var engines: [EngineRegistry.Entry] {
+        let allowed = model.policy.engines(from: model.registry.available.map(\.id))
+        return model.registry.available.filter { allowed.contains($0.id) }
     }
 }
 

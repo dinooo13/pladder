@@ -15,7 +15,9 @@ struct PladderApp: App {
     init() {
         let isDeveloperMode = OverlayDemo.isRequested || Screenshots.directory != nil
         self.isDeveloperMode = isDeveloperMode
-        let model = AppModel(location: isDeveloperMode ? .scratch : .live)
+        let model = isDeveloperMode
+            ? AppModel(location: .scratch, readPolicy: Screenshots.readPolicy)
+            : AppModel(location: .live)
         _model = State(initialValue: model)
         // Deferred, so the app has finished launching before the Accessibility prompt.
         if OverlayDemo.isRequested {
@@ -176,14 +178,14 @@ private struct MenuContent: View {
 
         // Only after a scheduled check found it: Sparkle's window waits for this click, so it
         // never takes focus from a dictation.
-        if let version = model.updates.waitingVersion {
+        if model.offersUpdates, let version = model.updates.waitingVersion {
             Button("Pladder \(version) is available — Install…") { model.updates.checkForUpdates() }
         }
         Button("About Pladder") {
             NSApp.activate(ignoringOtherApps: true)
             NSApp.orderFrontStandardAboutPanel(nil)
         }
-        if model.updates.isAvailable {
+        if model.offersUpdates {
             Button("Check for Updates…") { model.updates.checkForUpdates() }
                 .disabled(!model.updates.canCheck)
         }

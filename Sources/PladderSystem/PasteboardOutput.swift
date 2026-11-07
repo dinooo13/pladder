@@ -29,6 +29,7 @@ public final class PasteboardOutput: TextOutput {
 
     private static let log = Logger(subsystem: "de.dinooo13.pladder", category: "paste")
     private let owedReturn = Mutex<OwedReturn?>(nil)
+    private let clipboardMode = Atomic<Bool>(false)
 
     // Posted once, by its own timer or by the next paste, which must not go out ahead.
     private final class OwedReturn: Sendable {}
@@ -52,6 +53,11 @@ public final class PasteboardOutput: TextOutput {
         keeper = ClipboardKeeper(pasteboard: pasteboard, clock: clock, snapshotLimit: snapshotLimit)
     }
 
+    // Clipboard mode by policy: copied as without the grant, even with it.
+    public func setClipboardMode(_ on: Bool) {
+        clipboardMode.store(on, ordering: .relaxed)
+    }
+
     // A warm layout lookup is about a microsecond; the first in a process is tens of
     // milliseconds, paid at the first key-down.
     public func prepare() async {
@@ -66,7 +72,7 @@ public final class PasteboardOutput: TextOutput {
     public func insert(_ text: String, submit: Bool) async throws -> InsertResult {
         // Posting to the HID event tap needs Accessibility. Without it the transcript stays
         // on the clipboard: no restore, and no Return, which needs the same grant.
-        guard isTrusted() else {
+        guard !clipboardMode.load(ordering: .relaxed), isTrusted() else {
             await keeper.copy(text)
             return .copied
         }
