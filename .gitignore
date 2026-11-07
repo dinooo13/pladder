@@ -8,3 +8,5 @@ dist/
 .DS_Store
 .build-*/
 bench/
+# The update signing key; INSTALL.md, "Update signing key", says where it lives.
+sparkle-private-key*.txt

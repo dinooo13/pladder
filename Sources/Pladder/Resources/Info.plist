@@ -43,7 +43,7 @@
 	<key>SUFeedURL</key>
 	<string>https://github.com/dinooo13/pladder/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>
-	<string></string>
+	<string>5jh5OQwf1yjBlBK9m+BOBpiJ9AzAnRH4HhhHlRKvhvU=</string>
 	<key>SUEnableAutomaticChecks</key>
 	<false/>
 	<key>SUEnableSystemProfiling</key>
