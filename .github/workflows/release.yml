@@ -173,12 +173,29 @@ jobs:
           count=$(git rev-list --count HEAD)
           echo "CFBundleVersion $build, commits $count"
           test "$build" = "$count"
+      - name: Sign the DMG for Sparkle and write appcast.xml
+        # The key goes to sign_update on stdin and is never written to disk. The
+        # appcast is a release asset, so releases/latest/download/appcast.xml,
+        # the app's feed, is always the newest release's.
+        env:
+          SPARKLE_ED_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+          LAST_TAG: ${{ needs.check.outputs.last-tag }}
+        run: |
+          if [[ -z "$SPARKLE_ED_KEY" ]]; then
+            echo "::error::The release environment has no SPARKLE_ED_PRIVATE_KEY secret (INSTALL.md, \"Update signing key\")"
+            exit 1
+          fi
+          ./scripts/changelog.sh "$LAST_TAG" "v$VERSION" > "$RUNNER_TEMP/appcast-notes.md"
+          ./scripts/appcast.sh dist/Pladder.app dist/release/Pladder.dmg "$RUNNER_TEMP/appcast-notes.md" \
+            > dist/release/appcast.xml
+          cat dist/release/appcast.xml
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: Pladder-${{ inputs.version }}
           path: |
             dist/release/Pladder.dmg
             dist/release/Pladder.dmg.sha256
+            dist/release/appcast.xml
           if-no-files-found: error
           compression-level: 0
       - name: Publish
@@ -195,7 +212,7 @@ jobs:
           # always resolves; the version is in the tag and the title.
           gh release create "v$VERSION" --verify-tag ${draft[@]+"${draft[@]}"} \
             --title "Pladder $VERSION" --notes-file "$RUNNER_TEMP/notes.md" \
-            dist/release/Pladder.dmg dist/release/Pladder.dmg.sha256
+            dist/release/Pladder.dmg dist/release/Pladder.dmg.sha256 dist/release/appcast.xml
       - name: Delete the tag of a release that was not published
         # Deleting is allowed where creating is not, so this works even after
         # main's workflows changed. A release that exists keeps its tag.
