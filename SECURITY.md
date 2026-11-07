@@ -21,7 +21,7 @@ Being honest about the edges is part of the model:
 
 ## Supported versions
 
-Only the [latest release](https://github.com/dinooo13/pladder/releases/latest) gets fixes. Choose Check for Updates… in the menu to get one, or turn on automatic checks in Settings.
+Only the [latest release](https://github.com/dinooo13/pladder/releases/latest) gets fixes. Choose Check for Updates… in the menu to get one, or turn on automatic checks in Settings; a copy installed with Homebrew also gets it from `brew upgrade`.
 
 ## Reporting a vulnerability
 

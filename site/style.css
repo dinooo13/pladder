@@ -522,6 +522,7 @@ td.us a { color: inherit; }
 .release { margin-top: 20px; font-size: 14px; color: var(--faint); max-width: 34em; }
 .release + .release { margin-top: 8px; }
 .release code { font: 13px var(--mono); color: var(--muted); user-select: all; }
+.faq details code { font: 0.9em var(--mono); }
 
 /* Footer */
 
