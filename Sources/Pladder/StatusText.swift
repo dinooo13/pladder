@@ -135,6 +135,10 @@ extension ModelFileFailure {
     }
 }
 
+enum ManagedText {
+    static let footer = String(localized: "Managed by your organisation.")
+}
+
 enum MenuStatus {
     struct Chords {
         var hold: String
@@ -225,8 +229,15 @@ enum ProcessorText {
 }
 
 extension HotkeyWarning {
-    @MainActor var text: String {
+    // In Clipboard mode by policy the grant is not the user's to give, so no sentence asks for it.
+    @MainActor func text(inClipboardMode clipboardMode: Bool) -> String {
         switch self {
+        case .standIn(let stored, let standIn) where clipboardMode:
+            String(localized: "In Clipboard mode, \(stored.displayName) can’t be detected. \(standIn.sideAgnosticDisplayName) works in its place.")
+        case .toggleNeedsAccessibility(let toggle) where clipboardMode:
+            String(localized: "In Clipboard mode, \(toggle.displayName) can’t be detected, so the hands-free key is off.")
+        case .sendKeyNeedsAccessibility where clipboardMode:
+            String(localized: "The send key doesn’t work in Clipboard mode.")
         case .standIn(let stored, let standIn):
             String(localized: "Without Accessibility, \(stored.displayName) can’t be detected. \(standIn.sideAgnosticDisplayName) works in its place until you allow it.")
         case .systemShortcut(let owner, let chord):

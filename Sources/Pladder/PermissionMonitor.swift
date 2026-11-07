@@ -8,9 +8,17 @@ import PladderSystem
 @MainActor
 @Observable
 final class PermissionMonitor {
-    private(set) var accessibilityTrusted = Permissions.isAccessibilityTrusted
+    // The grant in effect: never in Clipboard mode, where the app does without it on purpose.
+    private(set) var accessibilityTrusted: Bool
     private(set) var microphoneStatus = Permissions.microphoneStatus
     private(set) var secureInputEnabled = SecureInput.isEnabled
+    // Set by a managed policy. The grant is then never asked for, nor even checked.
+    var clipboardMode: Bool {
+        didSet {
+            guard clipboardMode != oldValue else { return }
+            refreshAccessibility()
+        }
+    }
 
     @ObservationIgnored var onRefresh: () -> Void = {}
 
@@ -18,7 +26,12 @@ final class PermissionMonitor {
 
     private static let pollInterval: Duration = .seconds(2)
 
-    var needsAccessibility: Bool { !accessibilityTrusted }
+    init(clipboardMode: Bool = false) {
+        self.clipboardMode = clipboardMode
+        accessibilityTrusted = !clipboardMode && Permissions.isAccessibilityTrusted
+    }
+
+    var needsAccessibility: Bool { !clipboardMode && !accessibilityTrusted }
     var needsMicrophone: Bool { microphoneStatus != .authorized }
     var needsAnyPermission: Bool { needsAccessibility || needsMicrophone }
 
@@ -35,8 +48,7 @@ final class PermissionMonitor {
 
     // Assigns only what changed, so views reading one grant are not redrawn every poll.
     func refresh() {
-        let trusted = Permissions.isAccessibilityTrusted
-        if trusted != accessibilityTrusted { accessibilityTrusted = trusted }
+        refreshAccessibility()
         let microphone = Permissions.microphoneStatus
         if microphone != microphoneStatus { microphoneStatus = microphone }
         let secure = SecureInput.isEnabled
@@ -44,10 +56,16 @@ final class PermissionMonitor {
         onRefresh()
     }
 
+    private func refreshAccessibility() {
+        let trusted = !clipboardMode && Permissions.isAccessibilityTrusted
+        if trusted != accessibilityTrusted { accessibilityTrusted = trusted }
+    }
+
     // The system alert first, which has its own button to System Settings; opening the pane
     // as well put two system windows up at once. Once the alert has been seen this launch,
     // the pane directly, since macOS shows the alert only for an app not yet in the list.
     func grantAccessibility() {
+        guard !clipboardMode else { return }
         if promptedForAccessibility {
             Permissions.openAccessibilitySettings()
         } else {

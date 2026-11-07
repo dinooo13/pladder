@@ -37,18 +37,22 @@ final class AppModel {
     private static let hotkeyLog = Logger(subsystem: "de.dinooo13.pladder", category: "hotkey")
     private static let settingsLog = Logger(subsystem: "de.dinooo13.pladder", category: "settings")
 
+    // The settings in effect: the user's own with the managed policy on top. An edit goes back
+    // into the user's own, which is all the file ever holds.
     var settings: Settings {
-        get { storedSettings }
-        set {
-            let old = storedSettings
-            guard newValue != old else { return }
-            storedSettings = newValue
-            settingsChanged(from: old)
-        }
+        get { effectiveSettings }
+        set { apply(user: policy.userSettings(from: newValue, stored: userSettings), policy: policy) }
     }
-    private var storedSettings: Settings
+    private var effectiveSettings: Settings
+    @ObservationIgnored private var userSettings: Settings
+    private(set) var policy: ManagedPolicy
+    @ObservationIgnored private let readPolicy: PolicyReader
+    @ObservationIgnored private var policyProblems: [ManagedPolicy.Problem] = []
+    @ObservationIgnored private let output = PasteboardOutput()
 
-    init(location: SettingsLocation) {
+    typealias PolicyReader = ([EngineID]) -> (policy: ManagedPolicy, problems: [ManagedPolicy.Problem])
+
+    init(location: SettingsLocation, readPolicy: @escaping PolicyReader = { ManagedPolicySource().read(knownEngines: $0) }) {
         // The catalog's detail is an English catalog key, worded here, where the catalog is.
         var registry = EngineRegistry()
         for var entry in StandardEngines.entries {
@@ -79,21 +83,30 @@ final class AppModel {
         }
         // Only these have a switch any more; one left off by an older build would be stuck.
         initial.disabledProcessors.formIntersection(StandardProcessors.switchable)
-        storedSettings = initial
+        userSettings = initial
+        self.readPolicy = readPolicy
+        let (policy, problems) = readPolicy(registry.available.map(\.id))
+        self.policy = policy
+        policyProblems = problems
+        Self.log(problems)
+        if !policy.isEmpty { Self.log(policy) }
+        let effective = policy.apply(to: initial)
+        effectiveSettings = effective
+        output.setClipboardMode(policy.clipboardMode)
 
-        let permissions = PermissionMonitor()
+        let permissions = PermissionMonitor(clipboardMode: policy.clipboardMode)
         self.permissions = permissions
-        let hotkeys = HotkeyRouter(accessibilityTrusted: permissions.accessibilityTrusted, hotkey: initial.hotkey)
+        let hotkeys = HotkeyRouter(accessibilityTrusted: permissions.accessibilityTrusted, hotkey: effective.hotkey)
         self.hotkeys = hotkeys
         let polish = PolishModelController()
         self.polish = polish
 
         let events = self.events
         let coordinator = DictationCoordinator(
-            settings: DictationSettings(initial),
+            settings: DictationSettings(effective),
             registry: registry,
             capture: AVAudioEngineCapture(),
-            output: PasteboardOutput(),
+            output: output,
             outputMuter: OutputMuteController(
                 control: CoreAudioOutputMute(),
                 log: { Self.muteLog.info("\($0, privacy: .public)") }),
@@ -107,6 +120,7 @@ final class AppModel {
         self.coordinator = coordinator
         hotkeys.attach(coordinator)
         corrections = CorrectionInbox(dismissedURL: location.dismissedCorrectionsURL)
+        corrections.isLearning = effective.learnCorrections
         updates = UpdateController()
         overlay = OverlayController(coordinator: coordinator, pastes: { [permissions] in permissions.accessibilityTrusted })
 
@@ -128,9 +142,10 @@ final class AppModel {
         overlay.start()
         coordinator.start()
         polish.apply(model: settings.polishModel, polishing: settings.polishDictations)
-        updates.start(automaticChecks: settings.checksForUpdatesAutomatically)
+        // Not started at all under a policy that allows no update check.
+        if policy.allowsUpdateChecks { updates.start(automaticChecks: settings.checksForUpdatesAutomatically) }
         // Written now, so only this launch counts as the first.
-        if isFirstLaunch { try? store.save(settings) }
+        if isFirstLaunch { try? store.save(userSettings) }
     }
 
     // True once, on the first launch only, and never for the demo or the screenshots,
@@ -147,7 +162,10 @@ final class AppModel {
         await coordinator.shutdown()
     }
 
+    // On the permission poll, so a profile installed or removed while the app runs applies
+    // within two seconds; a dictation in flight finishes under the values it started with.
     private func permissionsRefreshed() {
+        refreshPolicy()
         hotkeys.update(
             accessibilityTrusted: permissions.accessibilityTrusted,
             secureInputEnabled: permissions.secureInputEnabled)
@@ -163,6 +181,62 @@ final class AppModel {
 
     // MARK: Settings
 
+    private func refreshPolicy() {
+        let (next, problems) = readPolicy(registry.available.map(\.id))
+        if problems != policyProblems {
+            policyProblems = problems
+            Self.log(problems)
+        }
+        guard next != policy else { return }
+        Self.log(next)
+        apply(user: userSettings, policy: next)
+        if started, next.allowsUpdateChecks { updates.start(automaticChecks: settings.checksForUpdatesAutomatically) }
+    }
+
+    private func apply(user: Settings, policy next: ManagedPolicy) {
+        let old = effectiveSettings
+        let userChanged = user != userSettings
+        userSettings = user
+        if next != policy {
+            if next.clipboardMode != policy.clipboardMode {
+                output.setClipboardMode(next.clipboardMode)
+                // Before `permissionsRefreshed` hands the router the grant, so it routes by the new mode.
+                permissions.clipboardMode = next.clipboardMode
+            }
+            policy = next
+        }
+        let effective = next.apply(to: user)
+        if effective != old {
+            effectiveSettings = effective
+            settingsChanged(from: old)
+        }
+        guard userChanged else { return }
+        do {
+            try store.save(user)
+        } catch {
+            Self.settingsLog.error("could not save settings: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    // `.public`: an admin reads these to see what a profile did, and they hold no user data.
+    private static func log(_ problems: [ManagedPolicy.Problem]) {
+        for problem in problems {
+            switch problem {
+            case .wrongType(let key):
+                settingsLog.error("managed policy: \(key.rawValue, privacy: .public) has the wrong type and is ignored")
+            case .unknownValues(let key, let values):
+                settingsLog.error("managed policy: \(key.rawValue, privacy: .public) names unknown values, ignored: \(values.joined(separator: ", "), privacy: .public)")
+            case .noKnownValue(let key):
+                settingsLog.error("managed policy: \(key.rawValue, privacy: .public) names nothing this build knows and is ignored")
+            }
+        }
+    }
+
+    private static func log(_ policy: ManagedPolicy) {
+        let keys = policy.managedKeys.map(\.rawValue).joined(separator: ", ")
+        settingsLog.notice("managed policy: \(keys.isEmpty ? "none" : keys, privacy: .public)")
+    }
+
     private func settingsChanged(from old: Settings) {
         let change = SettingsChange(from: old, to: settings)
         let monitor = change.hotkey ? hotkeys.hotkeyChanged(to: settings.hotkey) : nil
@@ -176,10 +250,8 @@ final class AppModel {
         if change.updateChecks {
             updates.apply(automaticChecks: settings.checksForUpdatesAutomatically)
         }
-        do {
-            try store.save(settings)
-        } catch {
-            Self.settingsLog.error("could not save settings: \(error.localizedDescription, privacy: .public)")
+        if settings.learnCorrections != corrections.isLearning {
+            corrections.isLearning = settings.learnCorrections
         }
     }
 
@@ -278,8 +350,16 @@ final class AppModel {
             ? hotkeys.displayName(of: toggle) : hold
         return MenuStatus.Chords(
             hold: hold, stop: stop,
-            accessibilityOff: standIn != nil,
+            accessibilityOff: !permissions.accessibilityTrusted,
             secureKeyboardEntry: hotkeys.usesCarbonForSecureInput)
+    }
+
+    // A policy that allows no update check leaves no way to start one, by hand either.
+    var offersUpdates: Bool { updates.isAvailable && policy.allowsUpdateChecks }
+
+    // Where the correction learner can run at all; elsewhere its switch would do nothing.
+    var canLearnCorrections: Bool {
+        permissions.accessibilityTrusted && polish.availability == .available
     }
 
     func setHotkeySuspended(_ suspended: Bool) {

@@ -6,12 +6,13 @@
 # so it is safe to run while another Pladder is in use; it shows a few
 # windows for a second or two.
 #
-# Usage: scripts/make-screenshots.sh [dir] [--settings | --settings-scene [--accessibility | --get-started] | --menu]   (default: docs/images)
+# Usage: scripts/make-screenshots.sh [dir] [--settings | --settings-scene [--accessibility | --get-started] | --menu] [--managed]   (default: docs/images)
 #   --settings  each Settings tab, light and dark, for reviewing the window
 #   --settings-scene  the real Settings window, toolbar and key window included
 #   --settings-scene --accessibility  the Settings window's accessibility tree, as text
 #   --settings-scene --get-started    the General tab at its tallest, with the end of Get Started
 #   --menu            the real menu of a status item of its own, opened in-process; the copy then exits
+#   --managed         any of the above under a sample managed policy: every managed control disabled
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

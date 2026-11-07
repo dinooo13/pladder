@@ -47,7 +47,15 @@ Three rules decide most questions:
   macOS `.help` and the accessibility hint are one attribute, so a control with help
   puts the hint first in it.
 - **Permissions are asked from a button beside a sentence** saying what the grant is
-  for ("Lets Pladder paste for you. …"), never by a system prompt at launch.
+  for ("Lets Pladder paste for you. …"), never by a system prompt at launch. In
+  Clipboard mode by policy Accessibility is never asked for, and no sentence says
+  "until you allow it".
+- **A managed setting is disabled, never hidden:** the control shows the value the
+  organisation's profile set, a picker offers only the allowed entries (disabled
+  when there is one), and the group gets one footer line, "Managed by your
+  organisation."; in a group the user still owns the rest of, that line is the
+  control's own second subtitle instead. Without a profile nothing of it shows
+  (docs/MANAGED.md).
 - **Get Started** is the top of General only while setup is under way, and stays to
   the end of that session with "Pladder is ready" and a field to try the first
   dictation in. A routine model load at launch is not setup.
@@ -157,6 +165,7 @@ Look at it before calling it done, light and dark, in English and German:
 scripts/make-screenshots.sh <dir> --settings-scene                 # the real Settings window, each tab
 scripts/make-screenshots.sh <dir> --settings-scene --get-started   # General at its tallest
 scripts/make-screenshots.sh <dir> --settings-scene --accessibility # what VoiceOver is given
+scripts/make-screenshots.sh <dir> --settings-scene --managed       # every managed control, disabled
 scripts/make-screenshots.sh <dir> --menu                           # the real menu
 scripts/overlay-demo.sh [dir] [--style …] [--reduce-motion]        # every pill path, as contact sheets
 ```
