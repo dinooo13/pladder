@@ -184,7 +184,7 @@ rm sparkle-private-key.txt
 
 The cask lives in its own repository, [dinooo13/homebrew-tap](https://github.com/dinooo13/homebrew-tap), as `Casks/pladder.rb`, which is what `brew install --cask dinooo13/tap/pladder` reads. Its source is `scripts/pladder.rb` here, with the version and the SHA-256 left out; `scripts/cask.sh` fills them in. Change the cask here, not in the tap: the next release overwrites the tap's copy.
 
-After the publish, the Release workflow writes `Casks/pladder.rb` for the new version and the SHA-256 of its DMG, and commits it to the tap through the GitHub API with `HOMEBREW_TAP_TOKEN`, as "pladder <version>". `brew upgrade` picks it up after the next `brew update`, which Homebrew runs by itself. A draft is not bumped, since its DMG is not public yet. A failed bump leaves the run green, since the release is already out; it shows as a failed step. Bump by hand then, or after publishing a draft, from a clone of the tap:
+After the publish, the Release workflow writes `Casks/pladder.rb` for the new version and the SHA-256 of its DMG, and commits it to the tap through the GitHub API with `HOMEBREW_TAP_TOKEN`, as "pladder <version>"; the first release with the step, 0.2.0, creates the file. `brew upgrade` picks it up after the next `brew update`, which Homebrew runs by itself. A draft is not bumped, since its DMG is not public yet. A failed bump leaves the run green, since the release is already out; it shows as a failed step. Bump by hand then, or after publishing a draft, from a clone of the tap:
 
 ```sh
 ../pladder/scripts/cask.sh 0.1.3 > Casks/pladder.rb   # reads the SHA-256 from the release
