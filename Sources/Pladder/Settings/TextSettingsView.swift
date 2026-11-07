@@ -87,9 +87,7 @@ struct TextSettingsView: View {
                     Text(fraction, format: .percent.precision(.fractionLength(0)))
                 }
             case .verifying:
-                ProgressView {
-                    Text("Checking the download…")
-                }
+                BusyRow("Checking the download…")
             case .failed(let failure):
                 LabeledContent {
                     Button("Try Again") { model.polish.retryDownload() }

@@ -68,7 +68,7 @@ struct OptionCard<Thumbnail: View>: View {
     @ViewBuilder let thumbnail: Thumbnail
 
     // Computed, since a generic type cannot hold static stored values.
-    private static var designSize: CGSize { CGSize(width: 132, height: 84) }
+    private static var designSize: CGSize { CGSize(width: 132, height: 62) }
     private static var scale: CGFloat { 0.75 }
     private static var cardSize: CGSize {
         CGSize(width: (designSize.width * scale).rounded(), height: (designSize.height * scale).rounded())
@@ -105,12 +105,14 @@ struct OverlayStyleThumbnail: View {
     let style: OverlayStyle
 
     private static let previewLevel: Float = 0.55
+    // One scale for every style, so the cards compare sizes the way the real pills do.
+    private static let pillScale: CGFloat = 0.65
 
     var body: some View {
         DesktopWash()
             // Overlay rather than ZStack: a scaled-down pill still lays out at full size, and in
             // a ZStack that would stretch the backdrop so the card only shows its middle.
-            .overlay(alignment: style == .menuBar ? .top : .bottom) {
+            .overlay(alignment: style == .menuBar ? .top : .center) {
                 content
             }
     }
@@ -118,18 +120,12 @@ struct OverlayStyleThumbnail: View {
     @ViewBuilder
     private var content: some View {
         switch style {
-        case .compact:
-            OverlayPill(state: .recording, level: Self.previewLevel, style: .compact, isPreview: true)
-                .fixedSize()
-                .scaleEffect(0.62)
-                .padding(.bottom, 2)
-        case .minimal:
-            OverlayPill(state: .recording, level: Self.previewLevel, style: .minimal, isPreview: true)
-                .fixedSize()
-                .scaleEffect(0.8)
-                .padding(.bottom, 10)
         case .menuBar:
             menuBar
+        case .compact, .minimal:
+            OverlayPill(state: .recording, level: Self.previewLevel, style: style, isPreview: true)
+                .fixedSize()
+                .scaleEffect(Self.pillScale)
         case .liveTranscript:
             OverlayPill(
                 state: .recording,
@@ -142,8 +138,7 @@ struct OverlayStyleThumbnail: View {
             // Proposed at the card's width the glass shrinks but the row does not, and the dot
             // ends up outside the capsule.
             .fixedSize()
-            .scaleEffect(0.8)
-            .padding(.bottom, 4)
+            .scaleEffect(Self.pillScale)
         }
     }
 
