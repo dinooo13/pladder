@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Privacy: your voice never leaves your Mac – Pladder</title>
-<meta name="description" content="How Pladder handles your voice and your words: audio and text stay on your Mac, the microphone is open only while you dictate, and there is no account, no analytics and no update check.">
+<meta name="description" content="How Pladder handles your voice and your words: audio and text stay on your Mac, the microphone is open only while you dictate, and there is no account and no analytics.">
 <link rel="canonical" href="https://dinooo13.github.io/pladder/privacy/">
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="../apple-touch-icon.png">
@@ -15,7 +15,7 @@
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="Pladder">
 <meta property="og:title" content="Pladder privacy: your voice never leaves your Mac">
-<meta property="og:description" content="Audio and text stay on your Mac. No account, no analytics, no update check.">
+<meta property="og:description" content="Audio and text stay on your Mac. No account, no analytics.">
 <meta property="og:url" content="https://dinooo13.github.io/pladder/privacy/">
 <meta property="og:image" content="https://dinooo13.github.io/pladder/social-preview.png">
 <meta property="og:image:width" content="1280">
@@ -56,18 +56,18 @@
 <p>The optional polish, marked Beta, also runs on your Mac: either Apple’s on-device model, which is part of macOS, or S1-mini by Superwhisper, which runs on your Mac’s graphics chip.</p>
 
 <h2>The network</h2>
-<p>Pladder makes no network requests except two kinds of one-time download from Hugging Face:</p>
+<p>Pladder makes two kinds of network request, and neither carries anything you said. It downloads its models once from Hugging Face:</p>
 <ul>
   <li>the speech model, on first launch;</li>
   <li>S1-mini, only if you choose it for polish. It is pinned to a fixed version and checked against its SHA-256 checksum before use.</li>
 </ul>
-<p>After that it works with Wi-Fi off. There is no update check, no crash reporter and no analytics.</p>
+<p>After that it works with Wi-Fi off. And it checks GitHub, where its source and releases are, for a newer version: when you choose Check for Updates… in the menu, or once a day if you turn on automatic checks in Settings, which are off until you do. A check fetches one small file that lists the newest release, and sends nothing about you, your Mac or your dictations. An update is installed only when its two signatures, Apple’s Developer ID and Pladder’s own key, both check out. There is no crash reporter and no analytics.</p>
 
 <h2>No account</h2>
 <p>There is nothing to sign up for, nothing to log in to and nothing to cancel.</p>
 
 <h2>Check it yourself</h2>
-<p>Pladder is open source under the MIT license. The model downloads are its only network code: FluidAudio’s downloader for the speech model, and <a href="https://github.com/dinooo13/pladder/blob/main/Sources/PladderRefine/ModelFiles.swift">ModelFiles.swift</a> for S1-mini. The same facts, for developers, are in <a href="https://github.com/dinooo13/pladder/blob/main/docs/PRIVACY.md">docs/PRIVACY.md</a>.</p>
+<p>Pladder is open source under the MIT license. Its network code is the downloads and the updater: FluidAudio’s downloader for the speech model, <a href="https://github.com/dinooo13/pladder/blob/main/Sources/PladderRefine/ModelFiles.swift">ModelFiles.swift</a> for S1-mini, and <a href="https://sparkle-project.org">Sparkle</a> for updates. The same facts, for developers, are in <a href="https://github.com/dinooo13/pladder/blob/main/docs/PRIVACY.md">docs/PRIVACY.md</a>.</p>
 
 <h2>This website</h2>
 <p>This site sets no cookies, runs no analytics and loads nothing from other servers: no outside fonts, no scripts, no tracking pixels. Every file comes from GitHub Pages, which hosts it and, like any web host, sees the requests.</p>
@@ -78,7 +78,7 @@
 <footer class="foot">
   <div>
     <p><em>Pladder</em> is Low German for “to babble”. Made by <a href="https://github.com/dinooo13">Fabian Meyer</a>.</p>
-    <p>Last updated <time datetime="2026-11-06">6 November 2026</time>.</p>
+    <p>Last updated <time datetime="2026-11-07">7 November 2026</time>.</p>
   </div>
   <nav aria-label="Footer"><a href="../">Home</a><a href="https://github.com/dinooo13/pladder">Source</a><a href="https://github.com/dinooo13/pladder/blob/main/docs/USAGE.md">Usage</a><a href="https://github.com/dinooo13/pladder/blob/main/docs/BENCHMARKS.md">Benchmarks</a></nav>
 </footer>

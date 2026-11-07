@@ -39,7 +39,13 @@ If a permission was missed, the menu bar menu offers **Allow Accessibility Acces
 
 ## Updating
 
-A downloaded copy: quit Pladder, download the new DMG and drag it to Applications again, replacing the old one. Pladder does not check for updates itself, because that would be a network call; watch the [releases](https://github.com/dinooo13/pladder/releases) instead.
+A downloaded copy updates itself. Choose **Check for Updates…** in the menu bar menu: if a newer release is out, Pladder shows what changed and offers to install it, downloads the DMG, checks its two signatures (Apple's Developer ID and Pladder's own EdDSA key), and replaces itself when you click **Install and Relaunch**. A dictation still on its way out is pasted first, and the clipboard and the speakers are given back, as on any quit. Microphone and Accessibility stay granted.
+
+To have Pladder look by itself, turn on **Check for updates automatically** in Settings > General. It is off until you do. Then Pladder asks GitHub once a day for `appcast.xml`, a small file that lists the newest release, and when there is one, the menu gets a line, **Pladder 0.3.0 is available — Install…**; no window opens until you click it. A check sends nothing about you, your Mac or your dictations. With the setting off, Pladder makes no request until you choose Check for Updates….
+
+Pladder updates itself wherever it is, as long as you can write there. A copy opened straight from the DMG, or from Downloads before macOS has moved it out of quarantine, says to move it to Applications first.
+
+**Copies of 0.1.x have no updater.** Replace one by hand once: quit Pladder, download the [latest DMG](https://github.com/dinooo13/pladder/releases/latest) and drag Pladder to Applications, replacing the old copy. From then on it updates itself.
 
 A copy built from source: pull and run the same command again:
 
@@ -48,7 +54,7 @@ git pull
 ./scripts/bundle.sh --install --run
 ```
 
-The install step quits the running copy and replaces it. Because the app is signed with your development certificate, macOS keeps the Microphone and Accessibility grants across updates. See [Signing](#signing) if it asks again.
+The install step quits the running copy and replaces it. Because the app is signed with your development certificate, macOS keeps the Microphone and Accessibility grants across updates. See [Signing](#signing) if it asks again. A copy built from source gets the commit count as its build number, and Check for Updates… offers it a release only when the release's build number is higher, that is when the release has commits the copy does not.
 
 ## Uninstalling
 
@@ -91,7 +97,7 @@ A release comes from the **Release** workflow (`.github/workflows/release.yml`):
 ./scripts/changelog.sh v0.1.0 HEAD
 ```
 
-Before anyone is asked to approve, a Linux job refuses a ref other than `main`, a version that is not `major.minor.patch`, one whose tag exists or that is not newer than the last tag, and a release in which nothing the build reads (the paths `ci.yml` builds for) changed since the last tag, unless **force** is ticked. The release job then waits for a reviewer of the `release` environment. Once approved, it tags the commit `v<version>`, builds and runs the tests as CI does, imports the certificate into a throwaway keychain, runs `scripts/release.sh`, checks that the build number is the commit count, uploads the DMG as a workflow artifact, and publishes the release "Pladder <version>" with `Pladder.dmg`, its `.sha256` and the notes from `scripts/changelog.sh`. Every release names its DMG `Pladder.dmg`, so `releases/latest/download/Pladder.dmg` always resolves; the version is in the tag and the title. Tick **draft** to check a release before it is public. The keychain and the key files are deleted as soon as `release.sh` is done, before the upload and the publish, and also when a step failed. The tag comes first because GitHub lets the workflow's token tag a commit only while its `.github/workflows` matches a branch tip: a push to `main` that changes a workflow during the run would otherwise fail it at the very end. If main's workflows changed between the dispatch and the approval, the job stops at once; run it again. A run that fails or is cancelled before the release exists deletes its tag, so it can simply be run again.
+Before anyone is asked to approve, a Linux job refuses a ref other than `main`, a version that is not `major.minor.patch`, one whose tag exists or that is not newer than the last tag, and a release in which nothing the build reads (the paths `ci.yml` builds for) changed since the last tag, unless **force** is ticked. The release job then waits for a reviewer of the `release` environment. Once approved, it tags the commit `v<version>`, builds and runs the tests as CI does, imports the certificate into a throwaway keychain, runs `scripts/release.sh`, checks that the build number is the commit count, signs the DMG with the update key and writes `appcast.xml` with `scripts/appcast.sh`, uploads the DMG as a workflow artifact, and publishes the release "Pladder <version>" with `Pladder.dmg`, its `.sha256`, `appcast.xml` and the notes from `scripts/changelog.sh`. Every release names its DMG `Pladder.dmg` and its feed `appcast.xml`, so `releases/latest/download/Pladder.dmg` always resolves and every copy's feed, `releases/latest/download/appcast.xml`, is always the newest release's; the version is in the tag and the title. Tick **draft** to check a release before it is public. The keychain and the key files are deleted as soon as `release.sh` is done, before the upload and the publish, and also when a step failed. The tag comes first because GitHub lets the workflow's token tag a commit only while its `.github/workflows` matches a branch tip: a push to `main` that changes a workflow during the run would otherwise fail it at the very end. If main's workflows changed between the dispatch and the approval, the job stops at once; run it again. A run that fails or is cancelled before the release exists deletes its tag, so it can simply be run again.
 
 The changelog groups the commit subjects since the last tag by their `Area:` prefix, folds the internal areas (Tests, CI, Bench, Docs, Scripts) into an Internals group at the end, and links the pull request a subject names, `(#93)`, and the issues a body `Closes` or `Refs`. Merge and `fixup!` commits are left out.
 
@@ -104,6 +110,7 @@ The signing secrets live in the `release` environment, so only a run a reviewer 
 | `NOTARY_API_KEY` | An App Store Connect API key with the Developer role, the contents of its `AuthKey_<key ID>.p8` |
 | `NOTARY_API_KEY_ID` | That key's ID |
 | `NOTARY_API_ISSUER` | The issuer ID shown above the keys in App Store Connect |
+| `SPARKLE_ED_PRIVATE_KEY` | The private EdDSA key updates are signed with, as `generate_keys -x` writes it (see [Update signing key](#update-signing-key)) |
 
 The API key, rather than an Apple ID and an app-specific password, because it can do no more than its role allows and can be revoked on its own. If a secret leaks, revoke the key in App Store Connect and the certificate in the developer portal.
 
@@ -113,7 +120,7 @@ A release can still be built by hand, on a Mac that has the Developer ID Applica
 xcrun notarytool store-credentials pladder-notary --apple-id <Apple ID> --team-id <team ID>
 ```
 
-It asks for an app-specific password from [account.apple.com](https://account.apple.com) and keeps it in the keychain. Instead of the profile, `NOTARY_KEY` (the path of the `.p8`), `NOTARY_KEY_ID` and `NOTARY_ISSUER` make the script sign in with the API key, as the workflow does. Then, from a clean, full clone of the commit to release:
+It asks for an app-specific password from [account.apple.com](https://account.apple.com) and keeps it in the keychain. The update key must be in the same login keychain, as `generate_keys` leaves it. Instead of the profile, `NOTARY_KEY` (the path of the `.p8`), `NOTARY_KEY_ID` and `NOTARY_ISSUER` make the script sign in with the API key, as the workflow does. Then, from a clean, full clone of the commit to release:
 
 ```sh
 ./scripts/release.sh 0.1.1
@@ -124,8 +131,30 @@ The script builds the app with the version and the commit count as its build num
 ```sh
 git tag -a v0.1.1 -m "Pladder 0.1.1" && git push origin v0.1.1
 ./scripts/changelog.sh v0.1.0 v0.1.1 > notes.md
-gh release create v0.1.1 dist/release/Pladder.dmg dist/release/Pladder.dmg.sha256 --title "Pladder 0.1.1" --notes-file notes.md
+./scripts/appcast.sh dist/Pladder.app dist/release/Pladder.dmg notes.md > dist/release/appcast.xml
+gh release create v0.1.1 dist/release/Pladder.dmg dist/release/Pladder.dmg.sha256 dist/release/appcast.xml --title "Pladder 0.1.1" --notes-file notes.md
 ```
+
+`appcast.sh` signs the DMG with the key from the login keychain (or from `SPARKLE_ED_KEY`, as the workflow passes it), checks the signature against the `SUPublicEDKey` of the app, and prints the feed.
+
+### Update signing key
+
+Every update is signed with one EdDSA key pair. The public half is `SUPublicEDKey` in `Sources/Pladder/Resources/Info.plist`, so every copy carries it; the private half signs each release's DMG. A build with an empty `SUPublicEDKey` has no updater, and `bundle.sh --release` refuses one. The pair is made once, on the Mac, with the `generate_keys` that SwiftPM fetched with Sparkle:
+
+```sh
+swift package resolve
+.build/artifacts/sparkle/Sparkle/bin/generate_keys --account pladder
+```
+
+It keeps the private key in the login keychain and prints the public key; put that into `SUPublicEDKey`. Export the private key, store it as the `release` environment secret `SPARKLE_ED_PRIVATE_KEY`, keep a copy offline, and delete the file:
+
+```sh
+.build/artifacts/sparkle/Sparkle/bin/generate_keys --account pladder -x sparkle-private-key.txt
+gh secret set SPARKLE_ED_PRIVATE_KEY --env release < sparkle-private-key.txt
+rm sparkle-private-key.txt
+```
+
+`appcast.sh` by hand signs with the keychain's `pladder` account. Keep the offline copy somewhere safe: every copy checks the DMG against this one public key before opening it (`SUVerifyUpdateBeforeExtraction`), so with the private key lost no update can reach them, and each would have to be replaced by hand once more. If the key leaks, make a new pair, ship the new public key in a release signed with the old private key, and replace the secret.
 
 ### Command-line transcriber
 
