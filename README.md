@@ -63,7 +63,7 @@ A dictionary fixes the words speech models get wrong: product names, libraries, 
 
 ## Install
 
-Pladder needs macOS 26 or later on Apple Silicon. Download `Pladder.dmg` from the [latest release](https://github.com/dinooo13/pladder/releases/latest), open it and drag Pladder to Applications. Or install it with Homebrew, and update it with `brew upgrade`:
+Pladder needs macOS 26 or later on Apple Silicon. Download `Pladder.dmg` from the [latest release](https://github.com/dinooo13/pladder/releases/latest), open it and drag Pladder to Applications. It updates itself: choose Check for Updates… in the menu, or turn on automatic checks in Settings. Or install it with Homebrew, and update it with `brew upgrade`:
 
 ```sh
 brew install --cask dinooo13/tap/pladder
