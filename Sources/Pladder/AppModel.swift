@@ -19,6 +19,7 @@ final class AppModel {
     let hotkeys: HotkeyRouter
     let polish: PolishModelController
     let corrections: CorrectionInbox
+    let updates: UpdateController
     private(set) var launchAtLoginError: String?
     // Can change behind the app's back in System Settings: re-read when settings open.
     private(set) var launchAtLoginEnabled = LaunchAtLogin.isEnabled
@@ -106,6 +107,7 @@ final class AppModel {
         self.coordinator = coordinator
         hotkeys.attach(coordinator)
         corrections = CorrectionInbox(dismissedURL: location.dismissedCorrectionsURL)
+        updates = UpdateController()
         overlay = OverlayController(coordinator: coordinator, pastes: { [permissions] in permissions.accessibilityTrusted })
 
         events.handler = { [weak self] in self?.handle($0.0, at: $0.1) }
@@ -126,6 +128,7 @@ final class AppModel {
         overlay.start()
         coordinator.start()
         polish.apply(model: settings.polishModel, polishing: settings.polishDictations)
+        updates.start(automaticChecks: settings.checksForUpdatesAutomatically)
         // Written now, so only this launch counts as the first.
         if isFirstLaunch { try? store.save(settings) }
     }
@@ -169,6 +172,9 @@ final class AppModel {
         }
         if change.polish {
             polish.apply(model: settings.polishModel, polishing: settings.polishDictations)
+        }
+        if change.updateChecks {
+            updates.apply(automaticChecks: settings.checksForUpdatesAutomatically)
         }
         do {
             try store.save(settings)

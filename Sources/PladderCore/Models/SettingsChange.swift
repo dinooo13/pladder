@@ -5,16 +5,19 @@ public struct SettingsChange: Sendable, Equatable {
     public var hotkey = false
     public var overlayStyle = false
     public var polish = false
+    public var updateChecks = false
 
-    public init(hotkey: Bool = false, overlayStyle: Bool = false, polish: Bool = false) {
+    public init(hotkey: Bool = false, overlayStyle: Bool = false, polish: Bool = false, updateChecks: Bool = false) {
         self.hotkey = hotkey
         self.overlayStyle = overlayStyle
         self.polish = polish
+        self.updateChecks = updateChecks
     }
 
     public init(from old: Settings, to new: Settings) {
         hotkey = new.hotkey != old.hotkey
         overlayStyle = new.overlayStyle != old.overlayStyle
         polish = new.polishModel != old.polishModel || new.polishDictations != old.polishDictations
+        updateChecks = new.checksForUpdatesAutomatically != old.checksForUpdatesAutomatically
     }
 }

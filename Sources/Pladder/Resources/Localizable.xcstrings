@@ -101,12 +101,42 @@
         }
       }
     },
+    "Asks GitHub once a day for a newer Pladder. Sends nothing about you.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fragt einmal am Tag bei GitHub nach einem neueren Pladder. Sendet nichts über dich."
+          }
+        }
+      }
+    },
     "Built into macOS. Adds one to two seconds to each dictation.": {
       "localizations": {
         "de": {
           "stringUnit": {
             "state": "translated",
             "value": "In macOS eingebaut. Kostet ein bis zwei Sekunden pro Diktat."
+          }
+        }
+      }
+    },
+    "Check for Updates…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nach Updates suchen …"
+          }
+        }
+      }
+    },
+    "Check for updates automatically": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatisch nach Updates suchen"
           }
         }
       }
@@ -527,6 +557,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pladder"
+          }
+        }
+      }
+    },
+    "Pladder %@ is available — Install…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pladder %@ ist verfügbar – Installieren …"
           }
         }
       }
