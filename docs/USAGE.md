@@ -94,7 +94,7 @@ The 25 European languages Parakeet TDT v3 supports, including English, German, F
 
 ## Long dictations
 
-Recordings stop at 10 minutes, so a lost key-up never leaves the microphone on; what was said up to then is pasted. Audio longer than 15 seconds is transcribed in overlapping windows while you are still speaking, so the wait after letting go stays the same.
+A held recording stops at 10 minutes, so a lost key-up never leaves the microphone on; what was said up to then is pasted. A recording started with the hands-free key runs up to 60 minutes. Audio longer than 15 seconds is transcribed in overlapping windows while you are still speaking, so the wait after letting go stays the same.
 
 ## From the command line
 

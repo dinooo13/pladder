@@ -1263,7 +1263,7 @@ final class EventLog: @unchecked Sendable {
         await c.cancelRecording()
     }
 
-    @Test func theCapFiresInToggleMode() async {
+    @Test func aLatchedRecordingOutlastsTheHeldCap() async {
         let hotkey = FakeHotkey()
         let clock = ManualClock()
         let (c, output, _) = makeCoordinator(settings: hybridSettings(), hotkeyMonitor: hotkey, clock: clock)
@@ -1273,7 +1273,13 @@ final class EventLog: @unchecked Sendable {
         hotkey.release()
         #expect(await waitUntil { c.isLatched })
         #expect(await clock.waitForSleepers(2))
+        let sleepers = clock.sleeperCount
         clock.advance(by: c.maximumDuration)
+        #expect(await waitUntil { clock.sleeperCount == sleepers })
+        #expect(c.state.isRecording)
+        clock.advance(by: c.latchedMaximumDuration - c.maximumDuration - .seconds(1))
+        #expect(c.state.isRecording)
+        clock.advance(by: .seconds(1))
         await c.cycleFinished()
         #expect(output.inserted.count == 1)
         #expect(output.submitted == [false])

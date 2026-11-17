@@ -63,7 +63,8 @@ its timers with `ManualClock`.
    drops that utterance itself and starts no loop. At release or cancel the
    session hands the coordinator what it ended with: the utterance or the
    whole buffer to transcribe, and the feed loop to wait for;
-6. starts the level meter and the 10 minute cap.
+6. starts the level meter and the cap: 10 minutes, or 60 if the recording
+   is latched by then.
 
 **Release** (`hotkeyReleased`). `endRecording()` stops everything the press
 started: the gesture tracker, the cancel key, the meter, the cap, the feed,
@@ -690,7 +691,8 @@ that default.
 | 0.3 s | Shortest recording that is transcribed | `DictationCoordinator.minimumDuration` | `PladderCore/DictationCoordinator.swift` |
 | 4 words | Shortest dictation that is polished | `DictationCoordinator.minimumPolishWords` | `PladderCore/DictationCoordinator.swift` |
 | 10 words | Longest sentence pasted without its capital and period | `ShortSentence.maximumWords` | `PladderCore/Support/ShortSentence.swift` |
-| 10 min | Recording cap | `DictationCoordinator.maximumDuration` | `PladderCore/DictationCoordinator.swift` |
+| 10 min | Recording cap, held | `DictationCoordinator.maximumDuration` | `PladderCore/DictationCoordinator.swift` |
+| 60 min | Recording cap, latched | `DictationCoordinator.latchedMaximumDuration` | `PladderCore/DictationCoordinator.swift` |
 | 100 ms | Feed loop cadence, and the chunk the paced bench feeds | `DictationCoordinator.defaultFeedInterval` | `PladderCore/DictationCoordinator.swift` |
 | 500 ms | Live pass cadence (Live Transcript) | `DictationCoordinator.livePassInterval` | `PladderCore/DictationCoordinator.swift` |
 | 2 s | Warm loop cadence | `DictationCoordinator.warmupInterval` | `PladderCore/DictationCoordinator.swift` |

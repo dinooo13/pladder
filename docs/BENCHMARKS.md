@@ -45,7 +45,7 @@ them.
 | 60s | 60 s | Chunked path. |
 | 2m | 2 min | A long dictation. |
 | 5m | 5 min | A very long dictation. |
-| 10m | 10 min | The app's recording cap. Heats the chip, so it runs last. |
+| 10m | 10 min | The app's cap for a held recording. Heats the chip, so it runs last. |
 
 30 s through 10 min show whether engine time grows linearly with chunk count
 and whether accuracy degrades at chunk seams, which FluidAudio's own notes
@@ -397,6 +397,26 @@ with 2 s of context are not the batch layout: its text differed from the
 whole-buffer text from 30 s up, and its word error was 0.9 to 1.2 % from
 60 s up where the batch path's was 0.0 to 0.2 %. That is why the fork's
 `IncrementalChunkProcessor` stays.
+
+## Past ten minutes
+
+A latched recording runs up to 60 minutes, longer than any standard
+fixture. Checked once on 2026-11-17 on the M1 (macOS 27.2), Parakeet Ultra,
+with a 60m fixture made by joining the 10m one six times (3,789 s) and the
+paced bench with its sleep taken out, so the audio was fed as fast as the
+windows ran. Every window is still run before `endUtterance`, which is what
+the timing needs; only the wall clock is shorter.
+
+| Fixture | Audio | `endUtterance` (median of 2) | WER | Identical whole-buffer |
+|---|---:|---:|---:|---|
+| 10m | 631 s | 0.179 s | 0.5 % | yes |
+| 60m | 3,789 s | 0.206 s | 0.6 % | yes |
+
+Six times the audio leaves 27 ms more at release, the last window
+and the merge over six times as many windows. The whole-buffer pass over the 60m fixture took 19.3 s, the wait
+the incremental path saves. The CLI's peak footprint was 813 MB, with the
+fixture itself and that whole-buffer pass in it. In the app the recording
+holds about 230 MB in FluidAudio's session until the release.
 
 ## Reading the app's release-to-paste log
 

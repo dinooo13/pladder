@@ -63,6 +63,8 @@ public final class DictationCoordinator {
     public var minimumPolishWords = 4
     // A key-up can be lost for real, e.g. while Secure Event Input hides keys from the tap.
     public var maximumDuration: Duration = .seconds(600)
+    // A latched recording has no key-up to lose; its cap only ends a forgotten latch.
+    public var latchedMaximumDuration: Duration = .seconds(3600)
     // Handy and VoiceInk use 300 to 500 ms.
     public var holdThreshold: Duration = .milliseconds(400)
     public var bounceWindow: Duration = .milliseconds(50)
@@ -400,9 +402,14 @@ public final class DictationCoordinator {
                 self.inputLevel = level
             }
         }
-        maxDurationTask = Task { [weak self, clock, maximumDuration] in
+        maxDurationTask = Task { [weak self, clock, maximumDuration, latchedMaximumDuration] in
             try? await clock.sleep(for: maximumDuration)
             guard let self, !Task.isCancelled, self.state.isRecording else { return }
+            // Asked at the held cap, not at the press: a hybrid key latches at its release.
+            if self.isLatched {
+                try? await clock.sleep(for: latchedMaximumDuration - maximumDuration)
+                guard !Task.isCancelled, self.state.isRecording else { return }
+            }
             // A lost key-up, not a release: never send a message unattended.
             self.hotkeyReleased(submit: false)
         }
