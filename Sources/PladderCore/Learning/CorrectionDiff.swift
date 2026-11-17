@@ -11,7 +11,7 @@ public enum CorrectionDiff {
     // So a one- or two-word paste can still be corrected.
     static let rewriteAllowance = 2
     // Past this the reading is skipped rather than a quadratic table built; a
-    // dictation near the 10 min cap can pass it, and then nothing is learned.
+    // dictation of ten minutes or more can pass it, and then nothing is learned.
     static let maximumCells = 4_000_000
 
     public static func candidates(in observation: PasteObservation) -> [CorrectionPair] {

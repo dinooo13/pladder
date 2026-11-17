@@ -57,8 +57,8 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
     private var manager: AsrManager?
     private var slot = UtteranceSlot<IncrementalChunkProcessor>()
     private var fedSampleCount = 0
-    // Kept only for `livePass`; the session holds its own copy. 38 MB at the 10 min cap,
-    // dropped when the utterance ends.
+    // Kept only for `livePass`, trimmed to its last window or two; the session holds the
+    // whole recording.
     private var liveAudio: [Float] = []
     private var loadTask: Task<Void, Error>?
 
@@ -171,6 +171,11 @@ public actor FluidAudioIncrementalEngine: StreamingTranscriptionEngine {
         guard !samples.isEmpty, let session = slot.session(for: utterance) else { return }
         fedSampleCount += samples.count
         liveAudio.append(contentsOf: samples)
+        // Only the last window is read; whole hops off the front leave its cut where it was.
+        if liveAudio.count > 2 * Self.maxWindowSamples {
+            let overflow = liveAudio.count - Self.maxWindowSamples
+            liveAudio.removeFirst((overflow / Self.windowHopSamples) * Self.windowHopSamples)
+        }
         // A window failing mid-recording must not take the dictation down: `finish()` still
         // runs the last window and merges what succeeded.
         try? await session.append(samples)
