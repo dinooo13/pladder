@@ -1,3 +1,4 @@
+#if PLADDER_DEV_MODES
 import AppKit
 import Foundation
 import PladderCore
@@ -7,7 +8,11 @@ import PladderCore
 // a copy in use. `scripts/overlay-demo.sh` lines its timed output up with a recording.
 @MainActor
 enum OverlayDemo {
-    static var isRequested: Bool { CommandLine.arguments.contains("--overlay-demo") }
+    static var isRequested: Bool { isRequested(in: CommandLine.arguments) }
+
+    nonisolated static func isRequested(in arguments: [String]) -> Bool {
+        arguments.contains("--overlay-demo")
+    }
 
     private struct Scenario {
         let name: String
@@ -169,3 +174,4 @@ private final class DemoHotkey: HotkeyMonitor, @unchecked Sendable {
     func stop() {}
     func setCancelKeyEnabled(_ enabled: Bool) {}
 }
+#endif
