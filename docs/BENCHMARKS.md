@@ -63,8 +63,13 @@ benchmark reports the actual length.
 1. Close other heavy work and check that `uptime` shows a low load average.
    Numbers jitter with thermal state and other load.
 2. Generate the fixtures once: `./scripts/make-fixtures.sh`
-3. Run: `swift run -c release pladder-cli bench bench/fixtures`. It takes
-   about seven minutes; leave the machine alone while it runs.
+3. Build first, then run under the `ane` lock, which every worktree on the
+   Mac shares, so no other benchmark or polish timing runs beside it:
+   `swift build -c release --product pladder-cli`, then
+   `scripts/lock.sh ane -- swift run -c release pladder-cli bench bench/fixtures`.
+   It takes about seven minutes; leave the machine alone while it runs. A
+   run that finds the lock held waits for it, up to an hour. Every command
+   below runs the same way.
 4. Runs never overlap, and every run is preceded by ten seconds of idle so
    it starts from the same state a real dictation does, rather than with
    warm clocks and residual heat from the previous run. `--pause` changes
@@ -78,7 +83,9 @@ benchmark reports the actual length.
    keeps ten and takes about twelve minutes.
 6. The tool prints the one-minute load average at start and end and tags
    any run during which the chip left its normal thermal state. A run with
-   a thermal tag or a load average well above one is not comparable.
+   a thermal tag or a load average well above one is not comparable. The
+   lock keeps benchmarks apart, not builds, so a build in another worktree
+   still shows here, and the load average still decides.
 7. A difference under roughly ten percent is noise. If a change lands near
    that line, run again.
 
@@ -94,7 +101,7 @@ timed. That is the part left
 on the release-to-paste path.
 
 ```sh
-swift run -c release pladder-cli bench bench/fixtures --paced --runs 2 --pause 2
+scripts/lock.sh ane -- swift run -c release pladder-cli bench bench/fixtures --paced --runs 2 --pause 2
 ```
 
 Pacing takes as long as the audio, so fixtures under 13 s are skipped: below
@@ -117,7 +124,7 @@ every two seconds. `--paced --live` models exactly that: a second task calls
 cancelled just before the release, as the coordinator's feed loop is.
 
 ```sh
-swift run -c release pladder-cli bench bench/fixtures --paced --live --runs 2 --pause 2
+scripts/lock.sh ane -- swift run -c release pladder-cli bench bench/fixtures --paced --live --runs 2 --pause 2
 ```
 
 Two things come out of it. The run line and two extra table columns report how
@@ -137,7 +144,7 @@ release-to-paste path (the feed hand-over, `endRecording`, the hops between
 stages on the main actor), has a number of its own here:
 
 ```sh
-swift run -c release pladder-cli bench-coordinator [--runs N] [--hold S] [--engine-latency MS] [--paste-latency MS] [--polish] [--live]
+scripts/lock.sh ane -- swift run -c release pladder-cli bench-coordinator [--runs N] [--hold S] [--engine-latency MS] [--paste-latency MS] [--polish] [--live]
 ```
 
 It builds the real `DictationCoordinator` with the app's processors on a
@@ -183,7 +190,7 @@ never shows that, because its releases always come straight after a feed.
 `bench-release` releases where you ask:
 
 ```sh
-swift run -c release pladder-cli bench-release bench/fixtures/30s.wav --at 15.1,15.3,28.3,28.4 --uniform 2-30:20
+scripts/lock.sh ane -- swift run -c release pladder-cli bench-release bench/fixtures/30s.wav --at 15.1,15.3,28.3,28.4 --uniform 2-30:20
 ```
 
 It builds the real coordinator and processors around the real engine, plays
@@ -462,7 +469,7 @@ inputs are hand-written in the shape Parakeet produces, with fillers left
 in; real dictation mostly arrives with numbers already as digits.
 
 ```sh
-swift run -c release pladder-cli polish-set docs/polish-set.json --model apple|s1-mini|s1-mini-8bit
+scripts/lock.sh ane -- swift run -c release pladder-cli polish-set docs/polish-set.json --model apple|s1-mini|s1-mini-8bit
 ```
 
 runs the app's processors over each input, then the model, warm, and prints
@@ -521,7 +528,7 @@ median of 31 runs, M1. "Typical" has a filler in every sentence; "worst" adds
 a spoken question mark to every sentence.
 
 ```sh
-swift run -c release pladder-cli bench-process bench/fixtures [--runs N]
+scripts/lock.sh ane -- swift run -c release pladder-cli bench-process bench/fixtures [--runs N]
 ```
 
 reads each fixture's script, puts "um," after the first word of every
