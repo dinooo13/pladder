@@ -20,7 +20,7 @@ cd "$ROOT"
 OUT="$ROOT/docs/images"
 if [[ $# -gt 0 && "$1" != --* ]]; then OUT="$1"; shift; fi
 
-"$ROOT/scripts/bundle.sh"
+"$ROOT/scripts/bundle.sh" --dev-modes
 # The binary directly, not `open`: screencapture then runs with this
 # terminal's Screen Recording grant.
 "$ROOT/dist/Pladder.app/Contents/MacOS/Pladder" --screenshots "$OUT" "$@"

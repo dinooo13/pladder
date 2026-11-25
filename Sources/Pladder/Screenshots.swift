@@ -1,3 +1,4 @@
+#if PLADDER_DEV_MODES
 import AppKit
 import SwiftUI
 import PladderCore
@@ -6,10 +7,11 @@ import PladderCore
 // or the engine, so it can run beside a copy in use; `scripts/make-screenshots.sh` wraps it.
 @MainActor
 enum Screenshots {
-    static var directory: URL? {
-        let args = CommandLine.arguments
-        guard let index = args.firstIndex(of: "--screenshots"), index + 1 < args.count else { return nil }
-        return URL(filePath: args[index + 1])
+    static var directory: URL? { directory(in: CommandLine.arguments) }
+
+    nonisolated static func directory(in arguments: [String]) -> URL? {
+        guard let index = arguments.firstIndex(of: "--screenshots"), index + 1 < arguments.count else { return nil }
+        return URL(filePath: arguments[index + 1])
     }
 
     static var capturesMenu: Bool { CommandLine.arguments.contains("--menu") }
@@ -407,3 +409,4 @@ private struct SettingsOpener: View {
         }
     }
 }
+#endif

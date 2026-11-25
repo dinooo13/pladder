@@ -5,11 +5,13 @@
 # signature, which macOS needs to remember the Accessibility and Microphone
 # grants across launches.
 #
-# Usage: scripts/bundle.sh [--run] [--install] [--release]
+# Usage: scripts/bundle.sh [--run] [--install] [--release] [--dev-modes]
 #   --run              launch dist/Pladder.app when done
 #   --install          copy the app to /Applications (replacing an old copy)
 #   --release          Developer ID only, with a secure timestamp (notarisation
 #                      needs both); scripts/release.sh passes it
+#   --dev-modes        with --overlay-demo and --screenshots, in .build/dev-modes;
+#                      scripts/make-screenshots.sh passes it
 #   SCRATCH=<dir>      optional swift build --scratch-path
 #   CODESIGN_IDENTITY  signing identity; auto-detected, "-" forces ad-hoc
 #   MARKETING_VERSION  CFBundleShortVersionString of the bundled Info.plist
@@ -20,21 +22,34 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-SCRATCH="${SCRATCH:-.build}"
 RUN=0
 INSTALL=0
 RELEASE=0
+DEV_MODES=0
 for arg in "$@"; do
 	case "$arg" in
 	--run) RUN=1 ;;
 	--install) INSTALL=1 ;;
 	--release) RELEASE=1 ;;
+	--dev-modes) DEV_MODES=1 ;;
 	*)
 		echo "unknown argument: $arg" >&2
 		exit 2
 		;;
 	esac
 done
+
+DEFINES=()
+if [[ "$DEV_MODES" -eq 1 ]]; then
+	if [[ "$RELEASE" -eq 1 || "$INSTALL" -eq 1 ]]; then
+		echo "--dev-modes never goes into a release or /Applications" >&2
+		exit 2
+	fi
+	DEFINES=(-Xswiftc -DPLADDER_DEV_MODES)
+	# A changed define recompiles every module, so the two builds keep apart.
+	SCRATCH="${SCRATCH:-.build/dev-modes}"
+fi
+SCRATCH="${SCRATCH:-.build}"
 
 APP="$ROOT/dist/Pladder.app"
 CONTENTS="$APP/Contents"
@@ -85,8 +100,8 @@ if [[ "$RELEASE" -eq 1 ]]; then
 	TIMESTAMP=--timestamp
 fi
 
-swift build -c release --product Pladder --scratch-path "$SCRATCH"
-BIN_DIR="$(swift build -c release --product Pladder --scratch-path "$SCRATCH" --show-bin-path)"
+swift build -c release --product Pladder --scratch-path "$SCRATCH" ${DEFINES[@]+"${DEFINES[@]}"}
+BIN_DIR="$(swift build -c release --product Pladder --scratch-path "$SCRATCH" ${DEFINES[@]+"${DEFINES[@]}"} --show-bin-path)"
 
 rm -rf "$APP"
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"

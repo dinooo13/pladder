@@ -23,11 +23,13 @@ runs:
       # recompiles every module a plain swift build made (about a minute).
       # Warnings in Pladder's own sources fail the build; the dependencies'
       # are theirs to fix. The log goes outside the checkout, which
-      # release.sh needs clean.
+      # release.sh needs clean. With the developer modes, so their code and
+      # test never rot unbuilt; the build without them is a strict subset,
+      # which `swift build` and main's Bundle step compile.
       shell: bash
       run: |
         set -o pipefail
-        swift build --build-tests 2>&1 | tee "$RUNNER_TEMP/build.log"
+        swift build --build-tests -Xswiftc -DPLADDER_DEV_MODES 2>&1 | tee "$RUNNER_TEMP/build.log"
         if grep -E "^$PWD/Sources/.*warning:" "$RUNNER_TEMP/build.log"; then exit 1; fi
     - name: Test
       # The suite takes seconds. If it stalls, the stack of every thread of
@@ -36,7 +38,7 @@ runs:
       shell: bash
       run: |
         set +e
-        swift test --skip-build &
+        swift test --skip-build -Xswiftc -DPLADDER_DEV_MODES &
         TEST=$!
         for _ in $(seq 1 300); do
           kill -0 "$TEST" 2>/dev/null || break

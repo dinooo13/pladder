@@ -10,29 +10,33 @@ struct PladderApp: App {
     @State private var model: AppModel
     // The overlay demo and the screenshots are not the app: a throwaway settings file,
     // and no menu bar item, which would be a second, slashed Pladder in the bar.
-    private let isDeveloperMode: Bool
+    private let showsMenuBarItem: Bool
 
     init() {
-        let isDeveloperMode = OverlayDemo.isRequested || Screenshots.directory != nil
-        self.isDeveloperMode = isDeveloperMode
-        let model = isDeveloperMode
-            ? AppModel(location: .scratch, readPolicy: Screenshots.readPolicy)
-            : AppModel(location: .live)
-        _model = State(initialValue: model)
-        // Deferred, so the app has finished launching before the Accessibility prompt.
-        if OverlayDemo.isRequested {
-            Task { @MainActor in await OverlayDemo.run() }
-        } else if let directory = Screenshots.directory {
-            Screenshots.appModel = model
-            Task { @MainActor in await Screenshots.run(into: directory) }
-        } else {
-            AppDelegate.shutdown = { await model.shutdown() }
-            Task { @MainActor in model.start() }
+        #if PLADDER_DEV_MODES
+        if OverlayDemo.isRequested || Screenshots.directory != nil {
+            let model = AppModel(location: .scratch, readPolicy: Screenshots.readPolicy)
+            _model = State(initialValue: model)
+            showsMenuBarItem = Screenshots.capturesMenu
+            if OverlayDemo.isRequested {
+                Task { @MainActor in await OverlayDemo.run() }
+            } else if let directory = Screenshots.directory {
+                Screenshots.appModel = model
+                Task { @MainActor in await Screenshots.run(into: directory) }
+            }
+            return
         }
+        #endif
+        let model = AppModel(location: .live)
+        _model = State(initialValue: model)
+        showsMenuBarItem = true
+        AppDelegate.shutdown = { await model.shutdown() }
+        // Deferred, so the app has finished launching before the Accessibility prompt.
+        Task { @MainActor in model.start() }
     }
 
     var body: some Scene {
-        MenuBarExtra(isInserted: .constant(!isDeveloperMode || Screenshots.capturesMenu)) {
+        MenuBarExtra(isInserted: .constant(showsMenuBarItem)) {
             MenuContent(model: model)
         } label: {
             MenuBarLabel(model: model)
