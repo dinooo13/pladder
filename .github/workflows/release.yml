@@ -1,4 +1,5 @@
 name: Release
+run-name: Release ${{ inputs.version }}${{ inputs.draft && ' (draft)' || '' }}
 
 # Started by hand only, from main. See INSTALL.md, "Releasing".
 on:
