@@ -11,6 +11,9 @@
 #
 # Plain bash 3.2 and POSIX awk, so it runs the same on macOS and ubuntu.
 set -euo pipefail
+for arg in "$@"; do
+	case "$arg" in -h | --help) sed -n '2,${/^#/!q;s/^# \{0,1\}//;p;}' "$0"; exit 0 ;; esac
+done
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"

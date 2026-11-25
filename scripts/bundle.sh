@@ -18,6 +18,9 @@
 #   BUILD_NUMBER       CFBundleVersion of the bundled Info.plist; default: the
 #                      commit count
 set -euo pipefail
+for arg in "$@"; do
+	case "$arg" in -h | --help) sed -n '2,${/^#/!q;s/^# \{0,1\}//;p;}' "$0"; exit 0 ;; esac
+done
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"

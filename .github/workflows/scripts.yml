@@ -21,5 +21,43 @@ jobs:
         run: |
           # Commands only: a comment may name what not to do.
           if grep -rnE '^[^#]*(pkill -x Pladder|killall Pladder)' scripts; then exit 1; fi
+      - name: Every script answers --help and does nothing else
+        # One that builds, launches or records before reading --help fails
+        # here: on the 5 s timeout, on a missing say or screencapture, or on
+        # the files it leaves behind.
+        run: |
+          for file in scripts/*; do
+            if [[ -x "$file" && "$file" != *.sh ]]; then
+              echo "::error file=$file::$file is executable but not a .sh, so no --help check covers it"
+              exit 1
+            fi
+          done
+          count=0
+          for script in scripts/*.sh; do
+            count=$((count + 1))
+            if [[ ! -x "$script" ]]; then
+              echo "::error file=$script::$script is not executable"
+              exit 1
+            fi
+            for args in "--help" "-h" "x --help"; do
+              read -r -a argv <<<"$args"
+              if ! out=$(timeout 5 "$script" "${argv[@]}" 2>&1); then
+                echo "::error file=$script::$script $args did not exit 0"
+                echo "$out"
+                exit 1
+              fi
+              if ! grep -q "^Usage: $script" <<<"$out"; then
+                echo "::error file=$script::$script $args printed no \"Usage: $script\" line"
+                echo "$out"
+                exit 1
+              fi
+            done
+          done
+          if [[ -n "$(git status --porcelain --ignored)" ]]; then
+            echo "::error::a --help run left files behind"
+            git status --porcelain --ignored
+            exit 1
+          fi
+          echo "$count scripts answer --help"
       - name: ShellCheck
         run: shellcheck scripts/*.sh

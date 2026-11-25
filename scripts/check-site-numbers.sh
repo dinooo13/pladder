@@ -10,9 +10,14 @@
 # It also fails when a page names a release, a version or a SHA-256: the
 # download is always the latest release, so a pinned one would go stale.
 #
+# Usage: scripts/check-site-numbers.sh
+#
 # Plain bash 3.2 and POSIX awk, so it runs the same on macOS and ubuntu.
 
 set -eo pipefail
+for arg in "$@"; do
+    case "$arg" in -h | --help) sed -n '2,${/^#/!q;s/^# \{0,1\}//;p;}' "$0"; exit 0 ;; esac
+done
 cd "$(dirname "$0")/.."
 
 sections=$(mktemp)

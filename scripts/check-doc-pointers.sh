@@ -5,9 +5,14 @@
 # outside code fences, with backticks removed. A bare `docs/X.md` is fine as
 # long as the file exists.
 #
+# Usage: scripts/check-doc-pointers.sh
+#
 # Plain bash 3.2 and POSIX awk, so it runs the same on macOS and ubuntu.
 
 set -eo pipefail
+for arg in "$@"; do
+    case "$arg" in -h | --help) sed -n '2,${/^#/!q;s/^# \{0,1\}//;p;}' "$0"; exit 0 ;; esac
+done
 cd "$(dirname "$0")/.."
 
 headings=$(mktemp)
