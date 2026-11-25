@@ -5,8 +5,8 @@ import PladderEngines
 // Developer tool. Commands and flags: docs/ARCHITECTURE.md, "pladder-cli". Each
 // command lives in a file of its own; shared helpers are in Support.swift.
 
-func usage() -> Never {
-    eprint("""
+func usageText() -> String {
+    """
     usage: pladder-cli <audio file> [--process] [--verbose] [--engine <id>]
            pladder-cli bench <fixtures dir> [--runs N] [--pause S] [--engine <id>]
            pladder-cli bench <fixtures dir> --paced [--runs N] [--pause S] [--all] [--live] [--engine <id>]
@@ -16,13 +16,21 @@ func usage() -> Never {
            pladder-cli polish <text file | -> [--model \(PolishModel.cliNames) | --gguf <file>] [--control <line>] [--instructions <file>]
            pladder-cli polish-set <set.json> [--model \(PolishModel.cliNames) | --gguf <file>] [--control <line>]
     engines: \(StandardEngines.entries.map(\.id.rawValue).joined(separator: ", ")); the first is the default
-    """)
+    """
+}
+
+func usage() -> Never {
+    eprint(usageText())
     exit(2)
 }
 
 // MARK: - Entry
 
 var arguments = Array(CommandLine.arguments.dropFirst())
+if arguments.contains(where: { $0 == "-h" || $0 == "--help" }) {
+    print(usageText())
+    exit(0)
+}
 if let flag = arguments.firstIndex(of: "--engine") {
     guard flag + 1 < arguments.count,
         let entry = StandardEngines.entries.first(where: { $0.id.rawValue == arguments[flag + 1] })
@@ -31,7 +39,7 @@ if let flag = arguments.firstIndex(of: "--engine") {
     arguments.removeSubrange(flag...(flag + 1))
 }
 switch arguments.first {
-case nil, "-h", "--help":
+case nil:
     usage()
 case "bench":
     arguments.removeFirst()
