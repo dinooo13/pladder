@@ -38,7 +38,8 @@ swift run -c release pladder-cli bench bench/fixtures --engine parakeet-tdt-v3-i
 swift run -c release pladder-cli bench-coordinator [--polish] [--live]   # the coordinator's own share of release-to-paste, stand-ins of fixed latency
 swift run -c release pladder-cli polish <text file> [--model apple|s1-mini|s1-mini-8bit]   # one transcript, cold and warm
 swift run -c release pladder-cli polish-set docs/polish-set.json --model s1-mini-8bit    # a polish model over the test set: error rate, exact matches, timings
-./scripts/overlay-demo.sh [dir] [--style …] [--speed …]  # play every overlay path with stand-ins, record the screen, cut contact sheets
+./scripts/overlay-demo.sh [dir] [--style …] [--reduce-motion]  # play every overlay path with stand-ins, record the screen, cut contact sheets
+./scripts/make-screenshots.sh [dir] [--settings | --settings-scene [--accessibility | --get-started] | --menu] [--managed]  # the app's own views as pictures: the README's by default, into docs/images
 ./scripts/check-site-numbers.sh               # the site's figures against docs/BENCHMARKS.md, and no pinned release on it
 ./scripts/make-site-media.sh <recording>       # a screen recording of a dictation as the site's MP4, WebM and poster
 ```
@@ -125,3 +126,46 @@ The developer dictates with a running Pladder all day, often into Claude session
 - Do not edit `~/Library/Application Support/Pladder/settings.json`; it is the live configuration.
 - A copy launched for testing gets its own settings file with `PLADDER_SETTINGS_PATH=/tmp/<branch>/settings.json "$PWD/dist/Pladder.app/Contents/MacOS/Pladder"`, and a different chord from the copy in use, so the two never fire together. Launched as the bare binary so the environment reaches it; its command line still contains `$PWD/dist/Pladder.app`, so the `pkill -f` above stops it.
 - To test an update, the copy needs a bundle ID of its own (Sparkle's defaults and the grants are per bundle ID), `LSEnvironment` in its Info.plist for `PLADDER_SETTINGS_PATH` (Sparkle relaunches it through LaunchServices, without your shell's environment), a feed on `http://127.0.0.1` and a throwaway key, signed with `appcast.sh` and `SPARKLE_ED_KEY`; never the real key.
+
+## Verify
+
+Proof is what you saw in this session: a command's output, a picture, a contact sheet. Every `scripts/*.sh` answers `-h` and `--help` with its usage and does nothing else, so ask it first. The rules in "Working on this Mac while Pladder is in use" hold for every line here.
+
+| Change | Run | Where it lands |
+|---|---|---|
+| Any Swift | `swift build`, with no new warning, and `swift test` | the terminal |
+| Core logic: the coordinator, a tracker, the settings | a test that fails without the change | the terminal |
+| A processor, the dictionary | `swift run -c release pladder-cli <audio file> --process --verbose` | `RAW:` and `TEXT:` on stdout |
+| Between `recordingStopped` and `inserted`, a processor, the engine | the critical-path rule: `pladder-cli bench`, `pladder-cli bench --paced`, `pladder-cli bench-coordinator`, `pladder-cli bench-release` or `pladder-cli bench-process`, before and after | tables on stdout, both in the pull request |
+| Polish, a model or its prompt | `pladder-cli polish-set docs/polish-set.json --model …` | error rate, exact matches and timings on stdout |
+| The pill, the coordinator's states | `scripts/overlay-demo.sh <dir>`, then with `--style minimal`, `--style liveTranscript` and `--reduce-motion` | `<dir>/sheet-*.png`, `demo.mov`, `demo.log` |
+| Settings | `scripts/make-screenshots.sh <dir> --settings-scene`, then `--settings-scene --get-started`, `--settings-scene --accessibility`, and any of them with `--managed`; `--settings` for each tab alone | `<dir>/scene-<tab>-light.png` and `-dark.png`, `accessibility-<tab>.txt`, `settings-<tab>-light.png` and `-dark.png` |
+| The menu | `scripts/make-screenshots.sh <dir> --menu` | `<dir>/menu.png`, in the system's appearance |
+| The README's pictures | `scripts/make-screenshots.sh` with no `<dir>` | `docs/images/styles-light.png` and `-dark.png`, committed |
+| The bundle, signing, the icon, the catalogs in the app | `scripts/bundle.sh`, then your own copy with its own settings file | `dist/Pladder.app` |
+| A script | `shellcheck scripts/*.sh`, and its `--help` | the terminal |
+| Docs, the site | `scripts/check-doc-pointers.sh`, `scripts/check-doc-commands.sh`, `scripts/check-site-numbers.sh`; `site/index.html` at phone and desktop widths | the terminal |
+
+`<dir>` is yours, `/tmp/<branch>/…`, one per run, and comes first: each run of the same mode replaces the last one's pictures. Without it `make-screenshots.sh` writes into `docs/images`, which is committed, and `overlay-demo.sh` into one directory every worktree shares. `scripts/overlay-demo.sh` and `scripts/make-screenshots.sh` build their own copy with the developer modes in (`-DPLADDER_DEV_MODES`, in `.build/dev-modes`); a plain `swift build` or `scripts/bundle.sh` build, and every release, has no `--overlay-demo` or `--screenshots`. Both put windows or the pill on the screen while they run and need Screen Recording for the terminal that runs them, so look at the pictures before quoting them. `pladder-cli --process` reads the live settings file and never writes it; `PLADDER_SETTINGS_PATH` names another. The fixtures come from `scripts/make-fixtures.sh`, once per worktree, into `bench/fixtures`.
+
+One at a time. Anything that records the screen (`scripts/overlay-demo.sh`, `scripts/make-screenshots.sh`) runs under `/tmp/pladder-screen.lock`: take it with `mkdir /tmp/pladder-screen.lock`, write an owner file inside (the worktree and the time), `rm -r` it when the run ends, and never remove a lock someone else took; wait instead. A benchmark has no lock, but one that ran beside another build or benchmark is not a result; `pladder-cli bench`, `pladder-cli bench-coordinator` and `pladder-cli bench-release` print the load average, and docs/BENCHMARKS.md, "Procedure", says what counts.
+
+The hard states: light and dark; every pill style and Reduce Motion; every path the demo plays, the clipboard hint and the two polish paths among them; the General tab at its tallest; every managed control; what VoiceOver is given; a recording longer than one 15 s window, which `bench --paced` checks byte for byte.
+
+Only a human can check: a real dictation into other apps, since no agent posts a hotkey event; the Accessibility and Microphone prompts and a first grant; German on a Mac set to German; Sparkle against the real key and feed; the notarised DMG and Gatekeeper's first open. Say in the report which of these the change needs.
+
+## Ship
+
+- **Verify:** `## Verify` for the kind of change, and what CI runs: `swift build` with no new warning, `swift test`, `shellcheck scripts/*.sh`, every script's `--help`, the three `check-*.sh`. A change on the release-to-paste path carries its benchmark, before and after. The pull request follows `.github/pull_request_template.md` and says what was not checked and who has to check it.
+- **Merge:** Rebase only, so every commit lands as it is: the subject an area, a colon and a sentence, the body the reason, `Closes #<issue>.` at the end of the last one, fixups squashed. `build-and-test`, `scripts` and `doc-pointers` green on the last commit and every review thread resolved, then `gh pr merge --rebase --match-head-commit <sha>`. GitHub keeps the branch; delete it.
+- **After merge:** Pull `main` in the root checkout. A change the build reads (`Sources`, `Package.swift`, `Package.resolved`, `Assets`, `scripts/bundle.sh`, `scripts/Pladder.entitlements`) is installed from there, on the Mac, with `./scripts/bundle.sh --install --run`. That stops `/Applications/Pladder.app`, the copy in use, and drops a recording in progress, so an agent runs it without asking only while the developer is not dictating: build first with a plain `./scripts/bundle.sh`, run the check below, and start the install as soon as it prints `idle`, so the install's own build has nothing left to do. When it prints nothing, ask first. A change under `site/` is published by `pages.yml`; wait for its run on the merge commit. Anything else needs nothing. A release is never part of shipping a change: `release.yml` is dispatched by hand.
+
+  ```sh
+  p='subsystem == "de.dinooo13.pladder" AND category == "capture" AND processImagePath == "/Applications/Pladder.app/Contents/MacOS/Pladder"'
+  /usr/bin/log show --last 20s --style compact --predicate "$p" | awk '/^Timestamp/{ok=1} /capture /{n++} END{exit !ok || n>0}' &&
+    /usr/bin/log show --last 61m --style compact --predicate "$p" | awk '/^Timestamp/{ok=1} /capture started/{s=1} /capture stop called/{s=0} END{exit !ok || s}' &&
+    echo idle
+  ```
+
+  The installed copy logs `capture started` when the microphone opens and `capture stop called` on every release, cancel, cap and quit, and `log show` sees each within a second. `idle` means the last start in the past 61 minutes (the latched cap, and a minute) was followed by a stop, and nothing started or stopped in the past 20 s, long enough for a polish and the clipboard's return. A `log show` that fails prints no `Timestamp` header, so it never reads as `idle`.
+- **Live check:** After an install, `/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' /Applications/Pladder.app/Contents/Info.plist` prints what `git rev-list --count HEAD` prints on `main`, and `pgrep -f /Applications/Pladder.app/Contents/MacOS/Pladder` finds the copy. The first real dictation is the developer's; its release-to-paste line shows with the `log show` command under "Critical-path rule". For the site, load https://dinooo13.github.io/pladder/ and look at what changed. For anything else, the checks on the merge commit: `gh run list --commit <sha>`.
