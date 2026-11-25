@@ -16,5 +16,5 @@ jobs:
         run: ./scripts/check-doc-pointers.sh
       - name: The site's numbers match the docs
         run: ./scripts/check-site-numbers.sh
-      - name: CLAUDE.md names scripts and pladder-cli commands that exist
-        run: ./scripts/check-doc-commands.sh
+      - name: CLAUDE.md and the skills name scripts and pladder-cli commands that exist
+        run: ./scripts/check-doc-commands.sh CLAUDE.md .claude/skills/*/SKILL.md
