@@ -70,6 +70,7 @@ public actor AVAudioEngineCapture: AudioCapture {
     }
 
     private static func startMarker() {
+        // CLAUDE.md, "Ship", matches this text to tell whether the user is dictating.
         log.log("capture started")
     }
 
@@ -79,6 +80,7 @@ public actor AVAudioEngineCapture: AudioCapture {
     }
 
     public func stop() async -> CapturedAudio {
+        // CLAUDE.md, "Ship", matches this text to tell whether the user is dictating.
         Self.log.log("capture stop called, isRecording=\(self.isRecording)")
         guard isRecording else { return CapturedAudio(samples: []) }
         isRecording = false
