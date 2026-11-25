@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Renders the pictures the README shows into docs/images with the app's own
 # views: the real overlay pill on a stand-in desktop, light and dark. The
-# social preview is drawn by scripts/make-icon.swift. Needs Screen Recording for the terminal that runs it.
+# social preview is drawn by scripts/make-icon.swift. Needs Screen Recording
+# for the terminal that runs it.
 # The app it launches never starts the hotkey, the microphone or the engine,
 # so it is safe to run while another Pladder is in use; it shows a few
 # windows for a second or two.
@@ -14,6 +15,9 @@
 #   --menu            the real menu of a status item of its own, opened in-process; the copy then exits
 #   --managed         any of the above under a sample managed policy: every managed control disabled
 set -euo pipefail
+for arg in "$@"; do
+	case "$arg" in -h | --help) sed -n '2,${/^#/!q;s/^# \{0,1\}//;p;}' "$0"; exit 0 ;; esac
+done
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"

@@ -4,9 +4,13 @@
 # Pladder.dmg. Without a SHA-256 it reads the release's Pladder.dmg.sha256.
 # See INSTALL.md, "Homebrew".
 #
-#   ./scripts/cask.sh 0.1.2 > ../homebrew-tap/Casks/pladder.rb
+# Usage: scripts/cask.sh <version> [<sha256>]
+#   scripts/cask.sh 0.1.2 > ../homebrew-tap/Casks/pladder.rb
 
 set -euo pipefail
+for arg in "$@"; do
+    case "$arg" in -h | --help) sed -n '2,${/^#/!q;s/^# \{0,1\}//;p;}' "$0"; exit 0 ;; esac
+done
 cd "$(dirname "$0")/.."
 
 version=${1:?usage: cask.sh <version> [<sha256>]}

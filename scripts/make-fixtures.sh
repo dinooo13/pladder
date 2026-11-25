@@ -15,6 +15,9 @@
 # sentence order, wrapping around for the long fixtures, until the estimated
 # duration reaches the target, so each file is a whole number of sentences.
 set -euo pipefail
+for arg in "$@"; do
+	case "$arg" in -h | --help) sed -n '2,${/^#/!q;s/^# \{0,1\}//;p;}' "$0"; exit 0 ;; esac
+done
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT="${1:-$ROOT/bench/fixtures}"
