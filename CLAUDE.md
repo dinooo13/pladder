@@ -26,6 +26,7 @@ Before and after any change that touches the code between `recordingStopped` and
 swift build                                   # debug build of everything
 swift test                                    # unit tests, well under a second
 ./scripts/bundle.sh [--run] [--install] [--dev-modes] # release build → dist/Pladder.app, signed
+./scripts/test-copy.sh [--stop | --dry-run]   # bundle dist/Pladder.app and launch it beside the copy in use, with its own settings file and chord; --stop stops it
 ./scripts/lock.sh [--wait <s>] <screen|ane> -- <command> # run a command holding the screen, or the Neural Engine and GPU, one worktree at a time; --status names the holder
 ./scripts/release.sh <version>                # Developer ID, notarised, stapled → dist/release/Pladder.dmg; publishes nothing
 ./scripts/changelog.sh <last tag> [<ref>]     # the release notes release.yml publishes, from the commit subjects
@@ -121,11 +122,11 @@ swift run -c release pladder-cli polish-set docs/polish-set.json --model s1-mini
 
 The developer dictates with a running Pladder all day, often into Claude sessions, and several worktrees may each have their own `dist/Pladder.app`.
 
-- Never `pkill -x Pladder` or `killall Pladder`: that also kills the copy in use, mid-recording, and the text is lost. Stop only the copy you launched: `pkill -f "$PWD/dist/Pladder.app"`. SIGTERM quits the normal way, so a copy stopped like this gives back the speakers and the clipboard first. `bundle.sh --install` stops only `/Applications/Pladder.app`, and CI fails on a script that kills every copy.
+- Never `pkill -x Pladder` or `killall Pladder`: that also kills the copy in use, mid-recording, and the text is lost. Stop only the copy you launched: `scripts/test-copy.sh --stop` for a test copy, `pkill -f "$PWD/dist/Pladder.app"` for one you started some other way. SIGTERM quits the normal way, so a copy stopped like this gives back the speakers and the clipboard first. `bundle.sh --install` stops only `/Applications/Pladder.app`, and CI fails on a script that kills every copy.
 - Do not post synthetic hotkey events unless the user has asked for a live UI test. Every running copy reacts to them, so they start, cut short, or paste the user's recordings.
 - To see an overlay change, run `scripts/overlay-demo.sh` and read its contact sheets. It drives the real coordinator and pill with stand-ins for the engine, microphone, paste and hotkey, so nothing reaches a running copy.
 - Do not edit `~/Library/Application Support/Pladder/settings.json`; it is the live configuration.
-- A copy launched for testing gets its own settings file with `PLADDER_SETTINGS_PATH=/tmp/<branch>/settings.json "$PWD/dist/Pladder.app/Contents/MacOS/Pladder"`, and a different chord from the copy in use, so the two never fire together. Launched as the bare binary so the environment reaches it; its command line still contains `$PWD/dist/Pladder.app`, so the `pkill -f` above stops it.
+- A copy for testing comes from `scripts/test-copy.sh`: it bundles `dist/Pladder.app`, launches the bare binary with a settings file of its own, `/tmp/<branch>/settings.json`, and a chord the copy in use never reacts to, chosen from the live settings file, which it only reads, and prints the PID. Stop it with `scripts/test-copy.sh --stop` as soon as you are done with it; that stops this worktree's test copy and nothing else.
 - To test an update, the copy needs a bundle ID of its own (Sparkle's defaults and the grants are per bundle ID), `LSEnvironment` in its Info.plist for `PLADDER_SETTINGS_PATH` (Sparkle relaunches it through LaunchServices, without your shell's environment), a feed on `http://127.0.0.1` and a throwaway key, signed with `appcast.sh` and `SPARKLE_ED_KEY`; never the real key.
 
 ## Verify
@@ -143,7 +144,7 @@ Proof is what you saw in this session: a command's output, a picture, a contact 
 | Settings | `scripts/make-screenshots.sh <dir> --settings-scene`, then `--settings-scene --get-started`, `--settings-scene --accessibility`, and any of them with `--managed`; `--settings` for each tab alone | `<dir>/scene-<tab>-light.png` and `-dark.png`, `accessibility-<tab>.txt`, `settings-<tab>-light.png` and `-dark.png` |
 | The menu | `scripts/make-screenshots.sh <dir> --menu` | `<dir>/menu.png`, in the system's appearance |
 | The README's pictures | `scripts/make-screenshots.sh` with no `<dir>` | `docs/images/styles-light.png` and `-dark.png`, committed |
-| The bundle, signing, the icon, the catalogs in the app | `scripts/bundle.sh`, then your own copy with its own settings file | `dist/Pladder.app` |
+| The bundle, signing, the icon, the catalogs in the app | `scripts/test-copy.sh`, then `scripts/test-copy.sh --stop` | `dist/Pladder.app`, the copy's PID on stdout, its log in `/tmp/<branch>/test-copy.log` |
 | A script | `shellcheck scripts/*.sh`, and its `--help` | the terminal |
 | Docs, the site | `scripts/check-doc-pointers.sh`, `scripts/check-doc-commands.sh`, `scripts/check-site-numbers.sh`; `site/index.html` at phone and desktop widths | the terminal |
 
