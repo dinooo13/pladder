@@ -121,5 +121,27 @@ jobs:
           "$L" --wait 5 ane -- true || fail "a takeover left over a minute ago was not cleared"
           [[ ! -e "$LOCK" && ! -e "$LOCK.takeover" ]] || fail "a stale takeover left a lock behind"
           echo "lock.sh: exit codes, --status, order, --wait 0, takeover, by hand, SIGTERM, nesting, a stale takeover"
+      - name: test-copy.sh picks a chord the copy in use never reacts to
+        run: |
+          fail() { echo "::error file=scripts/test-copy.sh::$*"; exit 1; }
+          home() { # <name> <settings.json or nothing>
+            h="$RUNNER_TEMP/homes/$1"
+            mkdir -p "$h/Library/Application Support/Pladder"
+            if [[ -n "$2" ]]; then printf '%s' "$2" >"$h/Library/Application Support/Pladder/settings.json"; fi
+            echo "$h"
+          }
+          expect() { # <name> <settings.json or nothing> <keyCodes>
+            out=$(HOME=$(home "$1" "$2") scripts/test-copy.sh --dry-run) || fail "$1: exited non-zero"
+            grep -qF "\"hotkey\":{\"keyCodes\":[$3]}" <<<"$out" || fail "$1: wanted [$3], got $out"
+          }
+          expect none "" "17,55,58,59"
+          expect defaults '{"hotkey":{"keyCodes":[49,58]},"toggleHotkey":{"keyCodes":[]},"submitKey":{"keyCodes":[9]}}' "17,55,58,59"
+          expect fn-hold '{"hotkey":{"keyCodes":[63]},"toggleHotkey":{"keyCodes":[49,58]},"submitKey":{"keyCodes":[59]}}' "17,55,58,59"
+          expect right-command '{"hotkey":{"keyCodes":[54]}}' "17,56,58,59"
+          expect taken '{"hotkey":{"keyCodes":[17,55,58,59]}}' "5,55,58,59"
+          for bad in '{"hotkey":' '{"hotkey":{"kind":"modifier","keyCode":54}}' '[]'; do
+            if HOME=$(home bad "$bad") scripts/test-copy.sh --dry-run >/dev/null 2>&1; then fail "launched on $bad"; fi
+          done
+          echo "test-copy.sh: chords for no file, the defaults, fn, Right Command and a taken T; unreadable files refused"
       - name: ShellCheck
         run: shellcheck scripts/*.sh
