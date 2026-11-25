@@ -26,6 +26,7 @@ Before and after any change that touches the code between `recordingStopped` and
 swift build                                   # debug build of everything
 swift test                                    # unit tests, well under a second
 ./scripts/bundle.sh [--run] [--install] [--dev-modes] # release build → dist/Pladder.app, signed
+./scripts/lock.sh [--wait <s>] <screen|ane> -- <command> # run a command holding the screen, or the Neural Engine and GPU, one worktree at a time; --status names the holder
 ./scripts/release.sh <version>                # Developer ID, notarised, stapled → dist/release/Pladder.dmg; publishes nothing
 ./scripts/changelog.sh <last tag> [<ref>]     # the release notes release.yml publishes, from the commit subjects
 ./scripts/appcast.sh <app> <dmg> <notes.md>   # sign the DMG for Sparkle and print the release's appcast.xml
@@ -136,8 +137,8 @@ Proof is what you saw in this session: a command's output, a picture, a contact 
 | Any Swift | `swift build`, with no new warning, and `swift test` | the terminal |
 | Core logic: the coordinator, a tracker, the settings | a test that fails without the change | the terminal |
 | A processor, the dictionary | `swift run -c release pladder-cli <audio file> --process --verbose` | `RAW:` and `TEXT:` on stdout |
-| Between `recordingStopped` and `inserted`, a processor, the engine | the critical-path rule: `pladder-cli bench`, `pladder-cli bench --paced`, `pladder-cli bench-coordinator`, `pladder-cli bench-release` or `pladder-cli bench-process`, before and after | tables on stdout, both in the pull request |
-| Polish, a model or its prompt | `pladder-cli polish-set docs/polish-set.json --model …` | error rate, exact matches and timings on stdout |
+| Between `recordingStopped` and `inserted`, a processor, the engine | the critical-path rule, under `scripts/lock.sh ane --`: `pladder-cli bench`, `pladder-cli bench --paced`, `pladder-cli bench-coordinator`, `pladder-cli bench-release` or `pladder-cli bench-process`, before and after | tables on stdout, both in the pull request |
+| Polish, a model or its prompt | `scripts/lock.sh ane -- swift run -c release pladder-cli polish-set docs/polish-set.json --model …` | error rate, exact matches and timings on stdout |
 | The pill, the coordinator's states | `scripts/overlay-demo.sh <dir>`, then with `--style minimal`, `--style liveTranscript` and `--reduce-motion` | `<dir>/sheet-*.png`, `demo.mov`, `demo.log` |
 | Settings | `scripts/make-screenshots.sh <dir> --settings-scene`, then `--settings-scene --get-started`, `--settings-scene --accessibility`, and any of them with `--managed`; `--settings` for each tab alone | `<dir>/scene-<tab>-light.png` and `-dark.png`, `accessibility-<tab>.txt`, `settings-<tab>-light.png` and `-dark.png` |
 | The menu | `scripts/make-screenshots.sh <dir> --menu` | `<dir>/menu.png`, in the system's appearance |
@@ -148,7 +149,15 @@ Proof is what you saw in this session: a command's output, a picture, a contact 
 
 `<dir>` is yours, `/tmp/<branch>/…`, one per run, and comes first: each run of the same mode replaces the last one's pictures. Without it `make-screenshots.sh` writes into `docs/images`, which is committed, and `overlay-demo.sh` into one directory every worktree shares. `scripts/overlay-demo.sh` and `scripts/make-screenshots.sh` build their own copy with the developer modes in (`-DPLADDER_DEV_MODES`, in `.build/dev-modes`); a plain `swift build` or `scripts/bundle.sh` build, and every release, has no `--overlay-demo` or `--screenshots`. Both put windows or the pill on the screen while they run and need Screen Recording for the terminal that runs them, so look at the pictures before quoting them. `pladder-cli --process` reads the live settings file and never writes it; `PLADDER_SETTINGS_PATH` names another. The fixtures come from `scripts/make-fixtures.sh`, once per worktree, into `bench/fixtures`.
 
-One at a time. Anything that records the screen (`scripts/overlay-demo.sh`, `scripts/make-screenshots.sh`) runs under `/tmp/pladder-screen.lock`: take it with `mkdir /tmp/pladder-screen.lock`, write an owner file inside (the worktree and the time), `rm -r` it when the run ends, and never remove a lock someone else took; wait instead. A benchmark has no lock, but one that ran beside another build or benchmark is not a result; `pladder-cli bench`, `pladder-cli bench-coordinator` and `pladder-cli bench-release` print the load average, and docs/BENCHMARKS.md, "Procedure", says what counts.
+One at a time. Every worktree shares the screen and the Neural Engine and GPU, and `scripts/lock.sh` gives each to one run at a time: `screen` to anything that records the screen, `ane` to anything that measures. `scripts/overlay-demo.sh` and `scripts/make-screenshots.sh` take `screen` themselves, once their build is done; a benchmark or a polish timing runs under `ane`, after `swift build -c release --product pladder-cli`, so the build stays outside the lock:
+
+```sh
+scripts/overlay-demo.sh /tmp/<branch>/demo
+scripts/lock.sh ane -- swift run -c release pladder-cli bench-coordinator
+scripts/lock.sh --status
+```
+
+A run that finds the lock held says who holds it and waits up to an hour (`--wait` changes that), so start it in the background. The lock goes back when the command ends, however it ends, and the next run takes over one whose holder is gone. Never remove `/tmp/pladder-*.lock` while its holder is alive; `--status` says whether it is. The lock keeps benchmarks apart, not builds: one that ran beside another build is still not a result; `pladder-cli bench`, `pladder-cli bench-coordinator` and `pladder-cli bench-release` print the load average, and docs/BENCHMARKS.md, "Procedure", says what counts.
 
 The hard states: light and dark; every pill style and Reduce Motion; every path the demo plays, the clipboard hint and the two polish paths among them; the General tab at its tallest; every managed control; what VoiceOver is given; a recording longer than one 15 s window, which `bench --paced` checks byte for byte.
 

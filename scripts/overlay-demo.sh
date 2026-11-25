@@ -9,7 +9,8 @@
 # shows and screencapture records.
 #
 # The demo never starts the hotkey, the microphone, the engine or the paste,
-# so it is safe to run while another Pladder is in use.
+# so it is safe to run while another Pladder is in use. It records under
+# scripts/lock.sh's screen lock, so a second demo waits for the first.
 #
 # Usage: scripts/overlay-demo.sh [dir] [--style compact|minimal|liveTranscript]
 #                                      [--reduce-motion]
@@ -23,10 +24,12 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 OUT="/tmp/pladder-overlay-demo"
 if [[ $# -gt 0 && "$1" != --* ]]; then OUT="$1"; shift; fi
+swift build --product Pladder -Xswiftc -DPLADDER_DEV_MODES --scratch-path .build/dev-modes
+# Again under the screen lock, so the build stays outside it: the second pass
+# finds it done.
+[[ -n "${PLADDER_LOCK_SCREEN:-}" ]] || exec "$ROOT/scripts/lock.sh" screen -- "$ROOT/scripts/overlay-demo.sh" "$OUT" "$@"
 mkdir -p "$OUT"
 rm -f "$OUT"/demo.mov "$OUT"/sheet-*.png
-
-swift build --product Pladder -Xswiftc -DPLADDER_DEV_MODES --scratch-path .build/dev-modes
 now() { perl -MTime::HiRes=time -e 'printf "%.3f", time'; }
 
 screencapture -x -v "$OUT/demo.mov" &

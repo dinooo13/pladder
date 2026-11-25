@@ -59,5 +59,67 @@ jobs:
             exit 1
           fi
           echo "$count scripts answer --help"
+      - name: lock.sh holds one run at a time and gives the lock back
+        run: |
+          export PLADDER_LOCK_DIR="$RUNNER_TEMP/locks"
+          mkdir -p "$PLADDER_LOCK_DIR"
+          L=scripts/lock.sh
+          LOCK="$PLADDER_LOCK_DIR/pladder-ane.lock"
+          fail() { echo "::error file=$L::$*"; exit 1; }
+          taken() {
+            for _ in $(seq 50); do
+              if grep -q '^command-pid=' "$LOCK/owner" 2>/dev/null; then return 0; fi
+              sleep 0.1
+            done
+            fail "the lock was never taken"
+          }
+
+          s=0; "$L" ane -- sh -c 'exit 7' || s=$?
+          [[ $s -eq 7 ]] || fail "a command's exit 7 came back as $s"
+          [[ ! -e "$LOCK" && "$("$L" --status ane)" == "ane: free" ]] || fail "a failed command left the lock held"
+
+          "$L" ane -- sh -c 'echo a >>"$1"; sleep 2; echo b >>"$1"' sh "$RUNNER_TEMP/order" & first=$!
+          taken
+          status=$("$L" --status ane)
+          for part in "held by $PWD" "pid $first" "sh -c echo a"; do
+            grep -qF "$part" <<<"$status" || fail "--status says \"$status\", without \"$part\""
+          done
+          s=0; "$L" --wait 0 ane -- true || s=$?
+          [[ $s -eq 75 ]] || fail "--wait 0 on a held lock exited $s, not 75"
+          "$L" ane -- sh -c 'echo c >>"$1"; echo d >>"$1"' sh "$RUNNER_TEMP/order"
+          wait "$first"
+          [[ "$(paste -s -d ' ' "$RUNNER_TEMP/order")" == "a b c d" ]] || fail "two runs interleaved: $(paste -s -d ' ' "$RUNNER_TEMP/order")"
+
+          sh -c 'exit 0' & dead=$!; wait "$dead"
+          mkdir "$LOCK"
+          printf 'pid=%s\nstarted=Mon Jan  1 00:00:00 2000\n' "$dead" >"$LOCK/owner"
+          grep -q "left by pid $dead (gone)" <<<"$("$L" --status ane)" || fail "--status missed a gone holder"
+          "$L" --wait 5 ane -- true || fail "a gone holder's lock was not taken over"
+          [[ ! -e "$LOCK" && ! -e "$LOCK.takeover" ]] || fail "the takeover left a lock behind"
+
+          mkdir "$LOCK"
+          echo "measuring by hand" >"$LOCK/owner"
+          s=0; "$L" --wait 2 ane -- true || s=$?
+          [[ $s -eq 75 && -f "$LOCK/owner" ]] || fail "a lock taken by hand was taken over (exit $s)"
+          grep -q "held by hand: measuring by hand" <<<"$("$L" --status ane)" || fail "--status missed a lock taken by hand"
+          rm -r "$LOCK"
+
+          "$L" ane -- sleep 2 & held=$!
+          taken
+          kill -TERM "$held"
+          s=0; wait "$held" || s=$?
+          [[ $s -eq 143 && ! -e "$LOCK" ]] || fail "SIGTERM exited $s and left the lock: $(ls "$PLADDER_LOCK_DIR")"
+
+          timeout 10 "$L" screen -- "$L" screen -- true || fail "a lock.sh inside the same lock did not just run"
+          [[ "$("$L" ane -- sh -c 'printf "%s\n" "$1"' sh --help)" == "--help" ]] || fail "--help after -- did not reach the command"
+
+          mkdir "$LOCK" "$LOCK.takeover"
+          printf 'pid=%s\nstarted=Mon Jan  1 00:00:00 2000\n' "$dead" >"$LOCK/owner"
+          s=0; timeout 10 "$L" --wait 2 ane -- true || s=$?
+          [[ $s -eq 75 ]] || fail "a fresh takeover left by another run did not end in the wait's timeout (exit $s)"
+          touch -t 200001010000 "$LOCK.takeover"
+          "$L" --wait 5 ane -- true || fail "a takeover left over a minute ago was not cleared"
+          [[ ! -e "$LOCK" && ! -e "$LOCK.takeover" ]] || fail "a stale takeover left a lock behind"
+          echo "lock.sh: exit codes, --status, order, --wait 0, takeover, by hand, SIGTERM, nesting, a stale takeover"
       - name: ShellCheck
         run: shellcheck scripts/*.sh
